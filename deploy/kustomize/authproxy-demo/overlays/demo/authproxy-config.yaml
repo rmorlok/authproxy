@@ -31,8 +31,6 @@ redis:
     envVar: AUTHPROXY_REDIS_PASSWORD
 hostApplication:
   initiateSessionUrl: https://demo.authproxy.net/
-connectors:
-  loadFromList: []
 appMetrics:
   database:
     provider: postgres

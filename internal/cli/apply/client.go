@@ -24,6 +24,11 @@ import (
 
 const DefaultRequestTimeout = 30 * time.Second
 
+// ErrRequestFailed reports a transport failure without exposing URLs or other
+// potentially sensitive transport details. Callers may retry read-only startup
+// preparation; a failed mutation must never be retried automatically.
+var ErrRequestFailed = errors.New("API request failed")
+
 // ClientOptions selects a single cluster service. Timeout zero disables the
 // deadline; CLI callers should use DefaultRequestTimeout unless overridden.
 type ClientOptions struct {
@@ -431,7 +436,7 @@ func (c *Client) request(
 		if errors.Is(err, context.DeadlineExceeded) {
 			return nil, false, fmt.Errorf("API request timed out: %w", context.DeadlineExceeded)
 		}
-		return nil, false, fmt.Errorf("API request failed")
+		return nil, false, ErrRequestFailed
 	}
 	defer resp.Body.Close()
 

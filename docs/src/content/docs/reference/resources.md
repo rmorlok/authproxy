@@ -186,23 +186,21 @@ duplicated inside the encrypted definition. Publishing a new primary moves the
 old primary to active; existing Connections remain bound to their exact
 generation until explicitly migrated.
 
-Configured connectors use this same YAML shape:
+Apply connectors with `ap apply -f connector.yaml` using this YAML shape:
 
 ```yaml
-connectors:
-  loadFromList:
-    - apiVersion: authproxy.net/v1alpha1
-      kind: Connector
-      metadata:
-        name: example-api
-        namespace: root.integrations
-      spec:
-        release:
-          desiredState: primary
-        definition:
-          displayName: Example API
-          auth:
-            type: no-auth
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: example-api
+  namespace: root.integrations
+spec:
+  release:
+    desiredState: primary
+  definition:
+    displayName: Example API
+    auth:
+      type: no-auth
 ```
 
 ### Connection

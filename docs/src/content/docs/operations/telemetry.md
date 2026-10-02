@@ -143,22 +143,21 @@ telemetry:
     injectOutboundDefault: false    # global default for W3C traceparent injection on outbound calls
 ```
 
-Per-connector overrides for trace context propagation live on the connector definition:
+Per-connector overrides for trace context propagation live on the connector definition applied with `ap apply`:
 
 ```yaml
-connectors:
-  loadFromList:
-    - apiVersion: authproxy.net/v1alpha1
-      kind: Connector
-      metadata:
-        name: google-drive
-        labels:
-          type: google-drive
-      spec:
-        definition:
-          auth: { type: OAuth2, ... }
-          telemetry:
-            propagateTraceContext: true # overrides telemetry.propagation.injectOutboundDefault for this connector
+apiVersion: authproxy.net/v1alpha1
+kind: Connector
+metadata:
+  name: google-drive
+  namespace: root
+  labels:
+    type: google-drive
+spec:
+  definition:
+    auth: { type: OAuth2, ... }
+    telemetry:
+      propagateTraceContext: true # overrides telemetry.propagation.injectOutboundDefault for this connector
 ```
 
 ## Standard `OTEL_*` env vars
@@ -265,7 +264,7 @@ A one-command local observability stack ships under a new `observability` compos
 ```bash
 docker compose --profile observability up -d
 export AUTHPROXY_OTEL_ENDPOINT=http://localhost:4317
-go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml all
+go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml --apply=./dev_config/default-resources.yaml --apply-actor=bobdole all
 ```
 
 Grafana is at <http://localhost:3000> — no login required. A pre-provisioned dashboard (**AuthProxy — Proxy RED + Inbound HTTP**) lives under the `AuthProxy` folder. The full operator runbook with query examples, persistence notes, and limitations is in [`dev_config/observability/README.md`](https://github.com/rmorlok/authproxy/blob/main/dev_config/observability/README.md).

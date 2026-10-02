@@ -75,7 +75,6 @@ The chart exposes typed values for the common connectivity blocks. See
 | `encryptionKeys` | Secret mount + path for the global AES key                            |
 | `actors`         | Secret mount + ACL permissions for admin actor keypairs               |
 | `hostApplication`| URL the marketplace UI redirects to for login                         |
-| `connectors`     | Inline, named connector definitions                                    |
 | `appMetrics`     | App metrics + request-event storage (defaults to shared main DB)      |
 | `config`         | Free-form overlay merged into the rendered AuthProxy YAML             |
 
@@ -248,3 +247,5 @@ at chart-release time. Override per-deploy with `--set image.tag=<tag>`.
 For chart-on-source-tree work (running CI locally, iterating on templates),
 see [`AGENTS.md`](../../../AGENTS.md) at the repo root and the chart-testing
 CI workflow under `.github/workflows/helm-chart-ci.yml`.
+
+Provision connectors after deployment with `ap apply -f resources.yaml`. The server configuration and chart values no longer accept a `connectors` block.

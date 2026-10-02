@@ -966,54 +966,6 @@ func TestSchemaDefinitions(t *testing.T) {
 			},
 		},
 		{
-			Name: "Connectors",
-			Schema: `
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["test"],
-  "properties": {
-	"test": {
-		"$ref": "./schema.json#/$defs/Connectors"
-    }
-  }
-}`,
-			Tests: []test{
-				{
-					Name:  "minimal",
-					Valid: true,
-					Data:  `{"test": {}}`,
-				},
-				{
-					Name:  "identifying_labels was removed",
-					Valid: false,
-					Data:  `{"test": {"identifyingLabels": ["type", "region"]}}`,
-				},
-				{
-					Name:  "rejects removed auto_migrate",
-					Valid: false,
-					Data:  `{"test": {"autoMigrate": true, "autoMigrationLockDuration": "30s"}}`,
-				},
-				{
-					Name:  "connector with name",
-					Valid: true,
-					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"name":"example","labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
-				},
-				{
-					Name:  "connector without id or name",
-					Valid: false,
-					Data:  `{"test":{"loadFromList":[{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","metadata":{"labels":{}},"spec":{"definition":{"displayName":"Example","logo":{"publicUrl":"https://example.com/logo.svg"},"auth":{"type":"no-auth"}}}}]}}`,
-				},
-				{
-					Name:  "extra property",
-					Valid: false,
-					Data:  `{"test": {"extra": "field"}}`,
-				},
-			},
-		},
-		{
 			Name: "RateLimits",
 			Schema: `
 {

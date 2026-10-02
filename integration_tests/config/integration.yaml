@@ -87,7 +87,3 @@ redis:
 
 oauth:
   roundTripTtl: 60m
-
-connectors:
-  autoMigrationLockDuration: 30s
-  loadFromList: []

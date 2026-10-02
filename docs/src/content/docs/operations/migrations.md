@@ -72,7 +72,7 @@ go run ./cmd/server serve --auto-migrate \
 
 `--auto-migrate` is intentionally a CLI-only option and is unsafe for
 production. It upgrades all schemas, initializes required encryption-key
-state, reconciles configured connectors and actors, verifies compatibility,
+state, reconciles configured namespaces, rate limits, and actors, verifies compatibility,
 and only then starts the requested services. Omitting it performs read-only
 verification only.
 

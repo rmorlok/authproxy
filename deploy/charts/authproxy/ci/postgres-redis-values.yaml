@@ -40,14 +40,10 @@ actors:
   existingSecret: authproxy-actors
 
 # AuthProxy's config validator requires these even when nothing actually
-# uses them in the smoke test — placeholder URL + empty connector list.
+# uses them in the smoke test — placeholder URL; resources are applied separately.
 hostApplication:
   initiateSessionUrl: http://placeholder.invalid/login
 
-connectors:
-  loadFromList: []
-
-# Faster probes so the helm test pod's rollout wait doesn't stall.
 healthcheck:
   initialDelaySeconds: 5
   periodSeconds: 3

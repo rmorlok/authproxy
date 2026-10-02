@@ -617,11 +617,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 	}
 
 	setup := func(t *testing.T, register func(g gin.IRouter, auth A)) *TestSetup {
-		cfg := config.FromRoot(&sconfig.Root{
-			Connectors: &sconfig.Connectors{
-				LoadFromList: []sconfig.Connector{},
-			},
-		})
+		cfg := config.FromRoot(&sconfig.Root{})
 
 		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, auth, authUtil := TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)

@@ -21,7 +21,6 @@ type Root struct {
 	Redis           *Redis          `json:"redis" yaml:"redis"`
 	Oauth           OAuth           `json:"oauth" yaml:"oauth"`
 	ErrorPages      ErrorPages      `json:"errorPages,omitempty" yaml:"errorPages,omitempty"`
-	Connectors      *Connectors     `json:"connectors" yaml:"connectors"`
 	RateLimits      *RateLimits     `json:"rateLimits,omitempty" yaml:"rateLimits,omitempty"`
 	AppMetrics      *AppMetrics     `json:"appMetrics,omitempty" yaml:"appMetrics,omitempty"`
 	Connections     *Connections    `json:"connections,omitempty" yaml:"connections,omitempty"`
@@ -41,12 +40,6 @@ func (r *Root) GetRootLogger() *slog.Logger {
 func (r *Root) Validate() error {
 	vc := &common.ValidationContext{Path: "$"}
 	result := &multierror.Error{}
-
-	if r.Connectors == nil {
-		result = multierror.Append(result, vc.NewError("connectors block is required"))
-	} else if err := r.Connectors.Validate(vc.PushField("connectors")); err != nil {
-		result = multierror.Append(result, err)
-	}
 
 	if err := r.RateLimits.Validate(vc.PushField("rateLimits")); err != nil {
 		result = multierror.Append(result, err)

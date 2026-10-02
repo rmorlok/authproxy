@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"text/tabwriter"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
@@ -150,6 +151,7 @@ func cmdRoutes() *cobra.Command {
 }
 
 func cmdServe() *cobra.Command {
+	var applyOptions startupApplyOptions
 	var noBanner bool
 	var autoMigrate bool
 
@@ -161,15 +163,24 @@ func cmdServe() *cobra.Command {
 			if _, err := resolveServices(args[0]); err != nil {
 				return err
 			}
+			startup, err := prepareStartupApply(cmd.Context(), args[0], applyOptions)
+			if err != nil {
+				return err
+			}
 			if err := prepareServe(cmd.Context(), autoMigrate, cmd.ErrOrStderr()); err != nil {
 				return err
 			}
-			return startServices(noBanner, args[0])
+			return serveWithApply(cmd.Context(), noBanner, args[0], startup, cmd.OutOrStdout())
 		},
 	}
 
 	cmd.Flags().BoolVar(&noBanner, "no-banner", false, "Don't show banner")
 	cmd.Flags().BoolVar(&autoMigrate, "auto-migrate", false, "Automatically migrate and reconcile a local/disposable development environment (unsafe for production)")
+
+	cmd.Flags().StringArrayVar(&applyOptions.filenames, "apply", nil, "Apply a local manifest file or directory after startup (repeatable)")
+	cmd.Flags().StringVar(&applyOptions.actor, "apply-actor", "", "Existing actor external ID used for startup apply")
+	cmd.Flags().StringVar(&applyOptions.actorNamespace, "apply-actor-namespace", "root", "Namespace of the actor used for startup apply")
+	cmd.Flags().DurationVar(&applyOptions.timeout, "apply-timeout", 2*time.Minute, "Total readiness and execution timeout for startup apply")
 
 	return cmd
 }

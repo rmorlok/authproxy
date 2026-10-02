@@ -62,13 +62,6 @@ type C interface {
 	// within the system, invoking appropriate events, lifecycle hooks, etc.
 	Migrate(ctx context.Context) error
 
-	// MigrateConnectors migrates connectors from configuration to the database
-	// It checks if the connector already exists in the database:
-	// - If it doesn't exist, it creates a new one
-	// - If it exists and the data matches, it does nothing
-	// - If it exists and the data has changed, it creates a new generation
-	MigrateConnectors(ctx context.Context) error
-
 	/*
 	 * Object references
 	 */

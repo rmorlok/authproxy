@@ -48,11 +48,7 @@ func (s *stubSessionInitiateUrlGenerator) GetInitiateSessionUrl(returnTo string)
 // invalid state params — no OAuth2 factory interaction is required, so the factory is
 // constructed normally.
 func setupPublicOauth2Test(t *testing.T) (*gin.Engine, *auth2.AuthTestUtil, *stubSessionInitiateUrlGenerator, func()) {
-	cfg := config.FromRoot(&sconfig.Root{
-		Connectors: &sconfig.Connectors{
-			LoadFromList: []sconfig.Connector{},
-		},
-	})
+	cfg := config.FromRoot(&sconfig.Root{})
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 	// GetBaseUrl is called to build returnToUrl on unauthenticated redirects; requires a port.
 	cfg.GetRoot().Public.PortVal = common.NewIntegerValueDirect(8080)

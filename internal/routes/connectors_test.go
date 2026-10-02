@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/test_utils/connectorfixture"
+
 	wfcore "github.com/cschleiden/go-workflows/core"
 	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/gin-gonic/gin"
@@ -262,13 +264,9 @@ func TestParseConnectorGenerationID(t *testing.T) {
 }
 
 func TestConnectors(t *testing.T) {
-	setup := func(t *testing.T, cfg config.C) *connectorRoutesTestSetup {
+	setup := func(t *testing.T, cfg config.C, resources ...sconfig.Connector) *connectorRoutesTestSetup {
 		if cfg == nil {
-			cfg = config.FromRoot(&sconfig.Root{
-				Connectors: &sconfig.Connectors{
-					LoadFromList: []sconfig.Connector{},
-				},
-			})
+			cfg = config.FromRoot(&sconfig.Root{})
 		}
 
 		root := cfg.GetRoot()
@@ -276,8 +274,8 @@ func TestConnectors(t *testing.T) {
 			panic("No root in config")
 		}
 
-		if len(root.Connectors.LoadFromList) == 0 {
-			root.Connectors.LoadFromList = []sconfig.Connector{
+		if len(resources) == 0 {
+			resources = []sconfig.Connector{
 				configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 0, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
 					DisplayName: "Test Connector",
 				}),
@@ -300,6 +298,7 @@ func TestConnectors(t *testing.T) {
 		h := httpf2.CreateFactory(cfg, rs, nil, aplog.NewNoopLogger())
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(context.Background()))
+		connectorfixture.Seed(t, db, e, resources...)
 		lifecycleCore := &fakeConnectorLifecycleCore{C: c}
 		workflowClient := &fakeTaskWorkflowClient{state: wfcore.WorkflowInstanceStateActive}
 
@@ -750,19 +749,15 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("label filter", func(t *testing.T) {
 				connectorId := apid.MustParse("cxr_test0000000000001")
-				cfg := config.FromRoot(&sconfig.Root{
-					Connectors: &sconfig.Connectors{
-						LoadFromList: []sconfig.Connector{
-							configuredConnectorResource(apid.MustParse("cxr_test0000000000123"), 1, "root", map[string]string{"type": "test-connector", "env": "dev"}, cschema.ConnectorDefinition{
-								DisplayName: "Test Connector",
-							}),
-							configuredConnectorResource(connectorId, 1, "root", map[string]string{"type": "test-connector", "env": "prod"}, cschema.ConnectorDefinition{
-								DisplayName: "Test Connector",
-							}),
-						},
-					},
-				})
-				tu := setup(t, cfg)
+				resources := []sconfig.Connector{
+					configuredConnectorResource(apid.MustParse("cxr_test0000000000123"), 1, "root", map[string]string{"type": "test-connector", "env": "dev"}, cschema.ConnectorDefinition{
+						DisplayName: "Test Connector",
+					}),
+					configuredConnectorResource(connectorId, 1, "root", map[string]string{"type": "test-connector", "env": "prod"}, cschema.ConnectorDefinition{
+						DisplayName: "Test Connector",
+					}),
+				}
+				tu := setup(t, nil, resources...)
 
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -903,13 +898,9 @@ func TestConnectors(t *testing.T) {
 			})
 
 			t.Run("redacts connector secrets by default", func(t *testing.T) {
-				tu := setup(t, config.FromRoot(&sconfig.Root{
-					Connectors: &sconfig.Connectors{
-						LoadFromList: []sconfig.Connector{
-							configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 1, "root", nil, redactionTestConnector()),
-						},
-					},
-				}))
+				tu := setup(t, nil, []sconfig.Connector{
+					configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 1, "root", nil, redactionTestConnector()),
+				}...)
 
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -935,13 +926,9 @@ func TestConnectors(t *testing.T) {
 			})
 
 			t.Run("replays connector secrets with secret replay permission", func(t *testing.T) {
-				tu := setup(t, config.FromRoot(&sconfig.Root{
-					Connectors: &sconfig.Connectors{
-						LoadFromList: []sconfig.Connector{
-							configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 1, "root", nil, redactionTestConnector()),
-						},
-					},
-				}))
+				tu := setup(t, nil, []sconfig.Connector{
+					configuredConnectorResource(apid.MustParse("cxr_test0000000000001"), 1, "root", nil, redactionTestConnector()),
+				}...)
 
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

@@ -641,3 +641,35 @@ deletion; the default waits for HTTP 404. A failed delete or wait stops subseque
 deletions and returns nonzero without retrying. Earlier applies and deletions
 remain committed. There are no atomic list/delete preconditions or locks against
 other writers; serialize conflicting changes when using prune.
+
+## Apply resources on server startup
+
+For a local development environment, start the server and apply resource manifests
+with the same validation, reconciliation, and dependency ordering as `ap apply`:
+
+```bash
+go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml \
+  --apply=./dev_config/default-resources.yaml --apply-actor=bobdole all
+```
+
+| Option | Behavior |
+|---|---|
+| `--apply PATH` | Local YAML/JSON file or directory; repeat to combine inputs into one batch. Directories are not recursive. URLs and stdin are not supported. |
+| `--apply-actor EXTERNAL_ID` | Required with `--apply`; existing actor whose permissions authorize the apply. |
+| `--apply-actor-namespace NAMESPACE` | Actor namespace; defaults to `root`. This does not set resource namespaces. |
+| `--apply-timeout DURATION` | Total readiness and apply deadline; defaults to `2m`. Must be positive. |
+
+The selected services must include `api` or `admin-api`. The server uses its local
+listener, preferring the admin API when both are started, and signs short-lived
+internal requests using its global encryption key. The actor must exist and have
+the permissions required by the manifests; startup apply does not grant permissions.
+With external actor sources, include the worker so actor synchronization can run.
+TLS listeners require a certificate trusted by the local client for `localhost`.
+
+Manifests must supply their own namespaces. Input validation occurs before
+migration or startup. The server retries read-only preparation while the listener
+and actor become available, then executes the batch once. It exits with an error
+if preparation times out or apply fails. Successful writes are not rolled back,
+and startup apply never prunes resources. `--auto-migrate` is independent: it
+prepares development database schemas, keys, actors, and remaining configured
+resources; it no longer loads connectors.

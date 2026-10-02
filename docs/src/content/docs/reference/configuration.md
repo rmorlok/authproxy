@@ -16,7 +16,6 @@ The development configuration demonstrates the full server shape at
 | `systemAuth` | JWT, actors, global encryption key, and DEK policy |
 | `database`, `redis` | Primary database and distributed state |
 | `appMetrics` | Request-event, resource-metric, and optional blob storage |
-| `connectors` | Connector loading and name-based reconciliation |
 | `tasks` | Task retention and worker behavior |
 | `telemetry` | OTLP exporter, signals, sampling, and label projection |
 
@@ -24,53 +23,30 @@ Fields can use AuthProxy value sources such as direct development values,
 environment variables, and file paths. Never put production credentials or
 key material directly in a committed YAML file.
 
-## Configured connector identity
+## Connector manifests
 
-Give every connector loaded from YAML a stable `name` when you omit its
-immutable `id`:
+Connectors are managed through [`ap apply`](/development/cli/#apply-resource-manifests).
+The server configuration no longer accepts a `connectors` block, including an
+empty one. Move each former `connectors.loadFromList` entry to a separate YAML
+manifest (or a document in a multi-document file), remove the wrapper and
+`autoMigrationLockDuration`, and give each new connector a `metadata.name` and
+`metadata.namespace`. Include Namespace manifests when those namespaces do not
+already exist.
 
-```yaml
-connectors:
-  loadFromList:
-    - apiVersion: authproxy.net/v1alpha1
-      kind: Connector
-      metadata:
-        name: google-drive
-        namespace: root.integrations
-        labels:
-          type: google-drive
-        annotations:
-          example.com/owner: integrations@example.com
-      spec:
-        release:
-          desiredState: primary
-        definition:
-          displayName: Google Drive
-          logo:
-            publicUrl: https://example.com/google-drive.svg
-          description: Connect to Google Drive.
-          auth:
-            type: no-auth
-```
+Use `ap apply -f resources.yaml` after deployment. For local development, use
+[`serve --apply`](/development/cli/#apply-resources-on-server-startup) to apply
+a file or directory once the API is available.
 
-With the development-only `serve --auto-migrate` option, AuthProxy reconciles
-this entry to the live connector whose exact
-name is `google-drive` in `root.integrations`. Labels are selectable metadata;
-annotations are non-selectable metadata for values such as ownership details,
-descriptions, and links. Neither participates in connector identity. Multiple
-configured versions use the same name and namespace.
+Existing connectors and generations remain in the database when upgrading;
+startup no longer reconciles, archives, or deletes connectors from configuration.
+Use their existing namespace/name or `metadata.id` to adopt them with apply.
+An explicit ID must already exist; omit IDs when creating new resources. For
+ordinary logical Connector applies, omit `metadata.generation`; apply creates a
+new generation when needed. Use ConnectorGeneration manifests for explicit
+generation lifecycle operations.
 
-An entry with an explicit `id` may omit `name`; a newly created connector then
-defaults its name to the ID. To rename an existing configured connector, keep
-its ID fixed and change `name`. Changing the name of an ID-less entry describes
-a new connector, so the old config-managed connector enters the normal orphan
-cleanup flow.
-
-The former flat connector form and `connectors.identifyingLabels` setting have
-been removed. Every entry must be an `authproxy.net/v1alpha1` `Connector`
-resource. Delete `identifyingLabels` from existing configuration and add a
-stable `metadata.name` to every connector entry that does not already specify
-`metadata.id`.
+Removing a manifest does not delete its resource. Use explicit resource deletion
+or the opt-in pruning options of `ap apply` when deletion is intended.
 
 ## Configured actor namespaces
 

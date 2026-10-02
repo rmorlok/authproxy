@@ -22,8 +22,6 @@ database:
   password: postgres
   database: authproxy
   sslmode: disable
-connectors:
-  loadFromList: []
 telemetry:
   enabled: true
   exporter:

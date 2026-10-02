@@ -9,7 +9,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/migration"
@@ -384,7 +383,7 @@ func (dm *DependencyManager) RunDevelopmentMigration(ctx context.Context) error 
 }
 
 func (dm *DependencyManager) ReconcileDevelopmentData(ctx context.Context) error {
-	if err := dm.reconcileConfiguredConnectors(ctx); err != nil {
+	if err := dm.reconcileConfiguredResources(ctx); err != nil {
 		return err
 	}
 	if err := dm.reconcileConfiguredActors(ctx); err != nil {
@@ -393,11 +392,11 @@ func (dm *DependencyManager) ReconcileDevelopmentData(ctx context.Context) error
 	return nil
 }
 
-func (dm *DependencyManager) reconcileConfiguredConnectors(ctx context.Context) error {
-	lockDuration := dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()
-	return dm.withMigrationLock(ctx, core.MigrateMutexKeyName, lockDuration, func(ctx context.Context) error {
+func (dm *DependencyManager) reconcileConfiguredResources(ctx context.Context) error {
+	const lockDuration = time.Minute
+	return dm.withMigrationLock(ctx, "configured-resources-migrate-lock", lockDuration, func(ctx context.Context) error {
 		if err := dm.GetCoreService().Migrate(ctx); err != nil {
-			return fmt.Errorf("reconcile configured connectors: %w", err)
+			return fmt.Errorf("reconcile configured resources: %w", err)
 		}
 		return nil
 	})

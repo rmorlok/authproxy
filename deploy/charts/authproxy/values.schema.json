@@ -301,14 +301,6 @@
       }
     },
 
-    "connectors": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "loadFromList": { "type": "array" }
-      }
-    },
-
     "appMetrics": {
       "type": "object",
       "additionalProperties": false,

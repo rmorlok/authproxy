@@ -70,9 +70,6 @@ blobStorage:
     path: /tmp/authproxy-blobs
     emptyDir: true
 
-connectors:
-  loadFromList: []
-
 appMetrics:
   shareMainDatabase: false
   existingSecret: authproxy-load-clickhouse

@@ -65,7 +65,6 @@ type (
 	ConnectorReleaseState   = connectors.ConnectorReleaseState
 	ConnectorStatus         = connectors.ConnectorStatus
 	ConnectorReleaseStatus  = connectors.ConnectorReleaseStatus
-	Connectors              = connectors.Connectors
 	PKCEMethod              = connectors.PKCEMethod
 	OAuth2GrantType         = connectors.OAuth2GrantType
 	Predicate               = common.Predicate

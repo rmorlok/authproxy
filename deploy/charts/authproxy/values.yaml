@@ -346,17 +346,7 @@ appMetrics:
   # Lives under `requestEvents` in the rendered server config.
   fullRequestRecording: never
 
-# -- Connector registry. AuthProxy refuses to start without the connectors
-# block — supply at least an empty `loadFromList` even when you intend to
-# manage connectors through the admin API at runtime.
-connectors:
-  # -- Inline connector definitions loaded at boot. See the AuthProxy
-  # connector schema docs for the format. Leave empty to manage connectors
-  # exclusively through the admin API.
-  loadFromList: []
-
-# -- Free-form config overlay merged on top of the rendered AuthProxy YAML.
-# Use this for fields the chart hasn't promoted to typed values yet.
+# -- Additional server configuration. Provision connectors separately with ap apply.
 config: {}
 
 # -- Liveness / readiness probe configuration. Targets the public service;

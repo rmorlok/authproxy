@@ -21,8 +21,6 @@ redis:
   provider: miniredis
 hostApplication:
   initiateSessionUrl: https://branch.dev.authproxy.net/
-connectors:
-  loadFromList: []
 appMetrics:
   database:
     provider: sqlite
