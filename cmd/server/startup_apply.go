@@ -34,19 +34,27 @@ type startupApply struct {
 
 // Prepare local input before migrations or listeners are started. The endpoint
 // comes from the selected listener, never a public base URL or client config.
-func prepareStartupApply(ctx context.Context, services string, options startupApplyOptions) (*startupApply, error) {
+func prepareStartupApply(
+	ctx context.Context,
+	services string,
+	options startupApplyOptions,
+) (*startupApply, error) {
 	if len(options.filenames) == 0 {
 		return nil, nil
 	}
+
 	if options.actor == "" {
 		return nil, fmt.Errorf("--apply requires --apply-actor (an existing actor's external ID)")
 	}
+
 	if err := namespace.ValidatePath(options.actorNamespace); err != nil {
 		return nil, fmt.Errorf("--apply-actor-namespace: %w", err)
 	}
+
 	if options.timeout <= 0 {
 		return nil, fmt.Errorf("--apply-timeout must be positive")
 	}
+
 	var selected *sconfig.ServiceHttp
 	var serviceID sconfig.ServiceId
 	for _, id := range strings.Split(services, ",") {
@@ -61,9 +69,11 @@ func prepareStartupApply(ctx context.Context, services string, options startupAp
 			}
 		}
 	}
+
 	if selected == nil {
 		return nil, fmt.Errorf("--apply requires serving api or admin-api")
 	}
+
 	for _, filename := range options.filenames {
 		if filename == "-" {
 			return nil, fmt.Errorf("--apply requires local files or directories; stdin is not supported")
@@ -72,29 +82,42 @@ func prepareStartupApply(ctx context.Context, services string, options startupAp
 			return nil, fmt.Errorf("--apply input: %w", err)
 		}
 	}
-	documents, err := apply.Load(ctx, apply.Options{Filenames: options.filenames, Validation: apply.ValidationStrict})
+
+	documents, err := apply.Load(
+		ctx,
+		apply.Options{
+			Filenames:  options.filenames,
+			Validation: apply.ValidationStrict,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
+
 	port, err := selected.PortVal.GetUint64Value(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("apply listener port: %w", err)
 	}
+
 	if port == 0 || port > 65535 {
 		return nil, fmt.Errorf("--apply requires a fixed listener port between 1 and 65535")
 	}
+
 	scheme := "http"
 	if selected.TlsVal != nil {
 		scheme = "https"
 	}
+
 	endpoint := fmt.Sprintf("%s://localhost:%d", scheme, port)
 	if cfg.GetRoot().SystemAuth.GlobalAESKey == nil {
 		return nil, fmt.Errorf("startup apply requires systemAuth.globalAesKey")
 	}
+
 	key, err := cfg.GetRoot().SystemAuth.GlobalAESKey.GetCurrentVersion(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("startup apply signing key: %w", err)
 	}
+
 	return &startupApply{
 		endpoint:       endpoint,
 		serviceID:      serviceID,
@@ -164,22 +187,34 @@ func (a *startupApply) run(ctx context.Context, out io.Writer) error {
 func startupApplyRetryable(err error) bool {
 	var apiErr *apply.APIError
 	if errors.As(err, &apiErr) {
-		return apiErr.StatusCode == 401 || apiErr.StatusCode == 429 || apiErr.StatusCode == 503
+		return apiErr.StatusCode == 401 ||
+			apiErr.StatusCode == 429 ||
+			apiErr.StatusCode == 503
 	}
-	return errors.Is(err, apply.ErrRequestFailed) || errors.Is(err, context.DeadlineExceeded)
+	return errors.Is(err, apply.ErrRequestFailed) ||
+		errors.Is(err, context.DeadlineExceeded)
 }
 
-func serveWithApply(ctx context.Context, noBanner bool, services string, a *startupApply, out io.Writer) error {
+func serveWithApply(
+	ctx context.Context,
+	noBanner bool,
+	services string,
+	a *startupApply,
+	out io.Writer,
+) error {
 	if a == nil {
 		return startServices(noBanner, services)
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
 	done := make(chan error, 1)
 	start := startServices
 	go func() { done <- start(noBanner, services) }()
+
 	applied := make(chan error, 1)
 	go func() { applied <- a.run(ctx, out) }()
+
 	select {
 	case err := <-done:
 		return err

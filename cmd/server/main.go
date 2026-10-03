@@ -163,13 +163,16 @@ func cmdServe() *cobra.Command {
 			if _, err := resolveServices(args[0]); err != nil {
 				return err
 			}
+
 			startup, err := prepareStartupApply(cmd.Context(), args[0], applyOptions)
 			if err != nil {
 				return err
 			}
+
 			if err := prepareServe(cmd.Context(), autoMigrate, cmd.ErrOrStderr()); err != nil {
 				return err
 			}
+
 			return serveWithApply(cmd.Context(), noBanner, args[0], startup, cmd.OutOrStdout())
 		},
 	}
