@@ -24,7 +24,10 @@ func Seed(t testing.TB, db database.DB, e encrypt.E, resources ...cschema.Connec
 		for _, path := range namespace.SplitPathsToPrefixes([]string{ns}) {
 			_, err := db.GetNamespace(ctx, path)
 			if errors.Is(err, database.ErrNotFound) {
-				err = db.CreateNamespace(ctx, &database.Namespace{Path: path, State: database.NamespaceStateActive})
+				err = db.CreateNamespace(ctx, &database.Namespace{
+					Path:  path,
+					State: database.NamespaceStateActive,
+				})
 			}
 			require.NoError(t, err)
 		}
@@ -44,10 +47,17 @@ func Seed(t testing.TB, db database.DB, e encrypt.E, resources ...cschema.Connec
 		require.NoError(t, err)
 		encrypted, err := e.EncryptStringForEntity(ctx, &resource, string(definition))
 		require.NoError(t, err)
-		require.NoError(t, db.UpsertConnectorGeneration(ctx, &database.ConnectorWithDefinition{
-			Id: id, Generation: generation, Namespace: ns, Name: resource.Metadata.Name,
-			Labels: resource.Metadata.Labels, Annotations: resource.Metadata.Annotations,
-			State: state, EncryptedDefinition: encrypted,
-		}))
+		require.NoError(t, db.UpsertConnectorGeneration(
+			ctx,
+			&database.ConnectorWithDefinition{
+				Id: id, Generation: generation,
+				Namespace:           ns,
+				Name:                resource.Metadata.Name,
+				Labels:              resource.Metadata.Labels,
+				Annotations:         resource.Metadata.Annotations,
+				State:               state,
+				EncryptedDefinition: encrypted,
+			},
+		))
 	}
 }
