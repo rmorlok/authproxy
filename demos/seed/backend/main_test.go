@@ -221,7 +221,7 @@ func TestDemoServerConfigsHaveNoConnectorDefinitions(t *testing.T) {
 			require.NoError(t, err)
 			var cfg map[string]any
 			require.NoError(t, yaml.Unmarshal(data, &cfg))
-			require.Equal(t, map[string]any{"loadFromList": []any{}}, cfg["connectors"])
+			require.NotContains(t, cfg, "connectors")
 			var serverConfig config.Root
 			require.NoError(t, util.DecodeYAMLStrict(data, &serverConfig))
 			require.NoError(t, serverConfig.Validate())

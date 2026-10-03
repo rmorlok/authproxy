@@ -641,3 +641,42 @@ deletion; the default waits for HTTP 404. A failed delete or wait stops subseque
 deletions and returns nonzero without retrying. Earlier applies and deletions
 remain committed. There are no atomic list/delete preconditions or locks against
 other writers; serialize conflicting changes when using prune.
+
+## Apply resources on server startup
+
+For a local development environment, start the server and apply resource manifests
+with the same validation, reconciliation, and dependency ordering as `ap apply`:
+
+```bash
+go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml \
+  --apply=./dev_config/default-resources.yaml all
+```
+
+| Option | Behavior |
+|---|---|
+| `--apply PATH` | Local YAML/JSON file or directory; repeat to combine inputs into one batch. Directories are not recursive. URLs and stdin are not supported. |
+| `--apply-actor EXTERNAL_ID` | Optional existing actor whose permissions authorize the apply. Defaults to `system` in `root`, created if absent. |
+| `--apply-actor-namespace NAMESPACE` | Namespace for an explicit `--apply-actor`; defaults to `root`. The default system actor always uses `root`. This does not set resource namespaces. |
+| `--apply-timeout DURATION` | Total readiness and apply deadline; defaults to `2m`. Must be positive. |
+
+The selected services must include `api` or `admin-api`. Comma-separated service
+lists and `all` are expanded and deduplicated once before startup. The server uses its local
+listener, preferring the admin API when both are started, and signs short-lived
+internal requests using its global encryption key. When `--apply-actor` is omitted,
+startup creates a `system` actor in `root` if absent, with full permissions across
+all namespaces and no self-signing key. An existing system actor is reused without
+changing its permissions, credentials, or metadata. Bootstrap runs after schema
+verification/migration and before the listeners start; it does not require a worker.
+
+An explicit `--apply-actor` must already exist (or be provisioned by an actor source)
+and have the permissions required by the manifests. For external actor sources,
+include the worker so actor synchronization can run.
+TLS listeners require a certificate trusted by the local client for `localhost`.
+
+Manifests must supply their own namespaces. Input validation occurs before
+migration or startup. The server retries read-only preparation while the listener
+and actor become available, then executes the batch once. It exits with an error
+if preparation times out or apply fails. Successful writes are not rolled back,
+and startup apply never prunes resources. `--auto-migrate` is independent: it
+prepares development database schemas, keys, actors, and configured namespaces
+and rate limits. Connector provisioning uses the apply batch.

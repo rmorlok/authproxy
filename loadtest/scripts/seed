@@ -52,9 +52,6 @@ systemAuth:
   globalAesKey:
     path: $REPO_ROOT/dev_config/keys/global_aes.key
 
-connectors:
-  loadFromList: []
-
 appMetrics:
   database:
     provider: sqlite

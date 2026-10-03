@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/hibiken/asynq"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -29,25 +29,33 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		return nil
 	}
 
-	connectorIdToConnector := make(map[apid.ID]*config.Connector)
 	refreshWithin := th.cfg.GetRoot().Oauth.GetRefreshTokensTimeBeforeExpiryOrDefault()
 
-	// Establish the smallest value of refreshWithIn for all active connector generations
-	// TODO: migrate this to use the database stored versions
-	for _, connector := range th.cfg.GetRoot().Connectors.GetConnectors() {
-		connectorIdToConnector[connector.GetId()] = &connector
-
-		if o2, ok := connector.Spec.Definition.Auth.Inner().(*config.AuthOAuth2); ok {
-			if o2.Token.GetRefreshInBackgroundOrDefault() &&
-				o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin) > refreshWithin {
-				refreshWithin = o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin)
+	// The scan window must include overrides on stored generations, including
+	// active generations still used by existing connections.
+	err := th.core.ListConnectorGenerationsBuilder().ForStates([]database.ConnectorGenerationState{
+		database.ConnectorGenerationStatePrimary, database.ConnectorGenerationStateActive,
+	}).Enumerate(ctx, func(page pagination.PageResult[iface.Connector]) (pagination.KeepGoing, error) {
+		for _, connector := range page.Results {
+			auth := connector.GetDefinition().Auth
+			if auth == nil {
+				continue
+			}
+			if o2, ok := auth.Inner().(*config.AuthOAuth2); ok {
+				if o2.Token.GetRefreshInBackgroundOrDefault() && o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin) > refreshWithin {
+					refreshWithin = o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin)
+				}
 			}
 		}
+		return pagination.Continue, nil
+	})
+	if err != nil {
+		return err
 	}
 
 	logger.Info("tokens being refreshed within", "within", refreshWithin)
 	queuedForRefresh := 0
-	err := th.db.EnumerateOAuth2TokensExpiringWithin(
+	err = th.db.EnumerateOAuth2TokensExpiringWithin(
 		ctx,
 		refreshWithin,
 		func(tokensWithConnections []*database.OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error) {

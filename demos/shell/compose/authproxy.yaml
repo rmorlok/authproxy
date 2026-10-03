@@ -28,8 +28,6 @@ database:
 redis:
   provider: redis
   address: redis:6379
-connectors:
-  loadFromList: []
 appMetrics:
   database:
     provider: sqlite

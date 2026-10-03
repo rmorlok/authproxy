@@ -118,9 +118,6 @@ template syntax.
 {{-   $_ := set $cfg "hostApplication" (dict "initiateSessionUrl" (tpl .Values.hostApplication.initiateSessionUrl $)) -}}
 {{- end -}}
 
-{{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
-{{- $connectors := dict "loadFromList" .Values.connectors.loadFromList -}}
-{{- $_ := set $cfg "connectors" $connectors -}}
 
 {{/* --- appMetrics (server unconditionally wires up the metrics store) --- */}}
 {{/*

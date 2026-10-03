@@ -41,7 +41,6 @@ func newDryRunService(t *testing.T) (
 			FakeEncryption:           true,
 			FakeEncryptionSkipBase64: true,
 		},
-		Connectors: &cfgschema.Connectors{},
 	})
 	logger := slog.Default()
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
@@ -265,7 +264,6 @@ func TestDryRunRateLimit_NoCache(t *testing.T) {
 	// dry-run requests and return empty results rather than 500ing.
 	cfg := config.FromRoot(&cfgschema.Root{
 		DevSettings: &cfgschema.DevSettings{Enabled: true, FakeEncryption: true, FakeEncryptionSkipBase64: true},
-		Connectors:  &cfgschema.Connectors{},
 	})
 	logger := slog.Default()
 	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)

@@ -16,7 +16,6 @@ The development configuration demonstrates the full server shape at
 | `systemAuth` | JWT, actors, global encryption key, and DEK policy |
 | `database`, `redis` | Primary database and distributed state |
 | `appMetrics` | Request-event, resource-metric, and optional blob storage |
-| `connectors` | Connector loading and name-based reconciliation |
 | `tasks` | Task retention and worker behavior |
 | `telemetry` | OTLP exporter, signals, sampling, and label projection |
 
@@ -24,53 +23,31 @@ Fields can use AuthProxy value sources such as direct development values,
 environment variables, and file paths. Never put production credentials or
 key material directly in a committed YAML file.
 
-## Configured connector identity
+## Connector manifests
 
-Give every connector loaded from YAML a stable `name` when you omit its
-immutable `id`:
+Define connectors as `authproxy.net/v1alpha1` `Connector` resources in YAML or
+JSON manifests, and manage them through
+[`ap apply`](/development/cli/#apply-resource-manifests). Store manifests in
+separate files or combine them in a multi-document YAML file. Server configuration
+contains service and infrastructure settings; connector manifests are separate
+inputs to apply.
 
-```yaml
-connectors:
-  loadFromList:
-    - apiVersion: authproxy.net/v1alpha1
-      kind: Connector
-      metadata:
-        name: google-drive
-        namespace: root.integrations
-        labels:
-          type: google-drive
-        annotations:
-          example.com/owner: integrations@example.com
-      spec:
-        release:
-          desiredState: primary
-        definition:
-          displayName: Google Drive
-          logo:
-            publicUrl: https://example.com/google-drive.svg
-          description: Connect to Google Drive.
-          auth:
-            type: no-auth
-```
+Give each new connector a `metadata.name` and `metadata.namespace`. Include
+Namespace manifests in the same apply batch when those namespaces do not exist.
+See [resource manifests](/reference/resources/) for the manifest structure.
 
-With the development-only `serve --auto-migrate` option, AuthProxy reconciles
-this entry to the live connector whose exact
-name is `google-drive` in `root.integrations`. Labels are selectable metadata;
-annotations are non-selectable metadata for values such as ownership details,
-descriptions, and links. Neither participates in connector identity. Multiple
-configured versions use the same name and namespace.
+Use `ap apply -f resources.yaml` after deployment. For local development, use
+[`serve --apply`](/development/cli/#apply-resources-on-server-startup) to apply
+a file or directory once the API is available.
 
-An entry with an explicit `id` may omit `name`; a newly created connector then
-defaults its name to the ID. To rename an existing configured connector, keep
-its ID fixed and change `name`. Changing the name of an ID-less entry describes
-a new connector, so the old config-managed connector enters the normal orphan
-cleanup flow.
+Apply identifies an existing connector by its namespace/name or `metadata.id`.
+An explicit ID must already exist; omit IDs when creating new resources. For
+Connector manifests, omit `metadata.generation`; apply creates a new generation
+when needed. Use ConnectorGeneration manifests for explicit generation lifecycle
+operations.
 
-The former flat connector form and `connectors.identifyingLabels` setting have
-been removed. Every entry must be an `authproxy.net/v1alpha1` `Connector`
-resource. Delete `identifyingLabels` from existing configuration and add a
-stable `metadata.name` to every connector entry that does not already specify
-`metadata.id`.
+Removing a manifest does not delete its resource. Use explicit resource deletion
+or the opt-in pruning options of `ap apply` when deletion is intended.
 
 ## Configured actor namespaces
 
@@ -106,8 +83,7 @@ namespace. For example,
 `root.smoke`. Permissions are source-specific, and permission namespaces can
 use actor templates such as `{{external_id}}`. Development migration creates
 each configured actor namespace and its missing parents before synchronization.
-Directory sources must always be keyed by namespace; the former
-single-directory actor source shape is not supported.
+Directory sources are keyed by namespace, as shown above.
 
 ## Kubernetes values
 

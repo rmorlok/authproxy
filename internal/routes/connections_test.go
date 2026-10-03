@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/test_utils/connectorfixture"
+
 	"github.com/rmorlok/authproxy/internal/apgin"
 
 	"github.com/gin-gonic/gin"
@@ -102,24 +104,22 @@ func TestConnections(t *testing.T) {
 	demoConnectorNamespace := "root.demo"
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
-		cfg = config.FromRoot(&sconfig.Root{
-			Connectors: &sconfig.Connectors{
-				LoadFromList: []sconfig.Connector{
-					configuredConnectorResource(connectorId, connectorGeneration, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
-						DisplayName: "Test Connector",
-					}),
-					configuredConnectorResource(oauthConnectorId, oauthConnectorGeneration, "root", map[string]string{"type": "oauth2-connector"}, cschema.ConnectorDefinition{
-						DisplayName: "OAuth2 Test Connector",
-						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
-							Type: sconfig.AuthTypeOAuth2,
-						}},
-					}),
-					configuredConnectorResource(configurationConnectorId, connectorGeneration, "root", map[string]string{"type": "configuration-connector"}, cschema.ConnectorDefinition{
-						DisplayName: "Configuration Test Connector",
-						SetupFlow: &cschema.SetupFlow{
-							Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{{
-								Id: "connection-settings",
-								JsonSchema: scommon.RawJSON(`{
+		resources := []sconfig.Connector{
+			configuredConnectorResource(connectorId, connectorGeneration, "root", map[string]string{"type": "test-connector"}, cschema.ConnectorDefinition{
+				DisplayName: "Test Connector",
+			}),
+			configuredConnectorResource(oauthConnectorId, oauthConnectorGeneration, "root", map[string]string{"type": "oauth2-connector"}, cschema.ConnectorDefinition{
+				DisplayName: "OAuth2 Test Connector",
+				Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
+					Type: sconfig.AuthTypeOAuth2,
+				}},
+			}),
+			configuredConnectorResource(configurationConnectorId, connectorGeneration, "root", map[string]string{"type": "configuration-connector"}, cschema.ConnectorDefinition{
+				DisplayName: "Configuration Test Connector",
+				SetupFlow: &cschema.SetupFlow{
+					Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{{
+						Id: "connection-settings",
+						JsonSchema: scommon.RawJSON(`{
 									"type":"object",
 									"required":["tenant"],
 									"properties":{
@@ -127,15 +127,14 @@ func TestConnections(t *testing.T) {
 										"workspace":{"type":"string"}
 									}
 								}`),
-							}}},
-						},
-					}),
-					configuredConnectorResource(demoConnectorId, demoConnectorGeneration, demoConnectorNamespace, map[string]string{"type": "demo-connector"}, cschema.ConnectorDefinition{
-						DisplayName: "Demo Connector",
-					}),
+					}}},
 				},
-			},
-		})
+			}),
+			configuredConnectorResource(demoConnectorId, demoConnectorGeneration, demoConnectorNamespace, map[string]string{"type": "demo-connector"}, cschema.ConnectorDefinition{
+				DisplayName: "Demo Connector",
+			}),
+		}
+		cfg = config.FromRoot(&sconfig.Root{})
 		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
@@ -147,6 +146,7 @@ func TestConnections(t *testing.T) {
 		rs.EXPECT().Incr(gomock.Any(), gomock.Any()).Return(redis.NewIntCmd(context.Background())).AnyTimes()
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.Migrate(context.Background()))
+		connectorfixture.Seed(t, db, e, resources...)
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
 		r := apgin.ForTest(nil)
 		cr.Register(r)

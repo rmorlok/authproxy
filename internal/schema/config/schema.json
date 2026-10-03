@@ -58,21 +58,6 @@
         }
       ]
     },
-    "Connectors": {
-      "properties": {
-        "autoMigrationLockDuration": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
-        },
-        "loadFromList": {
-          "items": {
-            "$ref": "../resources/connectors/schema.json"
-          },
-          "type": "array"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
     "RateLimits": {
       "properties": {
         "loadFromList": {
@@ -1187,9 +1172,6 @@
     },
     "errorPages": {
       "$ref": "#/$defs/ErrorPages"
-    },
-    "connectors": {
-      "$ref": "#/$defs/Connectors"
     },
     "rateLimits": {
       "$ref": "#/$defs/RateLimits"

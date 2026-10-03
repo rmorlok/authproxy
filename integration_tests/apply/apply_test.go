@@ -32,6 +32,7 @@ type object = map[string]any
 type cli struct {
 	binary, root, config string
 	seedBinary           string
+	serverBinary         string
 	env                  *helpers.IntegrationTestEnv
 	admin                bool
 }
@@ -207,6 +208,12 @@ func TestCLIApply(t *testing.T) {
 	output, err = build.CombinedOutput()
 	require.NoError(t, err, "%s", output)
 
+	serverBinary := filepath.Join(directory, "authproxy")
+	build = exec.Command("go", "build", "-o", serverBinary, "./cmd/server")
+	build.Dir = root
+	output, err = build.CombinedOutput()
+	require.NoError(t, err, "%s", output)
+
 	publicKey, err := os.ReadFile(filepath.Join(root, "dev_config/keys/admin/bobdole.pub"))
 	require.NoError(t, err)
 
@@ -228,7 +235,7 @@ func TestCLIApply(t *testing.T) {
 			t.Cleanup(env.Cleanup)
 
 			c := cli{
-				binary: binary, seedBinary: seedBinary,
+				binary: binary, seedBinary: seedBinary, serverBinary: serverBinary,
 				root: root, config: config,
 				env:   env,
 				admin: admin,
@@ -252,6 +259,7 @@ func TestCLIApply(t *testing.T) {
 						},
 					},
 				}), 201)
+			t.Run("StartupApply", c.startupApply)
 			t.Run("Identity", c.identity)
 			if !admin {
 				return

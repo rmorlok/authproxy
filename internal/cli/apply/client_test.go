@@ -337,3 +337,17 @@ func TestFailedMutationIsNotRetried(t *testing.T) {
 	require.Equal(t, 409, apiErr.StatusCode)
 	require.Equal(t, 1, calls)
 }
+
+func TestTransportFailureRemainsIdentifiableWithoutLeakingEndpoint(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	client, err := NewClient(ClientOptions{
+		APIURL:  server.URL,
+		Signer:  jwt.NewSigner("test"),
+		Timeout: time.Second,
+	})
+	require.NoError(t, err)
+	server.Close()
+	_, _, err = client.request(context.Background(), http.MethodGet, "namespaces/root", nil, nil)
+	require.ErrorIs(t, err, ErrRequestFailed)
+	require.NotContains(t, err.Error(), server.URL)
+}

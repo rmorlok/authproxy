@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/test_utils/connectorfixture"
+
 	"github.com/gin-gonic/gin"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -100,7 +102,7 @@ type IntegrationTestEnv struct {
 
 // SetupOptions configures how the integration test environment is created.
 type SetupOptions struct {
-	// Connectors to load into the config (merged with config file connectors).
+	// Connector fixtures to seed directly into the isolated test database.
 	Connectors []sconfig.Connector
 
 	// ConfigPath overrides the default integration config path.
@@ -240,15 +242,6 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 		workflows.WithPostgresMigrationDB(rawDb),
 	))
 
-	// Merge test-specific connectors into config
-	if len(opts.Connectors) > 0 {
-		cfgRoot := cfg.GetRoot()
-		if cfgRoot.Connectors == nil {
-			cfgRoot.Connectors = &sconfig.Connectors{}
-		}
-		cfgRoot.Connectors.LoadFromList = append(cfgRoot.Connectors.LoadFromList, opts.Connectors...)
-	}
-
 	if opts.ConfigureRoot != nil {
 		opts.ConfigureRoot(cfg.GetRoot())
 	}
@@ -310,6 +303,7 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	require.NoError(t, encrypt.SyncKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
 
 	require.NoError(t, dm.ReconcileDevelopmentData(context.Background()))
+	connectorfixture.Seed(t, dm.GetDatabase(), dm.GetEncryptService(), opts.Connectors...)
 
 	// Get the appropriate server
 	var httpServer *http.Server

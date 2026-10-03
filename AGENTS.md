@@ -57,7 +57,7 @@ docker compose --profile server up -d
 ### Run the server
 
 ```bash
-go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml all
+go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml --apply=./dev_config/default-resources.yaml --apply-actor=bobdole all
 ```
 
 The final arg is the service to run: `admin-api`, `api`, `public`, `worker`, or `all`.

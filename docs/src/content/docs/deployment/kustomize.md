@@ -52,8 +52,8 @@ ConfigMap's `resources.yaml`. The CLI and server are built from the same
 revision. The manual `Seed Demo` workflow reruns that job when needed.
 
 AuthProxy resources are standard multi-document manifests. `seed.yaml` contains
-only external provider setup; the server configuration has an empty connector
-loader. Existing demo resources are adopted by namespace/name on the first
+only external provider setup; the server configuration contains no connector
+definitions. Existing demo resources are adopted by namespace/name on the first
 apply, with later deploys using last-applied history. Provisioning failures fail
 the deployment. Prune is disabled, so removing a manifest does not delete or
 archive resources.

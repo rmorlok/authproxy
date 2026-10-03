@@ -113,7 +113,11 @@ rateLimits:
             refillRate: 1.0
 ```
 
-Connector references are resolved after configured connectors are reconciled. AuthProxy stores the stable connector ID, and the rule applies across every generation of that connector. The former flat rate-limit configuration is not accepted; update configuration before restarting on this breaking pre-production release.
+Connector references in configured rate limits must resolve to connectors that
+already exist. To provision connectors and their rate limits together, put both
+Connector and RateLimit manifests in the same `ap apply` batch. AuthProxy stores
+the stable connector ID, and the rule applies across every generation of that
+connector.
 
 ## Resource scope
 

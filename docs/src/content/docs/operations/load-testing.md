@@ -67,7 +67,7 @@ Before a run, verify:
 
 `up` creates the `authproxy-load` namespace by default and deploys separate
 `admin-api`, `api`, `public`, and `worker` releases. The admin API release
-performs the initial schema and connector migrations. `go-oauth2-server` runs
+performs the initial schema migration. Connectors are provisioned through the resource API. `go-oauth2-server` runs
 in test mode as a separate upstream sink, so an upstream limit can be
 identified separately from proxy capacity.
 

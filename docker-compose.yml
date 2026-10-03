@@ -107,7 +107,7 @@ services:
 
   server:
     build: .
-    command: ["serve", "--auto-migrate", "--config=/app/dev_config/docker.yaml", "all"]
+    command: ["serve", "--auto-migrate", "--config=/app/dev_config/docker.yaml", "--apply=/app/dev_config/docker-resources.yaml", "--apply-actor=bobdole", "all"]
     ports:
       - "8080:8080"
       - "8081:8081"

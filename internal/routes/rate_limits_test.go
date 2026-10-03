@@ -48,9 +48,7 @@ func TestRateLimits(t *testing.T) {
 	}
 
 	setup := func(t *testing.T) (*TestSetup, func()) {
-		cfg := config.FromRoot(&sconfig.Root{
-			Connectors: &sconfig.Connectors{LoadFromList: []sconfig.Connector{}},
-		})
+		cfg := config.FromRoot(&sconfig.Root{})
 		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)

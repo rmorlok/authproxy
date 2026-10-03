@@ -5,15 +5,12 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type connectorBuilder struct {
 	s                 *service
-	c                 *config.Connector
 	definition        *connectors.ConnectorDefinition
-	configSetters     []func(c *config.Connector)
 	generationSetters []func(v *Connector)
 }
 
@@ -21,24 +18,6 @@ func newConnectorBuilder(s *service) *connectorBuilder {
 	return &connectorBuilder{
 		s: s,
 	}
-}
-
-func (b *connectorBuilder) WithConfig(c *config.Connector) *connectorBuilder {
-	b.c = c
-	b.definition = &c.Spec.Definition
-
-	b.generationSetters = append([]func(v *Connector){
-		func(v *Connector) {
-			v.Generation = c.Metadata.Generation
-			v.Id = c.GetId()
-			v.Namespace = c.GetNamespace()
-			v.Name = c.Metadata.Name
-			v.Labels = c.Metadata.Labels
-			v.Annotations = c.Metadata.Annotations
-		},
-	}, b.generationSetters...)
-
-	return b
 }
 
 func (b *connectorBuilder) WithDefinition(definition *connectors.ConnectorDefinition) *connectorBuilder {
@@ -53,11 +32,6 @@ func (b *connectorBuilder) WithId(id apid.ID) *connectorBuilder {
 		},
 	)
 
-	b.configSetters = append(b.configSetters,
-		func(c *config.Connector) {
-			c.SetId(id)
-		},
-	)
 	return b
 }
 
@@ -68,11 +42,6 @@ func (b *connectorBuilder) WithState(state database.ConnectorGenerationState) *c
 		},
 	)
 
-	b.configSetters = append(b.configSetters,
-		func(c *config.Connector) {
-			c.Spec.Release.DesiredState = connectors.ConnectorReleaseState(state)
-		},
-	)
 	return b
 }
 
@@ -83,11 +52,6 @@ func (b *connectorBuilder) WithGeneration(ver uint64) *connectorBuilder {
 		},
 	)
 
-	b.configSetters = append(b.configSetters,
-		func(c *config.Connector) {
-			c.Metadata.Generation = ver
-		},
-	)
 	return b
 }
 
@@ -100,12 +64,6 @@ func (b *connectorBuilder) Build() (*Connector, error) {
 
 	c := Connector{
 		s: b.s,
-	}
-
-	if b.c != nil {
-		for _, setter := range b.configSetters {
-			setter(b.c)
-		}
 	}
 
 	for _, setter := range b.generationSetters {
