@@ -60,25 +60,41 @@ func TestRefreshScanUsesStoredConnectorOverrides(t *testing.T) {
 			db := dbmock.NewMockDB(ctrl)
 			builder := &refreshGenerations{connectors: []iface.Connector{
 				refreshConnector{definition: &cschema.ConnectorDefinition{}},
-				refreshConnector{definition: &cschema.ConnectorDefinition{Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Token: cschema.AuthOauth2Token{
-					RefreshTimeBeforeExpiry: &sconfig.HumanDuration{Duration: 45 * time.Minute},
-				}}}}},
+				refreshConnector{
+					definition: &cschema.ConnectorDefinition{
+						Auth: &cschema.Auth{
+							InnerVal: &cschema.AuthOAuth2{
+								Token: cschema.AuthOauth2Token{
+									RefreshTimeBeforeExpiry: &sconfig.HumanDuration{
+										Duration: 45 * time.Minute,
+									},
+								},
+							},
+						},
+					},
+				},
 			}}
 			if fail {
 				builder.err = errors.New("cannot read stored generations")
 			} else {
 				db.EXPECT().EnumerateOAuth2TokensExpiringWithin(gomock.Any(), 45*time.Minute, gomock.Any()).Return(nil)
 			}
+
 			handler := taskHandler{cfg: config.FromRoot(&sconfig.Root{}), db: db, core: refreshCore{builder: builder}, logger: aplog.NewNoopLogger()}
 			task, err := newRefreshExpiringOauth2TokensTask()
 			require.NoError(t, err)
+
 			err = handler.refreshExpiringOauth2Tokens(context.Background(), task)
 			if fail {
 				require.ErrorIs(t, err, builder.err)
 			} else {
 				require.NoError(t, err)
 			}
-			require.Equal(t, []database.ConnectorGenerationState{database.ConnectorGenerationStatePrimary, database.ConnectorGenerationStateActive}, builder.states)
+
+			require.Equal(t, []database.ConnectorGenerationState{
+				database.ConnectorGenerationStatePrimary,
+				database.ConnectorGenerationStateActive,
+			}, builder.states)
 		})
 	}
 }
