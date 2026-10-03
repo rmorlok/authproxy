@@ -85,6 +85,6 @@ func (f serveFlags) resolve(serviceList string) (serveOptions, error) {
 	if o.apply.timeout <= 0 {
 		return o, fmt.Errorf("--apply-timeout must be positive")
 	}
-	
+
 	return o, nil
 }
