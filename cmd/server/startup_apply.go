@@ -102,16 +102,27 @@ func (a *startupApply) run(ctx context.Context, out io.Writer) error {
 	defer cancel()
 	// Mint only after migration and service launch so migration time cannot
 	// consume the token's lifetime. Stored actor permissions authorize requests.
-	signer, err := jwt.NewJwtTokenBuilder().WithSystemSigned().WithSecretKey(a.signingKey).
-		WithServiceId(a.serviceID).WithActorExternalId(a.actor).WithNamespace(a.actorNamespace).
-		WithExpiresIn(a.timeout + time.Minute).SignerCtx(ctx)
+	signer, err := jwt.NewJwtTokenBuilder().
+		WithSystemSigned().
+		WithSecretKey(a.signingKey).
+		WithServiceId(a.serviceID).
+		WithActorExternalId(a.actor).
+		WithNamespace(a.actorNamespace).
+		WithExpiresIn(a.timeout + time.Minute).
+		SignerCtx(ctx)
 	if err != nil {
 		return err
 	}
-	client, err := apply.NewClient(apply.ClientOptions{APIURL: a.endpoint, Signer: signer, Timeout: apply.DefaultRequestTimeout})
+
+	client, err := apply.NewClient(apply.ClientOptions{
+		APIURL: a.endpoint,
+		Signer: signer,
+		Timeout: apply.DefaultRequestTimeout,
+	})
 	if err != nil {
 		return err
 	}
+
 	var batch *apply.Batch
 	for {
 		var err error
@@ -119,23 +130,28 @@ func (a *startupApply) run(ctx context.Context, out io.Writer) error {
 		if err == nil {
 			break
 		}
+
 		if ctx.Err() != nil {
 			return fmt.Errorf("startup apply readiness: %w", ctx.Err())
 		}
+
 		if !startupApplyRetryable(err) {
 			return fmt.Errorf("startup apply preparation: %w", err)
 		}
+
 		select {
 		case <-ctx.Done():
 			return fmt.Errorf("startup apply readiness: %w", ctx.Err())
 		case <-time.After(250 * time.Millisecond):
 		}
 	}
+
 	for _, warning := range batch.Warnings() {
 		if _, err := fmt.Fprintln(out, "Warning: "+warning); err != nil {
 			return err
 		}
 	}
+
 	results, err := batch.Execute(ctx)
 	for _, result := range results {
 		if result.Error != "" {
@@ -143,10 +159,12 @@ func (a *startupApply) run(ctx context.Context, out io.Writer) error {
 				return errors.Join(err, outputErr)
 			}
 		}
+
 		if _, outputErr := fmt.Fprintf(out, "%s %s: %s %s\n", result.Kind, result.Identity, result.Operation, result.Status); outputErr != nil {
 			return errors.Join(err, outputErr)
 		}
 	}
+
 	return err
 }
 

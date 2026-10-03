@@ -30,7 +30,14 @@ func TestServeOptionsServiceSelection(t *testing.T) {
 }
 
 func TestServeOptionsApplyIdentityAndService(t *testing.T) {
-	flags := serveFlags{apply: startupApplyOptions{filenames: []string{"resources.yaml"}, actorNamespace: "root", timeout: time.Minute}}
+	flags := serveFlags{
+		apply: startupApplyOptions{
+			filenames: []string{"resources.yaml"},
+			actorNamespace: "root",
+			timeout: time.Minute,
+		},
+	}
+
 	for _, tc := range []struct {
 		services string
 		want     sconfig.ServiceId
@@ -47,6 +54,7 @@ func TestServeOptionsApplyIdentityAndService(t *testing.T) {
 		require.Equal(t, "root", o.apply.actorNamespace)
 		require.True(t, o.apply.createSystemActor)
 	}
+
 	flags.apply.actor = "operator"
 	flags.apply.actorNamespace = "root.ops"
 	o, err := flags.resolve("all")
@@ -54,6 +62,7 @@ func TestServeOptionsApplyIdentityAndService(t *testing.T) {
 	require.False(t, o.apply.createSystemActor)
 	require.Equal(t, "operator", o.apply.actor)
 	require.Equal(t, "root.ops", o.apply.actorNamespace)
+
 	flags.apply.filenames = nil
 	o, err = flags.resolve("worker")
 	require.NoError(t, err)

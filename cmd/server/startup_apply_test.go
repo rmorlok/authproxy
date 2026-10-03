@@ -77,14 +77,19 @@ func TestStartupApplyWaitsAndSignsAsExistingActor(t *testing.T) {
 		}
 	}))
 	defer server.Close()
+
 	_, portText, err := net.SplitHostPort(server.Listener.Addr().String())
 	require.NoError(t, err)
+
 	port, err := strconv.Atoi(portText)
 	require.NoError(t, err)
+
 	startupTestConfig(t, port)
+
 	cfg.GetRoot().AdminApi.BaseUrl = common.NewStringValueDirect("https://never-contact.example")
 	a, err := prepareTestStartupApply(t, "all", startupOptions(t))
 	require.NoError(t, err)
+
 	var output bytes.Buffer
 	require.NoError(t, a.run(context.Background(), &output))
 	require.GreaterOrEqual(t, reads.Load(), int32(2))
@@ -153,12 +158,15 @@ func TestStartupApplyDoesNotRetryFailedWrites(t *testing.T) {
 func TestStartupApplyReadinessTimeout(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) }))
 	defer server.Close()
+
 	_, portText, _ := net.SplitHostPort(server.Listener.Addr().String())
 	port, _ := strconv.Atoi(portText)
+
 	startupTestConfig(t, port)
 	o := startupOptions(t)
 	o.timeout = 20 * time.Millisecond
 	a, err := prepareTestStartupApply(t, "api", o)
+
 	require.NoError(t, err)
 	require.ErrorIs(t, a.run(context.Background(), io.Discard), context.DeadlineExceeded)
 }

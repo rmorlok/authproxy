@@ -33,6 +33,7 @@ func ensureSystemApplyActor(ctx context.Context, db startupActorStore) error {
 	if !errors.Is(err, database.ErrNotFound) {
 		return err
 	}
+
 	err = db.CreateActor(ctx, &database.Actor{
 		Id:          apid.New(apid.PrefixActor),
 		Name:        "system",
@@ -45,5 +46,6 @@ func ensureSystemApplyActor(ctx context.Context, db startupActorStore) error {
 		// existing identity's permissions, signing key, and metadata must survive.
 		_, err = db.GetActorByExternalId(ctx, namespace.Root, "system")
 	}
+
 	return err
 }
