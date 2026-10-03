@@ -248,4 +248,5 @@ For chart-on-source-tree work (running CI locally, iterating on templates),
 see [`AGENTS.md`](../../../AGENTS.md) at the repo root and the chart-testing
 CI workflow under `.github/workflows/helm-chart-ci.yml`.
 
-Provision connectors after deployment with `ap apply -f resources.yaml`. The server configuration and chart values no longer accept a `connectors` block.
+Provision connectors after deployment with `ap apply -f resources.yaml`. Store
+connector resource manifests separately from server configuration and chart values.

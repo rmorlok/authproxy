@@ -25,25 +25,26 @@ key material directly in a committed YAML file.
 
 ## Connector manifests
 
-Connectors are managed through [`ap apply`](/development/cli/#apply-resource-manifests).
-The server configuration no longer accepts a `connectors` block, including an
-empty one. Move each former `connectors.loadFromList` entry to a separate YAML
-manifest (or a document in a multi-document file), remove the wrapper and
-`autoMigrationLockDuration`, and give each new connector a `metadata.name` and
-`metadata.namespace`. Include Namespace manifests when those namespaces do not
-already exist.
+Define connectors as `authproxy.net/v1alpha1` `Connector` resources in YAML or
+JSON manifests, and manage them through
+[`ap apply`](/development/cli/#apply-resource-manifests). Store manifests in
+separate files or combine them in a multi-document YAML file. Server configuration
+contains service and infrastructure settings; connector manifests are separate
+inputs to apply.
+
+Give each new connector a `metadata.name` and `metadata.namespace`. Include
+Namespace manifests in the same apply batch when those namespaces do not exist.
+See [resource manifests](/reference/resources/) for the manifest structure.
 
 Use `ap apply -f resources.yaml` after deployment. For local development, use
 [`serve --apply`](/development/cli/#apply-resources-on-server-startup) to apply
 a file or directory once the API is available.
 
-Existing connectors and generations remain in the database when upgrading;
-startup no longer reconciles, archives, or deletes connectors from configuration.
-Use their existing namespace/name or `metadata.id` to adopt them with apply.
+Apply identifies an existing connector by its namespace/name or `metadata.id`.
 An explicit ID must already exist; omit IDs when creating new resources. For
-ordinary logical Connector applies, omit `metadata.generation`; apply creates a
-new generation when needed. Use ConnectorGeneration manifests for explicit
-generation lifecycle operations.
+Connector manifests, omit `metadata.generation`; apply creates a new generation
+when needed. Use ConnectorGeneration manifests for explicit generation lifecycle
+operations.
 
 Removing a manifest does not delete its resource. Use explicit resource deletion
 or the opt-in pruning options of `ap apply` when deletion is intended.
@@ -82,8 +83,7 @@ namespace. For example,
 `root.smoke`. Permissions are source-specific, and permission namespaces can
 use actor templates such as `{{external_id}}`. Development migration creates
 each configured actor namespace and its missing parents before synchronization.
-Directory sources must always be keyed by namespace; the former
-single-directory actor source shape is not supported.
+Directory sources are keyed by namespace, as shown above.
 
 ## Kubernetes values
 

@@ -678,5 +678,5 @@ migration or startup. The server retries read-only preparation while the listene
 and actor become available, then executes the batch once. It exits with an error
 if preparation times out or apply fails. Successful writes are not rolled back,
 and startup apply never prunes resources. `--auto-migrate` is independent: it
-prepares development database schemas, keys, actors, and remaining configured
-resources; it no longer loads connectors.
+prepares development database schemas, keys, actors, and configured namespaces
+and rate limits. Connector provisioning uses the apply batch.
