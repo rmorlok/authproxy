@@ -340,7 +340,11 @@ func TestFailedMutationIsNotRetried(t *testing.T) {
 
 func TestTransportFailureRemainsIdentifiableWithoutLeakingEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
-	client, err := NewClient(ClientOptions{APIURL: server.URL, Signer: jwt.NewSigner("test"), Timeout: time.Second})
+	client, err := NewClient(ClientOptions{
+		APIURL:  server.URL,
+		Signer:  jwt.NewSigner("test"),
+		Timeout: time.Second,
+	})
 	require.NoError(t, err)
 	server.Close()
 	_, _, err = client.request(context.Background(), http.MethodGet, "namespaces/root", nil, nil)
