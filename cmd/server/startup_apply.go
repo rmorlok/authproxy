@@ -6,75 +6,40 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/cli/apply"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
-	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
-type startupApplyOptions struct {
-	filenames      []string
-	actor          string
-	actorNamespace string
-	timeout        time.Duration
-}
-
 type startupApply struct {
-	endpoint       string
-	serviceID      sconfig.ServiceId
-	signingKey     []byte
-	actor          string
-	actorNamespace string
-	documents      []apply.Document
-	timeout        time.Duration
+	createSystemActor bool
+	endpoint          string
+	serviceID         sconfig.ServiceId
+	signingKey        []byte
+	actor             string
+	actorNamespace    string
+	documents         []apply.Document
+	timeout           time.Duration
 }
 
 // Prepare local input before migrations or listeners are started. The endpoint
 // comes from the selected listener, never a public base URL or client config.
 func prepareStartupApply(
 	ctx context.Context,
-	services string,
-	options startupApplyOptions,
+	options serveOptions,
 ) (*startupApply, error) {
-	if len(options.filenames) == 0 {
+	if len(options.apply.filenames) == 0 {
 		return nil, nil
 	}
 
-	if options.actor == "" {
-		return nil, fmt.Errorf("--apply requires --apply-actor (an existing actor's external ID)")
+	selected := &cfg.GetRoot().Api.ServiceHttp
+	if options.applyService == sconfig.ServiceIdAdminApi {
+		selected = &cfg.GetRoot().AdminApi.ServiceHttp
 	}
 
-	if err := namespace.ValidatePath(options.actorNamespace); err != nil {
-		return nil, fmt.Errorf("--apply-actor-namespace: %w", err)
-	}
-
-	if options.timeout <= 0 {
-		return nil, fmt.Errorf("--apply-timeout must be positive")
-	}
-
-	var selected *sconfig.ServiceHttp
-	var serviceID sconfig.ServiceId
-	for _, id := range strings.Split(services, ",") {
-		switch id {
-		case "all", "admin-api":
-			selected = &cfg.GetRoot().AdminApi.ServiceHttp
-			serviceID = sconfig.ServiceIdAdminApi
-		case "api":
-			if selected == nil {
-				selected = &cfg.GetRoot().Api.ServiceHttp
-				serviceID = sconfig.ServiceIdApi
-			}
-		}
-	}
-
-	if selected == nil {
-		return nil, fmt.Errorf("--apply requires serving api or admin-api")
-	}
-
-	for _, filename := range options.filenames {
+	for _, filename := range options.apply.filenames {
 		if filename == "-" {
 			return nil, fmt.Errorf("--apply requires local files or directories; stdin is not supported")
 		}
@@ -86,7 +51,7 @@ func prepareStartupApply(
 	documents, err := apply.Load(
 		ctx,
 		apply.Options{
-			Filenames:  options.filenames,
+			Filenames:  options.apply.filenames,
 			Validation: apply.ValidationStrict,
 		},
 	)
@@ -119,13 +84,14 @@ func prepareStartupApply(
 	}
 
 	return &startupApply{
-		endpoint:       endpoint,
-		serviceID:      serviceID,
-		signingKey:     key.Data,
-		actor:          options.actor,
-		actorNamespace: options.actorNamespace,
-		documents:      documents,
-		timeout:        options.timeout,
+		endpoint:          endpoint,
+		serviceID:         options.applyService,
+		createSystemActor: options.apply.createSystemActor,
+		signingKey:        key.Data,
+		actor:             options.apply.actor,
+		actorNamespace:    options.apply.actorNamespace,
+		documents:         documents,
+		timeout:           options.apply.timeout,
 	}, nil
 }
 
@@ -197,20 +163,24 @@ func startupApplyRetryable(err error) bool {
 
 func serveWithApply(
 	ctx context.Context,
-	noBanner bool,
-	services string,
+	options serveOptions,
 	a *startupApply,
 	out io.Writer,
 ) error {
 	if a == nil {
-		return startServices(noBanner, services)
+		return startServices(options)
+	}
+	if a.createSystemActor {
+		if err := prepareSystemApplyActor(ctx); err != nil {
+			return fmt.Errorf("startup apply actor: %w", err)
+		}
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	done := make(chan error, 1)
 	start := startServices
-	go func() { done <- start(noBanner, services) }()
+	go func() { done <- start(options) }()
 
 	applied := make(chan error, 1)
 	go func() { applied <- a.run(ctx, out) }()

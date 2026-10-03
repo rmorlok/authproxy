@@ -67,9 +67,9 @@ func TestPrepareServeWithoutFlagOnlyVerifies(t *testing.T) {
 }
 
 func TestResolveServicesAll(t *testing.T) {
-	servers, err := resolveServices("all")
+	options, err := (serveFlags{}).resolve("all")
 	require.NoError(t, err)
-	require.Len(t, servers, 4)
+	require.Len(t, options.services, 4)
 }
 
 func TestServeDoesNotStartServicesWhenVerificationFails(t *testing.T) {
@@ -79,7 +79,7 @@ func TestServeDoesNotStartServicesWhenVerificationFails(t *testing.T) {
 			restoreMigrationManager(t, fake)
 			originalStartServices := startServices
 			started := 0
-			startServices = func(bool, string) error {
+			startServices = func(serveOptions) error {
 				started++
 				return nil
 			}

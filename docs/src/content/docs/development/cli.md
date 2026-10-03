@@ -649,21 +649,28 @@ with the same validation, reconciliation, and dependency ordering as `ap apply`:
 
 ```bash
 go run ./cmd/server serve --auto-migrate --config=./dev_config/default.yaml \
-  --apply=./dev_config/default-resources.yaml --apply-actor=bobdole all
+  --apply=./dev_config/default-resources.yaml all
 ```
 
 | Option | Behavior |
 |---|---|
 | `--apply PATH` | Local YAML/JSON file or directory; repeat to combine inputs into one batch. Directories are not recursive. URLs and stdin are not supported. |
-| `--apply-actor EXTERNAL_ID` | Required with `--apply`; existing actor whose permissions authorize the apply. |
-| `--apply-actor-namespace NAMESPACE` | Actor namespace; defaults to `root`. This does not set resource namespaces. |
+| `--apply-actor EXTERNAL_ID` | Optional existing actor whose permissions authorize the apply. Defaults to `system` in `root`, created if absent. |
+| `--apply-actor-namespace NAMESPACE` | Namespace for an explicit `--apply-actor`; defaults to `root`. The default system actor always uses `root`. This does not set resource namespaces. |
 | `--apply-timeout DURATION` | Total readiness and apply deadline; defaults to `2m`. Must be positive. |
 
-The selected services must include `api` or `admin-api`. The server uses its local
+The selected services must include `api` or `admin-api`. Comma-separated service
+lists and `all` are expanded and deduplicated once before startup. The server uses its local
 listener, preferring the admin API when both are started, and signs short-lived
-internal requests using its global encryption key. The actor must exist and have
-the permissions required by the manifests; startup apply does not grant permissions.
-With external actor sources, include the worker so actor synchronization can run.
+internal requests using its global encryption key. When `--apply-actor` is omitted,
+startup creates a `system` actor in `root` if absent, with full permissions across
+all namespaces and no self-signing key. An existing system actor is reused without
+changing its permissions, credentials, or metadata. Bootstrap runs after schema
+verification/migration and before the listeners start; it does not require a worker.
+
+An explicit `--apply-actor` must already exist (or be provisioned by an actor source)
+and have the permissions required by the manifests. For external actor sources,
+include the worker so actor synchronization can run.
 TLS listeners require a certificate trusted by the local client for `localhost`.
 
 Manifests must supply their own namespaces. Input validation occurs before

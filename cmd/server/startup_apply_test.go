@@ -83,7 +83,7 @@ func TestStartupApplyWaitsAndSignsAsExistingActor(t *testing.T) {
 	require.NoError(t, err)
 	startupTestConfig(t, port)
 	cfg.GetRoot().AdminApi.BaseUrl = common.NewStringValueDirect("https://never-contact.example")
-	a, err := prepareStartupApply(context.Background(), "all", startupOptions(t))
+	a, err := prepareTestStartupApply(t, "all", startupOptions(t))
 	require.NoError(t, err)
 	var output bytes.Buffer
 	require.NoError(t, a.run(context.Background(), &output))
@@ -114,7 +114,7 @@ func TestStartupApplyRejectsInvalidOptionsBeforeStartup(t *testing.T) {
 		name, services, want string
 		mutate               func(*startupApplyOptions)
 	}{
-		{"missing actor", "all", "--apply-actor", func(o *startupApplyOptions) { o.actor = "" }},
+		{"namespace without actor", "all", "--apply-actor", func(o *startupApplyOptions) { o.actor = "" }},
 		{"worker only", "worker", "requires serving", func(o *startupApplyOptions) {}},
 		{"zero timeout", "all", "positive", func(o *startupApplyOptions) { o.timeout = 0 }},
 		{"stdin", "all", "stdin", func(o *startupApplyOptions) { o.filenames = []string{"-"} }},
@@ -123,7 +123,7 @@ func TestStartupApplyRejectsInvalidOptionsBeforeStartup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			o := startupOptions(t)
 			tc.mutate(&o)
-			_, err := prepareStartupApply(context.Background(), tc.services, o)
+			_, err := prepareTestStartupApply(t, tc.services, o)
 			require.ErrorContains(t, err, tc.want)
 		})
 	}
@@ -143,7 +143,7 @@ func TestStartupApplyDoesNotRetryFailedWrites(t *testing.T) {
 	_, portText, _ := net.SplitHostPort(server.Listener.Addr().String())
 	port, _ := strconv.Atoi(portText)
 	startupTestConfig(t, port)
-	a, err := prepareStartupApply(context.Background(), "api", startupOptions(t))
+	a, err := prepareTestStartupApply(t, "api", startupOptions(t))
 	require.NoError(t, err)
 	err = a.run(context.Background(), io.Discard)
 	require.Error(t, err)
@@ -158,7 +158,7 @@ func TestStartupApplyReadinessTimeout(t *testing.T) {
 	startupTestConfig(t, port)
 	o := startupOptions(t)
 	o.timeout = 20 * time.Millisecond
-	a, err := prepareStartupApply(context.Background(), "api", o)
+	a, err := prepareTestStartupApply(t, "api", o)
 	require.NoError(t, err)
 	require.ErrorIs(t, a.run(context.Background(), io.Discard), context.DeadlineExceeded)
 }
@@ -182,11 +182,20 @@ func TestStartupApplyFailureFailsServe(t *testing.T) {
 	_, portText, _ := net.SplitHostPort(server.Listener.Addr().String())
 	port, _ := strconv.Atoi(portText)
 	startupTestConfig(t, port)
-	a, err := prepareStartupApply(context.Background(), "api", startupOptions(t))
+	a, err := prepareTestStartupApply(t, "api", startupOptions(t))
 	require.NoError(t, err)
 	original := startServices
 	stop := make(chan struct{})
 	t.Cleanup(func() { close(stop); startServices = original })
-	startServices = func(bool, string) error { <-stop; return nil }
-	require.ErrorContains(t, serveWithApply(context.Background(), true, "api", a, io.Discard), "startup apply failed")
+	startServices = func(serveOptions) error { <-stop; return nil }
+	require.ErrorContains(t, serveWithApply(context.Background(), serveOptions{}, a, io.Discard), "startup apply failed")
+}
+
+func prepareTestStartupApply(t *testing.T, services string, applyOptions startupApplyOptions) (*startupApply, error) {
+	t.Helper()
+	options, err := (serveFlags{apply: applyOptions}).resolve(services)
+	if err != nil {
+		return nil, err
+	}
+	return prepareStartupApply(context.Background(), options)
 }

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"text/tabwriter"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/migration"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api "github.com/rmorlok/authproxy/internal/service/api"
@@ -67,55 +67,27 @@ func loadConfig() error {
 	return nil
 }
 
-func runServices(noBanner bool, servicesList string) error {
-	servers, err := resolveServices(servicesList)
-	if err != nil {
-		return err
-	}
-
-	if !noBanner {
+// Service selection has already been expanded and validated by serveFlags.resolve.
+func runServices(options serveOptions) error {
+	if !options.noBanner {
 		banner()
 	}
-
-	wg := new(sync.WaitGroup)
-	for _, server := range servers {
+	servers := map[sconfig.ServiceId]func(config.C){
+		sconfig.ServiceIdAdminApi: admin_api.Serve,
+		sconfig.ServiceIdApi:      api.Serve,
+		sconfig.ServiceIdPublic:   public.Serve,
+		sconfig.ServiceIdWorker:   worker.Serve,
+	}
+	var wg sync.WaitGroup
+	for _, id := range options.services {
 		wg.Add(1)
-		go func(server func(cfg config.C)) {
+		go func() {
 			defer wg.Done()
-			server(cfg)
-		}(server)
+			servers[id](cfg)
+		}()
 	}
-
 	wg.Wait()
-
 	return nil
-}
-
-func resolveServices(servicesList string) ([]func(cfg config.C), error) {
-	services := strings.Split(servicesList, ",")
-	servers := make([]func(cfg config.C), 0, len(services))
-
-	if len(services) == 0 {
-		return nil, errors.New("no services provided")
-	}
-	for _, service := range services {
-		switch service {
-		case "admin-api":
-			servers = append(servers, admin_api.Serve)
-		case "api":
-			servers = append(servers, api.Serve)
-		case "public":
-			servers = append(servers, public.Serve)
-		case "worker":
-			servers = append(servers, worker.Serve)
-		case "all":
-			servers = append(servers, admin_api.Serve, api.Serve, public.Serve, worker.Serve)
-		default:
-			return nil, errors.New("unknown service: " + service)
-		}
-	}
-
-	return servers, nil
 }
 
 func banner() {
@@ -151,39 +123,38 @@ func cmdRoutes() *cobra.Command {
 }
 
 func cmdServe() *cobra.Command {
-	var applyOptions startupApplyOptions
-	var noBanner bool
-	var autoMigrate bool
+	var flags serveFlags
 
 	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start services",
 		Args:  cobra.ExactArgs(1), // Expect exactly one argument
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := resolveServices(args[0]); err != nil {
-				return err
-			}
-
-			startup, err := prepareStartupApply(cmd.Context(), args[0], applyOptions)
+			options, err := flags.resolve(args[0])
 			if err != nil {
 				return err
 			}
 
-			if err := prepareServe(cmd.Context(), autoMigrate, cmd.ErrOrStderr()); err != nil {
+			startup, err := prepareStartupApply(cmd.Context(), options)
+			if err != nil {
 				return err
 			}
 
-			return serveWithApply(cmd.Context(), noBanner, args[0], startup, cmd.OutOrStdout())
+			if err := prepareServe(cmd.Context(), options.autoMigrate, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
+
+			return serveWithApply(cmd.Context(), options, startup, cmd.OutOrStdout())
 		},
 	}
 
-	cmd.Flags().BoolVar(&noBanner, "no-banner", false, "Don't show banner")
-	cmd.Flags().BoolVar(&autoMigrate, "auto-migrate", false, "Automatically migrate and reconcile a local/disposable development environment (unsafe for production)")
+	cmd.Flags().BoolVar(&flags.noBanner, "no-banner", false, "Don't show banner")
+	cmd.Flags().BoolVar(&flags.autoMigrate, "auto-migrate", false, "Automatically migrate and reconcile a local/disposable development environment (unsafe for production)")
 
-	cmd.Flags().StringArrayVar(&applyOptions.filenames, "apply", nil, "Apply a local manifest file or directory after startup (repeatable)")
-	cmd.Flags().StringVar(&applyOptions.actor, "apply-actor", "", "Existing actor external ID used for startup apply")
-	cmd.Flags().StringVar(&applyOptions.actorNamespace, "apply-actor-namespace", "root", "Namespace of the actor used for startup apply")
-	cmd.Flags().DurationVar(&applyOptions.timeout, "apply-timeout", 2*time.Minute, "Total readiness and execution timeout for startup apply")
+	cmd.Flags().StringArrayVar(&flags.apply.filenames, "apply", nil, "Apply a local manifest file or directory after startup (repeatable)")
+	cmd.Flags().StringVar(&flags.apply.actor, "apply-actor", "", "Actor external ID used for startup apply (default: system in root, created if absent)")
+	cmd.Flags().StringVar(&flags.apply.actorNamespace, "apply-actor-namespace", "root", "Namespace of the actor used for startup apply")
+	cmd.Flags().DurationVar(&flags.apply.timeout, "apply-timeout", 2*time.Minute, "Total readiness and execution timeout for startup apply")
 
 	return cmd
 }

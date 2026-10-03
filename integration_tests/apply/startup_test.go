@@ -25,6 +25,16 @@ import (
 
 // Exercise the actual serve command, including local authentication and readiness.
 func (c cli) startupApply(t *testing.T) {
+	for _, actor := range []string{"apply-operator", ""} {
+		name := actor
+		if name == "" {
+			name = "default-system"
+		}
+		t.Run(name, func(t *testing.T) { c.startupApplyAs(t, actor, "startup-"+name) })
+	}
+}
+
+func (c cli) startupApplyAs(t *testing.T, actor, resourceName string) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	port := listener.Addr().(*net.TCPAddr).Port
@@ -60,14 +70,18 @@ func (c cli) startupApply(t *testing.T) {
 	require.NoError(t, os.WriteFile(configPath, configBytes, 0600))
 	_, err = config.LoadConfig(configPath)
 	require.NoError(t, err)
-	doc := manifest("Connector", "startup", "root", object{"definition": object{
+	doc := manifest("Connector", resourceName, "root", object{"definition": object{
 		"displayName": "Startup applied", "logo": object{"publicUrl": "https://example.com/logo.png"}, "auth": object{"type": "no-auth"},
 	}})
 	path := filepath.Join(directory, "resources.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(encode(t, doc)), 0600))
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, c.serverBinary, "serve", "--no-banner", "--config="+configPath, "--apply="+path, "--apply-actor=apply-operator", "--apply-timeout=30s", string(serviceID))
+	args := []string{"serve", "--no-banner", "--config=" + configPath, "--apply=" + path, "--apply-timeout=30s", string(serviceID)}
+	if actor != "" {
+		args = append(args, "--apply-actor="+actor)
+	}
+	cmd := exec.CommandContext(ctx, c.serverBinary, args...)
 	cmd.Dir = c.root
 	logPath := filepath.Join(directory, "server.log")
 	logFile, err := os.Create(logPath)
@@ -108,11 +122,14 @@ waiting:
 	}
 	key, err := root.SystemAuth.GlobalAESKey.GetCurrentVersion(context.Background())
 	require.NoError(t, err)
+	if actor == "" {
+		actor = "system"
+	}
 	token, err := jwt.NewJwtTokenBuilder().WithSystemSigned().WithSecretKey(key.Data).
-		WithServiceId(serviceID).WithActorExternalId("apply-operator").WithNamespace("root").WithExpiresIn(time.Minute).Token()
+		WithServiceId(serviceID).WithActorExternalId(actor).WithNamespace("root").WithExpiresIn(time.Minute).Token()
 	require.NoError(t, err)
 	observer := cli{env: &helpers.IntegrationTestEnv{ServerURL: fmt.Sprintf("http://localhost:%d", port), BearerToken: token}}
-	result := observer.request(t, "GET", "connectors?namespace=root&name=startup", nil, 200)
+	result := observer.request(t, "GET", "connectors?namespace=root&name="+resourceName, nil, 200)
 	require.Len(t, result["items"], 1)
 }
 
