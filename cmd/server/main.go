@@ -12,8 +12,6 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/migration"
@@ -102,26 +100,6 @@ func banner() {
 	color.Green(banner)
 }
 
-func cmdRoutes() *cobra.Command {
-	return &cobra.Command{
-		Use:   "routes",
-		Short: "Print routes exposed by app",
-		Run: func(cmd *cobra.Command, args []string) {
-			println("Admin API:")
-			server, _, _ := admin_api.GetGinServer(service.NewDependencyManager("admin-api", cfg))
-			apgin.PrintRoutes(server.Handler.(*gin.Engine))
-
-			println("\n\nAPI:")
-			server, _, _ = api.GetGinServer(service.NewDependencyManager("api", cfg))
-			apgin.PrintRoutes(server.Handler.(*gin.Engine))
-
-			println("\n\nPublic:")
-			server, _, _ = public.GetGinServer(service.NewDependencyManager("public", cfg))
-			apgin.PrintRoutes(server.Handler.(*gin.Engine))
-		},
-	}
-}
-
 func cmdServe() *cobra.Command {
 	var flags serveFlags
 
@@ -197,6 +175,7 @@ func parseMigrateArgs(args []string) (migration.Target, migration.Direction, *ui
 	if err != nil {
 		return "", "", nil, fmt.Errorf("%w; expected one of: %s", err, migration.FormatTargets())
 	}
+
 	direction := migration.DirectionUp
 	if len(args) >= 2 {
 		direction, err = migration.ParseDirection(args[1])
@@ -204,6 +183,7 @@ func parseMigrateArgs(args []string) (migration.Target, migration.Direction, *ui
 			return "", "", nil, err
 		}
 	}
+
 	var version *uint
 	if len(args) == 3 {
 		parsed, err := strconv.ParseUint(args[2], 10, 32)
@@ -216,6 +196,7 @@ func parseMigrateArgs(args []string) (migration.Target, migration.Direction, *ui
 		value := uint(parsed)
 		version = &value
 	}
+
 	return target, direction, version, nil
 }
 
@@ -233,14 +214,18 @@ func cmdMigrateStatus() *cobra.Command {
 					return fmt.Errorf("%w; expected one of: %s", err, migration.FormatTargets())
 				}
 			}
+
 			dm := newMigrationManager("migrate-status", cfg)
 			defer dm.ShutdownMigrationResources()
+
 			statuses := dm.MigrationStatuses(cmd.Context(), target)
 			printMigrationStatuses(cmd.OutOrStdout(), statuses)
+
 			var result error
 			for _, status := range statuses {
 				result = errors.Join(result, migration.IncompatibleError(status))
 			}
+
 			return result
 		},
 	}
@@ -296,7 +281,6 @@ func newRootCommand() *cobra.Command {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file; may also be specified in AUTHPROXY_CONFIG")
 
-	rootCmd.AddCommand(cmdRoutes())
 	rootCmd.AddCommand(cmdServe())
 	rootCmd.AddCommand(cmdMigrate())
 	rootCmd.AddCommand(cmdReencrypt())
