@@ -21,6 +21,22 @@ check is added, changed, or removed—including route `ForResource` /
 `ForVerb(s)` checks and direct checks such as secret replay—update that table in
 the same change.
 
+## Code comments
+
+- **Bias toward more explanatory comments when creating or changing code.**
+  Help readers understand intent and behavior without tracing the implementation.
+- Add doc comments to functions and methods, including unexported helpers,
+  explaining what they do. Describe important inputs, results, side effects,
+  error behavior, and assumptions when relevant.
+- Document structs and other substantive types with the logical concept they
+  represent, their role in the system, and important invariants. Comment fields
+  whose meaning, units, ownership, or lifecycle need explanation.
+- Use inline comments to explain non-obvious decisions, constraints, and
+  algorithms. Keep comments concise and substantive rather than restating
+  individual statements.
+- Update comments alongside behavior changes. Follow the language's doc-comment
+  conventions, including starting Go doc comments with the declared name.
+
 ## Workflow
 
 ### Preflight (required before commit)
