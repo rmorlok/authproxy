@@ -916,8 +916,9 @@ bounded usage guidance. Search offers `schema=none|compact|full`, defaulting to
 `none`, a small default limit (five), an explicit maximum, and a continuation
 cursor. `compact` removes verbose descriptions/examples but preserves validation
 constraints; `full` returns the unchanged schema. Any additional abbreviation
-must be marked as a non-executable preview that requires `describe`. Do not
-silently drain every page as existing `ap list` does. Minimal connection
+must be marked as a non-executable preview that requires `describe`. Search
+returns one page; the explicit Python `load_tools` helper described below
+traverses all pages to load the complete selected set. Minimal connection
 summaries include server-computed `canProxy` using the current actor/JWT
 intersection; connection visibility through a tool grant alone does not imply
 proxy capability.
@@ -927,6 +928,16 @@ and bounded keywords, combined with connection/ToolSet/label filters. Use a
 portable query/ranking abstraction for SQLite and PostgreSQL. Do not require
 an embedding service or LLM to operate AuthProxy. A later semantic index can
 implement the same authorized search contract without changing invocation.
+
+Accept an optional `labelSelector` using the existing
+[label-selector syntax](/concepts/labels-and-annotations/#label-selectors).
+Apply it server-side to Tool labels, including the bound connection's
+system-owned identity label `apxy/cxn/-/id=<connection-id>`, before pagination.
+This label is derived from the actual connection binding for both standalone
+and generated Tools and cannot be overridden by authored or imported metadata.
+Selectors narrow the authorized set; they never grant access. This lets clients
+select a connection's Tools through the same label-filtering mechanism as any
+other Tool grouping.
 
 ### Metadata conventions
 
@@ -1104,14 +1115,42 @@ client = AuthProxyClient(
     base_url="https://authproxy.example.com",
     token_provider=host_scoped_token,
 )
-tools = await load_tools(client, connection_ids=["cxn_01example0000001"])
+tools = await load_tools(client)
 tool_node = ToolNode(tools)
 ```
 
 This is proposed package syntax. The application also binds the same returned
-tools to its model and connects the ToolNode into its graph. Loading supports
-explicit IDs, connections, ToolSets, and bounded search results; do not eagerly
-load every authorized schema unless requested.
+tools to its model and connects the ToolNode into its graph. By default,
+`load_tools(client)` loads all Tools available to the client's JWT
+under the effective actor/JWT invocation permissions, across all connections
+and ToolSets. It traverses every authorized discovery page and obtains the full
+schemas needed to construct the wrappers. It must not silently return only the
+first search page or a truncated subset; pagination or schema-loading failures
+are reported as errors. The loader requests `includeUnavailable=true` and
+preserves readiness metadata so temporarily unavailable permitted Tools are
+included too; invocation still enforces availability and returns the existing
+availability error when appropriate.
+
+The signature is `load_tools(client, *, label_selector=None)`. The optional
+`label_selector` further restricts the loaded set and is forwarded
+as the discovery API's `labelSelector` on every page. Omitting it, passing
+`None`, or passing an empty string applies no label restriction. A selector
+matching no authorized Tools returns an empty list; an invalid selector raises
+an error. Use the existing connection identity label to load only one
+connection's Tools:
+
+```python
+tools = await load_tools(
+    client,
+    label_selector="apxy/cxn/-/id=cxn_01example0000001",
+)
+```
+
+Other Tool labels can be selected or combined using the same syntax, such as
+`capability=calendar,domain=productivity`. Connection filtering does not require
+a separate `connection_ids` loader argument. Applications that want progressive
+discovery can use the client's paginated search/describe/invoke methods or the
+meta-tools below instead of loading the full set up front.
 
 Map name, description, input JSON Schema, tags, metadata, and error handling to
 [LangChain StructuredTool](https://reference.langchain.com/python/langchain-core/tools/structured/StructuredTool).
@@ -1264,8 +1303,13 @@ Readiness to ship the full feature includes the following tests:
 - **Clients:** scoped-JWT rotation/expiry, compact pagination and full describe,
   stdout/stderr and exit-code contracts, argument files/stdin, JSONPath parsed
   before invocation, full rich-result file output, Python tenant isolation,
-  ToolNode integration, model-visible JSON-only results, error message status,
-  artifact preservation, and stale-wrapper refresh.
+  complete default Python loading across authorized pages/connections/ToolSets,
+  optional label selection including protected connection identity labels on
+  standalone and generated Tools, exclusion of matching unauthorized Tools,
+  inclusion of permitted unavailable Tools with readiness metadata, empty
+  selections, invalid selectors, and explicit loading failures, ToolNode
+  integration, model-visible JSON-only results, error message status, artifact
+  preservation, and stale-wrapper refresh.
 
 Use fake HTTP/MCP servers and captured specification fixtures for deterministic
 tests; do not depend on live third-party credentials. Add telemetry tests using
