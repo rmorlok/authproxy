@@ -5,6 +5,9 @@ title: Design notes
 These pages preserve implementation plans, migrations, and known product gaps.
 They are contributor context, not stable user-facing contracts.
 
+- [Tools, ToolSets, and agent access](/development/design/tools-and-toolsets/) —
+  proposed connection-bound execution, published ToolSet generations, live MCP
+  catalogs, agent discovery and CLI, and Python LangGraph integration.
 - [Kubernetes-style resource API migration](/development/design/kubernetes-resource-api/) —
   accepted target contract, route and payload inventory, deliberate protocol
   exceptions, and feature-branch sequencing for the breaking v1 migration.
