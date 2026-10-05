@@ -125,18 +125,19 @@ func ProxyResponseFromGentlemen(resp *gentleman.Response) (*ProxyResponse, error
 	return proxyResp, nil
 }
 
-// RawProxyRequest carries the inputs to the streaming raw-proxy path.
+// RawProxyRequest carries the inputs to the streaming proxy paths.
 // Separate from ProxyRequest because raw bodies are streamed (io.Reader on
 // the outbound request) rather than buffered into BodyRaw/BodyJson, and
-// the inbound URL + headers come pre-shaped by the route handler.
+// the URL and headers are prepared by the caller.
 type RawProxyRequest struct {
 	// Outbound is the request the orchestrator will send to the upstream.
-	// The route handler is responsible for resolving the URL (from
-	// X-AuthProxy-Upstream-URL), filtering hop-by-hop headers, and
-	// attaching the inbound body as outbound.Body. The orchestrator
-	// applies the connector's credentials via the Authenticator and
-	// sends it through httpf's *http.Client (rate-limit + OTel still
-	// apply, but gentleman's body buffering does not).
+	// Its URL and headers are cloned before credentials are applied. Calling
+	// ProxyRequestStream or ProxyRequestRaw transfers ownership of Body: it
+	// is closed even if credential resolution fails before an HTTP request
+	// can be sent. The caller must not read or reuse that body concurrently.
+	// Callers forwarding an inbound request also resolve the upstream URL
+	// and filter hop-by-hop headers before constructing this request.
+	// Requests use httpf's instrumented *http.Client without body buffering.
 	Outbound *http.Request
 	// Labels are forwarded to httpf's ForLabels chain (rate-limit,
 	// request events, OTel) — same shape as ProxyRequest.Labels for the
@@ -146,5 +147,11 @@ type RawProxyRequest struct {
 
 type Proxy interface {
 	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest) (*ProxyResponse, error)
+	// ProxyRequestStream returns response headers and a streaming body without
+	// consuming it. On success the caller must close the response body; early
+	// Close does not drain the stream. Only bodyless requests may be retried
+	// once after credential recovery from an upstream 401. See RawProxyRequest
+	// for ownership of the outgoing request body, including failure paths.
+	ProxyRequestStream(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest) (*http.Response, error)
 	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest, w http.ResponseWriter) error
 }

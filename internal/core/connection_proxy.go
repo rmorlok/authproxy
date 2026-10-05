@@ -70,8 +70,29 @@ func (c *connection) ProxyRequestRaw(
 ) error {
 	p, err := c.getProxyImpl()
 	if err != nil {
+		closeRawProxyRequestBody(req)
 		return err
 	}
 
 	return p.ProxyRequestRaw(ctx, reqType, req, w)
+}
+
+func (c *connection) ProxyRequestStream(
+	ctx context.Context,
+	reqType httpf.RequestType,
+	req *iface.RawProxyRequest,
+) (*http.Response, error) {
+	p, err := c.getProxyImpl()
+	if err != nil {
+		closeRawProxyRequestBody(req)
+		return nil, err
+	}
+
+	return p.ProxyRequestStream(ctx, reqType, req)
+}
+
+func closeRawProxyRequestBody(req *iface.RawProxyRequest) {
+	if req != nil && req.Outbound != nil && req.Outbound.Body != nil {
+		_ = req.Outbound.Body.Close()
+	}
 }

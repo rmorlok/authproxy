@@ -68,6 +68,13 @@ type Connection interface {
 		reqType httpf.RequestType,
 		req *ProxyRequest,
 	) (*ProxyResponse, error)
+	// ProxyRequestStream has the request/response body ownership and retry
+	// semantics documented on Proxy.ProxyRequestStream.
+	ProxyRequestStream(
+		ctx context.Context,
+		reqType httpf.RequestType,
+		req *RawProxyRequest,
+	) (*http.Response, error)
 	ProxyRequestRaw(
 		ctx context.Context,
 		reqType httpf.RequestType,

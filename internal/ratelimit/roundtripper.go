@@ -89,6 +89,11 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		if attr := app_metrics.AttributionFromContext(ctx); attr != nil {
 			attr.Source = app_metrics.ResponseSourceConnectorRateLimiter
 		}
+		// No downstream transport will take ownership of this body. Close
+		// it without draining a potentially open-ended upload.
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
 		return rt.syntheticTooManyRequests(remaining), nil
 	}
 
