@@ -135,6 +135,11 @@ type RawProxyRequest struct {
 	// ProxyRequestStream or ProxyRequestRaw transfers ownership of Body: it
 	// is closed even if credential resolution fails before an HTTP request
 	// can be sent. The caller must not read or reuse that body concurrently.
+	// A non-nil GetBody enables one retry after successful 401 recovery and
+	// must return a new, independent reader for the same bytes. The proxy owns
+	// each returned reader, including when retry preparation fails. It never
+	// buffers or seeks a body to replay it. GetBody must return promptly; its
+	// signature does not support cancellation while creating the reader.
 	// Callers forwarding an inbound request also resolve the upstream URL
 	// and filter hop-by-hop headers before constructing this request.
 	// Requests use httpf's instrumented *http.Client without body buffering.
@@ -149,9 +154,11 @@ type Proxy interface {
 	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest) (*ProxyResponse, error)
 	// ProxyRequestStream returns response headers and a streaming body without
 	// consuming it. On success the caller must close the response body; early
-	// Close does not drain the stream. Only bodyless requests may be retried
-	// once after credential recovery from an upstream 401. See RawProxyRequest
-	// for ownership of the outgoing request body, including failure paths.
+	// Close does not drain the stream. Bodyless requests and requests with
+	// GetBody may be retried once after credential recovery from an upstream
+	// 401. Replayability does not imply idempotency: transport errors and other
+	// status codes do not trigger this recovery retry. See RawProxyRequest for
+	// ownership of the outgoing request body, including failure paths.
 	ProxyRequestStream(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest) (*http.Response, error)
 	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest, w http.ResponseWriter) error
 }
