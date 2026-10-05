@@ -220,9 +220,9 @@ func TestProxyRequestStream_RecoversOnceWithFreshCredentials(t *testing.T) {
 	}
 }
 
-// TestProxyRequestStream_DoesNotReplayPost preserves the current bodyless-only
-// policy even when net/http could reconstruct the POST body through GetBody.
-func TestProxyRequestStream_DoesNotReplayPost(t *testing.T) {
+// TestProxyRequestStream_DoesNotReplayPostWithoutGetBody preserves one-shot
+// streaming uploads when the caller has not supplied a body-copy factory.
+func TestProxyRequestStream_DoesNotReplayPostWithoutGetBody(t *testing.T) {
 	auth := &fakeAuth{maxRecover: 1}
 	var payloads []string
 	p := newStreamTestProxy(auth, func(r *http.Request) (*http.Response, error) {
@@ -236,7 +236,7 @@ func TestProxyRequestStream_DoesNotReplayPost(t *testing.T) {
 	})
 	outbound, err := http.NewRequest(http.MethodPost, "https://example.test", strings.NewReader("payload"))
 	require.NoError(t, err)
-	require.NotNil(t, outbound.GetBody)
+	outbound.GetBody = nil
 	resp, err := p.ProxyRequestStream(context.Background(), httpf.RequestTypeProxy, &iface.RawProxyRequest{Outbound: outbound})
 	require.NoError(t, err)
 	defer resp.Body.Close()

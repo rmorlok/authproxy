@@ -11,6 +11,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -135,16 +136,14 @@ func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req
 //
 // Ownership of the outgoing body transfers on entry: validation or credential
 // resolution failures close it; once sent, the HTTP client closes it. A 401
-// permits one credential-recovery retry only when the request is bodyless.
-// GetBody and seekable bodies do not enable retries on this path.
+// permits one credential-recovery retry when the request is bodyless or GetBody
+// can provide an independent copy. Bodies are never buffered or rewound here.
 func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
 	if req == nil || req.Outbound == nil {
 		return nil, errors.New("raw proxy request requires an outbound *http.Request")
 	}
 	if req.Outbound.URL == nil {
-		if req.Outbound.Body != nil {
-			_ = req.Outbound.Body.Close()
-		}
+		closeRawRequestBody(req.Outbound)
 		return nil, errors.New("raw proxy request requires an outbound URL")
 	}
 
@@ -160,19 +159,32 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized && canRetryRawAfter401(req.Outbound.Body) {
+	if resp.StatusCode == http.StatusUnauthorized && canRetryRawAfter401(req.Outbound) {
+		if err := ctx.Err(); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
 		recoverErr := p.auth.RecoverFrom401(ctx)
+		if err := ctx.Err(); err != nil {
+			_ = resp.Body.Close()
+			return nil, err
+		}
+		// Recovery failures preserve the original, still-readable 401. Delay
+		// opening a replay body until recovery succeeds so there is no unused
+		// upload reader to clean up on that fallback path.
 		if recoverErr == nil {
-			p.logUpstreamRetryAttempted(ctx, reqType, resp.StatusCode)
 			// The discarded response could itself be an open-ended stream.
 			// Close it directly rather than waiting to drain it before retrying.
 			_ = resp.Body.Close()
-			resp, err = p.sendRaw(ctx, client, req.Outbound)
+			retry, err := rawRequestForRetry(ctx, req.Outbound)
 			if err != nil {
 				return nil, err
 			}
-		} else if !errors.Is(recoverErr, auth_methods.ErrCannotRecover) {
-			_ = recoverErr
+			p.logUpstreamRetryAttempted(ctx, reqType, resp.StatusCode)
+			resp, err = p.sendRaw(ctx, client, retry)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -186,7 +198,7 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 
 // ProxyRequestRaw forwards a streaming response into w with flushing after
 // each successful read and passes through trailers. ProxyRequestStream owns
-// credential application, middleware attribution, and bodyless 401 recovery.
+// credential application, middleware attribution, and replayable 401 recovery.
 func (p *proxy) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.RawProxyRequest, w http.ResponseWriter) error {
 	resp, err := p.ProxyRequestStream(ctx, reqType, req)
 	if err != nil {
@@ -243,34 +255,70 @@ func (p *proxy) logFinalStatus(ctx context.Context, reqType httpf.RequestType, s
 	}
 }
 
-// canRetryRawAfter401 permits recovery only for a bodyless request. This is
-// independent of the HTTP method; an empty or replayable non-nil body is still
-// excluded unless it is the standard http.NoBody sentinel.
-func canRetryRawAfter401(body io.ReadCloser) bool {
-	if body == nil {
-		return true
+// canRetryRawAfter401 permits recovery when the request is bodyless or its body
+// can be recreated. This is independent of HTTP method: replayability alone
+// does not make the operation idempotent, so only an upstream 401 enables retry.
+func canRetryRawAfter401(outbound *http.Request) bool {
+	return outbound.Body == nil || outbound.Body == http.NoBody || outbound.GetBody != nil
+}
+
+// rawRequestForRetry clones an eligible request without changing its framing,
+// URL, or headers. An existing body must come from GetBody as an independent
+// reader: net/http may still be reading or closing the original upload after
+// Do returns, so seeking or reusing that reader would race with the transport.
+// The caller owns the returned body until handing it to sendRaw. Factory errors
+// or cancellation close any newly created body and never touch the original.
+func rawRequestForRetry(ctx context.Context, outbound *http.Request) (*http.Request, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	if body == http.NoBody {
-		return true
+	retry := outbound.Clone(ctx)
+	if outbound.Body == nil || outbound.Body == http.NoBody {
+		return retry, nil
 	}
-	// Conservative default: assume the body has been (or is being)
-	// consumed and the retry would not see the same bytes. Real callers
-	// that need streaming-body 401-retry will need a rewindable body
-	// abstraction — a future PR.
-	return false
+
+	var err error
+	retry.Body, err = outbound.GetBody()
+	if contextErr := ctx.Err(); contextErr != nil {
+		closeRawRequestBody(retry)
+		return nil, contextErr
+	}
+	if err != nil {
+		closeRawRequestBody(retry)
+		return nil, fmt.Errorf("recreate raw proxy request body: %w", err)
+	}
+	if retry.Body == nil {
+		return nil, errors.New("raw proxy request GetBody returned a nil body")
+	}
+	return retry, nil
+}
+
+// closeRawRequestBody closes an outgoing body that has not been handed to the
+// HTTP client. It does not consume the stream or report close errors.
+func closeRawRequestBody(outbound *http.Request) {
+	if outbound.Body != nil {
+		_ = outbound.Body.Close()
+	}
 }
 
 // sendRaw clones the request's URL and headers for each authenticated attempt
 // so credential application never mutates the caller's request or carries
 // previous credentials into a retry. The body is not cloned and is owned by
-// this method until handed to the HTTP client.
+// this method until handed to the HTTP client; cancellation or credential
+// resolution errors before that handoff close the unsent body.
 func (p *proxy) sendRaw(ctx context.Context, client *http.Client, outbound *http.Request) (*http.Response, error) {
 	outbound = outbound.Clone(ctx)
+	if err := ctx.Err(); err != nil {
+		closeRawRequestBody(outbound)
+		return nil, err
+	}
 	app, err := p.auth.Resolve(ctx)
+	if contextErr := ctx.Err(); contextErr != nil {
+		closeRawRequestBody(outbound)
+		return nil, contextErr
+	}
 	if err != nil {
-		if outbound.Body != nil {
-			_ = outbound.Body.Close()
-		}
+		closeRawRequestBody(outbound)
 		return nil, err
 	}
 	if outbound.Header == nil {
