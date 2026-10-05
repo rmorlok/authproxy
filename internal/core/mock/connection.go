@@ -194,6 +194,14 @@ func (m *Connection) ProxyRequestRaw(
 	return nil
 }
 
+func (m *Connection) ProxyRequestStream(
+	ctx context.Context,
+	reqType httpf.RequestType,
+	req *iface.RawProxyRequest,
+) (*http.Response, error) {
+	return nil, nil
+}
+
 func (m *Connection) GetSetupStep() *cschema.SetupStep {
 	return m.SetupStep
 }

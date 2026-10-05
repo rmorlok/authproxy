@@ -180,6 +180,11 @@ func (rt *EnforcerRoundTripper) RoundTrip(
 			slog.Duration("retry_after", firing.decision.RetryAfter),
 			slog.Int("matched_rules", len(matchedSet)),
 		)
+		// No downstream transport will take ownership of this body. Close
+		// it without draining a potentially open-ended upload.
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
 		return rt.syntheticTooManyRequests(firing.rule.Id, firing.decision.RetryAfter), nil
 	}
 
