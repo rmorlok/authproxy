@@ -5,6 +5,8 @@ package oauth2
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -34,6 +36,17 @@ import (
 func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
+	// Serve the redirect destination locally so completing the browser flow
+	// does not depend on an external site's availability or HTML structure.
+	errorPage := http.NewServeMux()
+	errorPage.HandleFunc("GET /500.html", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = fmt.Fprint(w, `<!doctype html><html><body><h1 id="oauth-callback-error">OAuth callback rejected</h1></body></html>`)
+	})
+	errorServer := httptest.NewServer(errorPage)
+	t.Cleanup(errorServer.Close)
+	errorPageURL := errorServer.URL + "/500.html"
+
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	attackerExternalID := "alice-attacker-" + suffix
 	victimExternalID := "bob-victim-" + suffix
@@ -57,6 +70,9 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 		ServeMarketplaceUI: true,
 		Connectors:         []sconfig.Connector{connector},
 		LogCapture:         logCapture,
+		ConfigureRoot: func(root *sconfig.Root) {
+			root.ErrorPages.InternalError = errorPageURL
+		},
 	})
 	defer env.Cleanup()
 
@@ -129,14 +145,11 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	//    identifies the victim as the calling actor; state validation
 	//    detects ActorId mismatch and redirects to the error page.
 	forgedURL := env.PublicURL + "/oauth2/callback?state=" + url.QueryEscape(stateID) + "&code=" + url.QueryEscape(code)
-	errorPageURL := env.Cfg.GetRoot().ErrorPages.InternalError
-	require.NotEmpty(t, errorPageURL, "test config must set error_pages.internal_error")
-
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(forgedURL),
-		// example.com renders <h1>Example Domain</h1> reliably; we use
-		// it as a load signal after the proxy's 302.
-		chromedp.WaitVisible(`h1`, chromedp.ByQuery),
+		// This marker confirms that the configured error page loaded after
+		// the proxy's 302, rather than an unrelated page or browser error.
+		chromedp.WaitVisible(`#oauth-callback-error`, chromedp.ByQuery),
 	))
 
 	var finalURL string

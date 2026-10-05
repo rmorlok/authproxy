@@ -54,16 +54,17 @@ look like.
 ## What is asserted
 
 - **Browser lands on the error page.** After the 302 from the proxy,
-  the final URL is `error_pages.internal_error` (configured to
-  `https://example.com/500.html` in the test config). We use the
-  `<h1>Example Domain</h1>` element as the load signal.
+  the final URL exactly matches `ErrorPages.InternalError`, overridden
+  through `SetupOptions.ConfigureRoot` to the local test server's
+  `/500.html` URL. The fixture's unique `#oauth-callback-error` element
+  is the load signal.
 - **Exactly one `oauth callback rejected` log event** with
   `category=actor_mismatch` and `state_id` matching the minted state.
   The `actorId` field on the event reflects the *calling* actor
   (the victim) so a SOC analyst can see who clicked the link.
 - **No `oauth2_tokens` row** exists for the connection.
-- **Connection state is unchanged** — still `created`, with `setup_step`
-  and `setup_error` both nil.
+- **Connection state is unchanged** — still `ConnectionStateSetup`, with
+  `setup_step` at `OAuth2AuthorizeStepId` and `setup_error` nil.
 - **Provider observed zero `/token` calls** for the test's client id.
   The token exchange was short-circuited by state validation.
 
@@ -72,12 +73,14 @@ look like.
 | Lever                                                       | What it controls |
 | ----------------------------------------------------------- | ---------------- |
 | `helpers.SetupOptions{StartHTTPServer: true, IncludePublic: true, ServeMarketplaceUI: true, LogCapture: …}` | Real HTTP server + marketplace static assets so chromedp can bootstrap a session. |
+| `httptest.NewServer` and `SetupOptions.ConfigureRoot` | Serve the local `/500.html` error-page fixture and configure `ErrorPages.InternalError` to point to it before service initialization. |
 | `env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor("alice-attacker-…", root))` | Initiates the connection programmatically as the attacker — signs the request with a JWT carrying the attacker's external id. |
 | `provider.Authorize(...)` (`/test/authorize`)               | Mints the OAuth code without a browser. The provider doesn't care which proxy actor owns the state — it validates against its own client/user records — so the attacker can drive this leg programmatically. |
 | `env.PublicAuthUtil.GenerateBearerToken(ctx, "bob-victim-…", root, allPerms)` | Mints the JWT the victim's browser will present to the marketplace. |
 | chromedp navigation to `/connectors?authToken=<victim JWT>` | Triggers the marketplace SPA's `_initiate` call, which sets the victim's `SESSION-ID` cookie. We wait on the `Connect` button as the bootstrap-complete signal. |
 | chromedp navigation to the forged `/oauth2/callback?state=…&code=…` | Delivers the callback under the victim's cookie. The public service identifies the victim; state validation detects the actor mismatch and 302s to the error page. |
-| `chromedp.Location(&finalURL)`                              | Reads the URL the browser landed on after the 302. |
+| `chromedp.WaitVisible("#oauth-callback-error", chromedp.ByQuery)` | Waits for the local error-page fixture to load after the 302. |
+| `chromedp.Location(&finalURL)`                              | Reads the URL the browser landed on for an exact match against the configured error-page URL. |
 | `logCapture.RecordsWithMessage(t, rejectionEventMessage)`   | Surfaces the structured rejection event for assertions. |
 | `provider.Requests(EndpointToken, …)`                       | Confirms the token exchange path was never taken. |
 
@@ -94,11 +97,12 @@ sequenceDiagram
     participant DB as Postgres
     participant R as Redis
     participant P as OAuth provider<br/>(docker)
+    participant ERR as Local error-page fixture<br/>(httptest)
 
     Note over T,P: Attacker leg — programmatic, runs as alice
     T->>API: POST /api/v1/connections/_initiate<br/>(JWT signed as attacker)
     API->>R: write encrypted state envelope<br/>(ActorId = attacker)
-    API->>DB: insert connection (created, attacker actor)
+    API->>DB: persist connection (Setup, OAuth2 authorize step, attacker actor)
     API-->>T: { redirect_url containing state_id }
 
     T->>P: POST /test/authorize (client+user, decision=approve, state=state_id)
@@ -117,8 +121,10 @@ sequenceDiagram
     VIC->>PUB: GET /oauth2/callback?state=…&code=…<br/>(carries victim's SESSION-ID cookie)
     PUB->>R: GET state envelope
     PUB->>PUB: state.ActorId(attacker) ≠ caller(victim)
-    PUB-->>VIC: 302 → error_pages.internal_error
-    VIC->>VIC: load https://example.com/500.html
+    PUB-->>VIC: 302 → ErrorPages.InternalError
+    VIC->>ERR: GET /500.html
+    ERR-->>VIC: render #oauth-callback-error
+    T->>VIC: assert final URL equals configured error-page URL
 
     Note over T,PUB: An "oauth callback rejected" event with
     Note over T,PUB: category=actor_mismatch is in env.LogCapture.
@@ -132,13 +138,16 @@ populated. The auth middleware on the receiving service treats this
 as a self-asserted actor and upserts on first sight, so the test does
 not need to pre-create either actor row.
 
-## Why we rely on `https://example.com/500.html` reachability
+## Why the error page is served locally
 
-The error page redirect's destination URL comes from the test
-config's `error_pages.internal_error`. We chose `example.com` because
-it is reliably reachable and renders a stable `<h1>Example Domain</h1>`
-that chromedp can wait on as a load signal. An alternative — running
-a local HTTP stub for the error page — would add machinery without
-strengthening any assertion. The test asserts the *final URL*, not
-the page content; the `<h1>` wait is just a deterministic page-loaded
-gate.
+The test starts an `httptest.NewServer` for the error page and sets
+`ErrorPages.InternalError` to its `/500.html` URL through
+`SetupOptions.ConfigureRoot`. This removes external DNS, TLS, availability,
+and page-content dependencies from the redirect assertion. The real browser
+still establishes the victim's session through the marketplace and delivers
+the forged callback with that session cookie.
+
+After the callback redirects, chromedp waits for the fixture's unique
+`#oauth-callback-error` marker before reading the final URL. The exact URL
+assertion verifies that the browser reached the configured error page; the
+marker ensures the destination has loaded before that assertion runs.
