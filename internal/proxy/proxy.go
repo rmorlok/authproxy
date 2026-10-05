@@ -231,9 +231,15 @@ func (p *proxy) logFinalRawUpstreamStatus(ctx context.Context, reqType httpf.Req
 	p.logFinalStatus(ctx, reqType, resp.StatusCode, resp.Header.Get("Retry-After"))
 }
 
-func (p *proxy) logFinalStatus(ctx context.Context, reqType httpf.RequestType, statusCode int, retryAfter string) {
+func (p *proxy) logFinalStatus(
+	ctx context.Context,
+	reqType httpf.RequestType,
+	statusCode int,
+	retryAfter string,
+) {
 	switch {
-	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+	case statusCode == http.StatusUnauthorized ||
+		statusCode == http.StatusForbidden:
 		p.logger.WarnContext(ctx, "proxy upstream auth failure",
 			"connection_id", p.conn.GetId().String(),
 			"request_type", reqType.String(),
@@ -259,7 +265,9 @@ func (p *proxy) logFinalStatus(ctx context.Context, reqType httpf.RequestType, s
 // can be recreated. This is independent of HTTP method: replayability alone
 // does not make the operation idempotent, so only an upstream 401 enables retry.
 func canRetryRawAfter401(outbound *http.Request) bool {
-	return outbound.Body == nil || outbound.Body == http.NoBody || outbound.GetBody != nil
+	return outbound.Body == nil ||
+		outbound.Body == http.NoBody ||
+		outbound.GetBody != nil
 }
 
 // rawRequestForRetry clones an eligible request without changing its framing,
@@ -268,7 +276,10 @@ func canRetryRawAfter401(outbound *http.Request) bool {
 // Do returns, so seeking or reusing that reader would race with the transport.
 // The caller owns the returned body until handing it to sendRaw. Factory errors
 // or cancellation close any newly created body and never touch the original.
-func rawRequestForRetry(ctx context.Context, outbound *http.Request) (*http.Request, error) {
+func rawRequestForRetry(
+	ctx context.Context,
+	outbound *http.Request,
+) (*http.Request, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -306,7 +317,11 @@ func closeRawRequestBody(outbound *http.Request) {
 // previous credentials into a retry. The body is not cloned and is owned by
 // this method until handed to the HTTP client; cancellation or credential
 // resolution errors before that handoff close the unsent body.
-func (p *proxy) sendRaw(ctx context.Context, client *http.Client, outbound *http.Request) (*http.Response, error) {
+func (p *proxy) sendRaw(
+	ctx context.Context,
+	client *http.Client,
+	outbound *http.Request,
+) (*http.Response, error) {
 	outbound = outbound.Clone(ctx)
 	if err := ctx.Err(); err != nil {
 		closeRawRequestBody(outbound)
