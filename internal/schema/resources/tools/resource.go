@@ -76,7 +76,11 @@ func NewTool() *Tool {
 
 // NewToolReference returns a generation-free reference to an immutable Tool ID.
 func NewToolReference(id apid.ID) meta.ObjectReference {
-	return meta.ObjectReference{APIVersion: meta.APIVersionV1Alpha1, Kind: ToolKind, ID: id.String()}
+	return meta.ObjectReference{
+		APIVersion: meta.APIVersionV1Alpha1,
+		Kind:       ToolKind,
+		ID:         id.String(),
+	}
 }
 
 // GetId parses the Tool identity, returning apid.Nil when it is absent or invalid.
@@ -84,22 +88,28 @@ func (t *Tool) GetId() apid.ID {
 	if t == nil || t.Metadata.ID == "" {
 		return apid.Nil
 	}
+
 	if err := ValidateID(t.Metadata.ID); err != nil {
 		return apid.Nil
 	}
+
 	id, _ := apid.Parse(t.Metadata.ID)
+
 	return id
 }
 
 // ValidateID verifies that an identifier belongs to the Tool resource kind.
 func ValidateID(value string) error {
 	id, err := apid.Parse(value)
+
 	if err != nil {
 		return err
 	}
+
 	if id.Prefix() != apid.PrefixTool {
 		return fmt.Errorf("must be a tool id")
 	}
+
 	return nil
 }
 
@@ -108,9 +118,11 @@ func ValidateID(value string) error {
 // this helper does not publish a definition or allocate a revision.
 func (t *Tool) ApplyCreateDefaults(id apid.ID) *Tool {
 	clone := t.Clone()
+
 	if clone != nil && clone.Metadata.Name == "" {
 		clone.Metadata.Name = common.ResourceName(id.String())
 	}
+
 	return clone
 }
 
@@ -122,33 +134,55 @@ func (t *Tool) Validate(vc *common.ValidationContext) error {
 // ValidateFor checks resource identity, desired state, and server-owned status
 // for one lifecycle boundary. ID-only connection references still require the
 // service to resolve and verify the actual target namespace before applying.
-func (t *Tool) ValidateFor(mode meta.ValidationMode, vc *common.ValidationContext) error {
+func (t *Tool) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
 	vc = validationContext(vc)
+
 	if t == nil {
 		return vc.NewError("tool is required")
 	}
+
 	stored := mode == meta.ValidationModePersistence || mode == meta.ValidationModeResponse
+
 	var result *multierror.Error
-	result = multierror.Append(result, meta.ValidateResource(t.TypeMeta, t.Metadata, meta.ValidationOptions{
-		Mode: mode, Path: vc,
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1, ExpectedKind: ToolKind,
-		RequireID: stored, RequireName: stored, RequireNamespace: true,
-		IDValidator: ValidateID, NamespaceValidator: namespaceschema.ValidatePath,
-	}))
+	result = multierror.Append(result, meta.ValidateResource(
+		t.TypeMeta,
+		t.Metadata,
+		meta.ValidationOptions{
+			Mode:               mode,
+			Path:               vc,
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       ToolKind,
+			RequireID:          stored,
+			RequireName:        stored,
+			RequireNamespace:   true,
+			IDValidator:        ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+	))
+
 	if t.Metadata.Generation != 0 {
 		result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "does not apply to tools"))
 	}
+
 	result = multierror.Append(result, t.Spec.ValidateForNamespace(t.Metadata.Namespace, vc.PushField("spec")))
+
 	if stored && t.Spec.ConnectionRef.ID == "" {
 		result = multierror.Append(result, vc.NewErrorForField("spec.connectionRef.id", "is required for a stored connection binding"))
 	}
+
 	result = multierror.Append(result, meta.ValidateStatus(t.Status, mode, vc))
+
 	if stored && t.Status == nil {
 		result = multierror.Append(result, vc.NewErrorForField("status", "is required"))
 	}
+
 	if t.Status != nil {
 		result = multierror.Append(result, t.Status.ValidateForNamespace(t.Metadata.Namespace, vc.PushField("status")))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -164,12 +198,17 @@ func (s *ToolSpec) Validate(vc *common.ValidationContext) error {
 // execution compilation belong to the service, not these serialized contracts.
 func (s *ToolSpec) ValidateForNamespace(namespace string, vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if s == nil {
 		return vc.NewError("tool spec is required")
 	}
+
 	var result *multierror.Error
+
 	result = multierror.Append(result, ValidateConnectionReference(s.ConnectionRef, namespace, vc.PushField("connectionRef")))
+
 	result = multierror.Append(result, s.ToolDefinition.Validate(vc))
+
 	return result.ErrorOrNil()
 }
 
@@ -180,17 +219,30 @@ func (s *ToolSpec) ValidateForNamespace(namespace string, vc *common.ValidationC
 // a generation in Tool references.
 func ValidateConnectionReference(ref meta.ObjectReference, resourceNamespace string, vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	var result *multierror.Error
-	result = multierror.Append(result, meta.ValidateObjectReferenceWithOptions(ref, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1, ExpectedKind: connectionschema.ConnectionKind,
-		IDValidator: connectionschema.ValidateID, NamespaceValidator: namespaceschema.ValidatePath,
-	}, vc))
+
+	result = multierror.Append(result, meta.ValidateObjectReferenceWithOptions(
+		ref,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       connectionschema.ConnectionKind,
+			IDValidator:        connectionschema.ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+		vc,
+	))
+
 	if ref.Generation != 0 {
 		result = multierror.Append(result, vc.NewErrorForField("generation", "does not apply to connections"))
 	}
-	if resourceNamespace != "" && ref.Namespace != "" && ref.Namespace != resourceNamespace {
+
+	if resourceNamespace != "" &&
+		ref.Namespace != "" &&
+		ref.Namespace != resourceNamespace {
 		result = multierror.Append(result, vc.NewErrorfForField("namespace", "must equal the tool namespace %q", resourceNamespace))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -199,31 +251,47 @@ func ValidateConnectionReference(ref meta.ObjectReference, resourceNamespace str
 // require an atomic comparison against the previously stored revision in core.
 func (s *ToolStatus) ValidateForNamespace(namespace string, vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if s == nil {
 		return vc.NewError("tool status is required")
 	}
+
 	var result *multierror.Error
+
 	if s.Revision == 0 {
 		result = multierror.Append(result, vc.NewErrorForField("revision", "must be greater than zero"))
 	}
+
 	types := map[string]bool{}
+
 	for i, condition := range s.Conditions {
 		path := vc.PushField("conditions").PushIndex(i)
-		result = multierror.Append(result, meta.ValidateCondition(meta.Condition{
-			Type: condition.Type, Status: condition.Status,
-			LastTransitionTime: condition.LastTransitionTime, Reason: condition.Reason, Message: condition.Message,
-		}, path))
+		result = multierror.Append(result, meta.ValidateCondition(
+			meta.Condition{
+				Type:               condition.Type,
+				Status:             condition.Status,
+				LastTransitionTime: condition.LastTransitionTime,
+				Reason:             condition.Reason,
+				Message:            condition.Message,
+			},
+			path,
+		))
+
 		if types[condition.Type] {
 			result = multierror.Append(result, path.NewErrorForField("type", "must be unique within tool conditions"))
 		}
+
 		types[condition.Type] = true
+
 		if condition.ObservedRevision > s.Revision {
 			result = multierror.Append(result, path.NewErrorForField("observedRevision", "must not exceed the active tool revision"))
 		}
 	}
+
 	if s.ManagedBy != nil {
 		result = multierror.Append(result, s.ManagedBy.ValidateForNamespace(namespace, vc.PushField("managedBy")))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -232,28 +300,44 @@ func (s *ToolStatus) ValidateForNamespace(namespace string, vc *common.Validatio
 // service checks this boundary after resolving an ID-only owner reference.
 func (m *ToolManagedBy) ValidateForNamespace(namespace string, vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if m == nil {
 		return vc.NewError("tool owner is required")
 	}
+
 	var result *multierror.Error
+
 	path := vc.PushField("toolSetRef")
+
 	ref := m.ToolSetRef
-	result = multierror.Append(result, meta.ValidateObjectReferenceWithOptions(ref, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1, ExpectedKind: "ToolSet",
-		IDValidator: meta.IdValidatorForPrefix(apid.PrefixToolSet), NamespaceValidator: namespaceschema.ValidatePath,
-	}, path))
+
+	result = multierror.Append(result, meta.ValidateObjectReferenceWithOptions(
+		ref,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       "ToolSet",
+			IDValidator:        meta.IdValidatorForPrefix(apid.PrefixToolSet),
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+		path,
+	))
+
 	if ref.ID == "" {
 		result = multierror.Append(result, path.NewErrorForField("id", "is required for a stored ToolSet owner"))
 	}
+
 	if ref.Generation == 0 {
 		result = multierror.Append(result, path.NewErrorForField("generation", "must identify the applied ToolSet generation"))
 	}
+
 	if namespace != "" && ref.Namespace != "" && !namespaceschema.IsSameOrChild(ref.Namespace, namespace) {
 		result = multierror.Append(result, path.NewErrorForField("namespace", "must be the tool namespace or an ancestor"))
 	}
+
 	if strings.TrimSpace(m.SourceKey) == "" {
 		result = multierror.Append(result, vc.NewErrorForField("sourceKey", "must not be empty"))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -263,17 +347,23 @@ func (m *ToolManagedBy) ValidateForNamespace(namespace string, vc *common.Valida
 // reference validation must also be performed on the complete merged spec.
 func ValidateUpdate(before, after *Tool, vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if before == nil || after == nil {
 		return vc.NewError("before and after tools are required")
 	}
+
 	var result *multierror.Error
+
 	if before.Status != nil && before.Status.ManagedBy != nil {
 		result = multierror.Append(result, vc.NewErrorf("tool is managed by ToolSet %q; update the owning ToolSet instead", before.Status.ManagedBy.ToolSetRef.ID))
 	}
+
 	result = multierror.Append(result, meta.ValidateTypeMetaUpdate(before.TypeMeta, after.TypeMeta, vc))
 	result = multierror.Append(result, meta.ValidateMetadataUpdate(before.Metadata, after.Metadata, meta.UpdateOptions{ImmutableNamespace: true}, vc))
+
 	if !reflect.DeepEqual(before.Status, after.Status) {
 		result = multierror.Append(result, vc.NewErrorForField("status", "is server-owned and must remain unchanged"))
 	}
+
 	return result.ErrorOrNil()
 }
