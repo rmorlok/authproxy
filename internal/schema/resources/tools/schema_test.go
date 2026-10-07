@@ -279,3 +279,239 @@ func TestToolSchemaRejectsAmbiguousBodiesAndSelectors(t *testing.T) {
 		require.Error(t, compiled.Validate(document), selector)
 	}
 }
+
+// toolResourceSchemaFixture wraps an authored definition in a fully populated
+// Tool resource, including revision-aware readiness and generated ownership.
+func toolResourceSchemaFixture(t *testing.T) map[string]any {
+	t.Helper()
+	spec := toolSchemaFixture(t)
+	spec["connectionRef"] = map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "id": "cxn_example",
+	}
+	return map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1", "kind": "Tool",
+		"metadata": map[string]any{"id": "tol_example", "name": "create-item", "namespace": "root.acme"},
+		"spec":     spec,
+		"status": map[string]any{
+			"revision": 2,
+			"conditions": []any{map[string]any{
+				"type": "Ready", "status": "True", "observedRevision": 2,
+				"lastTransitionTime": "2026-10-06T12:00:00Z", "reason": "Published", "message": "Ready to invoke",
+			}},
+			"managedBy": map[string]any{
+				"toolSetRef": map[string]any{
+					"apiVersion": "authproxy.net/v1alpha1", "kind": "ToolSet", "id": "tls_example",
+					"generation": 3, "namespace": "root", "name": "provider-tools",
+				},
+				"sourceKey": "GET /v1/records/{recordId}",
+			},
+		},
+	}
+}
+
+// TestToolResourceSchemaRoundTrip checks real flat spec composition and typed
+// serialization without changing the preexisting authored-definition root.
+func TestToolResourceSchemaRoundTrip(t *testing.T) {
+	compiled, err := schema.CompileSchema(tools.SchemaIDToolResource)
+	require.NoError(t, err)
+	document := toolResourceSchemaFixture(t)
+	require.NoError(t, compiled.Validate(document))
+	encoded, err := json.Marshal(document)
+	require.NoError(t, err)
+	var resource tools.Tool
+	require.NoError(t, util.DecodeJSONStrict(encoded, &resource))
+	roundTrip, err := json.Marshal(resource)
+	require.NoError(t, err)
+	require.JSONEq(t, string(encoded), string(roundTrip))
+	asYAML, err := yaml.Marshal(resource)
+	require.NoError(t, err)
+	var fromYAML tools.Tool
+	require.NoError(t, util.DecodeYAMLStrict(asYAML, &fromYAML))
+	roundTrip, err = json.Marshal(fromYAML)
+	require.NoError(t, err)
+	require.JSONEq(t, string(encoded), string(roundTrip))
+	var decoded any
+	require.NoError(t, json.Unmarshal(roundTrip, &decoded))
+	require.NoError(t, compiled.Validate(decoded))
+	// The authored-definition root still rejects connection identity, even though
+	// ToolSpec composes those same definition fields with its reference.
+	require.Error(t, compileToolSchema(t).Validate(document["spec"]))
+
+	delete(document, "status")
+	delete(schemaObject(t, document, "metadata"), "id")
+	delete(schemaObject(t, document, "metadata"), "name")
+	schemaObject(t, document, "spec")["connectionRef"] = map[string]any{
+		"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "namespace": "root.acme", "name": "production",
+	}
+	require.NoError(t, compiled.Validate(document), "authoring may omit server fields and use a named connection")
+	document["status"] = map[string]any{"revision": 1}
+	require.NoError(t, compiled.Validate(document), "readiness observations and ownership are optional")
+}
+
+// TestToolResourceSchemaRejectsInvalidFields covers schema-owned resource and
+// reference constraints; lifecycle and cross-field comparisons remain in Go.
+func TestToolResourceSchemaRejectsInvalidFields(t *testing.T) {
+	compiled, err := schema.CompileSchema(tools.SchemaIDToolResource)
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name   string
+		path   []string
+		field  string
+		value  any
+		remove bool
+	}{
+		{name: "missing version", field: "apiVersion", remove: true},
+		{name: "wrong version", field: "apiVersion", value: "authproxy.net/v2"},
+		{name: "wrong kind", field: "kind", value: "ToolSet"},
+		{name: "missing metadata", field: "metadata", remove: true},
+		{name: "null metadata", field: "metadata", value: nil},
+		{name: "missing spec", field: "spec", remove: true},
+		{name: "unknown resource field", field: "definition", value: map[string]any{}},
+		{name: "wrong ID prefix", path: []string{"metadata"}, field: "id", value: "cxn_example"},
+		{name: "missing namespace", path: []string{"metadata"}, field: "namespace", remove: true},
+		{name: "invalid namespace", path: []string{"metadata"}, field: "namespace", value: "outside.acme"},
+		{name: "resource generation", path: []string{"metadata"}, field: "generation", value: 1},
+		{name: "unknown metadata", path: []string{"metadata"}, field: "revision", value: 1},
+		{name: "missing connection", path: []string{"spec"}, field: "connectionRef", remove: true},
+		{name: "missing description", path: []string{"spec"}, field: "description", remove: true},
+		{name: "nested definition", path: []string{"spec"}, field: "definition", value: map[string]any{}},
+		{name: "internal executor", path: []string{"spec"}, field: "mcpCall", value: map[string]any{}},
+		{name: "connection version", path: []string{"spec", "connectionRef"}, field: "apiVersion", value: "authproxy.net/v2"},
+		{name: "connection kind", path: []string{"spec", "connectionRef"}, field: "kind", value: "Connector"},
+		{name: "connection prefix", path: []string{"spec", "connectionRef"}, field: "id", value: "cxr_example"},
+		{name: "connection identity", path: []string{"spec", "connectionRef"}, field: "id", remove: true},
+		{name: "connection namespace", path: []string{"spec", "connectionRef"}, field: "namespace", value: "outside"},
+		{name: "connection generation", path: []string{"spec", "connectionRef"}, field: "generation", value: 1},
+		{name: "unknown connection field", path: []string{"spec", "connectionRef"}, field: "revision", value: 1},
+		{name: "missing revision", path: []string{"status"}, field: "revision", remove: true},
+		{name: "zero revision", path: []string{"status"}, field: "revision", value: 0},
+		{name: "fractional revision", path: []string{"status"}, field: "revision", value: 1.5},
+		{name: "unknown status field", path: []string{"status"}, field: "generation", value: 1},
+		{name: "missing source key", path: []string{"status", "managedBy"}, field: "sourceKey", remove: true},
+		{name: "blank source key", path: []string{"status", "managedBy"}, field: "sourceKey", value: " \t"},
+		{name: "unknown owner field", path: []string{"status", "managedBy"}, field: "generation", value: 1},
+		{name: "owner prefix", path: []string{"status", "managedBy", "toolSetRef"}, field: "id", value: "tol_example"},
+		{name: "owner kind", path: []string{"status", "managedBy", "toolSetRef"}, field: "kind", value: "Tool"},
+		{name: "canonical owner ID required", path: []string{"status", "managedBy", "toolSetRef"}, field: "id", remove: true},
+		{name: "owner generation required", path: []string{"status", "managedBy", "toolSetRef"}, field: "generation", remove: true},
+		{name: "owner generation positive", path: []string{"status", "managedBy", "toolSetRef"}, field: "generation", value: 0},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			document := toolResourceSchemaFixture(t)
+			object := schemaObject(t, document, test.path...)
+			if test.remove {
+				delete(object, test.field)
+			} else {
+				object[test.field] = test.value
+			}
+			require.Error(t, compiled.Validate(document))
+		})
+	}
+}
+
+// TestToolConditionAndReferenceSchemas checks the revision-based condition
+// vocabulary and generation-free Tool reference independently of an envelope.
+func TestToolConditionAndReferenceSchemas(t *testing.T) {
+	conditionSchema, err := schema.CompileSchema(tools.SchemaIDToolResource + "#/$defs/ToolCondition")
+	require.NoError(t, err)
+	for _, test := range []struct {
+		field string
+		value any
+		valid bool
+	}{
+		{"status", "Unknown", true}, {"observedRevision", 0, true}, {"observedRevision", 1, true},
+		{"observedRevision", -1, false}, {"observedGeneration", 1, false}, {"status", "ready", false},
+		{"type", "", false}, {"lastTransitionTime", nil, false}, {"unknown", true, false},
+	} {
+		condition := map[string]any{"type": "Ready", "status": "True", "lastTransitionTime": "2026-10-06T12:00:00Z"}
+		condition[test.field] = test.value
+		err := conditionSchema.Validate(condition)
+		if test.valid {
+			require.NoError(t, err)
+		} else {
+			require.Error(t, err, "%s=%v", test.field, test.value)
+		}
+	}
+	referenceSchema, err := schema.CompileSchema(tools.SchemaIDToolResource + "#/$defs/ToolReference")
+	require.NoError(t, err)
+	reference := map[string]any{"apiVersion": "authproxy.net/v1alpha1", "kind": "Tool", "id": "tol_example"}
+	require.NoError(t, referenceSchema.Validate(reference))
+	reference["generation"] = 1
+	require.Error(t, referenceSchema.Validate(reference))
+	delete(reference, "generation")
+	reference["id"] = "tls_example"
+	require.Error(t, referenceSchema.Validate(reference))
+	delete(reference, "id")
+	reference["name"], reference["namespace"] = "create-item", "root.acme"
+	require.NoError(t, referenceSchema.Validate(reference))
+}
+
+// TestToolPatchSchemaFields validates partial replacements independently from
+// the complete definition that ApplyTo constructs and validates afterward.
+func TestToolPatchSchemaFields(t *testing.T) {
+	compiled, err := schema.CompileSchema(tools.SchemaIDToolPatch)
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name, spec string
+		valid      bool
+	}{
+		{"empty patch", `{}`, true},
+		{"description only", `{"description":"Renamed operation"}`, true},
+		{"verbs only", `{"verbs":["tool:read"]}`, true},
+		{"input schema only", `{"inputSchema":{"type":"object"}}`, true},
+		{"output false", `{"outputSchema":false}`, true},
+		{"clear optional fields", `{"outputSchema":null,"hints":null,"limits":null,"proxyHttp":null,"javascript":null}`, true},
+		{"executor switch", `{"proxyHttp":null,"javascript":"async function execute() {}"}`, true},
+		{"executors checked after merge", `{"proxyHttp":{"method":"GET","url":"https://example.test"},"javascript":"code"}`, true},
+		{"connection ID", `{"connectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_example"}}`, true},
+		{"connection name", `{"connectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","namespace":"root.acme","name":"production"}}`, true},
+		{"null connection", `{"connectionRef":null}`, false},
+		{"null description", `{"description":null}`, false},
+		{"null verbs", `{"verbs":null}`, false},
+		{"null input schema", `{"inputSchema":null}`, false},
+		{"empty verbs", `{"verbs":[]}`, false},
+		{"incomplete executor replacement", `{"proxyHttp":{"url":"https://example.test"}}`, false},
+		{"invalid optional field", `{"hints":{"readOnly":"yes"}}`, false},
+		{"invalid cleared field replacement", `{"limits":{"maxRequests":0}}`, false},
+		{"internal executor", `{"openapiOperation":{}}`, false},
+		{"unknown field", `{"definition":{}}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var spec any
+			require.NoError(t, json.Unmarshal([]byte(test.spec), &spec))
+			document := map[string]any{
+				"apiVersion": "authproxy.net/v1alpha1", "kind": "Tool", "metadata": map[string]any{}, "spec": spec,
+			}
+			err := compiled.Validate(document)
+			if test.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+	for _, test := range []struct {
+		field  string
+		value  any
+		remove bool
+	}{
+		{field: "metadata", remove: true}, {field: "spec", remove: true},
+		{field: "metadata", value: nil}, {field: "spec", value: nil},
+		{field: "status", value: nil}, {field: "status", value: map[string]any{"revision": 2}},
+		{field: "kind", value: "ToolSet"}, {field: "unknown", value: true},
+		{field: "metadata", value: map[string]any{"generation": 1}},
+		{field: "metadata", value: map[string]any{"id": "cxn_example"}},
+		{field: "metadata", value: map[string]any{"createdAt": "2026-10-06T12:00:00Z"}},
+		{field: "metadata", value: map[string]any{"updatedAt": "2026-10-06T12:00:00Z"}},
+	} {
+		document := map[string]any{
+			"apiVersion": "authproxy.net/v1alpha1", "kind": "Tool", "metadata": map[string]any{}, "spec": map[string]any{},
+		}
+		if test.remove {
+			delete(document, test.field)
+		} else {
+			document[test.field] = test.value
+		}
+		require.Error(t, compiled.Validate(document), "field %s", test.field)
+	}
+}

@@ -311,7 +311,7 @@ func validateFieldValue(value any, vc *common.ValidationContext) error {
 			if _, nested := item.([]any); nested {
 				return vc.PushIndex(i).NewError("must be a scalar or typed lookup")
 			}
-			
+
 			if err := validateFieldValue(item, vc.PushIndex(i)); err != nil {
 				return err
 			}
