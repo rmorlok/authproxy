@@ -634,6 +634,74 @@ aws ec2 describe-network-interfaces \
 Delete them with `aws elbv2 delete-load-balancer` /
 `aws ec2 delete-network-interface`, then rerun `terraform destroy`.
 
+### 4.7 Demo returns 503 after a worker becomes NotReady
+
+**Symptom:** ingress returns 503, demo pods remain Pending, and scheduling
+events report `Too many pods` alongside an unreachable-node taint. A deploy
+may time out waiting for a backing service before updating AuthProxy.
+
+Check worker readiness, pod capacity, and service endpoints first:
+
+```bash
+kubectl get nodes -o wide
+kubectl describe node <node-name>
+kubectl -n demo get pods -o wide
+kubectl -n demo get events --sort-by=.lastTimestamp
+kubectl -n demo get endpointslice \
+  -l kubernetes.io/service-name=demo-demo-shell -o yaml
+aws eks list-nodegroups --cluster-name authproxy-eks --region us-east-1
+```
+
+The node's `providerID` identifies its EC2 instance. EC2 status checks can
+pass while kubelet is unreachable; compare them with the node's `Ready`
+condition and last heartbeat. An image rollback cannot recover a failed
+worker or create scheduling capacity.
+
+The Terraform managed node group enables `node_repair_config.enabled`.
+Verify the deployed setting using the node group name from the preceding
+command:
+
+```bash
+DEMO_NODEGROUP='<managed-nodegroup-name>'
+aws eks describe-nodegroup --cluster-name authproxy-eks \
+  --nodegroup-name "$DEMO_NODEGROUP" --region us-east-1 \
+  --query 'nodegroup.{repair:nodeRepairConfig,scaling:scalingConfig,health:health}'
+
+# Urgent repair enablement; reconcile any out-of-band settings in Terraform.
+aws eks update-nodegroup-config --cluster-name authproxy-eks \
+  --nodegroup-name "$DEMO_NODEGROUP" --region us-east-1 \
+  --node-repair-config enabled=true
+```
+
+[EKS node auto repair](https://docs.aws.amazon.com/eks/latest/userguide/node-repair.html)
+normally replaces a node after its unhealthy `Ready` condition persists
+for 30 minutes. This check does not require the node-monitoring add-on.
+The default 20% unhealthy-node stop threshold applies only to managed
+groups with more than five nodes, so one failed worker in a two-node group
+is eligible. Auto repair does not reserve failover capacity or repair
+`MemoryPressure` and `DiskPressure`; keep enough spare pod slots, memory,
+and disk for surviving workers and deployment rollouts.
+
+If a worker remains unreachable and needs immediate replacement, identify
+the failed EC2 instance and verify that its persistent data volumes have
+`DeleteOnTermination=false`. Preserve the demo PVCs, PVs, and EBS volumes.
+Then [replace the failed instance through its Auto Scaling group](https://docs.aws.amazon.com/cli/latest/reference/autoscaling/terminate-instance-in-auto-scaling-group.html)
+without reducing desired capacity:
+
+```bash
+aws autoscaling terminate-instance-in-auto-scaling-group \
+  --instance-id <failed-instance-id> \
+  --no-should-decrement-desired-capacity --region us-east-1
+```
+
+Bound EBS volumes require a schedulable worker in the volume's Availability
+Zone. Inspect `kubectl describe pv <pv-name>` for node affinity when a
+stateful pod stays Pending after replacement. Add capacity in the required
+zone if necessary; deleting a PVC to bypass affinity can delete its data.
+Wait for nodes, volume attachments, and demo deployments to become ready,
+then rerun the failed deployment and its smoke tests. Reconcile temporary
+capacity changes with the intended Terraform configuration after recovery.
+
 ---
 
 ## 5. Cost monitoring

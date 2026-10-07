@@ -1,6 +1,7 @@
 module "eks" {
+  # Node auto repair requires module v20.33 or newer.
   source  = "terraform-aws-modules/eks/aws"
-  version = "~> 20.24"
+  version = "~> 20.33"
 
   cluster_name    = var.cluster_name
   cluster_version = var.kubernetes_version
@@ -32,6 +33,13 @@ module "eks" {
       min_size     = var.node_group_min_size
       desired_size = var.node_group_desired_size
       max_size     = var.node_group_max_size
+
+      # Replace nodes that remain NotReady so a failed kubelet cannot leave
+      # the demo without capacity until an operator intervenes. EKS handles
+      # the standard Ready condition without the node-monitoring add-on.
+      node_repair_config = {
+        enabled = true
+      }
 
       labels = {
         role = "general"
