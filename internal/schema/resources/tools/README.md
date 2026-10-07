@@ -1,4 +1,4 @@
-# Authored Tool definitions
+# Tool resources and authored definitions
 
 This package owns `ToolDefinition`, the reusable definition shared by standalone
 Tools and explicit ToolSet templates. It contains descriptions, permission verb
@@ -6,17 +6,49 @@ aliases, input/output schemas, behavioral hints, execution limits, and exactly
 one `proxyHttp` or `javascript` executor. Definitions are trusted administrator
 input; hints do not authorize an operation or prove that it is safe to retry.
 
-This is a contract foundation. Tool resource identity, patches, revisions,
-ToolSet generations, compiler-produced OpenAPI/MCP plans, management routes,
-registry/apply support, and execution are introduced in later changes. The
-package does not import API DTOs or register a usable resource prematurely.
+`Tool` adds the resource envelope: `metadata` carries a `tol_` identity and
+namespace, `spec` combines `connectionRef` with the flat definition fields, and
+server-owned `status` carries a positive revision and readiness conditions.
+Tools have no `metadata.generation`. Conditions report `observedRevision`;
+zero or omission means no revision has been observed yet. Generated Tools carry
+`managedBy.toolSetRef` with a canonical `tls_` ID and applied generation, plus
+an exact `sourceKey`. These contracts currently describe authored executors,
+including explicit templates materialized by a future ToolSet controller.
+
+This is a contract foundation. ToolSet resources, compiler-produced OpenAPI/MCP
+plans, management routes, registry/apply support, persistence, and execution are
+introduced in later changes. The package does not import API DTOs or register a
+usable resource prematurely.
+
+Call `Tool.ValidateFor` with the relevant lifecycle mode. Authored resources
+accept a connection ID or namespace/name; stored and response resources require
+the resolved ID and status. An explicit connection namespace must equal the
+Tool namespace. The service must resolve references and verify the actual
+target namespace, including for ID-only references. An explicit ToolSet owner
+namespace must be the Tool's namespace or an ancestor. Status is rejected on
+authoring writes; neither schema validation nor patch application publishes or
+increments a revision.
+
+`ToolPatch` requires `metadata` and `spec` objects, which may be empty. Omitted
+spec fields preserve the current value; supplied fields replace the entire
+field. Null clears optional output schemas, hints, limits, and executors. Null
+is invalid for connection references, descriptions, verbs, and input schemas.
+Switching executors requires clearing the old executor and supplying the new
+one in the same patch. Metadata follows the shared patch convention: omitted
+or null maps retain the current map, while `{}` clears it. `ApplyTo` validates
+the complete resulting definition and returns a detached candidate, preserving
+the original resource and its server status. Identity and namespace stay
+immutable; standalone connection references may change within that namespace.
+Direct updates to generated Tools fail with the owning ToolSet identity.
 
 Use the repository's strict JSON/YAML decoders at input boundaries, then call
 `ToolDefinition.Validate`. The embedded JSON schema describes the authored wire
-shape. Go validation also compiles the native schemas and checks constraints
+shape. `SchemaIDToolResource` and `SchemaIDToolPatch` identify the separate
+resource and partial-update schemas in `schema-resource.json`. Go validation
+also compiles the native schemas and checks constraints
 such as conflicting HTTP error rules. Unknown authored fields, including
 `openapiOperation` and `mcpCall`, are rejected by strict decoding and the schema.
-The schema's open `ToolDefinitionFields` definition supports future flat spec
+The schema's open `ToolDefinitionFields` definition supports flat spec
 composition; `ToolDefinition` and the schema root close unknown fields.
 
 Input schemas explicitly declare top-level `type: object` (or `[object]`).

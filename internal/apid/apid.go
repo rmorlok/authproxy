@@ -38,6 +38,10 @@ const (
 	PrefixRateLimit           Prefix = "rl_"
 	PrefixSetupToken          Prefix = "stk_"
 	PrefixNotification        Prefix = "ntf_"
+	// PrefixTool identifies a callable Tool independently of its current revision.
+	PrefixTool Prefix = "tol_"
+	// PrefixToolSet identifies the owner of a generated Tool across generations.
+	PrefixToolSet Prefix = "tls_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
@@ -60,6 +64,8 @@ var validPrefixes = map[Prefix]bool{
 	PrefixRateLimit:           true,
 	PrefixSetupToken:          true,
 	PrefixNotification:        true,
+	PrefixTool:                true,
+	PrefixToolSet:             true,
 }
 
 // ID is a prefixed identifier string. The zero value is Nil (empty string).

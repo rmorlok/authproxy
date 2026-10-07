@@ -34,6 +34,23 @@ func TestNewConnectorGenerationPrefix(t *testing.T) {
 	require.Len(t, string(id), 4+suffixLen)
 }
 
+// TestToolPrefixes verifies that Tool and ToolSet identities round-trip through
+// the shared ID parser while retaining distinct entity types.
+func TestToolPrefixes(t *testing.T) {
+	for _, prefix := range []Prefix{PrefixTool, PrefixToolSet} {
+		t.Run(string(prefix), func(t *testing.T) {
+			id := New(prefix)
+			require.Len(t, id.String(), len(prefix)+suffixLen)
+			parsed, err := Parse(id.String())
+			require.NoError(t, err)
+			require.Equal(t, id, parsed)
+			require.Equal(t, prefix, parsed.Prefix())
+			require.NoError(t, parsed.ValidatePrefix(prefix))
+			require.Error(t, parsed.ValidatePrefix(PrefixConnection))
+		})
+	}
+}
+
 func TestParse(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		id, err := Parse("act_7Ks9mPqR2xvN3bXY")

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/tools/schema-resource.json",
+  "$ref": "#/$defs/Tool",
+  "$defs": {
+    "ToolMetadata": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+        {
+          "type": "object",
+          "required": ["namespace"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^tol_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": false
+          }
+        }
+      ]
+    },
+    "ToolMetadataPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "pattern": "^tol_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": false,
+            "createdAt": false,
+            "updatedAt": false
+          }
+        }
+      ]
+    },
+    "ToolReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Tool" },
+            "id": { "type": "string", "pattern": "^tol_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": false
+          }
+        }
+      ]
+    },
+    "ToolConnectionReference": {
+      "allOf": [
+        { "$ref": "../connection/schema.json#/$defs/ConnectionReference" },
+        {
+          "type": "object",
+          "properties": {
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+          }
+        }
+      ],
+      "description": "A Connection ID or namespaced name without a generation. Resource validation checks explicit namespace equality; the service resolves IDs and verifies the actual connection namespace."
+    },
+    "ToolSpec": {
+      "allOf": [
+        { "$ref": "schema.json#/$defs/ToolDefinitionFields" },
+        {
+          "type": "object",
+          "required": ["connectionRef"],
+          "properties": {
+            "connectionRef": { "$ref": "#/$defs/ToolConnectionReference" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ToolCondition": {
+      "type": "object",
+      "required": ["type", "status", "lastTransitionTime"],
+      "properties": {
+        "type": { "$ref": "../meta/schema.json#/$defs/Condition/properties/type" },
+        "status": { "$ref": "../meta/schema.json#/$defs/Condition/properties/status" },
+        "observedRevision": { "type": "integer", "minimum": 0 },
+        "lastTransitionTime": { "$ref": "../meta/schema.json#/$defs/Condition/properties/lastTransitionTime" },
+        "reason": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "Readiness observed for a Tool revision. Zero or omitted observedRevision means no revision has been observed. Go validation rejects duplicate condition types and observations newer than the active revision."
+    },
+    "ToolSetOwnerReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "required": ["id", "generation"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolSet" },
+            "id": { "type": "string", "pattern": "^tls_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ],
+      "description": "The canonical ID and applied generation of the managing ToolSet. Resource validation and reference resolution enforce ownership within the Tool namespace or an ancestor."
+    },
+    "ToolManagedBy": {
+      "type": "object",
+      "required": ["toolSetRef", "sourceKey"],
+      "properties": {
+        "toolSetRef": { "$ref": "#/$defs/ToolSetOwnerReference" },
+        "sourceKey": { "$ref": "schema.json#/$defs/NonBlankString" }
+      },
+      "additionalProperties": false
+    },
+    "ToolStatus": {
+      "type": "object",
+      "required": ["revision"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "conditions": { "type": "array", "items": { "$ref": "#/$defs/ToolCondition" } },
+        "managedBy": { "$ref": "#/$defs/ToolManagedBy" }
+      },
+      "additionalProperties": false,
+      "description": "Server-owned publication revision, readiness, and optional generated ownership. Lifecycle validation forbids authored status and requires status on stored and response resources."
+    },
+    "Tool": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Tool" },
+            "metadata": { "$ref": "#/$defs/ToolMetadata" },
+            "spec": { "$ref": "#/$defs/ToolSpec" },
+            "status": { "$ref": "#/$defs/ToolStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "ToolSpecPatch": {
+      "type": "object",
+      "properties": {
+        "connectionRef": { "$ref": "#/$defs/ToolConnectionReference" },
+        "description": { "$ref": "schema.json#/$defs/NonBlankString" },
+        "verbs": { "$ref": "schema.json#/$defs/ToolDefinitionFields/properties/verbs" },
+        "inputSchema": { "$ref": "schema.json#/$defs/InputSchema" },
+        "outputSchema": { "anyOf": [{ "$ref": "schema.json#/$defs/OutputSchema" }, { "type": "null" }] },
+        "hints": { "anyOf": [{ "$ref": "schema.json#/$defs/ToolHints" }, { "type": "null" }] },
+        "limits": { "anyOf": [{ "$ref": "schema.json#/$defs/ExecutionLimits" }, { "type": "null" }] },
+        "proxyHttp": { "anyOf": [{ "$ref": "schema.json#/$defs/ProxyHTTP" }, { "type": "null" }] },
+        "javascript": { "anyOf": [{ "$ref": "schema.json#/$defs/NonBlankString" }, { "type": "null" }] }
+      },
+      "additionalProperties": false,
+      "description": "Presence-aware whole-field replacements. Omission retains the current field; null clears only optional fields. Apply all fields before validating the complete definition and its single executor."
+    },
+    "ToolPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "spec"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "Tool" },
+            "metadata": { "$ref": "#/$defs/ToolMetadataPatch" },
+            "spec": { "$ref": "#/$defs/ToolSpecPatch" },
+            "status": false
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}
