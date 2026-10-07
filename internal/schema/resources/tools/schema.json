@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/tools/schema.json",
+  "$ref": "#/$defs/ToolDefinition",
+  "$defs": {
+    "NonBlankString": { "type": "string", "pattern": "\\S" },
+    "InputSchema": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "enum": ["object", ["object"]] }
+      },
+      "description": "An object-rooted JSON Schema. Publication validation compiles the native 2020-12 dialect, disables external resource loading, and enforces complexity limits. Authored schema properties remain opaque to the resource contract."
+    },
+    "OutputSchema": {
+      "type": ["object", "boolean"],
+      "description": "An optional JSON Schema for successful structured output; the same dialect, reference, and complexity checks apply as for inputSchema."
+    },
+    "ToolHints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "readOnly": { "type": "boolean" },
+        "destructive": { "type": "boolean" },
+        "idempotent": { "type": "boolean" }
+      }
+    },
+    "ExecutionLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeoutMillis": { "type": "integer", "minimum": 1 },
+        "maxRequests": { "type": "integer", "minimum": 1 },
+        "maxInputBytes": { "type": "integer", "minimum": 1 },
+        "maxOutputBytes": { "type": "integer", "minimum": 1 },
+        "maxResponseBytes": { "type": "integer", "minimum": 1 },
+        "maxEncodedResultBytes": { "type": "integer", "minimum": 1 },
+        "maxStackDepth": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "Scalar": { "type": ["string", "number", "boolean", "null"] },
+    "ValueDirective": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "propertyNames": { "const": "$value" },
+      "additionalProperties": { "$ref": "#/$defs/NonBlankString" },
+      "description": "The exact single-key typed-value directive. Its key belongs to the template language."
+    },
+    "ParameterValue": {
+      "oneOf": [
+        { "$ref": "#/$defs/Scalar" },
+        {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/Scalar" },
+              { "$ref": "#/$defs/ValueDirective" }
+            ]
+          }
+        },
+        { "$ref": "#/$defs/ValueDirective" }
+      ]
+    },
+    "ParameterMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/ParameterValue" }
+    },
+    "BodyTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mediaType", "template"],
+      "properties": {
+        "mediaType": { "$ref": "#/$defs/NonBlankString" },
+        "template": { "type": "string" }
+      }
+    },
+    "FormBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fields"],
+      "properties": {
+        "fields": { "$ref": "#/$defs/ParameterMap" }
+      }
+    },
+    "MultipartPart": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/NonBlankString" },
+        "filename": { "type": "string" },
+        "mediaType": { "type": "string" },
+        "text": { "type": "string" },
+        "bodyRaw": { "type": "string" }
+      },
+      "oneOf": [{ "required": ["text"] }, { "required": ["bodyRaw"] }]
+    },
+    "MultipartBody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parts"],
+      "properties": {
+        "parts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/MultipartPart" }
+        }
+      }
+    },
+    "ResponseError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "integer", "minimum": 100, "maximum": 599 }
+        },
+        "statusClass": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "default": { "const": true },
+        "code": { "$ref": "#/$defs/NonBlankString" },
+        "message": { "$ref": "#/$defs/NonBlankString" },
+        "retryable": { "type": "boolean" }
+      },
+      "oneOf": [
+        { "required": ["statuses"] },
+        { "required": ["statusClass"] },
+        { "required": ["default"] }
+      ]
+    },
+    "HTTPResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "transformJavascript": { "$ref": "#/$defs/NonBlankString" },
+        "errors": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ResponseError" },
+          "description": "Publication validation rejects duplicate selectors at the same priority. Exact statuses take precedence over status classes, then the default."
+        }
+      }
+    },
+    "ProxyHTTP": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "url"],
+      "properties": {
+        "method": { "type": "string", "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$" },
+        "url": { "$ref": "#/$defs/NonBlankString" },
+        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+        "query": { "$ref": "#/$defs/ParameterMap" },
+        "bodyJson": true,
+        "bodyTemplate": { "$ref": "#/$defs/BodyTemplate" },
+        "bodyRaw": { "type": "string" },
+        "form": { "$ref": "#/$defs/FormBody" },
+        "multipart": { "$ref": "#/$defs/MultipartBody" },
+        "response": { "$ref": "#/$defs/HTTPResponse" }
+      },
+      "oneOf": [
+        {
+          "not": {
+            "anyOf": [
+              { "required": ["bodyJson"] },
+              { "required": ["bodyTemplate"] },
+              { "required": ["bodyRaw"] },
+              { "required": ["form"] },
+              { "required": ["multipart"] }
+            ]
+          }
+        },
+        { "required": ["bodyJson"] },
+        { "required": ["bodyTemplate"] },
+        { "required": ["bodyRaw"] },
+        { "required": ["form"] },
+        { "required": ["multipart"] }
+      ]
+    },
+    "ToolDefinitionFields": {
+      "type": "object",
+      "required": ["description", "verbs", "inputSchema"],
+      "properties": {
+        "description": { "$ref": "#/$defs/NonBlankString" },
+        "verbs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/NonBlankString" }
+        },
+        "inputSchema": { "$ref": "#/$defs/InputSchema" },
+        "outputSchema": { "$ref": "#/$defs/OutputSchema" },
+        "hints": { "$ref": "#/$defs/ToolHints" },
+        "limits": { "$ref": "#/$defs/ExecutionLimits" },
+        "proxyHttp": { "$ref": "#/$defs/ProxyHTTP" },
+        "javascript": { "$ref": "#/$defs/NonBlankString" }
+      },
+      "oneOf": [{ "required": ["proxyHttp"] }, { "required": ["javascript"] }]
+    },
+    "ToolDefinition": {
+      "allOf": [{ "$ref": "#/$defs/ToolDefinitionFields" }],
+      "unevaluatedProperties": false
+    }
+  }
+}
