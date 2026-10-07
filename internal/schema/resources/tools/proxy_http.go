@@ -17,11 +17,16 @@ type ProxyHTTP struct {
 	Method  string            `json:"method" yaml:"method"`
 	URL     string            `json:"url" yaml:"url"`
 	Headers map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
+
 	// Query contains unencoded scalar or repeated scalar values. A single-key
 	// $value object inserts a typed value from invocation context at runtime.
 	Query map[string]common.RawJSON `json:"query,omitempty" yaml:"query,omitempty"`
+
+	//
 	// At most one body mode may be present. RawJSON retains explicit JSON null
 	// as a body, while nil means no bodyJson mode was supplied.
+	//
+
 	BodyJSON     common.RawJSON `json:"bodyJson,omitempty" yaml:"bodyJson,omitempty"`
 	BodyTemplate *BodyTemplate  `json:"bodyTemplate,omitempty" yaml:"bodyTemplate,omitempty"`
 	// BodyRaw is base64, optionally produced by a string template. It never
@@ -29,7 +34,8 @@ type ProxyHTTP struct {
 	BodyRaw   *string        `json:"bodyRaw,omitempty" yaml:"bodyRaw,omitempty"`
 	Form      *FormBody      `json:"form,omitempty" yaml:"form,omitempty"`
 	Multipart *MultipartBody `json:"multipart,omitempty" yaml:"multipart,omitempty"`
-	Response  *HTTPResponse  `json:"response,omitempty" yaml:"response,omitempty"`
+
+	Response *HTTPResponse `json:"response,omitempty" yaml:"response,omitempty"`
 
 	// nullBodyFields preserves malformed explicit nulls that pointer decoding
 	// would otherwise mistake for an omitted non-JSON body mode.
@@ -93,23 +99,29 @@ type HTTPErrorRule struct {
 func (p *ProxyHTTP) UnmarshalJSON(data []byte) error {
 	type plain ProxyHTTP
 	var decoded plain
+
 	if err := util.DecodeJSONStrict(data, &decoded); err != nil {
 		return err
 	}
+
 	var fields map[string]json.RawMessage
+
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
+
 	*p = ProxyHTTP(decoded)
 	for field, raw := range fields {
 		if strings.TrimSpace(string(raw)) != "null" {
 			continue
 		}
+
 		switch strings.ToLower(field) {
 		case "bodytemplate", "bodyraw", "form", "multipart":
 			p.nullBodyFields = append(p.nullBodyFields, field)
 		}
 	}
+
 	return nil
 }
 
@@ -131,22 +143,28 @@ func (b *BodyTemplate) UnmarshalJSON(data []byte) error {
 		MediaType string  `json:"mediaType"`
 		Template  *string `json:"template"`
 	}
+
 	if err := util.DecodeJSONStrict(data, &wire); err != nil {
 		return err
 	}
+
 	if wire.Template == nil {
 		return fmt.Errorf("bodyTemplate.template is required and must not be null")
 	}
+
 	*b = BodyTemplate{MediaType: wire.MediaType, Template: *wire.Template}
+
 	return nil
 }
 
 // UnmarshalYAML applies the same template-presence policy as the JSON contract.
 func (b *BodyTemplate) UnmarshalYAML(node *yaml.Node) error {
 	var raw common.RawJSON
+
 	if err := raw.UnmarshalYAML(node); err != nil {
 		return err
 	}
+
 	return b.UnmarshalJSON(raw)
 }
 
@@ -155,28 +173,37 @@ func (b *BodyTemplate) UnmarshalYAML(node *yaml.Node) error {
 func (p *MultipartPart) UnmarshalJSON(data []byte) error {
 	type plain MultipartPart
 	var decoded plain
+
 	if err := util.DecodeJSONStrict(data, &decoded); err != nil {
 		return err
 	}
+
 	var fields map[string]json.RawMessage
+
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
+
 	for field, raw := range fields {
-		if (strings.EqualFold(field, "text") || strings.EqualFold(field, "bodyRaw")) && strings.TrimSpace(string(raw)) == "null" {
+		if (strings.EqualFold(field, "text") || strings.EqualFold(field, "bodyRaw")) &&
+			strings.TrimSpace(string(raw)) == "null" {
 			return fmt.Errorf("multipart part %s must not be null", field)
 		}
 	}
+
 	*p = MultipartPart(decoded)
+
 	return nil
 }
 
 // UnmarshalYAML applies the same part-mode policy as the JSON contract.
 func (p *MultipartPart) UnmarshalYAML(node *yaml.Node) error {
 	var raw common.RawJSON
+
 	if err := raw.UnmarshalYAML(node); err != nil {
 		return err
 	}
+
 	return p.UnmarshalJSON(raw)
 }
 
@@ -185,13 +212,17 @@ func (p *MultipartPart) UnmarshalYAML(node *yaml.Node) error {
 func (r *HTTPErrorRule) UnmarshalJSON(data []byte) error {
 	type plain HTTPErrorRule
 	var decoded plain
+
 	if err := util.DecodeJSONStrict(data, &decoded); err != nil {
 		return err
 	}
+
 	var fields map[string]json.RawMessage
+
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
+
 	for field, raw := range fields {
 		switch strings.ToLower(field) {
 		case "statuses", "statusclass":
@@ -204,6 +235,7 @@ func (r *HTTPErrorRule) UnmarshalJSON(data []byte) error {
 			}
 		}
 	}
+
 	*r = HTTPErrorRule(decoded)
 	return nil
 }
