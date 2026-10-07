@@ -38,10 +38,8 @@ const (
 	PrefixRateLimit           Prefix = "rl_"
 	PrefixSetupToken          Prefix = "stk_"
 	PrefixNotification        Prefix = "ntf_"
-	// PrefixTool identifies a callable Tool independently of its current revision.
-	PrefixTool Prefix = "tol_"
-	// PrefixToolSet identifies the owner of a generated Tool across generations.
-	PrefixToolSet Prefix = "tls_"
+	PrefixTool                Prefix = "tol_"
+	PrefixToolSet             Prefix = "tls_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
