@@ -71,14 +71,15 @@ func (d *ToolDefinition) Clone() *ToolDefinition {
 		clone.Limits.MaxStackDepth = util.CloneValue(d.Limits.MaxStackDepth)
 	}
 
-	clone.ProxyHTTP = cloneProxyHTTP(d.ProxyHTTP)
+	clone.ProxyHTTP = d.ProxyHTTP.Clone()
 
 	return &clone
 }
 
-// cloneProxyHTTP preserves each body mode and its wire-presence validation
-// state while detaching all mutable request and response mapping values.
-func cloneProxyHTTP(p *ProxyHTTP) *ProxyHTTP {
+// Clone returns a detached HTTP plan, preserving each body mode and its
+// wire-presence validation state. A nil plan remains nil; all mutable request
+// and response mapping values are copied without interpreting raw JSON.
+func (p *ProxyHTTP) Clone() *ProxyHTTP {
 	if p == nil {
 		return nil
 	}

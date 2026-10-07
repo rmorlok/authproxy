@@ -1,18 +1,16 @@
 package util
 
-import (
-	"slices"
-
-	"github.com/rmorlok/authproxy/internal/schema/common"
-)
+import "slices"
 
 // CloneRawJSONMap copies both the map and each raw JSON byte slice, retaining
 // nil versus explicit empty values for validation and patch semantics.
-func CloneRawJSONMap(values map[string]common.RawJSON) map[string]common.RawJSON {
+// The byte-slice constraint preserves named raw JSON types without making
+// this utility package depend on schema packages that themselves import util.
+func CloneRawJSONMap[T ~[]byte](values map[string]T) map[string]T {
 	if values == nil {
 		return nil
 	}
-	clone := make(map[string]common.RawJSON, len(values))
+	clone := make(map[string]T, len(values))
 	for key, value := range values {
 		clone[key] = slices.Clone(value)
 	}
