@@ -54,30 +54,44 @@ func NewToolPatch() *ToolPatch {
 // ValidateFor checks the update envelope and required-field presence. Complete
 // definition validation happens after merging, so an executor can be cleared
 // and its replacement supplied together without rejecting intermediate state.
-func (p *ToolPatch) ValidateFor(mode meta.ValidationMode, vc *common.ValidationContext) error {
+func (p *ToolPatch) ValidateFor(
+	mode meta.ValidationMode,
+	vc *common.ValidationContext,
+) error {
 	vc = validationContext(vc)
+
 	if p == nil {
 		return vc.NewError("tool patch is required")
 	}
+
 	var result *multierror.Error
 	if mode != meta.ValidationModeUpdate {
 		result = multierror.Append(result, vc.NewError("tool patches require update validation mode"))
 	}
+
 	result = multierror.Append(result, meta.ValidateTypeMeta(p.TypeMeta, meta.APIVersionV1Alpha1, ToolKind, vc))
 	if p.Metadata == nil {
 		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
 	} else {
-		result = multierror.Append(result, meta.ValidateObjectMetaPatch(*p.Metadata, meta.ValidationOptions{
-			Mode: mode, Path: vc, IDValidator: ValidateID, NamespaceValidator: nschema.ValidatePath,
-		}))
+		result = multierror.Append(result, meta.ValidateObjectMetaPatch(
+			*p.Metadata,
+			meta.ValidationOptions{
+				Mode:               mode,
+				Path:               vc,
+				IDValidator:        ValidateID,
+				NamespaceValidator: nschema.ValidatePath,
+			},
+		))
 		if p.Metadata.Generation != nil {
 			result = multierror.Append(result, vc.NewErrorForField("metadata.generation", "does not apply to tools"))
 		}
 	}
+
 	if p.Spec == nil {
 		result = multierror.Append(result, vc.NewErrorForField("spec", "is required and must not be null"))
 	} else {
 		path := vc.PushField("spec")
+
 		for _, field := range []struct {
 			name     string
 			null     bool
@@ -92,11 +106,14 @@ func (p *ToolPatch) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 				result = multierror.Append(result, path.NewErrorForField(field.name, "must not be null"))
 			}
 		}
+
 		if p.Spec.ConnectionRef != nil {
 			result = multierror.Append(result, ValidateConnectionReference(*p.Spec.ConnectionRef, "", path.PushField("connectionRef")))
 		}
 	}
+
 	result = multierror.Append(result, meta.ValidateStatus(p.Status, mode, vc))
+
 	return result.ErrorOrNil()
 }
 
@@ -105,9 +122,11 @@ func (p *ToolPatch) ValidateFor(mode meta.ValidationMode, vc *common.ValidationC
 // value is mutated. The current status and revision remain server-owned.
 func (p *ToolPatch) ApplyTo(current *Tool, vc *common.ValidationContext) (*Tool, error) {
 	vc = validationContext(vc)
+
 	if current == nil {
 		return nil, vc.NewError("current tool is required")
 	}
+
 	if err := p.ValidateFor(meta.ValidationModeUpdate, vc); err != nil {
 		return nil, err
 	}
@@ -120,21 +139,26 @@ func (p *ToolPatch) ApplyTo(current *Tool, vc *common.ValidationContext) (*Tool,
 	if p.Spec.ConnectionRef != nil {
 		updated.Spec.ConnectionRef = *p.Spec.ConnectionRef
 	}
+
 	if p.Spec.Description != nil {
 		updated.Spec.Description = *p.Spec.Description
 	}
+
 	if p.Spec.Verbs != nil {
 		updated.Spec.Verbs = *p.Spec.Verbs
 	}
+
 	if p.Spec.has("inputSchema", p.Spec.InputSchema != nil) {
 		updated.Spec.InputSchema = p.Spec.InputSchema
 	}
+
 	if p.Spec.has("outputSchema", p.Spec.OutputSchema != nil) {
 		updated.Spec.OutputSchema = p.Spec.OutputSchema
 		if bytes.Equal(bytes.TrimSpace(updated.Spec.OutputSchema), []byte("null")) {
 			updated.Spec.OutputSchema = nil
 		}
 	}
+
 	if p.Spec.has("hints", p.Spec.Hints != nil) {
 		updated.Spec.Hints = p.Spec.Hints
 	}
@@ -186,13 +210,17 @@ func (p ToolSpecPatch) MarshalJSON() ([]byte, error) {
 // presence. Assignment is atomic: failed decoding leaves the receiver intact.
 func (p *ToolSpecPatch) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
+
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
 		return err
 	}
+
 	if fields == nil {
 		return fmt.Errorf("tool spec patch must be an object")
 	}
+
 	decoded := ToolSpecPatch{present: make(map[string]bool, len(fields))}
+
 	for name, raw := range fields {
 		var destination any
 		switch name {
@@ -217,12 +245,16 @@ func (p *ToolSpecPatch) UnmarshalJSON(data []byte) error {
 		default:
 			return fmt.Errorf("unknown tool spec patch field %q", name)
 		}
+
 		if err := util.DecodeJSONStrict(raw, destination); err != nil {
 			return fmt.Errorf("decode %s: %w", name, err)
 		}
+
 		decoded.present[name] = true
 	}
+
 	*p = decoded
+
 	return nil
 }
 
@@ -230,9 +262,11 @@ func (p *ToolSpecPatch) UnmarshalJSON(data []byte) error {
 // structured schemas and exact numeric values in emitted YAML.
 func (p ToolSpecPatch) MarshalYAML() (any, error) {
 	raw, err := p.MarshalJSON()
+
 	if err != nil {
 		return nil, err
 	}
+
 	return common.RawJSON(raw).MarshalYAML()
 }
 
@@ -256,6 +290,7 @@ func (p *ToolSpecPatch) markPresent(field string) {
 	if p.present == nil {
 		p.present = make(map[string]bool)
 	}
+
 	p.present[field] = true
 }
 
