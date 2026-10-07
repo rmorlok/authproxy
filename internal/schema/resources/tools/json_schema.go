@@ -22,20 +22,28 @@ const (
 // invocation data. Compilation never fetches external resources, applies
 // defaults, or coerces values. Input schemas explicitly declare an object root;
 // a local root $ref may accompany that declaration.
-func validateSchema(raw common.RawJSON, requireObject bool, vc *common.ValidationContext) error {
+func validateSchema(
+	raw common.RawJSON,
+	requireObject bool,
+	vc *common.ValidationContext,
+) error {
 	if len(raw) > maxSchemaBytes {
 		return vc.NewErrorf("JSON schema exceeds %d bytes", maxSchemaBytes)
 	}
+
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.UseNumber()
+
 	var document any
 	if err := decoder.Decode(&document); err != nil {
 		return vc.NewErrorf("invalid JSON schema: %v", err)
 	}
+
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
 		return vc.NewError("JSON schema must contain exactly one JSON value")
 	}
+
 	if !schemaJSONDepthAllowed(document, maxSchemaDepth) {
 		return vc.NewErrorf("JSON schema nesting exceeds %d levels", maxSchemaDepth)
 	}
@@ -45,6 +53,7 @@ func validateSchema(raw common.RawJSON, requireObject bool, vc *common.Validatio
 		if requireObject && !hasExplicitObjectType(root["type"]) {
 			return vc.NewError("input schema must declare top-level type object or [object]")
 		}
+
 		// Check the root before compilation: Compiler.Draft is a default, not
 		// a restriction on an explicitly declared older dialect.
 		if err := validateNativeSchemaDialect(root); err != nil {
@@ -63,13 +72,24 @@ func validateSchema(raw common.RawJSON, requireObject bool, vc *common.Validatio
 	compiler.LoadURL = func(string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("external JSON schema loading is disabled; bundle references in the schema")
 	}
-	compiler.RegisterExtension("authproxy-native-dialect", nil, nativeSchemaDialectCompiler{})
-	if err := compiler.AddResource(schemaResourceURL, bytes.NewReader(raw)); err != nil {
+
+	compiler.RegisterExtension(
+		"authproxy-native-dialect",
+		nil, // meta
+		nativeSchemaDialectCompiler{},
+	)
+
+	if err := compiler.AddResource(
+		schemaResourceURL,
+		bytes.NewReader(raw),
+	); err != nil {
 		return vc.NewErrorf("invalid JSON schema: %v", err)
 	}
+
 	if _, err := compiler.Compile(schemaResourceURL); err != nil {
 		return vc.NewErrorf("invalid JSON schema: %v", err)
 	}
+
 	return nil
 }
 
@@ -80,6 +100,7 @@ func hasExplicitObjectType(value any) bool {
 	if value == "object" {
 		return true
 	}
+
 	types, ok := value.([]any)
 	return ok && len(types) == 1 && types[0] == "object"
 }
@@ -119,7 +140,10 @@ type nativeSchemaDialectCompiler struct{}
 
 // Compile checks the dialect at one compiler-selected schema location without
 // adding runtime validation or interpreting annotation data.
-func (nativeSchemaDialectCompiler) Compile(_ jsonschemav5.CompilerContext, schema map[string]any) (jsonschemav5.ExtSchema, error) {
+func (nativeSchemaDialectCompiler) Compile(
+	_ jsonschemav5.CompilerContext,
+	schema map[string]any,
+) (jsonschemav5.ExtSchema, error) {
 	return nil, validateNativeSchemaDialect(schema)
 }
 
