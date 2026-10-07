@@ -92,7 +92,14 @@ func rawJSONYAMLNode(value any) (*yaml.Node, error) {
 			if err != nil {
 				return nil, err
 			}
-			node.Content = append(node.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, child)
+			node.Content = append(
+				node.Content,
+				&yaml.Node{
+					Kind:  yaml.ScalarNode,
+					Tag:   "!!str",
+					Value: key},
+				child,
+			)
 		}
 		return node, nil
 	case []any:
