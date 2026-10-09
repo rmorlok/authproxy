@@ -6,3 +6,7 @@ package toolsets
 // SchemaIDToolSets identifies the canonical ToolSet resource JSON schema. The
 // schema is embedded by internal/schema for compilation without external I/O.
 const SchemaIDToolSets = "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/toolsets/schema.json"
+
+// SchemaIDToolSetPatch identifies the authored ToolSet update envelope, whose
+// partial spec is validated separately from the complete resource definition.
+const SchemaIDToolSetPatch = SchemaIDToolSets + "#/$defs/ToolSetPatch"

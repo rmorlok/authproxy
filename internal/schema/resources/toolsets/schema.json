@@ -135,6 +135,53 @@
       },
       "additionalProperties": false
     },
+    "ToolSetMetadataPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectMetaPatch" },
+        {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string", "pattern": "^tls_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": { "type": "integer", "minimum": 1 },
+            "createdAt": false,
+            "updatedAt": false
+          }
+        }
+      ]
+    },
+    "ToolSetReleaseSpecPatch": {
+      "$ref": "#/$defs/ToolSetReleaseSpec",
+      "description": "An omitted desiredState or empty object leaves publication intent unchanged. Explicit null is invalid."
+    },
+    "ToolSetSpecPatch": {
+      "type": "object",
+      "properties": {
+        "connectionSelector": { "$ref": "#/$defs/ConnectionSelector" },
+        "release": { "$ref": "#/$defs/ToolSetReleaseSpecPatch" },
+        "definition": { "$ref": "#/$defs/ToolSetDefinition" }
+      },
+      "additionalProperties": false,
+      "description": "Omitted fields remain unchanged. A supplied selector or definition replaces the complete value; release alone is partial. Explicit null is invalid for each field."
+    },
+    "ToolSetPatch": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "spec"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolSet" },
+            "metadata": { "$ref": "#/$defs/ToolSetMetadataPatch" },
+            "spec": { "$ref": "#/$defs/ToolSetSpecPatch" },
+            "status": false
+          }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "An authored update requires metadata and spec objects, which may be empty. Generation selection, immutable identity, and publication policy are enforced by Go validation with the stored resource and endpoint context."
+    },
     "ToolSet": {
       "allOf": [
         { "$ref": "../meta/schema.json#/$defs/Resource" },

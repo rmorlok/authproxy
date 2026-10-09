@@ -1,9 +1,10 @@
 # Explicit ToolSet resource contracts
 
 This package owns the `ToolSet` resource envelope, generation release fields,
-connection selectors, and explicit template definitions. It is a contract
-foundation: management routes, registry/apply support, generation patches and
-publication, persistence, and reconciliation are implemented in later slices.
+connection selectors, explicit template definitions, patches, and generation
+selection policy. It is a contract foundation: management routes, registry/apply
+integration, publication transactions, persistence, and reconciliation are
+implemented in later slices.
 OpenAPI/MCP source contracts, filters, defaults, permission mappings, and source
 diagnostics are also deferred. Strict input decoding and the JSON schema reject
 those fields until their contracts are implemented.
@@ -12,8 +13,10 @@ those fields until their contracts are implemented.
 `spec.connectionSelector` is shared across generations. `spec.release` and
 `spec.definition` belong to a generation. Generation responses must project the
 current logical selector; a generation update must not restore an old selector.
-The future update policy will reject selector writes on generation endpoints
-and treat selector-only logical updates as membership changes, not migrations.
+The generation policy rejects selector writes on explicit generation targets
+and keeps selector-only logical updates on the selected resource, even when an
+editable draft exists. These membership changes do not migrate attached
+connections to a different generation.
 
 The release vocabulary mirrors Connectors. Authors may request `draft` or
 `primary`; observed status may be `draft`, `primary`, `active`, or `archived`.
@@ -28,6 +31,36 @@ mode so selector scope can be checked before any connections are selected.
 a name derived from the ID when absent, default `draft` intent, and the effective
 selector namespace. It does not publish, synthesize a selector, or set status.
 Configuration release defaults remain the responsibility of later reconciliation.
+
+## Patches and generation policy
+
+`ToolSetPatch` requires `metadata` and `spec` objects; either can be empty.
+`spec.connectionSelector` and `spec.definition` replace their entire fields.
+Replacing a selector without `namespace` restores the owner-and-descendants
+default, rather than retaining the previous scope. Metadata follows the shared
+patch contract: supplied label and annotation maps replace existing maps, and
+an empty map clears them. `spec.release` merges only `desiredState`; an empty
+release object is a no-op. Selector, definition, release, and desired-state
+fields cannot be explicitly null. `SchemaIDToolSetPatch` identifies the embedded
+patch schema.
+
+`ApplyTo` validates the patch and complete merged authored fields, preserves
+immutable identity and server-owned status, and returns a detached candidate.
+It does not perform publication or enforce generation editability. A candidate
+can request `primary` while retaining observed `draft` status until publication
+succeeds; snapshot validation is not a substitute for transition handling.
+
+`GenerationPolicy` supplies pure hooks for later registry/apply integration.
+Observed release status determines whether a generation is editable, published,
+or historical. Definition changes and explicit release intent select an
+existing draft or the newest generation as a source for a new draft. Metadata
+and selector changes alone remain on the selected resource. Finalization
+preserves publication intent and includes the selected definition when needed
+to distinguish publishing a draft from an already-satisfied primary request.
+Explicit generation targets reject selector writes and permit mutations only
+on drafts; an empty patch on a published or historical generation is allowed.
+Callers remain responsible for routing, authorization, persistence, and atomic
+publication. These hooks do not create drafts or migrate bindings themselves.
 
 ## Connection selection
 

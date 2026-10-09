@@ -261,3 +261,119 @@ func TestToolSetReferenceSchema(t *testing.T) {
 	reference["kind"] = "Tool"
 	require.Error(t, compiled.Validate(reference))
 }
+
+// toolSetPatchSchemaFixture reuses complete replacement values while omitting
+// server-observed status, which is never authored in an update envelope.
+func toolSetPatchSchemaFixture(t *testing.T) map[string]any {
+	t.Helper()
+	document := toolSetSchemaFixture(t)
+	delete(document, "status")
+	return document
+}
+
+// TestToolSetPatchSchemaRoundTrip checks offline and embedded compilation, and
+// preserves empty no-op objects and complete replacements across both codecs.
+func TestToolSetPatchSchemaRoundTrip(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/ToolSetPatch")
+	embedded, err := schema.CompileSchema(toolsets.SchemaIDToolSetPatch)
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name string
+		spec map[string]any
+	}{
+		{name: "complete replacements"},
+		{name: "empty patch", spec: map[string]any{}},
+		{name: "release no-op", spec: map[string]any{"release": map[string]any{}}},
+		{name: "request draft", spec: map[string]any{"release": map[string]any{"desiredState": "draft"}}},
+		{name: "request primary", spec: map[string]any{"release": map[string]any{"desiredState": "primary"}}},
+		{name: "selector replacement", spec: map[string]any{"connectionSelector": map[string]any{"matchLabels": map[string]any{}}}},
+		{name: "empty inventory replacement", spec: map[string]any{"definition": map[string]any{"source": map[string]any{"explicit": map[string]any{"tools": []any{}}}}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			document := toolSetPatchSchemaFixture(t)
+			if test.spec != nil {
+				document["metadata"] = map[string]any{}
+				document["spec"] = test.spec
+			}
+			require.NoError(t, compiled.Validate(document))
+			require.NoError(t, embedded.Validate(document))
+			encoded, err := json.Marshal(document)
+			require.NoError(t, err)
+			var patch toolsets.ToolSetPatch
+			require.NoError(t, util.DecodeJSONStrict(encoded, &patch))
+			roundTrip, err := json.Marshal(patch)
+			require.NoError(t, err)
+			require.JSONEq(t, string(encoded), string(roundTrip))
+			asYAML, err := yaml.Marshal(patch)
+			require.NoError(t, err)
+			var fromYAML toolsets.ToolSetPatch
+			require.NoError(t, util.DecodeYAMLStrict(asYAML, &fromYAML))
+			roundTrip, err = json.Marshal(fromYAML)
+			require.NoError(t, err)
+			require.JSONEq(t, string(encoded), string(roundTrip))
+			var decoded any
+			require.NoError(t, json.Unmarshal(roundTrip, &decoded))
+			require.NoError(t, compiled.Validate(decoded))
+		})
+	}
+}
+
+// TestToolSetPatchSchemaRejectsInvalidFields distinguishes full replacements
+// from partial release edits and rejects nulls, status, and unknown fields.
+func TestToolSetPatchSchemaRejectsInvalidFields(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/ToolSetPatch")
+	for _, test := range []struct {
+		name, field string
+		path        []string
+		value       any
+		remove      bool
+	}{
+		{name: "missing version", field: "apiVersion", remove: true},
+		{name: "wrong version", field: "apiVersion", value: "authproxy.net/v2"},
+		{name: "missing kind", field: "kind", remove: true},
+		{name: "wrong kind", field: "kind", value: "Tool"},
+		{name: "missing metadata", field: "metadata", remove: true},
+		{name: "null metadata", field: "metadata", value: nil},
+		{name: "missing spec", field: "spec", remove: true},
+		{name: "null spec", field: "spec", value: nil},
+		{name: "unknown root field", field: "definition", value: map[string]any{}},
+		{name: "observed status", field: "status", value: map[string]any{"release": map[string]any{"state": "primary"}}},
+		{name: "null status", field: "status", value: nil},
+		{name: "wrong ID prefix", path: []string{"metadata"}, field: "id", value: "tol_example"},
+		{name: "invalid namespace", path: []string{"metadata"}, field: "namespace", value: "root.product.**"},
+		{name: "zero generation", path: []string{"metadata"}, field: "generation", value: 0},
+		{name: "fractional generation", path: []string{"metadata"}, field: "generation", value: 1.5},
+		{name: "server creation time", path: []string{"metadata"}, field: "createdAt", value: "2026-10-08T12:00:00Z"},
+		{name: "server update time", path: []string{"metadata"}, field: "updatedAt", value: "2026-10-08T12:00:00Z"},
+		{name: "unknown metadata field", path: []string{"metadata"}, field: "revision", value: 1},
+		{name: "null selector", path: []string{"spec"}, field: "connectionSelector", value: nil},
+		{name: "partial selector", path: []string{"spec", "connectionSelector"}, field: "matchLabels", remove: true},
+		{name: "null selector labels", path: []string{"spec", "connectionSelector"}, field: "matchLabels", value: nil},
+		{name: "null selector namespace", path: []string{"spec", "connectionSelector"}, field: "namespace", value: nil},
+		{name: "unknown selector field", path: []string{"spec", "connectionSelector"}, field: "matchExpressions", value: []any{}},
+		{name: "null definition", path: []string{"spec"}, field: "definition", value: nil},
+		{name: "partial definition", path: []string{"spec", "definition"}, field: "source", remove: true},
+		{name: "missing replacement tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", remove: true},
+		{name: "null replacement tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", value: nil},
+		{name: "unknown source field", path: []string{"spec", "definition", "source"}, field: "mcp", value: map[string]any{}},
+		{name: "unknown spec field", path: []string{"spec"}, field: "source", value: map[string]any{}},
+		{name: "null release", path: []string{"spec"}, field: "release", value: nil},
+		{name: "null desired state", path: []string{"spec", "release"}, field: "desiredState", value: nil},
+		{name: "empty desired state", path: []string{"spec", "release"}, field: "desiredState", value: ""},
+		{name: "active desired state", path: []string{"spec", "release"}, field: "desiredState", value: "active"},
+		{name: "archived desired state", path: []string{"spec", "release"}, field: "desiredState", value: "archived"},
+		{name: "unknown desired state", path: []string{"spec", "release"}, field: "desiredState", value: "published"},
+		{name: "unknown release field", path: []string{"spec", "release"}, field: "state", value: "primary"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			document := toolSetPatchSchemaFixture(t)
+			object := schemaObject(t, document, test.path...)
+			if test.remove {
+				delete(object, test.field)
+			} else {
+				object[test.field] = test.value
+			}
+			require.Error(t, compiled.Validate(document))
+		})
+	}
+}
