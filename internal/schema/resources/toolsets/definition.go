@@ -67,9 +67,11 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 // absent source as an implicitly empty inventory.
 func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if s == nil {
 		return vc.NewError("toolset source is required")
 	}
+
 	return s.Explicit.Validate(vc.PushField("explicit"))
 }
 
@@ -77,23 +79,30 @@ func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 // Empty inventories are valid, but omission or null must not mean removal.
 func (s *ExplicitSource) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if s == nil {
 		return vc.NewError("explicit source is required")
 	}
+
 	if s.Tools == nil {
 		return vc.NewErrorForField("tools", "must be an array; use [] for an empty inventory")
 	}
+
 	var result *multierror.Error
 	keys := make(map[string]bool, len(s.Tools))
 	for i := range s.Tools {
 		template := &s.Tools[i]
 		path := vc.PushField("tools").PushIndex(i)
+
 		result = multierror.Append(result, template.Validate(path))
+
 		if keys[template.Key] {
 			result = multierror.Append(result, path.NewErrorForField("key", "must be unique within the ToolSet"))
 		}
+
 		keys[template.Key] = true
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -105,11 +114,14 @@ func (t *ToolTemplate) Validate(vc *common.ValidationContext) error {
 		return vc.NewError("tool template is required")
 	}
 	var result *multierror.Error
+
 	if strings.TrimSpace(t.Key) == "" {
 		result = multierror.Append(result, vc.NewErrorForField("key", "must not be empty"))
 	}
+
 	result = multierror.Append(result, t.Metadata.Validate(vc.PushField("metadata")))
 	result = multierror.Append(result, t.Spec.Validate(vc.PushField("spec")))
+
 	return result.ErrorOrNil()
 }
 
@@ -121,17 +133,21 @@ func (m *ToolTemplateMetadata) Validate(vc *common.ValidationContext) error {
 	}
 	vc = validationContext(vc)
 	var result *multierror.Error
+
 	if m.Name != "" {
 		if err := m.Name.Validate(); err != nil {
 			result = multierror.Append(result, vc.NewErrorfForField("name", "%v", err))
 		}
 	}
+
 	if err := meta.ValidateUserLabels(m.Labels); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("labels", "%v", err))
 	}
+
 	if err := meta.ValidateAnnotations(m.Annotations); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("annotations", "%v", err))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -143,9 +159,11 @@ func (d *ToolSetDefinition) Clone() *ToolSetDefinition {
 		return nil
 	}
 	clone := *d
+
 	if d.Source.Explicit != nil {
 		clone.Source.Explicit = util.CloneValue(d.Source.Explicit)
 		clone.Source.Explicit.Tools = slices.Clone(d.Source.Explicit.Tools)
+
 		for i := range clone.Source.Explicit.Tools {
 			template := &clone.Source.Explicit.Tools[i]
 			template.Spec = *template.Spec.Clone()
@@ -156,5 +174,6 @@ func (d *ToolSetDefinition) Clone() *ToolSetDefinition {
 			}
 		}
 	}
+
 	return &clone
 }
