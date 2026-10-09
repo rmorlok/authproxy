@@ -1,13 +1,15 @@
-# Explicit ToolSet resource contracts
+# ToolSet resource contracts
 
 This package owns the `ToolSet` resource envelope, generation release fields,
-connection selectors, explicit template definitions, patches, and generation
-selection policy. It is a contract foundation: management routes, registry/apply
+connection selectors, explicit templates, MCP source settings, imported permission
+mappings, patches, and generation selection policy. It is a contract foundation:
+management routes, registry/apply
 integration, publication transactions, persistence, and reconciliation are
 implemented in later slices.
-OpenAPI/MCP source contracts, filters, defaults, permission mappings, and source
-diagnostics are also deferred. Strict input decoding and the JSON schema reject
-those fields until their contracts are implemented.
+OpenAPI source contracts, imported defaults, and source diagnostics are also
+deferred. Strict input decoding and the JSON schema reject those fields until
+their contracts are implemented. MCP source validation does not connect to a
+provider, negotiate a protocol, or discover or execute tools.
 
 `metadata` identifies the logical `tls_` resource and its addressed generation.
 `spec.connectionSelector` is shared across generations. `spec.release` and
@@ -96,6 +98,58 @@ IDs, namespaces, generations, timestamps, and ownership are not authorable.
 Each template explicitly declares its verbs and HTTP or JavaScript executor.
 Definition validation checks native schemas and authored shape; publication will
 compile code/templates before installing an inventory.
+
+## MCP sources and imported permission mappings
+
+Exactly one of `spec.definition.source.explicit` and `source.mcp` is required.
+MCP settings belong to a published generation; the live catalog will be
+discovered separately through each bound connection. The endpoint template can
+read that connection's `cfg`, and `transport` must be `streamableHttp`.
+URL/template compilation, protocol negotiation, refresh scheduling, and
+connection-scoped discovery are adapter/controller responsibilities.
+
+```yaml
+source:
+  mcp:
+    endpoint: "https://{{cfg.apiHost}}/mcp"
+    transport: streamableHttp
+    refreshInterval: 5m
+    tools:
+      excludeNames: [admin_reset]
+permissionMappings:
+  - match:
+      sourceKeys: [list_calendars]
+    addVerbs: ["tool:calendar.list"]
+```
+
+`refreshInterval` is optional positive Go duration text, such as `5m` or `1.5s`;
+the authored string is preserved across JSON/YAML round trips. Omission leaves
+the interval to runtime policy. Go validation checks positivity and overflow in
+addition to the syntax described by the JSON schema.
+
+`tools.includeNames` and `tools.excludeNames` match exact upstream names without
+normalization or pattern expansion. Omitted inclusion means all names; an
+explicit empty inclusion list is rejected to avoid silently broadening selection.
+Exclusions take precedence over inclusions. An empty exclusion list is allowed.
+Null fields/lists/elements, blank names, and duplicate names within a list are
+rejected. `tools: {}` imposes no name restrictions.
+
+`permissionMappings` is optional and currently permitted only with MCP sources;
+explicit templates declare their own verbs. Each rule requires a `match` with
+at least one `sourceKeys` or `sourceKeyPatterns` entry and a nonempty `addVerbs`
+list. Keys remain exact, unnormalized identities. Patterns use Go regular
+expressions with full-string semantics (`\A(?:pattern)\z`), including across
+slash characters; exact keys and patterns combine with OR. Broad patterns
+deliberately cover future matching tools. Blank/duplicate entries and invalid
+patterns are rejected; aliases also reject surrounding whitespace.
+
+The importers will add the union of every matching rule's aliases to the Tool's
+canonical verb. Mappings never replace that verb, infer aliases from provider
+hints, or grant permission by themselves. Alias resolution and canonical verb
+generation are outside this schema slice. Validation does not require current
+catalog keys to exist, since each connection's catalog can differ and change.
+Definition replacements, including filter/mapping changes, remain generation
+changes under the existing patch policy.
 
 Use `util.DecodeJSONStrict` / `util.DecodeYAMLStrict` at input boundaries followed
 by resource lifecycle validation. `SchemaIDToolSets` identifies the embedded

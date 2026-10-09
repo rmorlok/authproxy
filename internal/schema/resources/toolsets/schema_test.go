@@ -175,11 +175,12 @@ func TestToolSetSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "missing definition", path: []string{"spec"}, field: "definition", remove: true},
 		{name: "missing source", path: []string{"spec", "definition"}, field: "source", remove: true},
 		{name: "selector inside generation", path: []string{"spec", "definition"}, field: "connectionSelector", value: map[string]any{}},
-		{name: "unsupported mappings", path: []string{"spec", "definition"}, field: "permissionMappings", value: []any{}},
+		{name: "mappings on explicit source", path: []string{"spec", "definition"}, field: "permissionMappings", value: []any{}},
 		{name: "missing explicit source", path: []string{"spec", "definition", "source"}, field: "explicit", remove: true},
 		{name: "null explicit source", path: []string{"spec", "definition", "source"}, field: "explicit", value: nil},
 		{name: "deferred OpenAPI source", path: []string{"spec", "definition", "source"}, field: "openapi", value: map[string]any{}},
-		{name: "deferred MCP source", path: []string{"spec", "definition", "source"}, field: "mcp", value: map[string]any{}},
+		{name: "competing MCP source", path: []string{"spec", "definition", "source"}, field: "mcp", value: map[string]any{"endpoint": "https://example.com/mcp", "transport": "streamableHttp"}},
+		{name: "null MCP beside explicit source", path: []string{"spec", "definition", "source"}, field: "mcp", value: nil},
 		{name: "missing tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", remove: true},
 		{name: "null tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", value: nil},
 		{name: "active is observed only", path: []string{"spec", "release"}, field: "desiredState", value: "active"},
@@ -355,7 +356,7 @@ func TestToolSetPatchSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "partial definition", path: []string{"spec", "definition"}, field: "source", remove: true},
 		{name: "missing replacement tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", remove: true},
 		{name: "null replacement tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", value: nil},
-		{name: "unknown source field", path: []string{"spec", "definition", "source"}, field: "mcp", value: map[string]any{}},
+		{name: "unknown source field", path: []string{"spec", "definition", "source"}, field: "openapi", value: map[string]any{}},
 		{name: "unknown spec field", path: []string{"spec"}, field: "source", value: map[string]any{}},
 		{name: "null release", path: []string{"spec"}, field: "release", value: nil},
 		{name: "null desired state", path: []string{"spec", "release"}, field: "desiredState", value: nil},
@@ -374,6 +375,218 @@ func TestToolSetPatchSchemaRejectsInvalidFields(t *testing.T) {
 				object[test.field] = test.value
 			}
 			require.Error(t, compiled.Validate(document))
+		})
+	}
+}
+
+// toolSetMCPDefinitionSchemaFixture includes exact names, fractional refresh
+// timing, and both permission matcher forms without tying them to a live catalog.
+func toolSetMCPDefinitionSchemaFixture(t *testing.T) map[string]any {
+	t.Helper()
+	var definition map[string]any
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"source":{"mcp":{
+			"endpoint":"https://{{cfg.host}}/mcp","transport":"streamableHttp","refreshInterval":"1.5s",
+			"tools":{"includeNames":["list_records"," exact name "],"excludeNames":[]}
+		}},
+		"permissionMappings":[{
+			"match":{"sourceKeys":["list_records"],"sourceKeyPatterns":["read_.*"]},
+			"addVerbs":["tool:records.read","custom verb"]
+		}]
+	}`), &definition))
+	return definition
+}
+
+// TestToolSetMCPSchemaRoundTrip shares one source contract across standalone
+// definitions, full resources, and whole-definition patches through both codecs.
+func TestToolSetMCPSchemaRoundTrip(t *testing.T) {
+	for _, test := range []struct {
+		name, fragment string
+		newValue       func() any
+	}{
+		{"definition", "#/$defs/ToolSetDefinition", func() any { return &toolsets.ToolSetDefinition{} }},
+		{"resource", "", func() any { return &toolsets.ToolSet{} }},
+		{"patch", "#/$defs/ToolSetPatch", func() any { return &toolsets.ToolSetPatch{} }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			compiled := compileToolSetSchema(t, test.fragment)
+			embedded, err := schema.CompileSchema(toolsets.SchemaIDToolSets + test.fragment)
+			require.NoError(t, err)
+			for _, shape := range []string{"complete", "empty mappings", "minimal"} {
+				t.Run(shape, func(t *testing.T) {
+					definition := toolSetMCPDefinitionSchemaFixture(t)
+					if shape == "empty mappings" {
+						definition["permissionMappings"] = []any{}
+					}
+					if shape == "minimal" {
+						delete(definition, "permissionMappings")
+						mcp := schemaObject(t, definition, "source", "mcp")
+						delete(mcp, "refreshInterval")
+						delete(mcp, "tools")
+					}
+					document := definition
+					if test.name != "definition" {
+						document = toolSetSchemaFixture(t)
+						schemaObject(t, document, "spec")["definition"] = definition
+						if test.name == "patch" {
+							delete(document, "status")
+						}
+					}
+					require.NoError(t, compiled.Validate(document))
+					require.NoError(t, embedded.Validate(document))
+					encoded, err := json.Marshal(document)
+					require.NoError(t, err)
+					value := test.newValue()
+					require.NoError(t, util.DecodeJSONStrict(encoded, value))
+					roundTrip, err := json.Marshal(value)
+					require.NoError(t, err)
+					require.JSONEq(t, string(encoded), string(roundTrip))
+					asYAML, err := yaml.Marshal(value)
+					require.NoError(t, err)
+					fromYAML := test.newValue()
+					require.NoError(t, util.DecodeYAMLStrict(asYAML, fromYAML))
+					roundTrip, err = json.Marshal(fromYAML)
+					require.NoError(t, err)
+					require.JSONEq(t, string(encoded), string(roundTrip))
+				})
+			}
+		})
+	}
+}
+
+// TestToolSetMCPSchemaRejectsInvalidFields exercises schema constraints directly,
+// including null presence that pointer decoding could otherwise erase.
+func TestToolSetMCPSchemaRejectsInvalidFields(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/ToolSetDefinition")
+	patchSchema := compileToolSetSchema(t, "#/$defs/ToolSetPatch")
+	for _, test := range []struct {
+		name, field string
+		path        []string
+		value       any
+		remove      bool
+	}{
+		{name: "missing source", field: "source", remove: true},
+		{name: "no source variant", field: "source", value: map[string]any{}},
+		{name: "null MCP", path: []string{"source"}, field: "mcp", value: nil},
+		{name: "both sources", path: []string{"source"}, field: "explicit", value: map[string]any{"tools": []any{}}},
+		{name: "null competing source", path: []string{"source"}, field: "explicit", value: nil},
+		{name: "null MCP beside explicit", field: "source", value: map[string]any{"explicit": map[string]any{"tools": []any{}}, "mcp": nil}},
+		{name: "deferred OpenAPI", path: []string{"source"}, field: "openapi", value: map[string]any{}},
+		{name: "missing endpoint", path: []string{"source", "mcp"}, field: "endpoint", remove: true},
+		{name: "null endpoint", path: []string{"source", "mcp"}, field: "endpoint", value: nil},
+		{name: "blank endpoint", path: []string{"source", "mcp"}, field: "endpoint", value: " \t"},
+		{name: "padded endpoint", path: []string{"source", "mcp"}, field: "endpoint", value: " https://example.com/mcp"},
+		{name: "multiline endpoint", path: []string{"source", "mcp"}, field: "endpoint", value: "https://example.com/\nmcp"},
+		{name: "missing transport", path: []string{"source", "mcp"}, field: "transport", remove: true},
+		{name: "null transport", path: []string{"source", "mcp"}, field: "transport", value: nil},
+		{name: "stdio transport", path: []string{"source", "mcp"}, field: "transport", value: "stdio"},
+		{name: "SSE transport", path: []string{"source", "mcp"}, field: "transport", value: "sse"},
+		{name: "source credentials", path: []string{"source", "mcp"}, field: "auth", value: map[string]any{}},
+		{name: "null refresh interval", path: []string{"source", "mcp"}, field: "refreshInterval", value: nil},
+		{name: "numeric refresh interval", path: []string{"source", "mcp"}, field: "refreshInterval", value: 1500},
+		{name: "invalid duration unit", path: []string{"source", "mcp"}, field: "refreshInterval", value: "1d"},
+		{name: "duration missing digits", path: []string{"source", "mcp"}, field: "refreshInterval", value: ".s"},
+		{name: "null filter", path: []string{"source", "mcp"}, field: "tools", value: nil},
+		{name: "unknown filter", path: []string{"source", "mcp", "tools"}, field: "includePatterns", value: []any{".*"}},
+		{name: "empty include list", path: []string{"source", "mcp", "tools"}, field: "includeNames", value: []any{}},
+		{name: "null include list", path: []string{"source", "mcp", "tools"}, field: "includeNames", value: nil},
+		{name: "null include name", path: []string{"source", "mcp", "tools"}, field: "includeNames", value: []any{nil}},
+		{name: "blank include name", path: []string{"source", "mcp", "tools"}, field: "includeNames", value: []any{" "}},
+		{name: "duplicate include name", path: []string{"source", "mcp", "tools"}, field: "includeNames", value: []any{"read", "read"}},
+		{name: "null exclude list", path: []string{"source", "mcp", "tools"}, field: "excludeNames", value: nil},
+		{name: "null exclude name", path: []string{"source", "mcp", "tools"}, field: "excludeNames", value: []any{nil}},
+		{name: "duplicate exclude name", path: []string{"source", "mcp", "tools"}, field: "excludeNames", value: []any{"read", "read"}},
+		{name: "null mappings", field: "permissionMappings", value: nil},
+		{name: "null mapping", field: "permissionMappings", value: []any{nil}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			definition := toolSetMCPDefinitionSchemaFixture(t)
+			object := schemaObject(t, definition, test.path...)
+			if test.remove {
+				delete(object, test.field)
+			} else {
+				object[test.field] = test.value
+			}
+			require.Error(t, compiled.Validate(definition))
+			patch := toolSetPatchSchemaFixture(t)
+			schemaObject(t, patch, "spec")["definition"] = definition
+			require.Error(t, patchSchema.Validate(patch), "patch definitions must use the same complete source contract")
+		})
+	}
+}
+
+// TestMCPSourceSchemaDurationAndFilterShapes accepts the fractional, compound,
+// and microsecond spellings supported by Go while leaving range checks to Go.
+func TestMCPSourceSchemaDurationAndFilterShapes(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/MCPSource")
+	for _, interval := range []string{"1.5s", "+5m", ".5s", "1.s", "1m30.5s", "1ns", "1us", "1µs", "1μs", "100ms", "1h"} {
+		source := map[string]any{"endpoint": "https://{{ cfg.host }}/mcp", "transport": "streamableHttp", "refreshInterval": interval}
+		require.NoError(t, compiled.Validate(source), interval)
+	}
+	for _, filter := range []map[string]any{
+		{}, {"excludeNames": []any{}},
+		{"includeNames": []any{" exact "}, "excludeNames": []any{" exact "}},
+	} {
+		require.NoError(t, compiled.Validate(map[string]any{
+			"endpoint": "https://example.com/mcp", "transport": "streamableHttp", "tools": filter,
+		}))
+	}
+}
+
+// TestPermissionMappingSchema verifies matcher alternatives, exact alias shape,
+// and strict list/object boundaries without duplicating Go's regexp parser.
+func TestPermissionMappingSchema(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/PermissionMapping")
+	for _, match := range []map[string]any{
+		{"sourceKeys": []any{" exact "}},
+		{"sourceKeyPatterns": []any{"read_.*"}},
+		{"sourceKeys": []any{}, "sourceKeyPatterns": []any{"read_.*"}},
+		{"sourceKeys": []any{"read"}, "sourceKeyPatterns": []any{}},
+	} {
+		require.NoError(t, compiled.Validate(map[string]any{"match": match, "addVerbs": []any{"custom verb"}}))
+	}
+	for _, test := range []struct {
+		name, field string
+		match       bool
+		value       any
+		remove      bool
+	}{
+		{name: "missing matcher", field: "match", remove: true},
+		{name: "null matcher", field: "match", value: nil},
+		{name: "empty matcher", field: "match", value: map[string]any{}},
+		{name: "empty matcher lists", field: "match", value: map[string]any{"sourceKeys": []any{}, "sourceKeyPatterns": []any{}}},
+		{name: "unknown matcher field", match: true, field: "operationIds", value: []any{"read"}},
+		{name: "null keys", match: true, field: "sourceKeys", value: nil},
+		{name: "null key entry", match: true, field: "sourceKeys", value: []any{nil}},
+		{name: "blank key", match: true, field: "sourceKeys", value: []any{" \t"}},
+		{name: "duplicate keys", match: true, field: "sourceKeys", value: []any{"read", "read"}},
+		{name: "null patterns", match: true, field: "sourceKeyPatterns", value: nil},
+		{name: "null pattern entry", match: true, field: "sourceKeyPatterns", value: []any{nil}},
+		{name: "blank pattern", match: true, field: "sourceKeyPatterns", value: []any{" \t"}},
+		{name: "duplicate patterns", match: true, field: "sourceKeyPatterns", value: []any{".*", ".*"}},
+		{name: "missing verbs", field: "addVerbs", remove: true},
+		{name: "null verbs", field: "addVerbs", value: nil},
+		{name: "empty verbs", field: "addVerbs", value: []any{}},
+		{name: "null verb", field: "addVerbs", value: []any{nil}},
+		{name: "blank verb", field: "addVerbs", value: []any{" \t"}},
+		{name: "leading verb whitespace", field: "addVerbs", value: []any{" tool:read"}},
+		{name: "trailing verb whitespace", field: "addVerbs", value: []any{"tool:read\n"}},
+		{name: "duplicate verbs", field: "addVerbs", value: []any{"tool:read", "tool:read"}},
+		{name: "unknown mapping field", field: "replaceVerbs", value: []any{"tool:read"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			definition := toolSetMCPDefinitionSchemaFixture(t)
+			mapping := definition["permissionMappings"].([]any)[0].(map[string]any)
+			object := mapping
+			if test.match {
+				object = schemaObject(t, mapping, "match")
+			}
+			if test.remove {
+				delete(object, test.field)
+			} else {
+				object[test.field] = test.value
+			}
+			require.Error(t, compiled.Validate(mapping))
 		})
 	}
 }

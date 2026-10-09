@@ -137,7 +137,7 @@ func (p *ToolSetSpecPatch) validate(vc *common.ValidationContext) error {
 			}
 		}
 	}
-	
+
 	return result.ErrorOrNil()
 }
 

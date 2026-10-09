@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -55,7 +56,7 @@ func TestExplicitDefinitionValidation(t *testing.T) {
 		field  string
 	}{
 		{"valid", func(d *ToolSetDefinition) {}, ""},
-		{"absent source", func(d *ToolSetDefinition) { d.Source.Explicit = nil }, "source.explicit"},
+		{"absent source", func(d *ToolSetDefinition) { d.Source.Explicit = nil }, "source"},
 		{"missing inventory", func(d *ToolSetDefinition) { d.Source.Explicit.Tools = nil }, "source.explicit.tools"},
 		{"empty inventory", func(d *ToolSetDefinition) { d.Source.Explicit.Tools = []ToolTemplate{} }, ""},
 		{"blank key", func(d *ToolSetDefinition) { d.Source.Explicit.Tools[0].Key = " \n" }, "source.explicit.tools[0].key"},
@@ -126,7 +127,7 @@ func TestExplicitDefinitionWireBoundary(t *testing.T) {
 				require.Error(t, format.decode(input, &decoded), field)
 			}
 			for _, input := range []string{
-				`{"source":{"openapi":{}}}`, `{"source":{"mcp":{}}}`,
+				`{"source":{"openapi":{}}}`, `{"source":{"explicit":null}}`,
 				`{"source":{"explicit":{"tools":[]}},"connectionSelector":{}}`,
 				`{"source":{"explicit":{"tools":[{"key":"k","spec":{"connectionRef":{}}}]}}}`,
 				`{"source":{"explicit":{"tools":[{"key":"k","spec":{"openapiOperation":{}}}]}}}`,
@@ -134,12 +135,146 @@ func TestExplicitDefinitionWireBoundary(t *testing.T) {
 			} {
 				require.Error(t, format.decode([]byte(input), &decoded), input)
 			}
-			for _, input := range []string{`{}`, `{"source":{}}`, `{"source":{"explicit":null}}`, `{"source":{"explicit":{}}}`, `{"source":{"explicit":{"tools":null}}}`} {
+			for _, input := range []string{`{}`, `{"source":{}}`, `{"source":{"mcp":{}}}`, `{"source":{"explicit":{}}}`, `{"source":{"explicit":{"tools":null}}}`} {
 				var invalid ToolSetDefinition
 				require.NoError(t, format.decode([]byte(input), &invalid))
 				require.Error(t, invalid.Validate(nil), input)
 			}
 		})
+	}
+}
+
+// importedDefinitionForTest includes every mutable imported-policy field while
+// keeping source names exact and publication independent of a sample catalog.
+func importedDefinitionForTest() *ToolSetDefinition {
+	return &ToolSetDefinition{
+		Source: ToolSetSource{MCP: &MCPSource{
+			Endpoint: "https://{{cfg.apiHost}}/mcp", Transport: MCPTransportStreamableHTTP,
+			RefreshInterval: util.ToPtr("1.5s"),
+			Tools:           &MCPToolFilter{IncludeNames: []string{"list_calendars", "admin_reset"}, ExcludeNames: []string{"admin_reset"}},
+		}},
+		PermissionMappings: []PermissionMapping{{
+			Match:    SourceKeyMatch{SourceKeys: []string{"list_calendars"}, SourceKeyPatterns: []string{"calendar_.*"}},
+			AddVerbs: []string{"tool:calendar.list", "tool:readonly"},
+		}},
+	}
+}
+
+// TestImportedDefinitionBoundary validates source exclusivity and policy
+// ownership without requiring a provider catalog or performing any network I/O.
+func TestImportedDefinitionBoundary(t *testing.T) {
+	definition := importedDefinitionForTest()
+	require.NoError(t, definition.Validate(nil))
+	definition.Source.Explicit = &ExplicitSource{Tools: []ToolTemplate{}}
+	require.ErrorContains(t, definition.Validate(nil), "exactly one")
+	definition.Source.MCP = nil
+	require.ErrorContains(t, definition.Validate(nil), "permissionMappings")
+	definition.PermissionMappings = []PermissionMapping{}
+	require.ErrorContains(t, definition.Validate(nil), "permissionMappings", "even an empty imported policy is invalid on an explicit source")
+	encoded, err := json.Marshal(definition)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), `"permissionMappings":[]`)
+	var decoded ToolSetDefinition
+	require.NoError(t, util.DecodeJSONStrict(encoded, &decoded))
+	require.ErrorContains(t, decoded.Validate(nil), "permissionMappings")
+	definition.PermissionMappings = nil
+	require.NoError(t, definition.Validate(nil))
+
+	definition = importedDefinitionForTest()
+	definition.PermissionMappings[0].Match = SourceKeyMatch{}
+	require.ErrorContains(t, definition.Validate(&common.ValidationContext{Path: "definition"}), "definition.permissionMappings[0].match")
+
+	for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
+		for _, input := range []string{
+			`{"source":null}`, `{"Source":{}}`,
+			`{"source":{"MCP":{}}}`, `{"source":{"openapi":{}}}`,
+			`{"source":{"explicit":{"tools":[]},"mcp":null}}`,
+			`{"source":{"mcp":{"endpoint":"https://example.com/mcp","transport":"streamableHttp"},"explicit":null}}`,
+			`{"permissionMappings":null}`, `{"permissionMappings":[null]}`,
+			`{"defaults":{}}`,
+		} {
+			require.Error(t, decode([]byte(input), &decoded), input)
+		}
+	}
+	require.Error(t, json.Unmarshal([]byte(`null`), &decoded))
+	// yaml.v3 does not call custom unmarshalers for a document-level null.
+	// Input boundaries decode fresh values and then validate required shape.
+	var empty ToolSetDefinition
+	require.NoError(t, util.DecodeYAMLStrict([]byte("null"), &empty))
+	require.Error(t, empty.Validate(nil))
+	for _, input := range []string{
+		"source:\n  <<: {mcp: null}\n  explicit: {tools: []}",
+		"source: {explicit: {tools: []}}\n<<: {permissionMappings: null}",
+		"source: {explicit: {tools: []}}\npermissionMappings: [ &empty null, *empty ]",
+	} {
+		require.Error(t, util.DecodeYAMLStrict([]byte(input), &decoded), input)
+	}
+	original := importedDefinitionForTest()
+	decoded = *original.Clone()
+	require.Error(t, json.Unmarshal([]byte(`{"source":{"unknown":{}}}`), &decoded))
+	require.Equal(t, original, &decoded, "failed definition decoding is atomic")
+}
+
+// TestImportedDefinitionRoundTrip checks complete resources and definition
+// replacements, including empty imported policy and excluded-name lists.
+func TestImportedDefinitionRoundTrip(t *testing.T) {
+	for _, emptyPolicies := range []bool{false, true} {
+		resource := authoredToolSetForResourceTest()
+		resource.Spec.Definition = *importedDefinitionForTest()
+		if emptyPolicies {
+			resource.Spec.Definition.PermissionMappings = []PermissionMapping{}
+			resource.Spec.Definition.Source.MCP.Tools.ExcludeNames = []string{}
+		}
+		for _, format := range []struct {
+			encode func(any) ([]byte, error)
+			decode func([]byte, any) error
+		}{{json.Marshal, util.DecodeJSONStrict}, {yaml.Marshal, util.DecodeYAMLStrict}} {
+			data, err := format.encode(resource)
+			require.NoError(t, err)
+			var decoded ToolSet
+			require.NoError(t, format.decode(data, &decoded))
+			require.NoError(t, decoded.Validate(nil))
+			require.Equal(t, resource, &decoded)
+			patch := NewToolSetPatch()
+			patch.Spec.Definition = resource.Spec.Definition.Clone()
+			data, err = format.encode(patch)
+			require.NoError(t, err)
+			var decodedPatch ToolSetPatch
+			require.NoError(t, format.decode(data, &decodedPatch))
+			require.NoError(t, decodedPatch.ValidateFor(meta.ValidationModeUpdate, nil))
+			require.Equal(t, patch.Spec.Definition, decodedPatch.Spec.Definition)
+			require.True(t, decodedPatch.Spec.HasDefinition())
+		}
+	}
+}
+
+// TestImportedDefinitionCandidateOwnership carries imported policy through the
+// existing patch/clone path while preserving the current generation and status.
+func TestImportedDefinitionCandidateOwnership(t *testing.T) {
+	current := storedToolSetForResourceTest()
+	patch := NewToolSetPatch()
+	patch.Spec.Definition = importedDefinitionForTest()
+	beforeCurrent, beforePatch := current.Clone(), patch.Clone()
+	require.True(t, GenerationPolicy().ChangesGeneration(patch))
+	candidate, err := patch.ApplyTo(current, nil)
+	require.NoError(t, err)
+	require.Nil(t, candidate.Spec.Definition.Source.Explicit)
+	require.Equal(t, current.Status, candidate.Status)
+	definition := &candidate.Spec.Definition
+	*definition.Source.MCP.RefreshInterval = "1h"
+	definition.Source.MCP.Tools.IncludeNames[0] = "other"
+	definition.Source.MCP.Tools.ExcludeNames[0] = "other"
+	definition.PermissionMappings[0].Match.SourceKeys[0] = "other"
+	definition.PermissionMappings[0].Match.SourceKeyPatterns[0] = "other.*"
+	definition.PermissionMappings[0].AddVerbs[0] = "tool:other"
+	require.Equal(t, beforeCurrent, current)
+	require.Equal(t, beforePatch, patch)
+
+	// Invalid/empty shapes remain inspectable when cloned instead of being
+	// normalized through serialization or treated as default policy.
+	for _, mappings := range [][]PermissionMapping{nil, {}, {{}}} {
+		definition := &ToolSetDefinition{PermissionMappings: mappings}
+		require.Equal(t, definition, definition.Clone())
 	}
 }
 
