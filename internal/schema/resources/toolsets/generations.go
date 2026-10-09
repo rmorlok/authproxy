@@ -33,6 +33,7 @@ func toolSetGenerationState(resource *ToolSet) (meta.GenerationState, error) {
 	if resource == nil || resource.Status == nil {
 		return 0, fmt.Errorf("tool set generation is missing release status")
 	}
+
 	switch resource.Status.Release.State {
 	case ToolSetReleaseStateDraft:
 		return meta.GenerationEditable, nil
@@ -63,9 +64,11 @@ func selectToolSetGeneration(
 	if desired == nil {
 		return meta.GenerationSelection{}, fmt.Errorf("desired tool set is required")
 	}
+
 	if _, err := toolSetGenerationState(selected); err != nil {
 		return meta.GenerationSelection{}, err
 	}
+
 	if !changesGeneration {
 		return meta.GenerationSelection{Source: meta.GenerationSelected}, nil
 	}
@@ -74,9 +77,11 @@ func selectToolSetGeneration(
 		publishDefinition: desired.Spec.Release.DesiredState == ToolSetReleaseStatePrimary &&
 			selected.Status.Release.State == ToolSetReleaseStatePrimary,
 	}
+
 	if hasEditable {
 		return meta.GenerationSelection{Source: meta.GenerationEditableSource, Context: ctx}, nil
 	}
+
 	ctx.requiresDraft = true
 	return meta.GenerationSelection{Source: meta.GenerationNewest, Context: ctx}, nil
 }
@@ -95,13 +100,16 @@ func finalizeToolSetGenerationPatch(
 	if desired == nil {
 		return nil, fmt.Errorf("desired tool set is required")
 	}
+
 	state, err := toolSetGenerationState(current)
 	if err != nil {
 		return nil, err
 	}
+
 	if patch == nil || patch.Metadata == nil || patch.Spec == nil {
 		return nil, fmt.Errorf("tool set patch requires metadata and spec")
 	}
+
 	var ctx toolSetGenerationContext
 	if selectionContext != nil {
 		var ok bool
@@ -110,6 +118,7 @@ func finalizeToolSetGenerationPatch(
 			return nil, fmt.Errorf("invalid tool set generation selection context")
 		}
 	}
+
 	if explicit {
 		if patch.Spec.HasConnectionSelector() {
 			return nil, fmt.Errorf("connection selection can only be changed through the logical tool set endpoint")
@@ -124,9 +133,11 @@ func finalizeToolSetGenerationPatch(
 	if !toolSetPatchChangesGeneration(result) && selectionContext == nil {
 		return result, nil
 	}
+
 	setRelease := func(state ToolSetReleaseState) {
 		result.Spec.Release = &ToolSetReleaseSpecPatch{DesiredState: &state}
 	}
+
 	desiredState := desired.Spec.Release.DesiredState
 	if !explicit && desiredState == ToolSetReleaseStatePrimary && state != meta.GenerationPublished {
 		setRelease(desiredState)
@@ -137,11 +148,14 @@ func finalizeToolSetGenerationPatch(
 	if ctx.publishDefinition && !result.Spec.HasDefinition() {
 		result.Spec.Definition = current.Spec.Definition.Clone()
 	}
+
 	if ctx.requiresDraft && !toolSetPatchChangesGeneration(result) {
 		setRelease(ToolSetReleaseStateDraft)
 	}
+
 	if result.Spec.HasDefinition() && desiredState != "" {
 		setRelease(desiredState)
 	}
+
 	return result, nil
 }

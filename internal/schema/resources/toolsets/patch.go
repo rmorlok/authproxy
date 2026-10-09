@@ -85,6 +85,7 @@ func (p *ToolSetPatch) ValidateFor(mode meta.ValidationMode, vc *common.Validati
 	if mode != meta.ValidationModeUpdate {
 		result = multierror.Append(result, vc.NewError("tool set patches require update validation mode"))
 	}
+
 	result = multierror.Append(result, meta.ValidateTypeMeta(p.TypeMeta, meta.APIVersionV1Alpha1, ToolSetKind, vc))
 	if p.Metadata == nil {
 		result = multierror.Append(result, vc.NewErrorForField("metadata", "is required and must not be null"))
@@ -93,11 +94,13 @@ func (p *ToolSetPatch) ValidateFor(mode meta.ValidationMode, vc *common.Validati
 			Mode: mode, Path: vc, IDValidator: ValidateID, NamespaceValidator: nschema.ValidatePath,
 		}))
 	}
+
 	if p.Spec == nil {
 		result = multierror.Append(result, vc.NewErrorForField("spec", "is required and must not be null"))
 	} else {
 		result = multierror.Append(result, p.Spec.validate(vc.PushField("spec")))
 	}
+
 	result = multierror.Append(result, meta.ValidateStatus(p.Status, mode, vc))
 	return result.ErrorOrNil()
 }
@@ -106,6 +109,7 @@ func (p *ToolSetPatch) ValidateFor(mode meta.ValidationMode, vc *common.Validati
 // replacement. It permits release:{} because that carries no desired-state edit.
 func (p *ToolSetSpecPatch) validate(vc *common.ValidationContext) error {
 	var result *multierror.Error
+
 	if p.HasConnectionSelector() {
 		if p.ConnectionSelector == nil {
 			result = multierror.Append(result, vc.NewErrorForField("connectionSelector", "must not be null"))
@@ -113,6 +117,7 @@ func (p *ToolSetSpecPatch) validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, p.ConnectionSelector.ValidateForNamespace(nschema.Root, vc.PushField("connectionSelector")))
 		}
 	}
+
 	if p.HasDefinition() {
 		if p.Definition == nil {
 			result = multierror.Append(result, vc.NewErrorForField("definition", "must not be null"))
@@ -120,6 +125,7 @@ func (p *ToolSetSpecPatch) validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, p.Definition.Validate(vc.PushField("definition")))
 		}
 	}
+
 	if p.HasRelease() {
 		if p.Release == nil {
 			result = multierror.Append(result, vc.NewErrorForField("release", "must not be null"))
@@ -131,6 +137,7 @@ func (p *ToolSetSpecPatch) validate(vc *common.ValidationContext) error {
 			}
 		}
 	}
+	
 	return result.ErrorOrNil()
 }
 
