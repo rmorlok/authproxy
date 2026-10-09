@@ -14,17 +14,19 @@ import (
 
 // ToolSetDefinition contains generation-owned behavior. Connection selection
 // is a logical ToolSet property and deliberately lives outside this definition.
-// This first contract supports explicit templates; imported source contracts
-// are introduced separately before OpenAPI or MCP can be authored here.
+// Imported permission mappings are administrator-authored additions to each
+// generated Tool's canonical verb; explicit templates declare their own verbs.
 type ToolSetDefinition struct {
-	Source ToolSetSource `json:"source" yaml:"source"`
+	Source             ToolSetSource       `json:"source" yaml:"source"`
+	PermissionMappings []PermissionMapping `json:"permissionMappings,omitempty" yaml:"permissionMappings,omitempty"`
 }
 
-// ToolSetSource selects the source of a generation's tool inventory. Explicit
-// is currently the only supported source. Input boundaries must use strict
-// decoding so future or misspelled source kinds cannot silently disappear.
+// ToolSetSource selects exactly one source of a generation's tool inventory.
+// MCP declares a connection-specific live catalog, not a generation snapshot
+// of upstream tools. OpenAPI acquisition contracts are introduced separately.
 type ToolSetSource struct {
 	Explicit *ExplicitSource `json:"explicit,omitempty" yaml:"explicit,omitempty"`
+	MCP      *MCPSource      `json:"mcp,omitempty" yaml:"mcp,omitempty"`
 }
 
 // ExplicitSource declares an entire inventory of authored templates. Tools
@@ -60,11 +62,19 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 	if d == nil {
 		return vc.NewError("toolset definition is required")
 	}
-	return d.Source.Validate(vc.PushField("source"))
+	var result *multierror.Error
+	result = multierror.Append(result, d.Source.Validate(vc.PushField("source")))
+	if d.PermissionMappings != nil && d.Source.MCP == nil {
+		result = multierror.Append(result, vc.NewErrorForField("permissionMappings", "are only supported for imported sources; explicit templates declare their own verbs"))
+	}
+	for i := range d.PermissionMappings {
+		result = multierror.Append(result, d.PermissionMappings[i].Validate(vc.PushField("permissionMappings").PushIndex(i)))
+	}
+	return result.ErrorOrNil()
 }
 
-// Validate requires the supported explicit source rather than accepting an
-// absent source as an implicitly empty inventory.
+// Validate requires exactly one supported source and validates its authored
+// configuration without contacting providers or discovering their catalogs.
 func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
 
@@ -72,7 +82,17 @@ func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 		return vc.NewError("toolset source is required")
 	}
 
-	return s.Explicit.Validate(vc.PushField("explicit"))
+	var result *multierror.Error
+	if (s.Explicit == nil) == (s.MCP == nil) {
+		result = multierror.Append(result, vc.NewError("must contain exactly one of explicit or mcp"))
+	}
+	if s.Explicit != nil {
+		result = multierror.Append(result, s.Explicit.Validate(vc.PushField("explicit")))
+	}
+	if s.MCP != nil {
+		result = multierror.Append(result, s.MCP.Validate(vc.PushField("mcp")))
+	}
+	return result.ErrorOrNil()
 }
 
 // Validate checks every template and rejects repeated exact source keys.
@@ -159,6 +179,11 @@ func (d *ToolSetDefinition) Clone() *ToolSetDefinition {
 		return nil
 	}
 	clone := *d
+	clone.Source.MCP = d.Source.MCP.Clone()
+	clone.PermissionMappings = slices.Clone(d.PermissionMappings)
+	for i := range clone.PermissionMappings {
+		clone.PermissionMappings[i] = *d.PermissionMappings[i].Clone()
+	}
 
 	if d.Source.Explicit != nil {
 		clone.Source.Explicit = util.CloneValue(d.Source.Explicit)

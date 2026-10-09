@@ -85,21 +85,107 @@
       "additionalProperties": false,
       "description": "An explicit inventory of templates. An empty array deliberately declares an empty inventory; omission or null is invalid."
     },
-    "ToolSetSource": {
+    "MCPToolFilter": {
       "type": "object",
-      "required": ["explicit"],
       "properties": {
-        "explicit": { "$ref": "#/$defs/ExplicitSource" }
+        "includeNames": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+        },
+        "excludeNames": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+        }
       },
       "additionalProperties": false,
-      "description": "Exactly one source is authored. This contract currently supports only explicit sources; OpenAPI and MCP source contracts are added separately."
+      "description": "Exact upstream tool names, preserved without normalization. Omitted inclusion is unrestricted; an authored inclusion list must be nonempty."
+    },
+    "MCPSource": {
+      "type": "object",
+      "required": ["endpoint", "transport"],
+      "properties": {
+        "endpoint": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:[^\\r\\n]*\\S)?$",
+          "description": "The upstream endpoint, optionally containing configuration templates. Surrounding whitespace and line breaks are invalid; URL and template compilation happen later."
+        },
+        "transport": { "const": "streamableHttp" },
+        "refreshInterval": {
+          "type": "string",
+          "pattern": "^[+-]?(?:0|(?:(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:ns|us|µs|μs|ms|s|m|h))+)$",
+          "description": "A Go duration string preserved exactly as authored. Go validation additionally requires a positive duration within the supported numeric range."
+        },
+        "tools": { "$ref": "#/$defs/MCPToolFilter" }
+      },
+      "additionalProperties": false
+    },
+    "ToolSetSource": {
+      "type": "object",
+      "properties": {
+        "explicit": { "$ref": "#/$defs/ExplicitSource" },
+        "mcp": { "$ref": "#/$defs/MCPSource" }
+      },
+      "oneOf": [{ "required": ["explicit"] }, { "required": ["mcp"] }],
+      "additionalProperties": false,
+      "description": "Exactly one explicit or MCP source is authored. OpenAPI source contracts are added separately."
+    },
+    "PermissionAlias": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^\\S(?:[\\s\\S]*\\S)?$",
+      "description": "An exact additional permission verb without surrounding whitespace. Canonical verb resolution is separate from this authored alias contract."
+    },
+    "PermissionMappingMatch": {
+      "type": "object",
+      "properties": {
+        "sourceKeys": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+        },
+        "sourceKeyPatterns": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+        }
+      },
+      "anyOf": [
+        { "required": ["sourceKeys"], "properties": { "sourceKeys": { "minItems": 1 } } },
+        { "required": ["sourceKeyPatterns"], "properties": { "sourceKeyPatterns": { "minItems": 1 } } }
+      ],
+      "additionalProperties": false,
+      "description": "At least one exact key or pattern is required. Matchers are ORed; Go validation checks regular-expression syntax and matching covers the complete source key."
+    },
+    "PermissionMapping": {
+      "type": "object",
+      "required": ["match", "addVerbs"],
+      "properties": {
+        "match": { "$ref": "#/$defs/PermissionMappingMatch" },
+        "addVerbs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/PermissionAlias" }
+        }
+      },
+      "additionalProperties": false
     },
     "ToolSetDefinition": {
       "type": "object",
       "required": ["source"],
       "properties": {
-        "source": { "$ref": "#/$defs/ToolSetSource" }
+        "source": { "$ref": "#/$defs/ToolSetSource" },
+        "permissionMappings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PermissionMapping" }
+        }
       },
+      "if": { "required": ["permissionMappings"] },
+      "then": { "properties": { "source": { "required": ["mcp"] } } },
       "additionalProperties": false
     },
     "ToolSetReleaseSpec": {
