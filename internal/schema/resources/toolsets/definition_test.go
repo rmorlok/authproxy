@@ -14,18 +14,36 @@ import (
 // explicitDefinitionForTest provides a complete, connection-independent
 // inventory whose metadata and definition can be changed independently.
 func explicitDefinitionForTest() *ToolSetDefinition {
-	return &ToolSetDefinition{Source: ToolSetSource{Explicit: &ExplicitSource{Tools: []ToolTemplate{{
-		Key: "list-records",
-		Metadata: &ToolTemplateMetadata{
-			Name: "list-records", Labels: map[string]string{"capability": "records"},
-			Annotations: map[string]string{"owner": "platform"},
+	return &ToolSetDefinition{
+		Source: ToolSetSource{
+			Explicit: &ExplicitSource{
+				Tools: []ToolTemplate{
+					{
+						Key: "list-records",
+						Metadata: &ToolTemplateMetadata{
+							Name: "list-records", Labels: map[string]string{
+								"capability": "records",
+							},
+							Annotations: map[string]string{
+								"owner": "platform",
+							},
+						},
+						Spec: tools.ToolDefinition{
+							Description: "List records",
+							Verbs: []string{
+								"tool:records.list",
+							},
+							InputSchema: common.RawJSON(`{"type":"object"}`),
+							ProxyHTTP: &tools.ProxyHTTP{
+								Method: "GET",
+								URL:    "https://{{cfg.host}}/records",
+							},
+						},
+					},
+				},
+			},
 		},
-		Spec: tools.ToolDefinition{
-			Description: "List records", Verbs: []string{"tool:records.list"},
-			InputSchema: common.RawJSON(`{"type":"object"}`),
-			ProxyHTTP:   &tools.ProxyHTTP{Method: "GET", URL: "https://{{cfg.host}}/records"},
-		},
-	}}}}}
+	}
 }
 
 // TestExplicitDefinitionValidation checks stable source identity and complete
@@ -69,10 +87,12 @@ func TestExplicitDefinitionValidation(t *testing.T) {
 			}
 		})
 	}
+
 	definition := explicitDefinitionForTest()
 	definition.Source.Explicit.Tools[0].Key = "GET /records/{id} "
 	definition.Source.Explicit.Tools = append(definition.Source.Explicit.Tools, definition.Source.Explicit.Tools[0])
 	definition.Source.Explicit.Tools[1].Key = "GET /records/{id}"
+	
 	require.NoError(t, definition.Validate(nil), "keys are exact opaque identities; duplicate naming stems are allowed")
 	require.Equal(t, "GET /records/{id} ", definition.Source.Explicit.Tools[0].Key)
 	require.Error(t, (*ToolSetDefinition)(nil).Validate(nil))
