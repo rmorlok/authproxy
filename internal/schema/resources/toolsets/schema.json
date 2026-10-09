@@ -123,15 +123,88 @@
       },
       "additionalProperties": false
     },
+    "OpenAPIFetchConnectionReference": {
+      "allOf": [
+        { "$ref": "../connection/schema.json#/$defs/ConnectionReference" },
+        {
+          "type": "object",
+          "properties": {
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+          }
+        }
+      ],
+      "description": "A Connection ID or namespaced name used to fetch the document. It has no generation and may belong to a different namespace from the ToolSet; access checks happen during fetching."
+    },
+    "OpenAPIDocument": {
+      "type": "object",
+      "properties": {
+        "inline": {
+          "type": "object",
+          "description": "An opaque document object. This authoring contract does not validate OpenAPI versions, compile schemas, or resolve references."
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/?#@\\s]+(?:[/?][^#]*)?$",
+          "not": { "pattern": "\\{\\{|\\}\\}|\\s$" },
+          "description": "A literal absolute HTTP(S) document URL without credentials, fragment, or templates. Go validation performs URL parsing and rejects surrounding whitespace."
+        },
+        "fetchConnectionRef": { "$ref": "#/$defs/OpenAPIFetchConnectionReference" }
+      },
+      "oneOf": [{ "required": ["inline"] }, { "required": ["url"] }],
+      "dependentRequired": { "fetchConnectionRef": ["url"] },
+      "additionalProperties": false
+    },
+    "OpenAPIOperationFilter": {
+      "type": "object",
+      "properties": {
+        "includeOperationIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+        },
+        "excludeOperationIds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+        }
+      },
+      "additionalProperties": false,
+      "description": "Exact operation IDs preserved without normalization. Omitted inclusion is unrestricted, supplied inclusion must be nonempty, and exclusion takes precedence."
+    },
+    "OpenAPIServerOverride": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^\\S(?:[^\\r\\n]*\\S)?$",
+          "description": "The execution server override, optionally containing configuration templates. Surrounding whitespace and line breaks are invalid; compilation happens later."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpenAPISource": {
+      "type": "object",
+      "required": ["document"],
+      "properties": {
+        "document": { "$ref": "#/$defs/OpenAPIDocument" },
+        "operations": { "$ref": "#/$defs/OpenAPIOperationFilter" },
+        "server": { "$ref": "#/$defs/OpenAPIServerOverride" }
+      },
+      "additionalProperties": false
+    },
     "ToolSetSource": {
       "type": "object",
       "properties": {
         "explicit": { "$ref": "#/$defs/ExplicitSource" },
-        "mcp": { "$ref": "#/$defs/MCPSource" }
+        "mcp": { "$ref": "#/$defs/MCPSource" },
+        "openapi": { "$ref": "#/$defs/OpenAPISource" }
       },
-      "oneOf": [{ "required": ["explicit"] }, { "required": ["mcp"] }],
+      "oneOf": [{ "required": ["explicit"] }, { "required": ["mcp"] }, { "required": ["openapi"] }],
       "additionalProperties": false,
-      "description": "Exactly one explicit or MCP source is authored. OpenAPI source contracts are added separately."
+      "description": "Exactly one explicit, MCP, or OpenAPI source is authored."
     },
     "PermissionAlias": {
       "type": "string",
@@ -185,7 +258,7 @@
         }
       },
       "if": { "required": ["permissionMappings"] },
-      "then": { "properties": { "source": { "required": ["mcp"] } } },
+      "then": { "properties": { "source": { "anyOf": [{ "required": ["mcp"] }, { "required": ["openapi"] }] } } },
       "additionalProperties": false
     },
     "ToolSetReleaseSpec": {

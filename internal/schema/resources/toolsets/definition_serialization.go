@@ -90,6 +90,8 @@ func (s *ToolSetSource) UnmarshalJSON(data []byte) error {
 		switch name {
 		case "explicit":
 			destination = &decoded.Explicit
+		case "openapi":
+			destination = &decoded.OpenAPI
 		case "mcp":
 			destination = &decoded.MCP
 		default:
