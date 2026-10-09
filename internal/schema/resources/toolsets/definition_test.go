@@ -92,7 +92,7 @@ func TestExplicitDefinitionValidation(t *testing.T) {
 	definition.Source.Explicit.Tools[0].Key = "GET /records/{id} "
 	definition.Source.Explicit.Tools = append(definition.Source.Explicit.Tools, definition.Source.Explicit.Tools[0])
 	definition.Source.Explicit.Tools[1].Key = "GET /records/{id}"
-	
+
 	require.NoError(t, definition.Validate(nil), "keys are exact opaque identities; duplicate naming stems are allowed")
 	require.Equal(t, "GET /records/{id} ", definition.Source.Explicit.Tools[0].Key)
 	require.Error(t, (*ToolSetDefinition)(nil).Validate(nil))

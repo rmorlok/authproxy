@@ -62,7 +62,9 @@ type ToolSetReleaseStatus struct {
 
 // NewToolSet returns an empty ToolSet with the canonical API version and kind.
 func NewToolSet() *ToolSet {
-	return &ToolSet{TypeMeta: meta.NewTypeMeta(ToolSetKind)}
+	return &ToolSet{
+		TypeMeta: meta.NewTypeMeta(ToolSetKind),
+	}
 }
 
 // NewToolSetReference returns a reference to the logical ToolSet identity.
@@ -88,12 +90,14 @@ func (t *ToolSet) GetId() apid.ID {
 // ValidateID checks that an identifier belongs to the ToolSet resource kind.
 func ValidateID(value string) error {
 	id, err := apid.Parse(value)
+
 	if err != nil {
 		return err
 	}
 	if id.Prefix() != apid.PrefixToolSet {
 		return fmt.Errorf("must be a tool set id")
 	}
+
 	return nil
 }
 
@@ -110,15 +114,20 @@ func (t *ToolSet) ApplyAPICreateDefaults(id apid.ID) *ToolSet {
 
 	clone.Metadata.ID = id.String()
 	clone.Metadata.Generation = 1
+
 	if clone.Metadata.Name == "" {
 		clone.Metadata.Name = common.ResourceName(id.String())
 	}
+
 	if clone.Spec.Release.DesiredState == "" {
 		clone.Spec.Release.DesiredState = ToolSetReleaseStateDraft
 	}
-	if clone.Spec.ConnectionSelector != nil && clone.Spec.ConnectionSelector.Namespace == "" {
+
+	if clone.Spec.ConnectionSelector != nil &&
+		clone.Spec.ConnectionSelector.Namespace == "" {
 		clone.Spec.ConnectionSelector.Namespace = clone.Metadata.Namespace + namespaceschema.WildcardSuffix
 	}
+
 	return clone
 }
 
@@ -133,10 +142,12 @@ func (t *ToolSet) Clone() *ToolSet {
 	clone.Metadata = meta.CloneObjectMeta(t.Metadata)
 	clone.Spec.ConnectionSelector = t.Spec.ConnectionSelector.Clone()
 	clone.Spec.Definition = *t.Spec.Definition.Clone()
+
 	if t.Status != nil {
 		status := *t.Status
 		clone.Status = &status
 	}
+
 	return &clone
 }
 

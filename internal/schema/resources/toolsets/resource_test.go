@@ -16,25 +16,38 @@ import (
 func authoredToolSetForResourceTest() *ToolSet {
 	resource := NewToolSet()
 	resource.Metadata.Namespace = "root.product"
-	resource.Spec.ConnectionSelector = &ConnectionSelector{MatchLabels: map[string]string{"provider": "calendar"}}
-	resource.Spec.Definition = ToolSetDefinition{Source: ToolSetSource{Explicit: &ExplicitSource{
-		Tools: []ToolTemplate{{
-			Key: "list-calendars",
-			Metadata: &ToolTemplateMetadata{
-				Name: "list-calendars", Labels: map[string]string{"capability": "calendars"},
-				Annotations: map[string]string{"description": "Calendar operations"},
-			},
-			Spec: tools.ToolDefinition{
-				Description: "List calendars", Verbs: []string{"tool:calendar.list"},
-				InputSchema: common.RawJSON(`{"type":"object"}`),
-				ProxyHTTP: &tools.ProxyHTTP{
-					Method: "GET", URL: "https://{{cfg.host}}/calendars",
-					Headers: map[string]string{"Accept": "application/json"},
-					Query:   map[string]common.RawJSON{"limit": common.RawJSON(`10`)},
+	resource.Spec.ConnectionSelector = &ConnectionSelector{
+		MatchLabels: map[string]string{
+			"provider": "calendar",
+		},
+	}
+	resource.Spec.Definition = ToolSetDefinition{
+		Source: ToolSetSource{
+			Explicit: &ExplicitSource{
+				Tools: []ToolTemplate{
+					{
+						Key: "list-calendars",
+						Metadata: &ToolTemplateMetadata{
+							Name:        "list-calendars",
+							Labels:      map[string]string{"capability": "calendars"},
+							Annotations: map[string]string{"description": "Calendar operations"},
+						},
+						Spec: tools.ToolDefinition{
+							Description: "List calendars",
+							Verbs:       []string{"tool:calendar.list"},
+							InputSchema: common.RawJSON(`{"type":"object"}`),
+							ProxyHTTP: &tools.ProxyHTTP{
+								Method: "GET", URL: "https://{{cfg.host}}/calendars",
+								Headers: map[string]string{"Accept": "application/json"},
+								Query:   map[string]common.RawJSON{"limit": common.RawJSON(`10`)},
+							},
+						},
+					},
 				},
 			},
-		}},
-	}}}
+		},
+	}
+
 	return resource
 }
 
@@ -54,14 +67,20 @@ func storedToolSetForResourceTest() *ToolSet {
 // by the server, including explicit namespace ownership in configuration files.
 func TestToolSetResourceLifecycle(t *testing.T) {
 	resource := authoredToolSetForResourceTest()
-	for _, mode := range []meta.ValidationMode{meta.ValidationModeCreate, meta.ValidationModeConfig, meta.ValidationModeUpdate} {
+	for _, mode := range []meta.ValidationMode{
+		meta.ValidationModeCreate,
+		meta.ValidationModeConfig,
+		meta.ValidationModeUpdate,
+	} {
 		require.NoError(t, resource.ValidateFor(mode, nil))
 		withStatus := resource.Clone()
 		withStatus.Status = &ToolSetStatus{Release: ToolSetReleaseStatus{State: ToolSetReleaseStateDraft}}
 		require.ErrorContains(t, withStatus.ValidateFor(mode, nil), "status")
 	}
+
 	require.NoError(t, resource.Validate(nil))
 	require.Empty(t, resource.Spec.Release.DesiredState, "config validation does not choose a release default")
+
 	for _, mode := range []meta.ValidationMode{meta.ValidationModePersistence, meta.ValidationModeResponse} {
 		err := resource.ValidateFor(mode, nil)
 		for _, field := range []string{"metadata.id", "metadata.name", "metadata.generation", "spec.release.desiredState", "status"} {
@@ -69,9 +88,11 @@ func TestToolSetResourceLifecycle(t *testing.T) {
 		}
 		require.NoError(t, storedToolSetForResourceTest().ValidateFor(mode, nil))
 	}
+
 	require.ErrorContains(t, storedToolSetForResourceTest().ValidateFor(meta.ValidationModeCreate, nil), "server-owned on create")
 	require.ErrorContains(t, resource.ValidateFor("unsupported", nil), "unknown metadata validation mode")
 	require.ErrorContains(t, (*ToolSet)(nil).Validate(&common.ValidationContext{Path: "candidate"}), "candidate")
+
 	resource.Metadata.Namespace = ""
 	require.ErrorContains(t, resource.Validate(nil), "metadata.namespace")
 }
@@ -109,12 +130,18 @@ func TestToolSetResourceValidation(t *testing.T) {
 // TestToolSetReleaseStates distinguishes authorable release intent from the
 // observed state of a previously published generation.
 func TestToolSetReleaseStates(t *testing.T) {
-	states := []ToolSetReleaseState{ToolSetReleaseStateDraft, ToolSetReleaseStatePrimary, ToolSetReleaseStateActive, ToolSetReleaseStateArchived}
+	states := []ToolSetReleaseState{
+		ToolSetReleaseStateDraft,
+		ToolSetReleaseStatePrimary,
+		ToolSetReleaseStateActive,
+		ToolSetReleaseStateArchived,
+	}
 	for _, desired := range states {
 		t.Run(string(desired), func(t *testing.T) {
 			authored := authoredToolSetForResourceTest()
 			authored.Spec.Release.DesiredState = desired
-			if desired == ToolSetReleaseStateDraft || desired == ToolSetReleaseStatePrimary {
+			if desired == ToolSetReleaseStateDraft ||
+				desired == ToolSetReleaseStatePrimary {
 				require.NoError(t, authored.Validate(nil))
 			} else {
 				require.ErrorContains(t, authored.Validate(nil), "spec.release.desiredState")
@@ -136,11 +163,13 @@ func TestToolSetReleaseStates(t *testing.T) {
 			}
 		})
 	}
+
 	for _, state := range []ToolSetReleaseState{"", "unknown"} {
 		stored := storedToolSetForResourceTest()
 		stored.Status.Release.State = state
 		require.ErrorContains(t, stored.ValidateFor(meta.ValidationModePersistence, nil), "status.release.state")
 	}
+	
 	authored := authoredToolSetForResourceTest()
 	authored.Spec.Release.DesiredState = "unknown"
 	require.ErrorContains(t, authored.Validate(nil), "spec.release.desiredState")
