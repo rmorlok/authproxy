@@ -169,7 +169,7 @@ func TestToolSetReleaseStates(t *testing.T) {
 		stored.Status.Release.State = state
 		require.ErrorContains(t, stored.ValidateFor(meta.ValidationModePersistence, nil), "status.release.state")
 	}
-	
+
 	authored := authoredToolSetForResourceTest()
 	authored.Spec.Release.DesiredState = "unknown"
 	require.ErrorContains(t, authored.Validate(nil), "spec.release.desiredState")

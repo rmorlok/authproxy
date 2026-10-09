@@ -22,12 +22,53 @@ func TestConnectionSelectorNamespaceScope(t *testing.T) {
 		name, owner, scope, want string
 		matches, excludes        []string
 	}{
-		{"default subtree", "root.team", "", "root.team.**", []string{"root.team", "root.team.user", "root.team.user.child"}, []string{"root", "root.other", "root.teamwork"}},
-		{"exact owner", "root.team", "root.team", "root.team", []string{"root.team"}, []string{"root.team.user", "root.teamwork"}},
-		{"narrower subtree", "root.team", "root.team.user.**", "root.team.user.**", []string{"root.team.user", "root.team.user.child"}, []string{"root.team", "root.team.user2"}},
-		{"exact descendant", "root.team", "root.team.user", "root.team.user", []string{"root.team.user"}, []string{"root.team", "root.team.user.child"}},
-		{"root owner", "root", "", "root.**", []string{"root", "root.team", "root.team.user"}, []string{"rooted"}},
-		{"literal underscore", "root.team_a", "", "root.team_a.**", []string{"root.team_a", "root.team_a.user"}, []string{"root.teamXa", "root.teamXa.user"}},
+		{
+			name:     "default subtree",
+			owner:    "root.team",
+			scope:    "",
+			want:     "root.team.**",
+			matches:  []string{"root.team", "root.team.user", "root.team.user.child"},
+			excludes: []string{"root", "root.other", "root.teamwork"},
+		},
+		{
+			name:     "exact owner",
+			owner:    "root.team",
+			scope:    "root.team",
+			want:     "root.team",
+			matches:  []string{"root.team"},
+			excludes: []string{"root.team.user", "root.teamwork"},
+		},
+		{
+			name:     "narrower subtree",
+			owner:    "root.team",
+			scope:    "root.team.user.**",
+			want:     "root.team.user.**",
+			matches:  []string{"root.team.user", "root.team.user.child"},
+			excludes: []string{"root.team", "root.team.user2"},
+		},
+		{
+			name:     "exact descendant",
+			owner:    "root.team",
+			scope:    "root.team.user",
+			want:     "root.team.user",
+			matches:  []string{"root.team.user"},
+			excludes: []string{"root.team", "root.team.user.child"}},
+		{
+			name:     "root owner",
+			owner:    "root",
+			scope:    "",
+			want:     "root.**",
+			matches:  []string{"root", "root.team", "root.team.user"},
+			excludes: []string{"rooted"},
+		},
+		{
+			name:     "literal underscore",
+			owner:    "root.team_a",
+			scope:    "",
+			want:     "root.team_a.**",
+			matches:  []string{"root.team_a", "root.team_a.user"},
+			excludes: []string{"root.teamXa", "root.teamXa.user"},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			selector := &toolsets.ConnectionSelector{Namespace: test.scope, MatchLabels: map[string]string{}}

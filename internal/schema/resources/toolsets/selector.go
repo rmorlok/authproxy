@@ -30,16 +30,22 @@ type ConnectionSelector struct {
 // Explicit matchers may narrow the owner's subtree but cannot select ancestors
 // or siblings. Labels use read-side validation so system and inherited keys
 // retain their existing grammar and longer system-value limits.
-func (s *ConnectionSelector) ValidateForNamespace(owner string, vc *common.ValidationContext) error {
+func (s *ConnectionSelector) ValidateForNamespace(
+	owner string,
+	vc *common.ValidationContext,
+) error {
 	vc = validationContext(vc)
 	if s == nil {
 		return vc.NewError("connection selector is required")
 	}
+
 	var result *multierror.Error
+
 	ownerErr := nschema.ValidatePath(owner)
 	if ownerErr != nil {
 		result = multierror.Append(result, vc.NewErrorf("invalid owning namespace: %v", ownerErr))
 	}
+
 	if s.Namespace != "" {
 		if err := nschema.ValidateMatcher(s.Namespace); err != nil {
 			result = multierror.Append(result, vc.NewErrorfForField("namespace", "%v", err))
@@ -47,11 +53,13 @@ func (s *ConnectionSelector) ValidateForNamespace(owner string, vc *common.Valid
 			result = multierror.Append(result, vc.NewErrorfForField("namespace", "must match only namespace %q or its descendants", owner))
 		}
 	}
+
 	if s.MatchLabels == nil {
 		result = multierror.Append(result, vc.NewErrorForField("matchLabels", "is required and must be an object; use {} to select all connections in scope"))
 	} else if err := meta.ValidateLabels(s.MatchLabels); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("matchLabels", "%v", err))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -60,23 +68,29 @@ func (s *ConnectionSelector) ValidateForNamespace(owner string, vc *common.Valid
 // contain selector delimiters, so sorted key=value terms express exactly ANDed
 // equality requirements. An empty label string imposes no label restriction;
 // the returned namespace matcher still applies. Errors return no partial scope.
-func (s *ConnectionSelector) Compile(owner string) (namespaceMatcher, labelSelector string, err error) {
+func (s *ConnectionSelector) Compile(
+	owner string,
+) (namespaceMatcher, labelSelector string, err error) {
 	if err := s.ValidateForNamespace(owner, nil); err != nil {
 		return "", "", err
 	}
+
 	namespaceMatcher = s.Namespace
 	if namespaceMatcher == "" {
 		namespaceMatcher = owner + nschema.WildcardSuffix
 	}
+
 	keys := make([]string, 0, len(s.MatchLabels))
 	for key := range s.MatchLabels {
 		keys = append(keys, key)
 	}
+
 	sort.Strings(keys)
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
 		parts = append(parts, key+"="+s.MatchLabels[key])
 	}
+
 	return namespaceMatcher, strings.Join(parts, ","), nil
 }
 
@@ -102,6 +116,7 @@ func (s *ConnectionSelector) UnmarshalJSON(data []byte) error {
 	if fields == nil {
 		return fmt.Errorf("connection selector must be an object")
 	}
+
 	var decoded ConnectionSelector
 	for name, raw := range fields {
 		switch name {
