@@ -36,15 +36,20 @@ type SourceKeyMatch struct {
 // consulting a source catalog. It preserves exact keys, patterns, and verb order.
 func (p *PermissionMapping) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if p == nil {
 		return vc.NewError("permission mapping is required")
 	}
+
 	var result *multierror.Error
 	result = multierror.Append(result, p.Match.Validate(vc.PushField("match")))
+
 	if len(p.AddVerbs) == 0 {
 		result = multierror.Append(result, vc.NewErrorForField("addVerbs", "must contain at least one permission verb"))
 	}
+
 	result = multierror.Append(result, validateMappingStrings(p.AddVerbs, true, vc.PushField("addVerbs")))
+
 	return result.ErrorOrNil()
 }
 
@@ -53,15 +58,19 @@ func (p *PermissionMapping) Validate(vc *common.ValidationContext) error {
 // overlap between exact keys and patterns is allowed because matching is OR.
 func (m *SourceKeyMatch) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if m == nil {
 		return vc.NewError("source key match is required")
 	}
+
 	var result *multierror.Error
 	if len(m.SourceKeys)+len(m.SourceKeyPatterns) == 0 {
 		result = multierror.Append(result, vc.NewError("must contain at least one source key or source key pattern"))
 	}
+
 	result = multierror.Append(result, validateMappingStrings(m.SourceKeys, false, vc.PushField("sourceKeys")))
 	result = multierror.Append(result, validateMappingStrings(m.SourceKeyPatterns, false, vc.PushField("sourceKeyPatterns")))
+
 	for i, pattern := range m.SourceKeyPatterns {
 		// Validate the pattern independently before wrapping it. Otherwise an
 		// unmatched closing/opening pair could escape the enclosing group and
@@ -70,6 +79,7 @@ func (m *SourceKeyMatch) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.PushField("sourceKeyPatterns").PushIndex(i).NewErrorf("must be a valid Go regular expression: %v", err))
 			continue
 		}
+
 		// Absolute anchors retain whole-key semantics even with inline (?m).
 		if _, err := regexp.Compile(`\A(?:` + pattern + `)\z`); err != nil {
 			result = multierror.Append(result, vc.PushField("sourceKeyPatterns").PushIndex(i).NewErrorf("must be a valid full-string Go regular expression: %v", err))
@@ -83,18 +93,22 @@ func (m *SourceKeyMatch) Validate(vc *common.ValidationContext) error {
 func validateMappingStrings(values []string, requireTrimmed bool, vc *common.ValidationContext) error {
 	var result *multierror.Error
 	seen := make(map[string]bool, len(values))
+
 	for i, value := range values {
 		path := vc.PushIndex(i)
+
 		if strings.TrimSpace(value) == "" {
 			result = multierror.Append(result, path.NewError("must not be blank"))
 		} else if requireTrimmed && strings.TrimSpace(value) != value {
 			result = multierror.Append(result, path.NewError("must not have surrounding whitespace"))
 		}
+
 		if seen[value] {
 			result = multierror.Append(result, path.NewError("must not duplicate another entry"))
 		}
 		seen[value] = true
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -128,9 +142,11 @@ func (p *PermissionMapping) UnmarshalJSON(data []byte) error {
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
 		return err
 	}
+
 	if fields == nil {
 		return fmt.Errorf("permission mapping must be an object")
 	}
+
 	var decoded PermissionMapping
 	for name, raw := range fields {
 		switch name {
@@ -148,7 +164,9 @@ func (p *PermissionMapping) UnmarshalJSON(data []byte) error {
 			return fmt.Errorf("unknown permission mapping field %q", name)
 		}
 	}
+
 	*p = decoded
+
 	return nil
 }
 
@@ -159,18 +177,23 @@ func (m *SourceKeyMatch) UnmarshalJSON(data []byte) error {
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
 		return err
 	}
+
 	if fields == nil {
 		return fmt.Errorf("source key match must be an object")
 	}
+
 	var decoded SourceKeyMatch
+
 	for name, raw := range fields {
 		if name != "sourceKeys" && name != "sourceKeyPatterns" {
 			return fmt.Errorf("unknown source key match field %q", name)
 		}
+
 		values, err := decodeMappingStrings(raw, name)
 		if err != nil {
 			return err
 		}
+
 		if name == "sourceKeys" {
 			decoded.SourceKeys = values
 		} else {
@@ -188,9 +211,11 @@ func decodeMappingStrings(data []byte, field string) ([]string, error) {
 	if err := util.DecodeJSONStrict(data, &values); err != nil {
 		return nil, fmt.Errorf("decode %s: %w", field, err)
 	}
+
 	if values == nil {
 		return nil, fmt.Errorf("%s must be an array, not null", field)
 	}
+
 	result := make([]string, len(values))
 	for i, value := range values {
 		if value == nil {
@@ -198,6 +223,7 @@ func decodeMappingStrings(data []byte, field string) ([]string, error) {
 		}
 		result[i] = *value
 	}
+
 	return result, nil
 }
 

@@ -64,12 +64,15 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 	}
 	var result *multierror.Error
 	result = multierror.Append(result, d.Source.Validate(vc.PushField("source")))
+
 	if d.PermissionMappings != nil && d.Source.MCP == nil {
 		result = multierror.Append(result, vc.NewErrorForField("permissionMappings", "are only supported for imported sources; explicit templates declare their own verbs"))
 	}
+
 	for i := range d.PermissionMappings {
 		result = multierror.Append(result, d.PermissionMappings[i].Validate(vc.PushField("permissionMappings").PushIndex(i)))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -86,12 +89,15 @@ func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 	if (s.Explicit == nil) == (s.MCP == nil) {
 		result = multierror.Append(result, vc.NewError("must contain exactly one of explicit or mcp"))
 	}
+
 	if s.Explicit != nil {
 		result = multierror.Append(result, s.Explicit.Validate(vc.PushField("explicit")))
 	}
+
 	if s.MCP != nil {
 		result = multierror.Append(result, s.MCP.Validate(vc.PushField("mcp")))
 	}
+
 	return result.ErrorOrNil()
 }
 

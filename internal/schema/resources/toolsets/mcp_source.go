@@ -48,25 +48,31 @@ type MCPToolFilter struct {
 // or choosing an interval default. Unsupported transport names fail explicitly.
 func (s *MCPSource) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
+
 	if s == nil {
 		return vc.NewError("MCP source is required")
 	}
+
 	var result *multierror.Error
 	if strings.TrimSpace(s.Endpoint) == "" {
 		result = multierror.Append(result, vc.NewErrorForField("endpoint", "must not be blank"))
 	} else if strings.TrimSpace(s.Endpoint) != s.Endpoint || strings.ContainsAny(s.Endpoint, "\r\n") {
 		result = multierror.Append(result, vc.NewErrorForField("endpoint", "must not contain surrounding whitespace or newlines"))
 	}
+
 	if s.Transport != MCPTransportStreamableHTTP {
 		result = multierror.Append(result, vc.NewErrorForField("transport", "must be streamableHttp"))
 	}
+
 	if s.RefreshInterval != nil {
 		interval, err := time.ParseDuration(*s.RefreshInterval)
 		if err != nil || interval <= 0 {
 			result = multierror.Append(result, vc.NewErrorForField("refreshInterval", "must be a positive Go duration"))
 		}
 	}
+
 	result = multierror.Append(result, s.Tools.Validate(vc.PushField("tools")))
+
 	return result.ErrorOrNil()
 }
 
@@ -77,11 +83,15 @@ func (f *MCPToolFilter) Validate(vc *common.ValidationContext) error {
 	if f == nil {
 		return nil
 	}
+
 	vc = validationContext(vc)
+
 	var result *multierror.Error
+
 	if f.IncludeNames != nil && len(f.IncludeNames) == 0 {
 		result = multierror.Append(result, vc.NewErrorForField("includeNames", "must not be empty when supplied"))
 	}
+
 	for _, list := range []struct {
 		field string
 		names []string
@@ -98,6 +108,7 @@ func (f *MCPToolFilter) Validate(vc *common.ValidationContext) error {
 			seen[name] = true
 		}
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -117,7 +128,10 @@ func (f *MCPToolFilter) Clone() *MCPToolFilter {
 	if f == nil {
 		return nil
 	}
-	return &MCPToolFilter{IncludeNames: slices.Clone(f.IncludeNames), ExcludeNames: slices.Clone(f.ExcludeNames)}
+	return &MCPToolFilter{
+		IncludeNames: slices.Clone(f.IncludeNames),
+		ExcludeNames: slices.Clone(f.ExcludeNames),
+	}
 }
 
 // UnmarshalJSON rejects unknown, mis-cased, and null configuration fields before
@@ -149,10 +163,13 @@ func (s *MCPSource) UnmarshalYAML(node *yaml.Node) error {
 // than turning them into empty names. Validation handles blank and duplicate names.
 func (f *MCPToolFilter) UnmarshalJSON(data []byte) error {
 	fields, err := decodeMCPObject(data, "includeNames", "excludeNames")
+
 	if err != nil {
 		return err
 	}
+
 	var decoded MCPToolFilter
+
 	for field, raw := range fields {
 		var names []*string
 		if err := util.DecodeJSONStrict(raw, &names); err != nil {
@@ -171,7 +188,9 @@ func (f *MCPToolFilter) UnmarshalJSON(data []byte) error {
 			decoded.ExcludeNames = values
 		}
 	}
+
 	*f = decoded
+
 	return nil
 }
 
@@ -209,14 +228,19 @@ func (f MCPToolFilter) fieldsForMarshal() map[string][]string {
 
 // decodeMCPObject checks owned field names and explicit nulls transactionally.
 // Required fields are checked by Validate after decoding a complete value.
-func decodeMCPObject(data []byte, allowed ...string) (map[string]json.RawMessage, error) {
+func decodeMCPObject(
+	data []byte,
+	allowed ...string,
+) (map[string]json.RawMessage, error) {
 	var fields map[string]json.RawMessage
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
 		return nil, err
 	}
+
 	if fields == nil {
 		return nil, fmt.Errorf("MCP configuration must be an object")
 	}
+
 	for field, raw := range fields {
 		if !slices.Contains(allowed, field) {
 			return nil, fmt.Errorf("unknown MCP configuration field %q", field)
@@ -225,5 +249,6 @@ func decodeMCPObject(data []byte, allowed ...string) (map[string]json.RawMessage
 			return nil, fmt.Errorf("%s must not be null", field)
 		}
 	}
+
 	return fields, nil
 }

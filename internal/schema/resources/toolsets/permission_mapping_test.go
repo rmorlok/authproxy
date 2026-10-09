@@ -50,8 +50,18 @@ func TestPermissionMappingValidation(t *testing.T) {
 		{"duplicate alias", func(p *PermissionMapping) { p.AddVerbs = []string{"tool:read", "tool:read"} }, "addVerbs[1]"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			mapping := &PermissionMapping{Match: SourceKeyMatch{SourceKeys: []string{"list"}}, AddVerbs: []string{"tool:read"}}
+			mapping := &PermissionMapping{
+				Match: SourceKeyMatch{
+					SourceKeys: []string{
+						"list",
+					},
+				}, AddVerbs: []string{
+					"tool:read",
+				},
+			}
+
 			test.edit(mapping)
+
 			require.ErrorContains(t, mapping.Validate(&common.ValidationContext{Path: "definition.permissionMappings[2]"}), "definition.permissionMappings[2]."+test.path)
 		})
 	}
@@ -143,12 +153,14 @@ func TestPermissionMappingYAMLAliasesAndMerges(t *testing.T) {
 func TestPermissionMappingCloneAndDecodeOwnership(t *testing.T) {
 	require.Nil(t, (*PermissionMapping)(nil).Clone())
 	require.Nil(t, (*SourceKeyMatch)(nil).Clone())
+
 	for _, list := range [][]string{nil, {}} {
 		mapping := &PermissionMapping{Match: SourceKeyMatch{SourceKeys: list, SourceKeyPatterns: list}, AddVerbs: list}
 		clone := mapping.Clone()
 		require.Equal(t, mapping, clone)
 		require.NotSame(t, mapping, clone)
 	}
+
 	mapping := &PermissionMapping{Match: SourceKeyMatch{SourceKeys: []string{"list"}, SourceKeyPatterns: []string{`list_.*`}}, AddVerbs: []string{"tool:read"}}
 	clone := mapping.Clone()
 	clone.Match.SourceKeys[0] = "changed"
