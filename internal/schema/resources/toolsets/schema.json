@@ -1,0 +1,156 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/toolsets/schema.json",
+  "$ref": "#/$defs/ToolSet",
+  "$defs": {
+    "ToolSetMetadata": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectMeta" },
+        {
+          "type": "object",
+          "required": ["namespace"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^tls_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" }
+          }
+        }
+      ]
+    },
+    "ToolSetReference": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/ObjectReference" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolSet" },
+            "id": { "type": "string", "pattern": "^tls_" },
+            "namespace": { "$ref": "../namespace/schema.json#/$defs/NamespacePath" },
+            "generation": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    },
+    "ConnectionSelector": {
+      "type": "object",
+      "required": ["matchLabels"],
+      "properties": {
+        "namespace": {
+          "anyOf": [
+            { "const": "" },
+            { "$ref": "../namespace/schema.json#/$defs/NamespaceMatcher" }
+          ],
+          "description": "Omission or an empty string uses the ToolSet namespace subtree. Go validation requires an explicit matcher to stay within that subtree."
+        },
+        "matchLabels": {
+          "$ref": "../meta/schema.json#/$defs/Labels",
+          "description": "ANDed exact matches, including inherited labels. An explicit empty object selects every eligible connection within the namespace scope."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TemplateLabels": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Labels" },
+        { "propertyNames": { "not": { "pattern": "^apxy/" } } }
+      ],
+      "description": "Administrator-authored labels cannot write the reserved system-label namespace."
+    },
+    "ToolTemplateMetadata": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "../../common/schema.json#/$defs/ResourceName" },
+        "labels": { "$ref": "#/$defs/TemplateLabels" },
+        "annotations": { "$ref": "../meta/schema.json#/$defs/Annotations" }
+      },
+      "additionalProperties": false
+    },
+    "ToolTemplate": {
+      "type": "object",
+      "required": ["key", "spec"],
+      "properties": {
+        "key": { "$ref": "../tools/schema.json#/$defs/NonBlankString" },
+        "metadata": { "$ref": "#/$defs/ToolTemplateMetadata" },
+        "spec": { "$ref": "../tools/schema.json#/$defs/ToolDefinition" }
+      },
+      "additionalProperties": false,
+      "description": "A reusable authored Tool definition with a stable, exact source key. Go validation requires keys to be unique within an explicit source. Connection identity is supplied by the binding."
+    },
+    "ExplicitSource": {
+      "type": "object",
+      "required": ["tools"],
+      "properties": {
+        "tools": { "type": "array", "items": { "$ref": "#/$defs/ToolTemplate" } }
+      },
+      "additionalProperties": false,
+      "description": "An explicit inventory of templates. An empty array deliberately declares an empty inventory; omission or null is invalid."
+    },
+    "ToolSetSource": {
+      "type": "object",
+      "required": ["explicit"],
+      "properties": {
+        "explicit": { "$ref": "#/$defs/ExplicitSource" }
+      },
+      "additionalProperties": false,
+      "description": "Exactly one source is authored. This contract currently supports only explicit sources; OpenAPI and MCP source contracts are added separately."
+    },
+    "ToolSetDefinition": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": { "$ref": "#/$defs/ToolSetSource" }
+      },
+      "additionalProperties": false
+    },
+    "ToolSetReleaseSpec": {
+      "type": "object",
+      "properties": {
+        "desiredState": { "type": "string", "enum": ["draft", "primary"] }
+      },
+      "additionalProperties": false
+    },
+    "ToolSetSpec": {
+      "type": "object",
+      "required": ["connectionSelector", "definition"],
+      "properties": {
+        "connectionSelector": { "$ref": "#/$defs/ConnectionSelector" },
+        "release": { "$ref": "#/$defs/ToolSetReleaseSpec" },
+        "definition": { "$ref": "#/$defs/ToolSetDefinition" }
+      },
+      "additionalProperties": false
+    },
+    "ToolSetReleaseStatus": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "type": "string", "enum": ["draft", "primary", "active", "archived"] }
+      },
+      "additionalProperties": false
+    },
+    "ToolSetStatus": {
+      "type": "object",
+      "required": ["release"],
+      "properties": {
+        "release": { "$ref": "#/$defs/ToolSetReleaseStatus" }
+      },
+      "additionalProperties": false
+    },
+    "ToolSet": {
+      "allOf": [
+        { "$ref": "../meta/schema.json#/$defs/Resource" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolSet" },
+            "metadata": { "$ref": "#/$defs/ToolSetMetadata" },
+            "spec": { "$ref": "#/$defs/ToolSetSpec" },
+            "status": { "$ref": "#/$defs/ToolSetStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "The logical selector remains outside the generation-owned definition. Lifecycle validation applies server-owned metadata/status rules and stored-generation requirements."
+    }
+  }
+}
