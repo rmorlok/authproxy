@@ -20,7 +20,7 @@ func openAPISourceForTest() *OpenAPISource {
 			IncludeOperationIDs: &[]string{"listCalendars", "createEvent"},
 			ExcludeOperationIDs: &[]string{"createEvent"},
 		},
-		Server: &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}/v1"},
+		Server: &OpenAPIServerConfig{URL: util.ToPtr("https://{{cfg.apiHost}}/v1")},
 	}
 }
 
@@ -34,18 +34,20 @@ func TestOpenAPISourceValidation(t *testing.T) {
 	}{
 		{"valid", func(s *OpenAPISource) {}, ""},
 		{"optional omitted", func(s *OpenAPISource) { s.Operations = nil; s.Server = nil }, ""},
-		{"whole URL template", func(s *OpenAPISource) { s.Server.URL = "{{cfg.serverUrl}}" }, ""},
+		{"whole URL template", func(s *OpenAPISource) { *s.Server.URL = "{{cfg.serverUrl}}" }, ""},
+		{"document server selection", func(s *OpenAPISource) { s.Server = &OpenAPIServerConfig{Index: util.ToPtr(0)} }, ""},
+		{"negative server index", func(s *OpenAPISource) { s.Server = &OpenAPIServerConfig{Index: util.ToPtr(-1)} }, "server.index"},
 		{"missing document", func(s *OpenAPISource) { s.Document = nil }, "document"},
 		{"invalid document", func(s *OpenAPISource) { s.Document = &OpenAPIDocument{} }, "document"},
 		{"empty inclusion", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = &[]string{} }, "operations.includeOperationIds"},
 		{"blank ID", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = &[]string{" \t"} }, "operations.includeOperationIds[0]"},
 		{"duplicate include", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = &[]string{"same", "same"} }, "operations.includeOperationIds[1]"},
 		{"duplicate exclude", func(s *OpenAPISource) { s.Operations.ExcludeOperationIDs = &[]string{"same", "same"} }, "operations.excludeOperationIds[1]"},
-		{"empty server URL", func(s *OpenAPISource) { s.Server.URL = "" }, "server.url"},
-		{"blank server URL", func(s *OpenAPISource) { s.Server.URL = " \t" }, "server.url"},
-		{"padded URL", func(s *OpenAPISource) { s.Server.URL = " https://example.test " }, "server.url"},
-		{"line feed", func(s *OpenAPISource) { s.Server.URL = "https://example.test/\nv1" }, "server.url"},
-		{"carriage return", func(s *OpenAPISource) { s.Server.URL = "https://example.test/\rv1" }, "server.url"},
+		{"empty server URL", func(s *OpenAPISource) { *s.Server.URL = "" }, "server.url"},
+		{"blank server URL", func(s *OpenAPISource) { *s.Server.URL = " \t" }, "server.url"},
+		{"padded URL", func(s *OpenAPISource) { *s.Server.URL = " https://example.test " }, "server.url"},
+		{"line feed", func(s *OpenAPISource) { *s.Server.URL = "https://example.test/\nv1" }, "server.url"},
+		{"carriage return", func(s *OpenAPISource) { *s.Server.URL = "https://example.test/\rv1" }, "server.url"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			source := openAPISourceForTest()
@@ -60,7 +62,7 @@ func TestOpenAPISourceValidation(t *testing.T) {
 	}
 	require.Error(t, (*OpenAPISource)(nil).Validate(nil))
 	require.NoError(t, (*OpenAPIOperationFilter)(nil).Validate(nil))
-	require.NoError(t, (*OpenAPIServerOverride)(nil).Validate(nil))
+	require.NoError(t, (*OpenAPIServerConfig)(nil).Validate(nil))
 	filter := &OpenAPIOperationFilter{
 		IncludeOperationIDs: &[]string{"read", "Read", " read "},
 		ExcludeOperationIDs: &[]string{"read"},
@@ -108,7 +110,7 @@ func TestOpenAPISourceStrictDecoding(t *testing.T) {
 		`{"operations":{"includeOperationIds":"read"}}`, `{"operations":{"includeOperationIDs":["read"]}}`,
 		`{"operations":{"includeMethods":["GET"]}}`,
 		`{"server":{"url":null}}`, `{"server":{"URL":"https://example.test"}}`, `{"server":{"url":5}}`,
-		`{"server":{"index":0}}`, `{"server":{"variables":{"version":"v1"}}}`,
+		`{"server":{"index":null}}`, `{"server":{"variables":{"version":null}}}`,
 		`{"security":{}}`, `{"references":[]}`, `{"skipUnsupported":true}`, `[]`,
 	} {
 		for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
@@ -161,11 +163,11 @@ func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	*clone.Document.URL = "https://changed.test/openapi.json"
 	(*clone.Operations.IncludeOperationIDs)[0] = "changed"
 	(*clone.Operations.ExcludeOperationIDs)[0] = "changed"
-	clone.Server.URL = "changed"
+	*clone.Server.URL = "changed"
 	require.Equal(t, openAPISourceForTest(), source)
 	require.Nil(t, (*OpenAPISource)(nil).Clone())
 	require.Nil(t, (*OpenAPIOperationFilter)(nil).Clone())
-	require.Nil(t, (*OpenAPIServerOverride)(nil).Clone())
+	require.Nil(t, (*OpenAPIServerConfig)(nil).Clone())
 	require.Equal(t, &OpenAPISource{}, (&OpenAPISource{}).Clone())
 	filter := (&OpenAPIOperationFilter{IncludeOperationIDs: &[]string{}}).Clone()
 	require.NotNil(t, filter.IncludeOperationIDs)

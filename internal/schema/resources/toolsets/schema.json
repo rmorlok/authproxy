@@ -172,17 +172,29 @@
       "additionalProperties": false,
       "description": "Exact operation IDs preserved without normalization. Omitted inclusion is unrestricted, supplied inclusion must be nonempty, and exclusion takes precedence."
     },
-    "OpenAPIServerOverride": {
+    "OpenAPIServerConfig": {
       "type": "object",
-      "required": ["url"],
       "properties": {
         "url": {
           "type": "string",
           "minLength": 1,
           "pattern": "^\\S(?:[^\\r\\n]*\\S)?$",
           "description": "The execution server override, optionally containing configuration templates. Surrounding whitespace and line breaks are invalid; compilation happens later."
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The zero-based index in the effective OpenAPI 3 servers list after operation, path, and root precedence. Document-specific bounds are checked by the importer."
+        },
+        "variables": {
+          "type": "object",
+          "propertyNames": { "pattern": "[^\\s\u000B\u0085\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]" },
+          "additionalProperties": { "type": "string" },
+          "description": "Literal import-time bindings for the selected server's variables. Names are exact and nonblank; values are retained without template evaluation, including empty strings, whitespace, and template-looking text. The importer checks declared variable names and enums."
         }
       },
+      "oneOf": [{ "required": ["url"] }, { "required": ["index"] }],
+      "dependentRequired": { "variables": ["index"] },
       "additionalProperties": false
     },
     "OpenAPISource": {
@@ -191,7 +203,7 @@
       "properties": {
         "document": { "$ref": "#/$defs/OpenAPIDocument" },
         "operations": { "$ref": "#/$defs/OpenAPIOperationFilter" },
-        "server": { "$ref": "#/$defs/OpenAPIServerOverride" }
+        "server": { "$ref": "#/$defs/OpenAPIServerConfig" }
       },
       "additionalProperties": false
     },

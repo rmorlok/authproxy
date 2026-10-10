@@ -2,7 +2,6 @@ package toolsets
 
 import (
 	"slices"
-	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -16,7 +15,7 @@ import (
 type OpenAPISource struct {
 	Document   *OpenAPIDocument        `json:"document" yaml:"document"`
 	Operations *OpenAPIOperationFilter `json:"operations,omitempty" yaml:"operations,omitempty"`
-	Server     *OpenAPIServerOverride  `json:"server,omitempty" yaml:"server,omitempty"`
+	Server     *OpenAPIServerConfig    `json:"server,omitempty" yaml:"server,omitempty"`
 }
 
 // OpenAPIOperationFilter selects exact document operationId values. Omitted
@@ -27,15 +26,6 @@ type OpenAPISource struct {
 type OpenAPIOperationFilter struct {
 	IncludeOperationIDs *[]string `json:"includeOperationIds,omitempty" yaml:"includeOperationIds,omitempty"`
 	ExcludeOperationIDs *[]string `json:"excludeOperationIds,omitempty" yaml:"excludeOperationIds,omitempty"`
-}
-
-// OpenAPIServerOverride deliberately replaces the document-selected server base
-// URL. Omission preserves the importer's server precedence and relative-URL
-// rules; authoring this override does not select a server index or bind variables.
-type OpenAPIServerOverride struct {
-	// URL may contain connection cfg templates, including a whole-URL template.
-	// Template compilation and rendered URL validation precede later execution.
-	URL string `json:"url" yaml:"url"`
 }
 
 // Validate checks the required document and optional import settings without
@@ -76,22 +66,6 @@ func (f OpenAPIOperationFilter) lists() exactNameLists {
 	}
 }
 
-// Validate requires a nonblank override without surrounding whitespace or line
-// breaks. A nil override is valid; template and URL semantics are checked later.
-func (s *OpenAPIServerOverride) Validate(vc *common.ValidationContext) error {
-	if s == nil {
-		return nil
-	}
-	vc = validationContext(vc)
-	if strings.TrimSpace(s.URL) == "" {
-		return vc.NewErrorForField("url", "must not be blank")
-	}
-	if strings.TrimSpace(s.URL) != s.URL || strings.ContainsAny(s.URL, "\r\n") {
-		return vc.NewErrorForField("url", "must not contain surrounding whitespace or newlines")
-	}
-	return nil
-}
-
 // Clone returns a detached source, including document data and optional import
 // settings. It preserves absent or invalid fields for later diagnostics.
 func (s *OpenAPISource) Clone() *OpenAPISource {
@@ -119,11 +93,6 @@ func (f *OpenAPIOperationFilter) Clone() *OpenAPIOperationFilter {
 		clone.ExcludeOperationIDs = util.ToPtr(slices.Clone(*f.ExcludeOperationIDs))
 	}
 	return &clone
-}
-
-// Clone returns an independent optional server override without normalization.
-func (s *OpenAPIServerOverride) Clone() *OpenAPIServerOverride {
-	return util.CloneValue(s)
 }
 
 // UnmarshalJSON rejects noncanonical fields and null objects before ordinary
@@ -154,21 +123,6 @@ func (f *OpenAPIOperationFilter) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnmarshalJSON accepts only the canonical non-null url field. Its required
-// value is checked by Validate, and failed decoding preserves the receiver.
-func (s *OpenAPIServerOverride) UnmarshalJSON(data []byte) error {
-	if _, err := decodeStrictObject(data, "OpenAPI server override", "url"); err != nil {
-		return err
-	}
-	type plain OpenAPIServerOverride
-	var decoded plain
-	if err := util.DecodeJSONStrict(data, &decoded); err != nil {
-		return err
-	}
-	*s = OpenAPIServerOverride(decoded)
-	return nil
-}
-
 // UnmarshalYAML resolves aliases and merges before applying strict source rules.
 func (s *OpenAPISource) UnmarshalYAML(node *yaml.Node) error {
 	var raw common.RawJSON
@@ -185,13 +139,4 @@ func (f *OpenAPIOperationFilter) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	return f.UnmarshalJSON(raw)
-}
-
-// UnmarshalYAML resolves composition before validating the owned url field.
-func (s *OpenAPIServerOverride) UnmarshalYAML(node *yaml.Node) error {
-	var raw common.RawJSON
-	if err := raw.UnmarshalYAML(node); err != nil {
-		return err
-	}
-	return s.UnmarshalJSON(raw)
 }
