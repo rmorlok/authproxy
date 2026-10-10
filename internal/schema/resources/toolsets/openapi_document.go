@@ -20,7 +20,9 @@ import (
 // Exactly one of Inline and URL is required. Inline content remains opaque JSON;
 // parsing OpenAPI versions, resolving references, and fetching are importer work.
 type OpenAPIDocument struct {
-	Inline common.RawJSON `json:"inline,omitempty" yaml:"inline,omitempty"`
+	// Inline uses a pointer so omission is distinct from supplied empty content.
+	// An invalid inline value must not disappear and silently select a URL source.
+	Inline *common.RawJSON `json:"inline,omitempty" yaml:"inline,omitempty"`
 
 	// URL is a literal acquisition address, independent of per-connection cfg.
 	URL *string `json:"url,omitempty" yaml:"url,omitempty"`
@@ -47,7 +49,7 @@ func (d *OpenAPIDocument) Validate(vc *common.ValidationContext) error {
 	}
 
 	if d.Inline != nil {
-		raw := bytes.TrimSpace(d.Inline)
+		raw := bytes.TrimSpace(*d.Inline)
 
 		// Checking syntax without decoding numbers keeps large integers and
 		// arbitrary provider extensions intact for the later document parser.
@@ -107,37 +109,13 @@ func (d *OpenAPIDocument) Clone() *OpenAPIDocument {
 	}
 
 	clone := *d
-	clone.Inline = slices.Clone(d.Inline)
+	if d.Inline != nil {
+		clone.Inline = util.ToPtr(slices.Clone(*d.Inline))
+	}
 	clone.URL = util.CloneValue(d.URL)
 	clone.FetchConnectionRef = util.CloneValue(d.FetchConnectionRef)
 
 	return &clone
-}
-
-// MarshalJSON preserves an explicitly supplied inline source, even when its raw
-// bytes are invalid or empty. Dropping it via omitempty could turn an invalid
-// two-source document into a valid URL-only acquisition request.
-func (d OpenAPIDocument) MarshalJSON() ([]byte, error) {
-	var inline *common.RawJSON
-	if d.Inline != nil {
-		inline = &d.Inline
-	}
-
-	return json.Marshal(struct {
-		Inline             *common.RawJSON       `json:"inline,omitempty"`
-		URL                *string               `json:"url,omitempty"`
-		FetchConnectionRef *meta.ObjectReference `json:"fetchConnectionRef,omitempty"`
-	}{inline, d.URL, d.FetchConnectionRef})
-}
-
-// MarshalYAML applies the same source-presence rules as JSON while retaining
-// native numeric nodes in opaque inline document content.
-func (d OpenAPIDocument) MarshalYAML() (any, error) {
-	raw, err := d.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	return common.RawJSON(raw).MarshalYAML()
 }
 
 // UnmarshalJSON accepts only canonical owned fields and rejects explicit nulls.

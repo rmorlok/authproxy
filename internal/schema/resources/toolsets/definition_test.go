@@ -284,7 +284,7 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 	document := &OpenAPIDocument{URL: util.ToPtr("https://example.com/openapi.json")}
 	if inline {
 		document.URL = nil
-		document.Inline = common.RawJSON(`{"openapi":"3.1.0","paths":{},"x-provider":{"example":9007199254740993,"schema":{"$ref":"https://never-fetch.invalid/schema.json"}}}`)
+		document.Inline = util.ToPtr(common.RawJSON(`{"openapi":"3.1.0","paths":{},"x-provider":{"example":9007199254740993,"schema":{"$ref":"https://never-fetch.invalid/schema.json"}}}`))
 	} else {
 		// Acquisition authority is checked later; this independent connection
 		// intentionally belongs to a different namespace than the ToolSet.
@@ -352,7 +352,7 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			require.JSONEq(t, string(before), string(after))
 
 			if inline {
-				require.Contains(t, string(decoded.Spec.Definition.Source.OpenAPI.Document.Inline), "9007199254740993")
+				require.Contains(t, string(*decoded.Spec.Definition.Source.OpenAPI.Document.Inline), "9007199254740993")
 			}
 
 			patch := NewToolSetPatch()
@@ -410,7 +410,7 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 		clone := original.Clone()
 
 		if inline {
-			clone.Source.OpenAPI.Document.Inline[0] = '['
+			(*clone.Source.OpenAPI.Document.Inline)[0] = '['
 		} else {
 			*clone.Source.OpenAPI.Document.URL = "https://other.example/spec.json"
 			clone.Source.OpenAPI.Document.FetchConnectionRef.Namespace = "root.other"

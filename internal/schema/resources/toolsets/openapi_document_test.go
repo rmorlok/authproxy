@@ -33,16 +33,16 @@ func TestOpenAPIDocumentShape(t *testing.T) {
 		`{"swagger":"2.0","$ref":"https://unreachable.invalid/external.json"}`,
 		`{"components":{"schemas":{"Example":{"$schema":"vendor-dialect","type":"array"}}}}`,
 	} {
-		document := &OpenAPIDocument{Inline: common.RawJSON(raw)}
+		document := &OpenAPIDocument{Inline: util.ToPtr(common.RawJSON(raw))}
 		require.NoError(t, document.Validate(nil), raw)
-		require.Equal(t, raw, string(document.Inline), "validation must not rewrite document contents")
+		require.Equal(t, raw, string(*document.Inline), "validation must not rewrite document contents")
 	}
 	for _, raw := range []string{"", " ", "null", "true", "[]", `"text"`, "{malformed", "{} {}"} {
-		document := &OpenAPIDocument{Inline: common.RawJSON(raw)}
+		document := &OpenAPIDocument{Inline: util.ToPtr(common.RawJSON(raw))}
 		require.ErrorContains(t, document.Validate(&common.ValidationContext{Path: "source.openapi.document"}), "source.openapi.document.inline", raw)
 	}
 	document := fetchedDocumentForTest()
-	document.Inline = common.RawJSON(`{}`)
+	document.Inline = util.ToPtr(common.RawJSON(`{}`))
 	require.ErrorContains(t, document.Validate(nil), "exactly one")
 	document.URL = nil
 	require.ErrorContains(t, document.Validate(nil), "fetchConnectionRef")
@@ -144,15 +144,15 @@ func TestOpenAPIDocumentRoundTrip(t *testing.T) {
 	}{
 		{json.Marshal, util.DecodeJSONStrict}, {yaml.Marshal, util.DecodeYAMLStrict},
 	} {
-		for _, original := range []*OpenAPIDocument{{Inline: raw}, fetchedDocumentForTest()} {
+		for _, original := range []*OpenAPIDocument{{Inline: &raw}, fetchedDocumentForTest()} {
 			encoded, err := format.encode(original)
 			require.NoError(t, err)
 			var decoded OpenAPIDocument
 			require.NoError(t, format.decode(encoded, &decoded))
 			require.NoError(t, decoded.Validate(nil))
 			if original.Inline != nil {
-				require.Contains(t, string(decoded.Inline), "9007199254740993")
-				require.Contains(t, string(decoded.Inline), "18446744073709551615")
+				require.Contains(t, string(*decoded.Inline), "9007199254740993")
+				require.Contains(t, string(*decoded.Inline), "18446744073709551615")
 			} else {
 				require.Equal(t, original, &decoded)
 			}
@@ -160,7 +160,7 @@ func TestOpenAPIDocumentRoundTrip(t *testing.T) {
 	}
 	// Native JSON can retain numeric syntax outside float64's finite range;
 	// shape validation must not impose a floating-point representation on it.
-	document := &OpenAPIDocument{Inline: common.RawJSON(`{"x-number":1e999}`)}
+	document := &OpenAPIDocument{Inline: util.ToPtr(common.RawJSON(`{"x-number":1e999}`))}
 	require.NoError(t, document.Validate(nil))
 	encoded, err := json.Marshal(document)
 	require.NoError(t, err)
@@ -180,16 +180,29 @@ func TestOpenAPIDocumentMarshalPreservesSourcePresence(t *testing.T) {
 	} {
 		t.Run(format.name, func(t *testing.T) {
 			document := fetchedDocumentForTest()
-			document.Inline = common.RawJSON{}
+			document.Inline = util.ToPtr(common.RawJSON{})
 			require.ErrorContains(t, document.Validate(nil), "exactly one")
 			_, err := format.encode(document)
 			require.Error(t, err, "an invalid inline source must not be omitted")
 			require.NotNil(t, document.Inline)
 
-			document.Inline = nil
+			// A supplied pointer to nil bytes is still an inline source. Normal
+			// serialization emits null, which strict document decoding rejects.
+			document.Inline = util.ToPtr(common.RawJSON(nil))
+			require.ErrorContains(t, document.Validate(nil), "exactly one")
+			require.ErrorContains(t, document.Validate(nil), "inline")
 			encoded, err := format.encode(document)
 			require.NoError(t, err)
+			var fields map[string]any
+			require.NoError(t, format.decode(encoded, &fields))
+			require.Contains(t, fields, "inline")
+			require.Nil(t, fields["inline"])
 			var decoded OpenAPIDocument
+			require.ErrorContains(t, format.decode(encoded, &decoded), "inline must not be null")
+
+			document.Inline = nil
+			encoded, err = format.encode(document)
+			require.NoError(t, err)
 			require.NoError(t, format.decode(encoded, &decoded))
 			require.NoError(t, decoded.Validate(nil))
 			require.Equal(t, document, &decoded)
@@ -217,18 +230,26 @@ func TestOpenAPIDocumentYAMLComposition(t *testing.T) {
 // detaches every pointer without losing an explicitly invalid empty byte slice.
 func TestOpenAPIDocumentCloneAndDecodeOwnership(t *testing.T) {
 	original := fetchedDocumentForTest()
-	original.Inline = common.RawJSON(" { malformed ")
+	original.Inline = util.ToPtr(common.RawJSON(" { malformed "))
 	clone := original.Clone()
 	require.Equal(t, original, clone)
-	clone.Inline[0] = '['
+	(*clone.Inline)[0] = '['
 	*clone.URL = "https://changed.test/spec"
 	clone.FetchConnectionRef.Namespace = "root.changed"
-	require.Equal(t, common.RawJSON(" { malformed "), original.Inline)
+	require.Equal(t, common.RawJSON(" { malformed "), *original.Inline)
 	require.Equal(t, *fetchedDocumentForTest().URL, *original.URL)
 	require.Equal(t, "root.specification_accounts", original.FetchConnectionRef.Namespace)
 	require.Nil(t, (*OpenAPIDocument)(nil).Clone())
 	require.Nil(t, (&OpenAPIDocument{}).Clone().Inline)
-	require.NotNil(t, (&OpenAPIDocument{Inline: common.RawJSON{}}).Clone().Inline)
+	for _, raw := range []common.RawJSON{nil, {}} {
+		original := &OpenAPIDocument{Inline: util.ToPtr(raw)}
+		clone := original.Clone()
+		require.Equal(t, original, clone)
+		require.NotNil(t, clone.Inline)
+		require.NotSame(t, original.Inline, clone.Inline)
+		*clone.Inline = common.RawJSON(`{}`)
+		require.Equal(t, raw, *original.Inline)
+	}
 
 	document := fetchedDocumentForTest()
 	require.Error(t, util.DecodeJSONStrict([]byte(`{"url":"https://changed.test/spec","fetchConnectionRef":{"generation":0}}`), document))
