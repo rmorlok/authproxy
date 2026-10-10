@@ -151,7 +151,7 @@ func importedDefinitionForTest() *ToolSetDefinition {
 		Source: ToolSetSource{MCP: &MCPSource{
 			Endpoint: "https://{{cfg.apiHost}}/mcp", Transport: MCPTransportStreamableHTTP,
 			RefreshInterval: util.ToPtr("1.5s"),
-			Tools:           &MCPToolFilter{IncludeNames: []string{"list_calendars", "admin_reset"}, ExcludeNames: []string{"admin_reset"}},
+			Tools:           &MCPToolFilter{IncludeNames: &[]string{"list_calendars", "admin_reset"}, ExcludeNames: &[]string{"admin_reset"}},
 		}},
 		PermissionMappings: []PermissionMapping{{
 			Match:    SourceKeyMatch{SourceKeys: []string{"list_calendars"}, SourceKeyPatterns: []string{"calendar_.*"}},
@@ -223,7 +223,7 @@ func TestImportedDefinitionRoundTrip(t *testing.T) {
 		resource.Spec.Definition = *importedDefinitionForTest()
 		if emptyPolicies {
 			resource.Spec.Definition.PermissionMappings = []PermissionMapping{}
-			resource.Spec.Definition.Source.MCP.Tools.ExcludeNames = []string{}
+			resource.Spec.Definition.Source.MCP.Tools.ExcludeNames = &[]string{}
 		}
 		for _, format := range []struct {
 			encode func(any) ([]byte, error)
@@ -262,8 +262,8 @@ func TestImportedDefinitionCandidateOwnership(t *testing.T) {
 	require.Equal(t, current.Status, candidate.Status)
 	definition := &candidate.Spec.Definition
 	*definition.Source.MCP.RefreshInterval = "1h"
-	definition.Source.MCP.Tools.IncludeNames[0] = "other"
-	definition.Source.MCP.Tools.ExcludeNames[0] = "other"
+	(*definition.Source.MCP.Tools.IncludeNames)[0] = "other"
+	(*definition.Source.MCP.Tools.ExcludeNames)[0] = "other"
 	definition.PermissionMappings[0].Match.SourceKeys[0] = "other"
 	definition.PermissionMappings[0].Match.SourceKeyPatterns[0] = "other.*"
 	definition.PermissionMappings[0].AddVerbs[0] = "tool:other"
@@ -300,8 +300,8 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 			OpenAPI: &OpenAPISource{
 				Document: document,
 				Operations: &OpenAPIOperationFilter{
-					IncludeOperationIDs: []string{"listCalendars"},
-					ExcludeOperationIDs: []string{},
+					IncludeOperationIDs: &[]string{"listCalendars"},
+					ExcludeOperationIDs: &[]string{},
 				},
 				Server: &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}"},
 			},
@@ -416,8 +416,8 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 			clone.Source.OpenAPI.Document.FetchConnectionRef.Namespace = "root.other"
 		}
 
-		clone.Source.OpenAPI.Operations.IncludeOperationIDs[0] = "other"
-		clone.Source.OpenAPI.Operations.ExcludeOperationIDs = append(clone.Source.OpenAPI.Operations.ExcludeOperationIDs, "other")
+		(*clone.Source.OpenAPI.Operations.IncludeOperationIDs)[0] = "other"
+		*clone.Source.OpenAPI.Operations.ExcludeOperationIDs = append(*clone.Source.OpenAPI.Operations.ExcludeOperationIDs, "other")
 		clone.Source.OpenAPI.Server.URL = "https://other.example"
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
 

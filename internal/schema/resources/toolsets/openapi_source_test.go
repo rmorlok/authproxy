@@ -17,8 +17,8 @@ func openAPISourceForTest() *OpenAPISource {
 	return &OpenAPISource{
 		Document: &OpenAPIDocument{URL: &url},
 		Operations: &OpenAPIOperationFilter{
-			IncludeOperationIDs: []string{"listCalendars", "createEvent"},
-			ExcludeOperationIDs: []string{"createEvent"},
+			IncludeOperationIDs: &[]string{"listCalendars", "createEvent"},
+			ExcludeOperationIDs: &[]string{"createEvent"},
 		},
 		Server: &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}/v1"},
 	}
@@ -37,10 +37,10 @@ func TestOpenAPISourceValidation(t *testing.T) {
 		{"whole URL template", func(s *OpenAPISource) { s.Server.URL = "{{cfg.serverUrl}}" }, ""},
 		{"missing document", func(s *OpenAPISource) { s.Document = nil }, "document"},
 		{"invalid document", func(s *OpenAPISource) { s.Document = &OpenAPIDocument{} }, "document"},
-		{"empty inclusion", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = []string{} }, "operations.includeOperationIds"},
-		{"blank ID", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = []string{" \t"} }, "operations.includeOperationIds[0]"},
-		{"duplicate include", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = []string{"same", "same"} }, "operations.includeOperationIds[1]"},
-		{"duplicate exclude", func(s *OpenAPISource) { s.Operations.ExcludeOperationIDs = []string{"same", "same"} }, "operations.excludeOperationIds[1]"},
+		{"empty inclusion", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = &[]string{} }, "operations.includeOperationIds"},
+		{"blank ID", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = &[]string{" \t"} }, "operations.includeOperationIds[0]"},
+		{"duplicate include", func(s *OpenAPISource) { s.Operations.IncludeOperationIDs = &[]string{"same", "same"} }, "operations.includeOperationIds[1]"},
+		{"duplicate exclude", func(s *OpenAPISource) { s.Operations.ExcludeOperationIDs = &[]string{"same", "same"} }, "operations.excludeOperationIds[1]"},
 		{"empty server URL", func(s *OpenAPISource) { s.Server.URL = "" }, "server.url"},
 		{"blank server URL", func(s *OpenAPISource) { s.Server.URL = " \t" }, "server.url"},
 		{"padded URL", func(s *OpenAPISource) { s.Server.URL = " https://example.test " }, "server.url"},
@@ -62,11 +62,11 @@ func TestOpenAPISourceValidation(t *testing.T) {
 	require.NoError(t, (*OpenAPIOperationFilter)(nil).Validate(nil))
 	require.NoError(t, (*OpenAPIServerOverride)(nil).Validate(nil))
 	filter := &OpenAPIOperationFilter{
-		IncludeOperationIDs: []string{"read", "Read", " read "},
-		ExcludeOperationIDs: []string{"read"},
+		IncludeOperationIDs: &[]string{"read", "Read", " read "},
+		ExcludeOperationIDs: &[]string{"read"},
 	}
 	require.NoError(t, filter.Validate(nil), "IDs remain exact; exclusion wins intentional overlap")
-	require.Equal(t, " read ", filter.IncludeOperationIDs[2])
+	require.Equal(t, " read ", (*filter.IncludeOperationIDs)[2])
 }
 
 // TestOpenAPISourceRoundTrip preserves templates and explicit empty filter
@@ -83,7 +83,7 @@ func TestOpenAPISourceRoundTrip(t *testing.T) {
 		require.NoError(t, format.decode(encoded, &decoded))
 		require.NoError(t, decoded.Validate(nil))
 		require.Equal(t, source, &decoded)
-		for _, filter := range []*OpenAPIOperationFilter{{}, {ExcludeOperationIDs: []string{}}, {IncludeOperationIDs: []string{}}} {
+		for _, filter := range []*OpenAPIOperationFilter{{}, {ExcludeOperationIDs: &[]string{}}, {IncludeOperationIDs: &[]string{}}} {
 			encoded, err := format.encode(filter)
 			require.NoError(t, err)
 			var decoded OpenAPIOperationFilter
@@ -140,7 +140,7 @@ server:
 `
 	require.NoError(t, util.DecodeYAMLStrict([]byte(input), &source))
 	require.NoError(t, source.Validate(nil))
-	require.Equal(t, []string{"read"}, source.Operations.ExcludeOperationIDs)
+	require.Equal(t, []string{"read"}, *source.Operations.ExcludeOperationIDs)
 	for _, input := range []string{
 		"<<: {document: null}",
 		"operations: &none null\nserver: *none",
@@ -153,27 +153,23 @@ server:
 }
 
 // TestOpenAPISourceCloneAndDecodeOwnership protects nested source settings from
-// mutation through clones, marshal results, or partially decoded replacements.
+// mutation through clones or partially decoded replacements.
 func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	source := openAPISourceForTest()
 	clone := source.Clone()
 	require.Equal(t, source, clone)
 	*clone.Document.URL = "https://changed.test/openapi.json"
-	clone.Operations.IncludeOperationIDs[0] = "changed"
-	clone.Operations.ExcludeOperationIDs[0] = "changed"
+	(*clone.Operations.IncludeOperationIDs)[0] = "changed"
+	(*clone.Operations.ExcludeOperationIDs)[0] = "changed"
 	clone.Server.URL = "changed"
 	require.Equal(t, openAPISourceForTest(), source)
 	require.Nil(t, (*OpenAPISource)(nil).Clone())
 	require.Nil(t, (*OpenAPIOperationFilter)(nil).Clone())
 	require.Nil(t, (*OpenAPIServerOverride)(nil).Clone())
 	require.Equal(t, &OpenAPISource{}, (&OpenAPISource{}).Clone())
-	filter := (&OpenAPIOperationFilter{IncludeOperationIDs: []string{}}).Clone()
+	filter := (&OpenAPIOperationFilter{IncludeOperationIDs: &[]string{}}).Clone()
 	require.NotNil(t, filter.IncludeOperationIDs)
 	require.Nil(t, filter.ExcludeOperationIDs)
-	value, err := source.Operations.MarshalYAML()
-	require.NoError(t, err)
-	value.(map[string][]string)["includeOperationIds"][0] = "changed"
-	require.Equal(t, openAPISourceForTest(), source)
 
 	require.Error(t, json.Unmarshal([]byte(`{"server":{"url":"changed"},"operations":{"includeOperationIds":[null]}}`), source))
 	require.Equal(t, openAPISourceForTest(), source, "source decoding is atomic")
@@ -182,4 +178,46 @@ func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(`{"document":{"url":"https://example.test/openapi.json"}}`), source))
 	require.Nil(t, source.Operations)
 	require.Nil(t, source.Server)
+}
+
+// TestOpenAPIOperationFilterListOwnership preserves supplied list pointers and independently
+// clones their slice headers, even for empty or invalid nil-slice values.
+func TestOpenAPIOperationFilterListOwnership(t *testing.T) {
+	for _, values := range [][]string{nil, {}, {"read"}} {
+		filter := &OpenAPIOperationFilter{IncludeOperationIDs: util.ToPtr(values), ExcludeOperationIDs: util.ToPtr(values)}
+		clone := filter.Clone()
+		require.Equal(t, filter, clone)
+		require.NotSame(t, filter.IncludeOperationIDs, clone.IncludeOperationIDs)
+		require.NotSame(t, filter.ExcludeOperationIDs, clone.ExcludeOperationIDs)
+		if values == nil {
+			require.ErrorContains(t, filter.Validate(nil), "includeOperationIds: must not be null")
+			require.ErrorContains(t, filter.Validate(nil), "excludeOperationIds: must not be null")
+		}
+		*clone.IncludeOperationIDs = append(*clone.IncludeOperationIDs, "added")
+		*clone.ExcludeOperationIDs = append(*clone.ExcludeOperationIDs, "added")
+		require.Equal(t, values, *filter.IncludeOperationIDs)
+		require.Equal(t, values, *filter.ExcludeOperationIDs)
+	}
+}
+
+// TestOpenAPIOperationFilterDecodeState checks atomic failure and replacement of previously
+// supplied lists through both decoders, independently of source-level decoding.
+func TestOpenAPIOperationFilterDecodeState(t *testing.T) {
+	for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
+		for _, input := range []string{
+			`{"includeOperationIds":["changed"],"excludeOperationIds":[null]}`,
+			`{"includeOperationIds":[null],"excludeOperationIds":["changed"]}`,
+			`{"includeOperationIds":null}`, `{"excludeOperationIds":null}`,
+			`{"unknown":[],"includeOperationIds":["changed"]}`,
+		} {
+			filter := openAPISourceForTest().Operations
+			require.Error(t, decode([]byte(input), filter), input)
+			require.Equal(t, openAPISourceForTest().Operations, filter, input)
+		}
+		filter := openAPISourceForTest().Operations
+		require.NoError(t, decode([]byte(`{"excludeOperationIds":[]}`), filter))
+		require.Equal(t, &OpenAPIOperationFilter{ExcludeOperationIDs: &[]string{}}, filter)
+		require.NoError(t, decode([]byte(`{}`), filter))
+		require.Equal(t, &OpenAPIOperationFilter{}, filter)
+	}
 }

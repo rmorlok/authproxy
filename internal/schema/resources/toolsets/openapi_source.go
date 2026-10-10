@@ -1,7 +1,6 @@
 package toolsets
 
 import (
-	"encoding/json"
 	"slices"
 	"strings"
 
@@ -24,9 +23,10 @@ type OpenAPISource struct {
 // inclusion is unrestricted, including operations without IDs; a supplied
 // inclusion must be nonempty and only matches named operations. Exclusions win
 // overlap. These IDs are not normalized or interpreted as fallback source keys.
+// A nil list pointer means omitted; supplied lists must point to a non-nil slice.
 type OpenAPIOperationFilter struct {
-	IncludeOperationIDs []string `json:"includeOperationIds,omitempty" yaml:"includeOperationIds,omitempty"`
-	ExcludeOperationIDs []string `json:"excludeOperationIds,omitempty" yaml:"excludeOperationIds,omitempty"`
+	IncludeOperationIDs *[]string `json:"includeOperationIds,omitempty" yaml:"includeOperationIds,omitempty"`
+	ExcludeOperationIDs *[]string `json:"excludeOperationIds,omitempty" yaml:"excludeOperationIds,omitempty"`
 }
 
 // OpenAPIServerOverride deliberately replaces the document-selected server base
@@ -105,15 +105,20 @@ func (s *OpenAPISource) Clone() *OpenAPISource {
 	return &clone
 }
 
-// Clone detaches both operation lists while retaining nil versus explicit [].
+// Clone detaches list pointers and backing arrays, preserving omitted, empty,
+// and invalid nil-slice values for later validation.
 func (f *OpenAPIOperationFilter) Clone() *OpenAPIOperationFilter {
 	if f == nil {
 		return nil
 	}
-	return &OpenAPIOperationFilter{
-		IncludeOperationIDs: slices.Clone(f.IncludeOperationIDs),
-		ExcludeOperationIDs: slices.Clone(f.ExcludeOperationIDs),
+	clone := *f
+	if f.IncludeOperationIDs != nil {
+		clone.IncludeOperationIDs = util.ToPtr(slices.Clone(*f.IncludeOperationIDs))
 	}
+	if f.ExcludeOperationIDs != nil {
+		clone.ExcludeOperationIDs = util.ToPtr(slices.Clone(*f.ExcludeOperationIDs))
+	}
+	return &clone
 }
 
 // Clone returns an independent optional server override without normalization.
@@ -189,15 +194,4 @@ func (s *OpenAPIServerOverride) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	return s.UnmarshalJSON(raw)
-}
-
-// MarshalJSON retains explicit empty lists, especially invalid inclusion that
-// must not turn into an omitted, unrestricted import when serialized.
-func (f OpenAPIOperationFilter) MarshalJSON() ([]byte, error) {
-	return json.Marshal(f.lists().fieldsForMarshal())
-}
-
-// MarshalYAML preserves the same list presence as JSON using detached slices.
-func (f OpenAPIOperationFilter) MarshalYAML() (any, error) {
-	return f.lists().fieldsForMarshal(), nil
 }
