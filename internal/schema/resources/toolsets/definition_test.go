@@ -289,16 +289,31 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 		// Acquisition authority is checked later; this independent connection
 		// intentionally belongs to a different namespace than the ToolSet.
 		document.FetchConnectionRef = &meta.ObjectReference{
-			APIVersion: meta.APIVersionV1Alpha1, Kind: "Connection", Namespace: "root.documents", Name: "spec-reader",
+			APIVersion: meta.APIVersionV1Alpha1,
+			Kind:       "Connection",
+			Namespace:  "root.documents",
+			Name:       "spec-reader",
 		}
 	}
 	return &ToolSetDefinition{
-		Source: ToolSetSource{OpenAPI: &OpenAPISource{
-			Document:   document,
-			Operations: &OpenAPIOperationFilter{IncludeOperationIDs: []string{"listCalendars"}, ExcludeOperationIDs: []string{}},
-			Server:     &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}"},
-		}},
-		PermissionMappings: []PermissionMapping{{Match: SourceKeyMatch{SourceKeys: []string{"listCalendars"}}, AddVerbs: []string{"tool:calendar.list"}}},
+		Source: ToolSetSource{
+			OpenAPI: &OpenAPISource{
+				Document: document,
+				Operations: &OpenAPIOperationFilter{
+					IncludeOperationIDs: []string{"listCalendars"},
+					ExcludeOperationIDs: []string{},
+				},
+				Server: &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}"},
+			},
+		},
+		PermissionMappings: []PermissionMapping{
+			{
+				Match: SourceKeyMatch{
+					SourceKeys: []string{"listCalendars"},
+				},
+				AddVerbs: []string{"tool:calendar.list"},
+			},
+		},
 	}
 }
 
@@ -312,17 +327,30 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 		for _, format := range []struct {
 			encode func(any) ([]byte, error)
 			decode func([]byte, any) error
-		}{{json.Marshal, util.DecodeJSONStrict}, {yaml.Marshal, util.DecodeYAMLStrict}} {
+		}{
+			{
+				json.Marshal,
+				util.DecodeJSONStrict,
+			},
+			{
+				yaml.Marshal,
+				util.DecodeYAMLStrict,
+			},
+		} {
 			encoded, err := format.encode(current)
 			require.NoError(t, err)
+
 			var decoded ToolSet
 			require.NoError(t, format.decode(encoded, &decoded))
 			require.NoError(t, decoded.ValidateFor(meta.ValidationModeResponse, nil))
+
 			before, err := json.Marshal(current)
 			require.NoError(t, err)
+
 			after, err := json.Marshal(decoded)
 			require.NoError(t, err)
 			require.JSONEq(t, string(before), string(after))
+
 			if inline {
 				require.Contains(t, string(decoded.Spec.Definition.Source.OpenAPI.Document.Inline), "9007199254740993")
 			}
@@ -331,8 +359,10 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			patch.Spec.Definition = current.Spec.Definition.Clone()
 			encoded, err = format.encode(patch)
 			require.NoError(t, err)
+
 			var decodedPatch ToolSetPatch
 			require.NoError(t, format.decode(encoded, &decodedPatch))
+
 			candidate, err := decodedPatch.ApplyTo(storedToolSetForResourceTest(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, candidate.Spec.Definition.Source.OpenAPI)
@@ -365,7 +395,9 @@ func TestOpenAPISourceUnion(t *testing.T) {
 			require.Error(t, decode([]byte(input), &decoded), input)
 		}
 	}
+
 	var decoded ToolSetDefinition
+
 	require.Error(t, util.DecodeYAMLStrict([]byte("source:\n  <<: {openapi: null}\n  explicit: {tools: []}"), &decoded))
 }
 
@@ -376,16 +408,19 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 		original := openAPIDefinitionForTest(inline)
 		before := original.Clone()
 		clone := original.Clone()
+
 		if inline {
 			clone.Source.OpenAPI.Document.Inline[0] = '['
 		} else {
 			*clone.Source.OpenAPI.Document.URL = "https://other.example/spec.json"
 			clone.Source.OpenAPI.Document.FetchConnectionRef.Namespace = "root.other"
 		}
+
 		clone.Source.OpenAPI.Operations.IncludeOperationIDs[0] = "other"
 		clone.Source.OpenAPI.Operations.ExcludeOperationIDs = append(clone.Source.OpenAPI.Operations.ExcludeOperationIDs, "other")
 		clone.Source.OpenAPI.Server.URL = "https://other.example"
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
+
 		require.Equal(t, before, original)
 	}
 }
@@ -398,6 +433,7 @@ func TestExplicitDefinitionCloneIsDetached(t *testing.T) {
 	original.Source.Explicit.Tools[0].Spec.InputSchema = common.RawJSON(" { malformed ")
 	clone := original.Clone()
 	require.Equal(t, original, clone)
+
 	template := &clone.Source.Explicit.Tools[0]
 	template.Key = "other"
 	template.Metadata.Name = "other"
@@ -415,10 +451,24 @@ func TestExplicitDefinitionCloneIsDetached(t *testing.T) {
 	require.Equal(t, common.RawJSON(" { malformed "), unchanged.Spec.InputSchema)
 	require.Equal(t, common.RawJSON(`null`), unchanged.Spec.ProxyHTTP.Query["q"])
 	require.Nil(t, (*ToolSetDefinition)(nil).Clone())
+
 	for _, definition := range []*ToolSetDefinition{
-		{}, {Source: ToolSetSource{Explicit: &ExplicitSource{}}},
-		{Source: ToolSetSource{Explicit: &ExplicitSource{Tools: []ToolTemplate{}}}},
-		{Source: ToolSetSource{Explicit: &ExplicitSource{Tools: []ToolTemplate{{Key: "incomplete"}}}}},
+		{},
+		{
+			Source: ToolSetSource{Explicit: &ExplicitSource{}},
+		},
+		{
+			Source: ToolSetSource{
+				Explicit: &ExplicitSource{Tools: []ToolTemplate{}},
+			},
+		},
+		{
+			Source: ToolSetSource{
+				Explicit: &ExplicitSource{
+					Tools: []ToolTemplate{{Key: "incomplete"}},
+				},
+			},
+		},
 	} {
 		require.Equal(t, definition, definition.Clone(), "clone must retain empty and invalid shapes for validation")
 	}
