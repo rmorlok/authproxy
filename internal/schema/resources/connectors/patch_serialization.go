@@ -7,11 +7,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type connectorSpecPatchWire struct {
-	Release    *ConnectorReleaseSpecPatch `json:"release,omitempty" yaml:"release,omitempty"`
-	Definition *ConnectorDefinition       `json:"definition,omitempty" yaml:"definition,omitempty"`
-}
+// connectorSpecPatchWire reuses the canonical fields without their serialization methods.
+// Fresh values keep decoding atomic and reset omitted fields and presence flags.
+type connectorSpecPatchWire ConnectorSpecPatch
 
+// MarshalJSON preserves explicit null updates while omitting unsupplied fields.
 func (c ConnectorSpecPatch) MarshalJSON() ([]byte, error) {
 	value := map[string]any{}
 	if c.HasRelease() {
@@ -23,6 +23,8 @@ func (c ConnectorSpecPatch) MarshalJSON() ([]byte, error) {
 	return json.Marshal(value)
 }
 
+// UnmarshalJSON strictly decodes fields and records their presence, replacing
+// the receiver only after decoding succeeds.
 func (c *ConnectorSpecPatch) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
@@ -32,12 +34,13 @@ func (c *ConnectorSpecPatch) UnmarshalJSON(data []byte) error {
 	if err := util.DecodeJSONStrict(data, &wire); err != nil {
 		return err
 	}
-	*c = ConnectorSpecPatch{Release: wire.Release, Definition: wire.Definition}
+	*c = ConnectorSpecPatch(wire)
 	_, c.releasePresent = fields["release"]
 	_, c.definitionPresent = fields["definition"]
 	return nil
 }
 
+// MarshalYAML builds a presence-aware representation of the supplied fields.
 func (c ConnectorSpecPatch) MarshalYAML() (any, error) {
 	value := map[string]any{}
 	if c.HasRelease() {
@@ -49,12 +52,14 @@ func (c ConnectorSpecPatch) MarshalYAML() (any, error) {
 	return value, nil
 }
 
+// UnmarshalYAML strictly decodes fields and records their presence, replacing
+// the receiver only after decoding succeeds.
 func (c *ConnectorSpecPatch) UnmarshalYAML(value *yaml.Node) error {
 	var wire connectorSpecPatchWire
 	if err := util.DecodeYAMLNodeStrict(value, &wire); err != nil {
 		return err
 	}
-	*c = ConnectorSpecPatch{Release: wire.Release, Definition: wire.Definition}
+	*c = ConnectorSpecPatch(wire)
 	node := value
 	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
 		node = node.Content[0]
@@ -72,6 +77,10 @@ func (c *ConnectorSpecPatch) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// connectorReleaseSpecPatchWire avoids recursive decoding while retaining canonical tags.
+type connectorReleaseSpecPatchWire ConnectorReleaseSpecPatch
+
+// MarshalJSON preserves explicit null updates while omitting unsupplied fields.
 func (c ConnectorReleaseSpecPatch) MarshalJSON() ([]byte, error) {
 	value := map[string]any{}
 	if c.HasDesiredState() {
@@ -80,22 +89,23 @@ func (c ConnectorReleaseSpecPatch) MarshalJSON() ([]byte, error) {
 	return json.Marshal(value)
 }
 
+// UnmarshalJSON strictly decodes fields and records their presence, replacing
+// the receiver only after decoding succeeds.
 func (c *ConnectorReleaseSpecPatch) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
 		return err
 	}
-	var wire struct {
-		DesiredState *ConnectorReleaseState `json:"desiredState,omitempty"`
-	}
+	var wire connectorReleaseSpecPatchWire
 	if err := util.DecodeJSONStrict(data, &wire); err != nil {
 		return err
 	}
-	*c = ConnectorReleaseSpecPatch{DesiredState: wire.DesiredState}
+	*c = ConnectorReleaseSpecPatch(wire)
 	_, c.desiredStatePresent = fields["desiredState"]
 	return nil
 }
 
+// MarshalYAML builds a presence-aware representation of the supplied fields.
 func (c ConnectorReleaseSpecPatch) MarshalYAML() (any, error) {
 	value := map[string]any{}
 	if c.HasDesiredState() {
@@ -104,14 +114,14 @@ func (c ConnectorReleaseSpecPatch) MarshalYAML() (any, error) {
 	return value, nil
 }
 
+// UnmarshalYAML strictly decodes fields and records their presence, replacing
+// the receiver only after decoding succeeds.
 func (c *ConnectorReleaseSpecPatch) UnmarshalYAML(value *yaml.Node) error {
-	var wire struct {
-		DesiredState *ConnectorReleaseState `yaml:"desiredState,omitempty"`
-	}
+	var wire connectorReleaseSpecPatchWire
 	if err := util.DecodeYAMLNodeStrict(value, &wire); err != nil {
 		return err
 	}
-	*c = ConnectorReleaseSpecPatch{DesiredState: wire.DesiredState}
+	*c = ConnectorReleaseSpecPatch(wire)
 	node := value
 	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
 		node = node.Content[0]

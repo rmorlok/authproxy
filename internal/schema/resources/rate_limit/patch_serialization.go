@@ -7,14 +7,11 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type rateLimitSpecPatchWire struct {
-	Scope     *RateLimitScope `json:"scope,omitempty" yaml:"scope,omitempty"`
-	Mode      *Mode           `json:"mode,omitempty" yaml:"mode,omitempty"`
-	Selector  *Selector       `json:"selector,omitempty" yaml:"selector,omitempty"`
-	Bucket    *Bucket         `json:"bucket,omitempty" yaml:"bucket,omitempty"`
-	Algorithm *Algorithm      `json:"algorithm,omitempty" yaml:"algorithm,omitempty"`
-}
+// rateLimitSpecPatchWire reuses the canonical fields without their serialization methods.
+// Fresh values keep decoding atomic and reset omitted fields and presence flags.
+type rateLimitSpecPatchWire RateLimitSpecPatch
 
+// MarshalJSON preserves explicit null updates while omitting unsupplied fields.
 func (p RateLimitSpecPatch) MarshalJSON() ([]byte, error) {
 	value := map[string]any{}
 	if p.scopePresent || p.Scope != nil {
@@ -35,6 +32,8 @@ func (p RateLimitSpecPatch) MarshalJSON() ([]byte, error) {
 	return json.Marshal(value)
 }
 
+// UnmarshalJSON strictly decodes fields and records their presence, replacing
+// the receiver only after decoding succeeds.
 func (p *RateLimitSpecPatch) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
@@ -44,7 +43,7 @@ func (p *RateLimitSpecPatch) UnmarshalJSON(data []byte) error {
 	if err := util.DecodeJSONStrict(data, &wire); err != nil {
 		return err
 	}
-	p.assign(wire)
+	*p = RateLimitSpecPatch(wire)
 	_, p.scopePresent = fields["scope"]
 	_, p.modePresent = fields["mode"]
 	_, p.selectorPresent = fields["selector"]
@@ -53,6 +52,7 @@ func (p *RateLimitSpecPatch) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalYAML builds a presence-aware representation of the supplied fields.
 func (p RateLimitSpecPatch) MarshalYAML() (any, error) {
 	value := map[string]any{}
 	if p.scopePresent || p.Scope != nil {
@@ -73,12 +73,14 @@ func (p RateLimitSpecPatch) MarshalYAML() (any, error) {
 	return value, nil
 }
 
+// UnmarshalYAML strictly decodes fields and records their presence, replacing
+// the receiver only after decoding succeeds.
 func (p *RateLimitSpecPatch) UnmarshalYAML(value *yaml.Node) error {
 	var wire rateLimitSpecPatchWire
 	if err := util.DecodeYAMLNodeStrict(value, &wire); err != nil {
 		return err
 	}
-	p.assign(wire)
+	*p = RateLimitSpecPatch(wire)
 	node := value
 	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
 		node = node.Content[0]
@@ -100,8 +102,4 @@ func (p *RateLimitSpecPatch) UnmarshalYAML(value *yaml.Node) error {
 		}
 	}
 	return nil
-}
-
-func (p *RateLimitSpecPatch) assign(w rateLimitSpecPatchWire) {
-	*p = RateLimitSpecPatch{Scope: w.Scope, Mode: w.Mode, Selector: w.Selector, Bucket: w.Bucket, Algorithm: w.Algorithm}
 }
