@@ -183,48 +183,97 @@ check document identity, unsupported features, and actual operation membership.
 
 ### Server selection and overrides
 
-An optional `server` object requires exactly one of `url` or `index`. Omitting
-the entire object preserves the importer's default server selection and document
-variable defaults; `server: {}` is invalid. The existing `server.url` form
-deliberately replaces the document-selected server base URL and may use connection
-`cfg` templates, including a whole-URL template. Rendered URL validation and
-template compilation happen later.
-
-To select a document server and bind its variables instead, use a zero-based
-`index` and optional literal `variables`:
+OpenAPI 3 describes an HTTP API, including its endpoints and the base URLs where
+they are available. A provider can list several base URLs under `servers` and
+use placeholders such as `{tenant}` in those URLs. For example, this fragment
+of a provider's OpenAPI document describes production and sandbox servers:
 
 ```yaml
-source:
-  openapi:
-    document:
-      url: https://api.example.com/openapi.json
-    server:
-      index: 0
-      variables:
-        region: us
-        version: v1
+servers:
+  - url: https://{tenant}.{region}.example.com/v1
+    description: Production
+    variables:
+      tenant:
+        default: demo
+      region:
+        default: us
+        enum: [us, eu]
+  - url: https://sandbox.example.com/v1
+    description: Sandbox
 ```
 
-For each OAS 3 operation, the importer first chooses the effective `servers`
-list using operation/path/document precedence, then selects the requested index.
-The index does not select from a merged list or fall back to a parent list if
-out of range. A per-operation override can therefore make an index invalid for
-that operation. Relative URLs still require resolution against the document's
-base URI. Bounds, base URI availability, variable names, defaults, and enum
-membership are document-dependent import checks, not authoring-schema checks.
-Swagger 2 has `schemes`/`host`/`basePath` instead of `servers`; a later importer
-must diagnose `index`/`variables` for that format rather than reinterpret the
-index as a scheme choice. Omitting `server` or using `url` remains applicable.
+The provider's `variables` section defines the placeholders. Here, `tenant`
+defaults to `demo`; `region` defaults to `us` and allows `us` or `eu`. These are
+[OpenAPI server variables](https://spec.openapis.org/oas/v3.1.1.html#server-variable-object).
 
-`variables` requires `index`, including an explicit `index: 0` when binding the
-first server. Omitted bindings preserve the document's defaults; `{}` supplies
-no overrides. Names must be nonblank and are matched exactly without trimming.
-Values are strings preserved verbatim, including empty strings and whitespace.
-They are literal import-time bindings: text such as `{{cfg.region}}` is not
-evaluated. Use `server.url` for runtime connection configuration instead. Null
-fields or map values, unknown fields, negative indices, and mixed URL/selection
-modes are rejected. Explicit zero and an empty variables object survive ordinary
-JSON/YAML serialization; clones detach both pointers and the bindings map.
+AuthProxy's `OpenAPIServerConfig` chooses the base URL for the generated tools.
+It lives at `source.openapi.server`. The separate `document.url` identifies
+where to download the specification.
+
+#### Choose a document server
+
+Use `index` to select a server from the provider's list, starting at zero.
+Use `variables` to supply values for that server's placeholders:
+
+```yaml
+# Under source.openapi:
+server:
+  index: 0
+  variables:
+    tenant: acme
+    region: eu
+```
+
+This selects the production server and produces the base URL
+`https://acme.eu.example.com/v1`. A generated tool for `GET /calendars` would
+call `https://acme.eu.example.com/v1/calendars`. Leaving out `region` in this
+example would use its default, `us`. Using `index: 1` with no variables would
+select the sandbox.
+
+`index` is an AuthProxy setting for choosing an entry in the OpenAPI list.
+The supplied variable values are fixed for the ToolSet generation: every
+connection using that generation gets the same `acme` tenant and `eu` region.
+
+#### Use connection configuration
+
+When the tenant differs by connection, override the base URL with an AuthProxy
+template instead:
+
+```yaml
+# Under source.openapi:
+server:
+  url: "https://{{cfg.tenant}}.eu.example.com/v1"
+```
+
+Here, `cfg.tenant` comes from the bound connection's stored configuration, such
+as a tenant collected during connection setup. A connection with tenant `acme`
+would use `https://acme.eu.example.com/v1` as its base URL; one with tenant
+`globex` would use `https://globex.eu.example.com/v1`.
+
+**Variable bindings do not support AuthProxy templates in the current contract.**
+Putting `tenant: "{{cfg.tenant}}"` inside `variables` keeps that text as a literal
+value. Only the `url` form supports runtime connection configuration. Template
+support inside variable bindings would require a later change.
+
+#### Selection rules
+
+- Supply exactly one of `url` or `index`. `variables` requires `index`, including
+  `index: 0` for the first server. Omitting `server` keeps the importer's default
+  selection and the document's variable defaults; `server: {}` is invalid.
+- OpenAPI lets an endpoint declare its own server list. An operation's list
+  overrides its path's list, which overrides the document-wide list. AuthProxy
+  applies `index` to that operation's list, without merging lists or falling
+  back to a parent if the index is out of range.
+- Bindings use exact, nonblank variable names and literal string values. Empty
+  strings are allowed; empty `variables: {}` supplies no overrides. Null fields
+  or values, unknown fields, and negative indices are rejected.
+- The importer will check server bounds, declared variables, allowed values,
+  and relative URL resolution. Swagger 2 has no `servers` list, so indexed
+  selection does not apply; omission or a URL override remains available.
+
+This slice defines and validates the configuration. Server resolution, variable
+substitution, and URL template execution will be implemented in the importer
+and execution layers.
 
 Security mappings, source-key overrides, unsupported-operation policy, reference
 bundles/base URIs, and external-reference fetch settings remain separate contracts;
