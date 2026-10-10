@@ -83,6 +83,8 @@ func (s *ServiceAdminApi) XsrfRequestQueueDepth() int {
 	return *s.XsrfRequestQueueDepthVal
 }
 
+// UnmarshalYAML strictly decodes HTTP and service-specific configuration into
+// a fresh value, replacing the receiver only after every field succeeds.
 func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
@@ -104,24 +106,17 @@ func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	type rawServiceAdminApi struct {
-		Ui                       *ServiceAdminUi                   `yaml:"ui"`
-		SessionTimeoutVal        *HumanDuration                    `yaml:"sessionTimeout"`
-		XsrfRequestQueueDepthVal *int                              `yaml:"xsrfRequestQueueDepth"`
-		StaticVal                *ServicePublicStaticContentConfig `yaml:"static,omitempty"`
-		CookieVal                *CookieConfig                     `yaml:"cookie,omitempty"`
-	}
-	raw := &rawServiceAdminApi{}
-	if err := util.DecodeYAMLNodeStrict(yamlMappingWithFields(value, adminFields...), raw); err != nil {
+	// plain retains the canonical fields and tags without recursively invoking
+	// UnmarshalYAML. Only this service's fields reach this decoder; HTTP and
+	// polymorphic TLS configuration have already been decoded separately.
+	type plain ServiceAdminApi
+	var decoded plain
+	if err := util.DecodeYAMLNodeStrict(yamlMappingWithFields(value, adminFields...), &decoded); err != nil {
 		return err
 	}
 
-	s.ServiceHttp = hs
-	s.Ui = raw.Ui
-	s.SessionTimeoutVal = raw.SessionTimeoutVal
-	s.XsrfRequestQueueDepthVal = raw.XsrfRequestQueueDepthVal
-	s.StaticVal = raw.StaticVal
-	s.CookieVal = raw.CookieVal
+	decoded.ServiceHttp = hs
+	*s = ServiceAdminApi(decoded)
 
 	return nil
 }
