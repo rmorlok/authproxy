@@ -1,7 +1,6 @@
 package toolsets
 
 import (
-	"encoding/json"
 	"slices"
 	"strings"
 	"time"
@@ -37,9 +36,10 @@ type MCPSource struct {
 // MCPToolFilter selects exact upstream names without changing their routing
 // identity. Omitted IncludeNames includes all names; a supplied empty list is
 // invalid. Exclusions take precedence, including when a name is also included.
+// A nil list pointer means omitted; supplied lists must point to a non-nil slice.
 type MCPToolFilter struct {
-	IncludeNames []string `json:"includeNames,omitempty" yaml:"includeNames,omitempty"`
-	ExcludeNames []string `json:"excludeNames,omitempty" yaml:"excludeNames,omitempty"`
+	IncludeNames *[]string `json:"includeNames,omitempty" yaml:"includeNames,omitempty"`
+	ExcludeNames *[]string `json:"excludeNames,omitempty" yaml:"excludeNames,omitempty"`
 }
 
 // Validate checks authored source shape without interpreting endpoint templates
@@ -106,15 +106,20 @@ func (s *MCPSource) Clone() *MCPSource {
 	return &clone
 }
 
-// Clone preserves nil versus empty lists while detaching their backing arrays.
+// Clone detaches list pointers and backing arrays, preserving omitted, empty,
+// and invalid nil-slice values for later validation.
 func (f *MCPToolFilter) Clone() *MCPToolFilter {
 	if f == nil {
 		return nil
 	}
-	return &MCPToolFilter{
-		IncludeNames: slices.Clone(f.IncludeNames),
-		ExcludeNames: slices.Clone(f.ExcludeNames),
+	clone := *f
+	if f.IncludeNames != nil {
+		clone.IncludeNames = util.ToPtr(slices.Clone(*f.IncludeNames))
 	}
+	if f.ExcludeNames != nil {
+		clone.ExcludeNames = util.ToPtr(slices.Clone(*f.ExcludeNames))
+	}
+	return &clone
 }
 
 // UnmarshalJSON rejects unknown, mis-cased, and null configuration fields before
@@ -162,15 +167,4 @@ func (f *MCPToolFilter) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	return f.UnmarshalJSON(raw)
-}
-
-// MarshalJSON retains explicitly empty lists, especially invalid includeNames:[]
-// which must never serialize as an omitted, unrestricted inclusion policy.
-func (f MCPToolFilter) MarshalJSON() ([]byte, error) {
-	return json.Marshal(f.lists().fieldsForMarshal())
-}
-
-// MarshalYAML preserves the same list presence as JSON without exposing aliases.
-func (f MCPToolFilter) MarshalYAML() (any, error) {
-	return f.lists().fieldsForMarshal(), nil
 }

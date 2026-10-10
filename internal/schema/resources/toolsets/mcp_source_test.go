@@ -17,7 +17,7 @@ func mcpSourceContractForTest() *MCPSource {
 	return &MCPSource{
 		Endpoint: "https://{{cfg.apiHost}}/mcp", Transport: MCPTransportStreamableHTTP,
 		RefreshInterval: &interval,
-		Tools:           &MCPToolFilter{IncludeNames: []string{"list_calendars", "create_event"}, ExcludeNames: []string{"create_event"}},
+		Tools:           &MCPToolFilter{IncludeNames: &[]string{"list_calendars", "create_event"}, ExcludeNames: &[]string{"create_event"}},
 	}
 }
 
@@ -38,10 +38,10 @@ func TestMCPSourceValidation(t *testing.T) {
 		{"newline", func(s *MCPSource) { s.Endpoint = "https://example.test/\nmcp" }, "endpoint"},
 		{"missing transport", func(s *MCPSource) { s.Transport = "" }, "transport"},
 		{"unsupported transport", func(s *MCPSource) { s.Transport = "stdio" }, "transport"},
-		{"empty inclusion", func(s *MCPSource) { s.Tools.IncludeNames = []string{} }, "tools.includeNames"},
-		{"blank name", func(s *MCPSource) { s.Tools.IncludeNames = []string{" \n"} }, "tools.includeNames[0]"},
-		{"duplicate include", func(s *MCPSource) { s.Tools.IncludeNames = []string{"same", "same"} }, "tools.includeNames[1]"},
-		{"duplicate exclude", func(s *MCPSource) { s.Tools.ExcludeNames = []string{"same", "same"} }, "tools.excludeNames[1]"},
+		{"empty inclusion", func(s *MCPSource) { s.Tools.IncludeNames = &[]string{} }, "tools.includeNames"},
+		{"blank name", func(s *MCPSource) { s.Tools.IncludeNames = &[]string{" \n"} }, "tools.includeNames[0]"},
+		{"duplicate include", func(s *MCPSource) { s.Tools.IncludeNames = &[]string{"same", "same"} }, "tools.includeNames[1]"},
+		{"duplicate exclude", func(s *MCPSource) { s.Tools.ExcludeNames = &[]string{"same", "same"} }, "tools.excludeNames[1]"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			source := mcpSourceContractForTest()
@@ -62,12 +62,12 @@ func TestMCPSourceValidation(t *testing.T) {
 	require.Error(t, (*MCPSource)(nil).Validate(nil))
 	require.NoError(t, (*MCPToolFilter)(nil).Validate(nil))
 	filter := &MCPToolFilter{
-		IncludeNames: []string{"list_calendars", " list_calendars", "LIST_CALENDARS"},
-		ExcludeNames: []string{"list_calendars"},
+		IncludeNames: &[]string{"list_calendars", " list_calendars", "LIST_CALENDARS"},
+		ExcludeNames: &[]string{"list_calendars"},
 	}
 	require.NoError(t, filter.Validate(nil), "names remain exact; overlap is valid because exclusions take precedence")
-	require.Equal(t, " list_calendars", filter.IncludeNames[1])
-	require.NoError(t, (&MCPToolFilter{ExcludeNames: []string{}}).Validate(nil))
+	require.Equal(t, " list_calendars", (*filter.IncludeNames)[1])
+	require.NoError(t, (&MCPToolFilter{ExcludeNames: &[]string{}}).Validate(nil))
 }
 
 // TestMCPSourceRoundTrip preserves fractional and compound duration text along
@@ -93,7 +93,7 @@ func TestMCPSourceRoundTrip(t *testing.T) {
 				require.NoError(t, decoded.Validate(nil))
 				require.Equal(t, source, &decoded)
 			}
-			for _, filter := range []*MCPToolFilter{{}, {ExcludeNames: []string{}}, {IncludeNames: []string{}}} {
+			for _, filter := range []*MCPToolFilter{{}, {ExcludeNames: &[]string{}}, {IncludeNames: &[]string{}}} {
 				encoded, err := format.encode(filter)
 				require.NoError(t, err)
 				var decoded MCPToolFilter
@@ -145,7 +145,7 @@ tools:
 `
 	require.NoError(t, util.DecodeYAMLStrict([]byte(input), &source))
 	require.NoError(t, source.Validate(nil))
-	require.Equal(t, []string{"list_calendars"}, source.Tools.ExcludeNames)
+	require.Equal(t, []string{"list_calendars"}, *source.Tools.ExcludeNames)
 	for _, input := range []string{
 		"<<: {refreshInterval: null}\n",
 		"refreshInterval: &none null\ntools: *none\n",
@@ -157,30 +157,68 @@ tools:
 }
 
 // TestMCPSourceCloneAndDecodeOwnership protects pinned source settings from
-// changes through clones, failed decodes, and the native YAML marshal result.
+// changes through clones and failed decodes.
 func TestMCPSourceCloneAndDecodeOwnership(t *testing.T) {
 	source := mcpSourceContractForTest()
 	clone := source.Clone()
 	require.Equal(t, source, clone)
 	clone.Endpoint = "changed"
 	*clone.RefreshInterval = "5m"
-	clone.Tools.IncludeNames[0] = "changed"
-	clone.Tools.ExcludeNames[0] = "changed"
+	(*clone.Tools.IncludeNames)[0] = "changed"
+	(*clone.Tools.ExcludeNames)[0] = "changed"
 	require.Equal(t, mcpSourceContractForTest(), source)
 	require.Nil(t, (*MCPSource)(nil).Clone())
 	require.Nil(t, (*MCPToolFilter)(nil).Clone())
 	require.Equal(t, &MCPSource{}, (&MCPSource{}).Clone())
-	filter := (&MCPToolFilter{IncludeNames: []string{}}).Clone()
+	filter := (&MCPToolFilter{IncludeNames: &[]string{}}).Clone()
 	require.NotNil(t, filter.IncludeNames)
 	require.Nil(t, filter.ExcludeNames)
-	value, err := source.Tools.MarshalYAML()
-	require.NoError(t, err)
-	value.(map[string][]string)["includeNames"][0] = "changed"
-	require.Equal(t, mcpSourceContractForTest(), source)
 
 	require.Error(t, util.DecodeJSONStrict([]byte(`{"endpoint":"changed","tools":{"includeNames":[null]}}`), source))
 	require.Equal(t, mcpSourceContractForTest(), source, "failed decoding is transactional")
 	require.NoError(t, util.DecodeJSONStrict([]byte(`{"endpoint":"https://example.test/mcp","transport":"streamableHttp"}`), source))
 	require.Nil(t, source.RefreshInterval)
 	require.Nil(t, source.Tools)
+}
+
+// TestMCPToolFilterListOwnership preserves supplied list pointers and independently
+// clones their slice headers, even for empty or invalid nil-slice values.
+func TestMCPToolFilterListOwnership(t *testing.T) {
+	for _, values := range [][]string{nil, {}, {"read"}} {
+		filter := &MCPToolFilter{IncludeNames: util.ToPtr(values), ExcludeNames: util.ToPtr(values)}
+		clone := filter.Clone()
+		require.Equal(t, filter, clone)
+		require.NotSame(t, filter.IncludeNames, clone.IncludeNames)
+		require.NotSame(t, filter.ExcludeNames, clone.ExcludeNames)
+		if values == nil {
+			require.ErrorContains(t, filter.Validate(nil), "includeNames: must not be null")
+			require.ErrorContains(t, filter.Validate(nil), "excludeNames: must not be null")
+		}
+		*clone.IncludeNames = append(*clone.IncludeNames, "added")
+		*clone.ExcludeNames = append(*clone.ExcludeNames, "added")
+		require.Equal(t, values, *filter.IncludeNames)
+		require.Equal(t, values, *filter.ExcludeNames)
+	}
+}
+
+// TestMCPToolFilterDecodeState checks atomic failure and replacement of previously
+// supplied lists through both decoders, independently of source-level decoding.
+func TestMCPToolFilterDecodeState(t *testing.T) {
+	for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
+		for _, input := range []string{
+			`{"includeNames":["changed"],"excludeNames":[null]}`,
+			`{"includeNames":[null],"excludeNames":["changed"]}`,
+			`{"includeNames":null}`, `{"excludeNames":null}`,
+			`{"unknown":[],"includeNames":["changed"]}`,
+		} {
+			filter := mcpSourceContractForTest().Tools
+			require.Error(t, decode([]byte(input), filter), input)
+			require.Equal(t, mcpSourceContractForTest().Tools, filter, input)
+		}
+		filter := mcpSourceContractForTest().Tools
+		require.NoError(t, decode([]byte(`{"excludeNames":[]}`), filter))
+		require.Equal(t, &MCPToolFilter{ExcludeNames: &[]string{}}, filter)
+		require.NoError(t, decode([]byte(`{}`), filter))
+		require.Equal(t, &MCPToolFilter{}, filter)
+	}
 }

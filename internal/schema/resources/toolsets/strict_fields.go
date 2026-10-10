@@ -62,34 +62,42 @@ func jsonFieldNames(t reflect.Type) []string {
 // exactNameLists is an include/exclude pair of exact upstream identifiers, such
 // as MCP tool names or OpenAPI operation IDs. Omitted inclusion is unrestricted;
 // a supplied inclusion must be nonempty. Exclusions win overlap, and names are
-// never trimmed or normalized.
+// never trimmed or normalized. Nil pointers are omitted, while supplied lists
+// must point to non-nil slices.
 type exactNameLists struct {
 	includeField string
-	include      []string
+	include      *[]string
 	excludeField string
-	exclude      []string
+	exclude      *[]string
 }
 
-// validate checks nonblank, per-list unique names and a nonempty inclusion.
+// validate rejects supplied nil slices and checks nonblank, per-list unique
+// names and a nonempty inclusion.
 func (l exactNameLists) validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
 
 	var result *multierror.Error
 
-	if l.include != nil && len(l.include) == 0 {
-		result = multierror.Append(result, vc.NewErrorForField(l.includeField, "must not be empty when supplied"))
-	}
-
 	for _, list := range []struct {
 		field string
-		names []string
+		names *[]string
 	}{
 		{l.includeField, l.include},
 		{l.excludeField, l.exclude},
 	} {
-		seen := make(map[string]bool, len(list.names))
+		if list.names == nil {
+			continue
+		}
+		if *list.names == nil {
+			result = multierror.Append(result, vc.NewErrorForField(list.field, "must not be null"))
+			continue
+		}
+		if list.field == l.includeField && len(*list.names) == 0 {
+			result = multierror.Append(result, vc.NewErrorForField(list.field, "must not be empty when supplied"))
+		}
+		seen := make(map[string]bool, len(*list.names))
 
-		for i, name := range list.names {
+		for i, name := range *list.names {
 			path := vc.PushField(list.field).PushIndex(i)
 
 			if strings.TrimSpace(name) == "" {
@@ -133,24 +141,11 @@ func (l *exactNameLists) decode(data []byte, label string) error {
 		}
 
 		if field == l.includeField {
-			l.include = values
+			l.include = &values
 		} else {
-			l.exclude = values
+			l.exclude = &values
 		}
 	}
 
 	return nil
-}
-
-// fieldsForMarshal returns only supplied lists as detached copies, retaining
-// non-nil empties so an invalid inclusion never serializes as unrestricted.
-func (l exactNameLists) fieldsForMarshal() map[string][]string {
-	fields := make(map[string][]string)
-	if l.include != nil {
-		fields[l.includeField] = slices.Clone(l.include)
-	}
-	if l.exclude != nil {
-		fields[l.excludeField] = slices.Clone(l.exclude)
-	}
-	return fields
 }
