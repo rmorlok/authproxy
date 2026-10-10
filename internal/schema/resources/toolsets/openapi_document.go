@@ -109,9 +109,11 @@ func (d *OpenAPIDocument) Clone() *OpenAPIDocument {
 	}
 
 	clone := *d
+
 	if d.Inline != nil {
 		clone.Inline = util.ToPtr(slices.Clone(*d.Inline))
 	}
+
 	clone.URL = util.CloneValue(d.URL)
 	clone.FetchConnectionRef = util.CloneValue(d.FetchConnectionRef)
 
@@ -123,15 +125,19 @@ func (d *OpenAPIDocument) Clone() *OpenAPIDocument {
 // an invalid replacement cannot partially change an existing acquisition source.
 func (d *OpenAPIDocument) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
+
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
 		return err
 	}
+
 	if fields == nil {
 		return fmt.Errorf("OpenAPI document must be an object")
 	}
+
 	var decoded OpenAPIDocument
 	for field, raw := range fields {
 		var destination any
+
 		switch field {
 		case "inline":
 			destination = &decoded.Inline
@@ -142,19 +148,24 @@ func (d *OpenAPIDocument) UnmarshalJSON(data []byte) error {
 		default:
 			return fmt.Errorf("unknown OpenAPI document field %q", field)
 		}
+
 		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 			return fmt.Errorf("%s must not be null", field)
 		}
+
 		if field == "fetchConnectionRef" {
 			if err := validateOpenAPIFetchReferenceFields(raw); err != nil {
 				return err
 			}
 		}
+
 		if err := util.DecodeJSONStrict(raw, destination); err != nil {
 			return fmt.Errorf("decode %s: %w", field, err)
 		}
 	}
+
 	*d = decoded
+
 	return nil
 }
 
@@ -173,9 +184,11 @@ func (d *OpenAPIDocument) UnmarshalYAML(node *yaml.Node) error {
 // other fields must use their canonical spelling and cannot be explicitly null.
 func validateOpenAPIFetchReferenceFields(data []byte) error {
 	var fields map[string]json.RawMessage
+
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
 		return err
 	}
+
 	for field, raw := range fields {
 		switch field {
 		case "apiVersion", "kind", "id", "name", "namespace":
@@ -184,9 +197,11 @@ func validateOpenAPIFetchReferenceFields(data []byte) error {
 		default:
 			return fmt.Errorf("unknown fetchConnectionRef field %q", field)
 		}
+
 		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 			return fmt.Errorf("fetchConnectionRef.%s must not be null", field)
 		}
 	}
+
 	return nil
 }
