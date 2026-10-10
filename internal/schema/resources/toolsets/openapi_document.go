@@ -21,8 +21,10 @@ import (
 // parsing OpenAPI versions, resolving references, and fetching are importer work.
 type OpenAPIDocument struct {
 	Inline common.RawJSON `json:"inline,omitempty" yaml:"inline,omitempty"`
+
 	// URL is a literal acquisition address, independent of per-connection cfg.
 	URL *string `json:"url,omitempty" yaml:"url,omitempty"`
+
 	// FetchConnectionRef optionally authenticates the URL fetch. It does not
 	// bind generated tools or authorize acquisition; the service resolves the
 	// reference and checks administrative authority before using credentials.
@@ -37,33 +39,41 @@ func (d *OpenAPIDocument) Validate(vc *common.ValidationContext) error {
 	if d == nil {
 		return vc.NewError("OpenAPI document is required")
 	}
+
 	var result *multierror.Error
+
 	if (d.Inline == nil) == (d.URL == nil) {
 		result = multierror.Append(result, vc.NewError("must contain exactly one of inline or url"))
 	}
+
 	if d.Inline != nil {
 		raw := bytes.TrimSpace(d.Inline)
+
 		// Checking syntax without decoding numbers keeps large integers and
 		// arbitrary provider extensions intact for the later document parser.
 		if !json.Valid(raw) || len(raw) == 0 || raw[0] != '{' {
 			result = multierror.Append(result, vc.NewErrorForField("inline", "must contain one JSON object"))
 		}
 	}
+
 	if d.URL != nil {
 		if err := validateOpenAPIDocumentURL(*d.URL); err != nil {
 			result = multierror.Append(result, vc.NewErrorForField("url", err.Error()))
 		}
 	}
+
 	if d.FetchConnectionRef != nil {
 		if d.URL == nil {
 			result = multierror.Append(result, vc.NewErrorForField("fetchConnectionRef", "is only supported with url"))
 		}
+
 		// Acquisition can use a separately authorized connection in another
 		// namespace; a Tool's same-namespace execution binding rule does not apply.
 		result = multierror.Append(result, tools.ValidateConnectionReference(
 			*d.FetchConnectionRef, "", vc.PushField("fetchConnectionRef"),
 		))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -74,15 +84,18 @@ func validateOpenAPIDocumentURL(value string) error {
 		strings.Contains(value, "{{") || strings.Contains(value, "}}") {
 		return fmt.Errorf("must be a literal URL without surrounding whitespace or templates")
 	}
+
 	parsed, err := url.Parse(value)
 	if err != nil || parsed.Opaque != "" || parsed.Hostname() == "" ||
 		(!strings.EqualFold(parsed.Scheme, "http") && !strings.EqualFold(parsed.Scheme, "https")) {
 		return fmt.Errorf("must be an absolute HTTP(S) URL with a host")
 	}
+
 	// Presence matters even for an empty fragment: URL.Parse discards a bare #.
 	if parsed.User != nil || strings.Contains(value, "#") {
 		return fmt.Errorf("must not contain user information or a fragment")
 	}
+
 	return nil
 }
 
@@ -92,10 +105,12 @@ func (d *OpenAPIDocument) Clone() *OpenAPIDocument {
 	if d == nil {
 		return nil
 	}
+
 	clone := *d
 	clone.Inline = slices.Clone(d.Inline)
 	clone.URL = util.CloneValue(d.URL)
 	clone.FetchConnectionRef = util.CloneValue(d.FetchConnectionRef)
+
 	return &clone
 }
 
@@ -107,6 +122,7 @@ func (d OpenAPIDocument) MarshalJSON() ([]byte, error) {
 	if d.Inline != nil {
 		inline = &d.Inline
 	}
+
 	return json.Marshal(struct {
 		Inline             *common.RawJSON       `json:"inline,omitempty"`
 		URL                *string               `json:"url,omitempty"`
