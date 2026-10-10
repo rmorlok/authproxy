@@ -49,11 +49,15 @@ func (s *OpenAPIServerConfig) Validate(vc *common.ValidationContext) error {
 	if s == nil {
 		return nil
 	}
+
 	vc = validationContext(vc)
+
 	var result *multierror.Error
+
 	if (s.URL == nil) == (s.Index == nil) {
 		result = multierror.Append(result, vc.NewError("must contain exactly one of url or index"))
 	}
+
 	if s.URL != nil {
 		if strings.TrimSpace(*s.URL) == "" {
 			result = multierror.Append(result, vc.NewErrorForField("url", "must not be blank"))
@@ -61,18 +65,22 @@ func (s *OpenAPIServerConfig) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.NewErrorForField("url", "must not contain surrounding whitespace or newlines"))
 		}
 	}
+
 	if s.Index != nil && *s.Index < 0 {
 		result = multierror.Append(result, vc.NewErrorForField("index", "must not be negative"))
 	}
+
 	if s.Variables != nil {
 		if s.URL != nil {
 			result = multierror.Append(result, vc.NewErrorForField("variables", "is only supported with index, not a URL override"))
 		} else if s.Index == nil {
 			result = multierror.Append(result, vc.NewErrorForField("variables", "requires index"))
 		}
+
 		if *s.Variables == nil {
 			result = multierror.Append(result, vc.NewErrorForField("variables", "must be an object, not null"))
 		}
+
 		// Sort names so diagnostics remain stable despite Go map iteration order.
 		for _, name := range slices.Sorted(maps.Keys(*s.Variables)) {
 			if strings.TrimSpace(name) == "" {
@@ -80,6 +88,7 @@ func (s *OpenAPIServerConfig) Validate(vc *common.ValidationContext) error {
 			}
 		}
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -89,22 +98,30 @@ func (s *OpenAPIServerConfig) Clone() *OpenAPIServerConfig {
 	if s == nil {
 		return nil
 	}
+
 	clone := *s
 	clone.URL = util.CloneValue(s.URL)
 	clone.Index = util.CloneValue(s.Index)
+
 	if s.Variables != nil {
 		clone.Variables = util.ToPtr(maps.Clone(*s.Variables))
 	}
+
 	return &clone
 }
 
 // UnmarshalJSON rejects noncanonical keys, null fields, and duplicate or
 // non-string bindings. The receiver is replaced only after decoding succeeds.
 func (s *OpenAPIServerConfig) UnmarshalJSON(data []byte) error {
-	fields, err := decodeStrictObject(data, "OpenAPI server configuration", jsonFieldNames(reflect.TypeOf(OpenAPIServerConfig{}))...)
+	fields, err := decodeStrictObject(
+		data,
+		"OpenAPI server configuration",
+		jsonFieldNames(reflect.TypeOf(OpenAPIServerConfig{}))...,
+	)
 	if err != nil {
 		return err
 	}
+
 	if raw, ok := fields["variables"]; ok {
 		if err := validateOpenAPIServerBindingsJSON(raw); err != nil {
 			return err
@@ -120,12 +137,15 @@ func (s *OpenAPIServerConfig) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	type plain OpenAPIServerConfig
 	var decoded plain
 	if err := util.DecodeJSONStrict(checked, &decoded); err != nil {
 		return err
 	}
+
 	*s = OpenAPIServerConfig(decoded)
+
 	return nil
 }
 
@@ -134,25 +154,31 @@ func (s *OpenAPIServerConfig) UnmarshalJSON(data []byte) error {
 // null values into empty strings. Escaped names are compared after decoding.
 func validateOpenAPIServerBindingsJSON(raw json.RawMessage) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
+
 	token, err := decoder.Token()
 	if err != nil {
 		return err
 	}
+
 	if token != json.Delim('{') {
 		return fmt.Errorf("variables must be an object")
 	}
+
 	seen := make(map[string]bool)
 	for decoder.More() {
 		token, err := decoder.Token()
 		if err != nil {
 			return err
 		}
+
 		name := token.(string) // Object keys in valid JSON are always strings.
 		if seen[name] {
 			return fmt.Errorf("variables[%q] must not be repeated", name)
 		}
+
 		seen[name] = true
 		value, err := decoder.Token()
+
 		if err != nil {
 			return err
 		}
@@ -160,6 +186,7 @@ func validateOpenAPIServerBindingsJSON(raw json.RawMessage) error {
 			return fmt.Errorf("variables[%q] must be a string", name)
 		}
 	}
+
 	return nil
 }
 
