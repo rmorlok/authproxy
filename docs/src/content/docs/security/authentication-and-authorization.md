@@ -46,6 +46,27 @@ configured public key. Private keys belong in the host backend, automation
 secret store, or developer keychain—not in a browser bundle, mobile client, URL,
 log, or source repository.
 
+### Signing Key IDs (`kid`)
+
+Tokens minted by AuthProxy services, the CLI, and the Go token builder carry a
+JOSE `kid` header. The `kid` is an opaque fingerprint of one version of the
+signing key (derived from the public key for asymmetric keys, and from an HMAC
+of the secret for shared keys), so each rotated key version has a distinct
+`kid`.
+
+The `kid` never selects which key is trusted. AuthProxy still chooses the
+candidate key from configuration or storage—the global AES key for
+system-signed tokens, the actor's stored key, or `systemAuth.jwtSigningKey`—and
+uses the `kid` only to pick the matching version of that trusted key. This lets
+tokens signed with a previous key version keep verifying while the provider
+still lists that version. A token whose `kid` matches no trusted key version is
+rejected, as is a token whose `alg` is not compatible with the selected key.
+
+Tokens without a `kid` remain supported and are verified against the current
+version of the selected key. Host applications that sign tokens themselves
+should either omit `kid` or set it to the value AuthProxy derives; any other
+`kid` is rejected.
+
 AuthProxy validates standard JWT timing claims, its own claim structure, and
 the service audience. When a token contains a nonce, it must also expire; the
 nonce can establish authentication only once. A subject-only token must resolve

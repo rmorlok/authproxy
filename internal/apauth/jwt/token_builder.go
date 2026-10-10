@@ -395,7 +395,13 @@ func (tb *tokenBuilder) TokenCtx(ctx context.Context) (string, error) {
 		return "", err
 	}
 
+	kid, err := keyIdForSigningKey(keyData)
+	if err != nil {
+		return "", err
+	}
+
 	token := jwt.NewWithClaims(signingMethdod, claims)
+	token.Header[KeyIdHeader] = kid
 	tokenString, err := token.SignedString(keyData)
 	if err != nil {
 		return "", fmt.Errorf("error signing jwt: %w", err)

@@ -267,6 +267,14 @@ func signingKeyMethodFromParsedPublicKey(parsedKey interface{}) (interface{}, jw
 }
 
 func (pb *parserBuilder) getVerifyingKeyData(ctx context.Context, unverified *AuthProxyClaims) (interface{}, jwt.SigningMethod, error) {
+	return pb.getVerifyingKeyDataForKeyId(ctx, unverified, "")
+}
+
+// getVerifyingKeyDataForKeyId loads the key used to verify a token. The candidate key is always chosen by the key
+// selector from trusted configuration or storage. When the token carries a kid, it only narrows that trusted key to
+// the specific version it identifies (supporting rotation); a kid that matches no version is rejected. Without a
+// kid, the current version of the key is used, preserving compatibility with legacy tokens.
+func (pb *parserBuilder) getVerifyingKeyDataForKeyId(ctx context.Context, unverified *AuthProxyClaims, kid string) (interface{}, jwt.SigningMethod, error) {
 	keySelector := pb.defaultKeySelector
 	if pb.keySelector != nil {
 		keySelector = pb.keySelector
@@ -277,17 +285,45 @@ func (pb *parserBuilder) getVerifyingKeyData(ctx context.Context, unverified *Au
 		return nil, nil, err
 	}
 
-	ver, err := keyData.GetCurrentVersion(ctx)
+	loadKey := func(raw []byte) (interface{}, jwt.SigningMethod, error) {
+		if isShared {
+			return raw, &jwt.SigningMethodHMAC{}, nil
+		}
+
+		return loadPublicKeyFromPEMOrOpenSSH(raw)
+	}
+
+	if kid == "" {
+		ver, err := keyData.GetCurrentVersion(ctx)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get key data: %w", err)
+		}
+
+		return loadKey(ver.Data)
+	}
+
+	versions, err := keyData.ListVersions(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get key data: %w", err)
-	}
-	rawKeyData := ver.Data
-
-	if isShared {
-		return rawKeyData, &jwt.SigningMethodHMAC{}, nil
+		return nil, nil, fmt.Errorf("failed to list key versions: %w", err)
 	}
 
-	return loadPublicKeyFromPEMOrOpenSSH(rawKeyData)
+	for _, ver := range versions {
+		key, method, err := loadKey(ver.Data)
+		if err != nil {
+			continue
+		}
+
+		verKid, err := keyIdForVerifyingKey(key)
+		if err != nil {
+			continue
+		}
+
+		if verKid == kid {
+			return key, method, nil
+		}
+	}
+
+	return nil, nil, ErrUnknownKeyId
 }
 
 func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxyClaims, error) {
@@ -310,9 +346,22 @@ func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxy
 			return nil, errors.New("invalid token")
 		}
 
-		key, _, err := pb.getVerifyingKeyData(ctx, unverifiedClaims)
+		kid := ""
+		if rawKid, present := unverified.Header[KeyIdHeader]; present {
+			var isString bool
+			kid, isString = rawKid.(string)
+			if !isString || kid == "" {
+				return nil, ErrUnknownKeyId
+			}
+		}
+
+		key, _, err := pb.getVerifyingKeyDataForKeyId(ctx, unverifiedClaims, kid)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get key for token: %w", err)
+		}
+
+		if !signingMethodCompatible(unverified.Method, key) {
+			return nil, ErrSigningMethodMismatch
 		}
 
 		return key, nil
