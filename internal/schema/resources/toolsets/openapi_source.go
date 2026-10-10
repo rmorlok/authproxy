@@ -1,6 +1,7 @@
 package toolsets
 
 import (
+	"reflect"
 	"slices"
 
 	"github.com/hashicorp/go-multierror"
@@ -16,6 +17,7 @@ type OpenAPISource struct {
 	Document   *OpenAPIDocument        `json:"document" yaml:"document"`
 	Operations *OpenAPIOperationFilter `json:"operations,omitempty" yaml:"operations,omitempty"`
 	Server     *OpenAPIServerConfig    `json:"server,omitempty" yaml:"server,omitempty"`
+	References *OpenAPIReferenceConfig `json:"references,omitempty" yaml:"references,omitempty"`
 }
 
 // OpenAPIOperationFilter selects exact document operationId values. Omitted
@@ -41,6 +43,7 @@ func (s *OpenAPISource) Validate(vc *common.ValidationContext) error {
 	result = multierror.Append(result, s.Document.Validate(vc.PushField("document")))
 	result = multierror.Append(result, s.Operations.Validate(vc.PushField("operations")))
 	result = multierror.Append(result, s.Server.Validate(vc.PushField("server")))
+	result = multierror.Append(result, s.References.Validate(vc.PushField("references")))
 
 	return result.ErrorOrNil()
 }
@@ -76,6 +79,7 @@ func (s *OpenAPISource) Clone() *OpenAPISource {
 	clone.Document = s.Document.Clone()
 	clone.Operations = s.Operations.Clone()
 	clone.Server = s.Server.Clone()
+	clone.References = s.References.Clone()
 	return &clone
 }
 
@@ -98,7 +102,7 @@ func (f *OpenAPIOperationFilter) Clone() *OpenAPIOperationFilter {
 // UnmarshalJSON rejects noncanonical fields and null objects before ordinary
 // pointer decoding could erase their presence. Failed decoding is atomic.
 func (s *OpenAPISource) UnmarshalJSON(data []byte) error {
-	if _, err := decodeStrictObject(data, "OpenAPI source", "document", "operations", "server"); err != nil {
+	if _, err := decodeStrictObject(data, "OpenAPI source", jsonFieldNames(reflect.TypeOf(OpenAPISource{}))...); err != nil {
 		return err
 	}
 	type plain OpenAPISource

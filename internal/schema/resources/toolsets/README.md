@@ -275,10 +275,85 @@ This slice defines and validates the configuration. Server resolution, variable
 substitution, and URL template execution will be implemented in the importer
 and execution layers.
 
-Security mappings, source-key overrides, unsupported-operation policy, reference
-bundles/base URIs, and external-reference fetch settings remain separate contracts;
-those configuration fields are currently rejected. Actual acquisition, immutable
-snapshots, refresh, server resolution, and operation compilation are future work.
+### Reference bundles
+
+OpenAPI uses `$ref` to reuse schemas and other definitions. A fragment-only
+reference such as `#/components/schemas/Item` selects content within the current
+reference resource. A reference such as `schemas/item.json` identifies another
+document; `schemas/item.json#/$defs/Item` also selects a fragment within it.
+Relative references need a base URI to identify their target.
+
+`OpenAPIReferenceConfig` lives at `source.openapi.references`. It supplies an
+optional `baseUri` for the entry document and an offline `bundle` of documents
+keyed by their absolute URI identities:
+
+```yaml
+source:
+  openapi:
+    document:
+      inline:
+        openapi: "3.1.0"
+        info:
+          title: Item API
+          version: "1.0.0"
+        servers:
+          - url: https://api.example.test
+        paths:
+          /item:
+            get:
+              operationId: getItem
+              responses:
+                "200":
+                  description: The requested item.
+                  content:
+                    application/json:
+                      schema:
+                        $ref: schemas/item.json
+    references:
+      baseUri: https://example.test/api/openapi.yaml
+      bundle:
+        https://example.test/api/schemas/item.json:
+          type: object
+          required: [id]
+          properties:
+            id: {type: string}
+            name: {type: string}
+```
+
+Here, resolving `schemas/item.json` against the entry document's `baseUri`
+produces `https://example.test/api/schemas/item.json`, the bundle key. The
+importer will obtain that document from the supplied bundle. The key becomes
+that document's retrieval identity for resolving its own relative references.
+
+`baseUri` supplies the entry document's intended retrieval context. If omitted,
+a document fetched through `document.url` gets its context from its retrieval
+URL. It does not override the standard precedence of OpenAPI 3.2 `$self` or
+JSON Schema `$id`. Those content-defined identities, fragments, and reference
+resolution are importer responsibilities. See the
+[OpenAPI reference-resolution rules](https://spec.openapis.org/oas/v3.2.1.html#relative-references-in-api-description-uris).
+
+The base URI and bundle keys must be literal absolute URIs without fragments,
+user information, whitespace, or template placeholders. Bundle keys cannot be
+relative; `baseUri` provides context for references inside the document, not for
+those keys. URI identities are not fetch instructions: a `urn:` or `file:` identity
+can name offline content without accessing a network or filesystem. Credentials
+from `document.fetchConnectionRef` are never inherited by these identities.
+
+Bundle values remain opaque JSON, including boolean schemas, arrays, nulls,
+and nested provider extensions. Valid JSON alone does not promise a supported
+reference target. The importer will check document versions, target types,
+`$id` and other identity collisions, and complete reference resolution. The
+authoring schema and Go validation perform no I/O or provider-schema validation.
+Unknown configuration fields, null configuration fields, and duplicate bundle
+keys are rejected; a null value inside a bundled document remains opaque data.
+Omitting `references`, supplying `references: {}`, or supplying `bundle: {}`
+adds no bundled documents; these forms do not permit external fetching.
+
+Explicit network reference-fetch settings, security mappings, source-key
+overrides, and unsupported-operation policy remain separate contracts; those
+configuration fields are currently rejected. Actual acquisition, reference
+resolution, immutable snapshots, refresh, server resolution, and operation
+compilation are future work.
 
 ## MCP sources and imported permission mappings
 

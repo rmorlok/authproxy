@@ -197,13 +197,42 @@
       "dependentRequired": { "variables": ["index"] },
       "additionalProperties": false
     },
+    "OpenAPIReferenceURI": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:[^#]*$",
+      "not": {
+        "anyOf": [
+          { "pattern": "[\\s\u0000-\u001F\u007F-\u009F\u00A0\u1680\u2000-\u200A\u2028\u2029\u202F\u205F\u3000]" },
+          { "pattern": "\\{\\{|\\}\\}" },
+          { "pattern": "^[A-Za-z][A-Za-z0-9+.-]*://[^/?#]*@" }
+        ]
+      },
+      "description": "A literal absolute document URI without a fragment, user information, whitespace, controls, or templates. It identifies content rather than authorizing a fetch; URNs and file URIs are permitted. These patterns guide authoring; Go validation additionally parses the URI."
+    },
+    "OpenAPIReferenceConfig": {
+      "type": "object",
+      "properties": {
+        "baseUri": {
+          "$ref": "#/$defs/OpenAPIReferenceURI",
+          "description": "The supplied root reference base context, defaulting to the document's retrieval URI when available. In-content $self and $id semantics are preserved by the importer."
+        },
+        "bundle": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/OpenAPIReferenceURI" },
+          "additionalProperties": true,
+          "description": "Opaque JSON documents indexed by their absolute document identities. Values may be any JSON, including boolean schemas, arrays, scalars, and null. Target compatibility and reference resolution are importer checks; no URI here enables network or filesystem access."
+        }
+      },
+      "additionalProperties": false
+    },
     "OpenAPISource": {
       "type": "object",
       "required": ["document"],
       "properties": {
         "document": { "$ref": "#/$defs/OpenAPIDocument" },
         "operations": { "$ref": "#/$defs/OpenAPIOperationFilter" },
-        "server": { "$ref": "#/$defs/OpenAPIServerConfig" }
+        "server": { "$ref": "#/$defs/OpenAPIServerConfig" },
+        "references": { "$ref": "#/$defs/OpenAPIReferenceConfig" }
       },
       "additionalProperties": false
     },
