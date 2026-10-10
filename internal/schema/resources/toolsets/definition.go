@@ -23,9 +23,11 @@ type ToolSetDefinition struct {
 
 // ToolSetSource selects exactly one source of a generation's tool inventory.
 // MCP declares a connection-specific live catalog, not a generation snapshot
-// of upstream tools. OpenAPI acquisition contracts are introduced separately.
+// of upstream tools. OpenAPI configures acquisition of an immutable generation
+// snapshot; these authoring contracts do not acquire or compile either source.
 type ToolSetSource struct {
 	Explicit *ExplicitSource `json:"explicit,omitempty" yaml:"explicit,omitempty"`
+	OpenAPI  *OpenAPISource  `json:"openapi,omitempty" yaml:"openapi,omitempty"`
 	MCP      *MCPSource      `json:"mcp,omitempty" yaml:"mcp,omitempty"`
 }
 
@@ -65,7 +67,7 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 	var result *multierror.Error
 	result = multierror.Append(result, d.Source.Validate(vc.PushField("source")))
 
-	if d.PermissionMappings != nil && d.Source.MCP == nil {
+	if d.PermissionMappings != nil && d.Source.MCP == nil && d.Source.OpenAPI == nil {
 		result = multierror.Append(result, vc.NewErrorForField("permissionMappings", "are only supported for imported sources; explicit templates declare their own verbs"))
 	}
 
@@ -86,8 +88,13 @@ func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 	}
 
 	var result *multierror.Error
-	if (s.Explicit == nil) == (s.MCP == nil) {
-		result = multierror.Append(result, vc.NewError("must contain exactly one of explicit or mcp"))
+
+	if util.CountTrue([]bool{
+		s.Explicit != nil,
+		s.OpenAPI != nil,
+		s.MCP != nil,
+	}) != 1 {
+		result = multierror.Append(result, vc.NewError("must contain exactly one of explicit, openapi, or mcp"))
 	}
 
 	if s.Explicit != nil {
@@ -96,6 +103,10 @@ func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 
 	if s.MCP != nil {
 		result = multierror.Append(result, s.MCP.Validate(vc.PushField("mcp")))
+	}
+
+	if s.OpenAPI != nil {
+		result = multierror.Append(result, s.OpenAPI.Validate(vc.PushField("openapi")))
 	}
 
 	return result.ErrorOrNil()
@@ -185,6 +196,7 @@ func (d *ToolSetDefinition) Clone() *ToolSetDefinition {
 		return nil
 	}
 	clone := *d
+	clone.Source.OpenAPI = d.Source.OpenAPI.Clone()
 	clone.Source.MCP = d.Source.MCP.Clone()
 	clone.PermissionMappings = slices.Clone(d.PermissionMappings)
 	for i := range clone.PermissionMappings {

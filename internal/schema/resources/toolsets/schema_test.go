@@ -26,7 +26,7 @@ func compileToolSetSchema(t *testing.T, fragment string) *jsonschemav5.Schema {
 	}
 	for _, path := range []string{
 		"../../common/schema.json", "../meta/schema.json", "../namespace/schema.json",
-		"../tools/schema.json", "schema.json",
+		"../tools/schema.json", "../connection/schema.json", "schema.json",
 	} {
 		data, err := os.ReadFile(path)
 		require.NoError(t, err)
@@ -178,7 +178,7 @@ func TestToolSetSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "mappings on explicit source", path: []string{"spec", "definition"}, field: "permissionMappings", value: []any{}},
 		{name: "missing explicit source", path: []string{"spec", "definition", "source"}, field: "explicit", remove: true},
 		{name: "null explicit source", path: []string{"spec", "definition", "source"}, field: "explicit", value: nil},
-		{name: "deferred OpenAPI source", path: []string{"spec", "definition", "source"}, field: "openapi", value: map[string]any{}},
+		{name: "unknown source variant", path: []string{"spec", "definition", "source"}, field: "graphql", value: map[string]any{}},
 		{name: "competing MCP source", path: []string{"spec", "definition", "source"}, field: "mcp", value: map[string]any{"endpoint": "https://example.com/mcp", "transport": "streamableHttp"}},
 		{name: "null MCP beside explicit source", path: []string{"spec", "definition", "source"}, field: "mcp", value: nil},
 		{name: "missing tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", remove: true},
@@ -356,7 +356,7 @@ func TestToolSetPatchSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "partial definition", path: []string{"spec", "definition"}, field: "source", remove: true},
 		{name: "missing replacement tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", remove: true},
 		{name: "null replacement tools", path: []string{"spec", "definition", "source", "explicit"}, field: "tools", value: nil},
-		{name: "unknown source field", path: []string{"spec", "definition", "source"}, field: "openapi", value: map[string]any{}},
+		{name: "unknown source field", path: []string{"spec", "definition", "source"}, field: "graphql", value: map[string]any{}},
 		{name: "unknown spec field", path: []string{"spec"}, field: "source", value: map[string]any{}},
 		{name: "null release", path: []string{"spec"}, field: "release", value: nil},
 		{name: "null desired state", path: []string{"spec", "release"}, field: "desiredState", value: nil},
@@ -471,7 +471,7 @@ func TestToolSetMCPSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "both sources", path: []string{"source"}, field: "explicit", value: map[string]any{"tools": []any{}}},
 		{name: "null competing source", path: []string{"source"}, field: "explicit", value: nil},
 		{name: "null MCP beside explicit", field: "source", value: map[string]any{"explicit": map[string]any{"tools": []any{}}, "mcp": nil}},
-		{name: "deferred OpenAPI", path: []string{"source"}, field: "openapi", value: map[string]any{}},
+		{name: "unknown source variant", path: []string{"source"}, field: "graphql", value: map[string]any{}},
 		{name: "missing endpoint", path: []string{"source", "mcp"}, field: "endpoint", remove: true},
 		{name: "null endpoint", path: []string{"source", "mcp"}, field: "endpoint", value: nil},
 		{name: "blank endpoint", path: []string{"source", "mcp"}, field: "endpoint", value: " \t"},
@@ -588,5 +588,216 @@ func TestPermissionMappingSchema(t *testing.T) {
 			}
 			require.Error(t, compiled.Validate(mapping))
 		})
+	}
+}
+
+// toolSetOpenAPIDefinitionSchemaFixture reuses import permission mappings while
+// keeping the provider's document wholly separate from AuthProxy-owned fields.
+func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any) map[string]any {
+	t.Helper()
+	definition := toolSetMCPDefinitionSchemaFixture(t)
+	definition["source"] = map[string]any{"openapi": map[string]any{
+		"document": document,
+		"operations": map[string]any{
+			"includeOperationIds": []any{"list_records", " exact ID "},
+			"excludeOperationIds": []any{},
+		},
+		"server": map[string]any{"url": "https://{{ cfg.host }}/v1"},
+	}}
+	return definition
+}
+
+// TestToolSetOpenAPISchemaRoundTrip preserves opaque inline documents and both
+// fetch reference forms in full resources, definitions, and replacement patches.
+func TestToolSetOpenAPISchemaRoundTrip(t *testing.T) {
+	for _, envelope := range []struct {
+		name, fragment string
+		newValue       func() any
+	}{
+		{"definition", "#/$defs/ToolSetDefinition", func() any { return &toolsets.ToolSetDefinition{} }},
+		{"resource", "", func() any { return &toolsets.ToolSet{} }},
+		{"patch", "#/$defs/ToolSetPatch", func() any { return &toolsets.ToolSetPatch{} }},
+	} {
+		t.Run(envelope.name, func(t *testing.T) {
+			compiled := compileToolSetSchema(t, envelope.fragment)
+			embedded, err := schema.CompileSchema(toolsets.SchemaIDToolSets + envelope.fragment)
+			require.NoError(t, err)
+			for _, test := range []struct {
+				name     string
+				document map[string]any
+			}{
+				{"opaque inline", map[string]any{"inline": map[string]any{
+					"openapi": "future-version", "unknown_provider_field": []any{nil, true, 7.25},
+					"components": map[string]any{"schemas": map[string]any{"Example": map[string]any{
+						"$schema": "provider-dialect", "$ref": "https://must-not-fetch.invalid/schema.json",
+					}}},
+				}}},
+				{"empty inline", map[string]any{"inline": map[string]any{}}},
+				{"public URL", map[string]any{"url": "HTTP://docs.example.com/schema.json?revision=2"}},
+				{"fetch by ID", map[string]any{"url": "https://docs.example.com/schema.json", "fetchConnectionRef": map[string]any{
+					"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "id": "cxn_0123456789abcdef",
+				}}},
+				{"fetch by namespaced name", map[string]any{"url": "https://docs.example.com/schema.json", "fetchConnectionRef": map[string]any{
+					"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "namespace": "root.docs", "name": "document-reader",
+				}}},
+			} {
+				t.Run(test.name, func(t *testing.T) {
+					definition := toolSetOpenAPIDefinitionSchemaFixture(t, test.document)
+					if test.name == "empty inline" {
+						definition["permissionMappings"] = []any{}
+					}
+					document := definition
+					if envelope.name != "definition" {
+						document = toolSetSchemaFixture(t)
+						schemaObject(t, document, "spec")["definition"] = definition
+						if envelope.name == "patch" {
+							delete(document, "status")
+						}
+					}
+					require.NoError(t, compiled.Validate(document))
+					require.NoError(t, embedded.Validate(document))
+					encoded, err := json.Marshal(document)
+					require.NoError(t, err)
+					value := envelope.newValue()
+					require.NoError(t, util.DecodeJSONStrict(encoded, value))
+					roundTrip, err := json.Marshal(value)
+					require.NoError(t, err)
+					require.JSONEq(t, string(encoded), string(roundTrip))
+					asYAML, err := yaml.Marshal(value)
+					require.NoError(t, err)
+					fromYAML := envelope.newValue()
+					require.NoError(t, util.DecodeYAMLStrict(asYAML, fromYAML))
+					roundTrip, err = json.Marshal(fromYAML)
+					require.NoError(t, err)
+					require.JSONEq(t, string(encoded), string(roundTrip))
+				})
+			}
+		})
+	}
+}
+
+// TestOpenAPISourceSchemaRejectsInvalidFields keeps AuthProxy-owned source
+// fields strict while leaving document contents and import compilation separate.
+func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPISource")
+	patchSchema := compileToolSetSchema(t, "#/$defs/ToolSetPatch")
+	for _, test := range []struct {
+		name, field string
+		path        []string
+		value       any
+		remove      bool
+	}{
+		{name: "missing document", field: "document", remove: true},
+		{name: "null document", field: "document", value: nil},
+		{name: "empty document choice", field: "document", value: map[string]any{}},
+		{name: "competing document choices", path: []string{"document"}, field: "inline", value: map[string]any{}},
+		{name: "null competing document", path: []string{"document"}, field: "inline", value: nil},
+		{name: "null URL", path: []string{"document"}, field: "url", value: nil},
+		{name: "relative document URL", path: []string{"document"}, field: "url", value: "schema.json"},
+		{name: "file document URL", path: []string{"document"}, field: "url", value: "file:///tmp/schema.json"},
+		{name: "missing URL authority", path: []string{"document"}, field: "url", value: "https:///schema.json"},
+		{name: "URL port without host", path: []string{"document"}, field: "url", value: "https://:8080/schema.json"},
+		{name: "URL control character", path: []string{"document"}, field: "url", value: "https://example.com/schema\tv1.json"},
+		{name: "URL credentials", path: []string{"document"}, field: "url", value: "https://reader:secret@example.com/schema.json"},
+		{name: "URL fragment", path: []string{"document"}, field: "url", value: "https://example.com/schema.json#"},
+		{name: "URL template", path: []string{"document"}, field: "url", value: "https://{{cfg.host}}/schema.json"},
+		{name: "URL padding", path: []string{"document"}, field: "url", value: "https://example.com/schema.json "},
+		{name: "unsupported base URI", path: []string{"document"}, field: "baseURI", value: "https://example.com/"},
+		{name: "null fetch reference", path: []string{"document"}, field: "fetchConnectionRef", value: nil},
+		{name: "missing reference kind", path: []string{"document", "fetchConnectionRef"}, field: "kind", remove: true},
+		{name: "wrong reference kind", path: []string{"document", "fetchConnectionRef"}, field: "kind", value: "Connector"},
+		{name: "wrong reference ID", path: []string{"document", "fetchConnectionRef"}, field: "id", value: "cxr_0123456789abcdef"},
+		{name: "null reference ID", path: []string{"document", "fetchConnectionRef"}, field: "id", value: nil},
+		{name: "reference without identity", path: []string{"document", "fetchConnectionRef"}, field: "id", remove: true},
+		{name: "invalid reference namespace", path: []string{"document", "fetchConnectionRef"}, field: "namespace", value: "root.docs.**"},
+		{name: "null reference namespace", path: []string{"document", "fetchConnectionRef"}, field: "namespace", value: nil},
+		{name: "reference generation", path: []string{"document", "fetchConnectionRef"}, field: "generation", value: 1},
+		{name: "reference zero generation", path: []string{"document", "fetchConnectionRef"}, field: "generation", value: 0},
+		{name: "reference null generation", path: []string{"document", "fetchConnectionRef"}, field: "generation", value: nil},
+		{name: "unknown reference field", path: []string{"document", "fetchConnectionRef"}, field: "token", value: "secret"},
+		{name: "null operation filter", field: "operations", value: nil},
+		{name: "empty inclusion", path: []string{"operations"}, field: "includeOperationIds", value: []any{}},
+		{name: "null inclusion", path: []string{"operations"}, field: "includeOperationIds", value: nil},
+		{name: "null operation ID", path: []string{"operations"}, field: "includeOperationIds", value: []any{nil}},
+		{name: "blank operation ID", path: []string{"operations"}, field: "includeOperationIds", value: []any{" \t"}},
+		{name: "duplicate operation ID", path: []string{"operations"}, field: "includeOperationIds", value: []any{"read", "read"}},
+		{name: "null exclusion", path: []string{"operations"}, field: "excludeOperationIds", value: nil},
+		{name: "null excluded ID", path: []string{"operations"}, field: "excludeOperationIds", value: []any{nil}},
+		{name: "duplicate excluded ID", path: []string{"operations"}, field: "excludeOperationIds", value: []any{"read", "read"}},
+		{name: "unknown filter field", path: []string{"operations"}, field: "tags", value: []any{"records"}},
+		{name: "null server", field: "server", value: nil},
+		{name: "missing server URL", path: []string{"server"}, field: "url", remove: true},
+		{name: "null server URL", path: []string{"server"}, field: "url", value: nil},
+		{name: "padded server URL", path: []string{"server"}, field: "url", value: " https://example.com/"},
+		{name: "multiline server URL", path: []string{"server"}, field: "url", value: "https://example.com/\nv1"},
+		{name: "unknown server field", path: []string{"server"}, field: "variables", value: map[string]any{}},
+		{name: "unsupported security", field: "security", value: map[string]any{}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			definition := toolSetOpenAPIDefinitionSchemaFixture(t, map[string]any{
+				"url": "https://example.com/schema.json", "fetchConnectionRef": map[string]any{
+					"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "id": "cxn_0123456789abcdef",
+				},
+			})
+			source := schemaObject(t, definition, "source", "openapi")
+			object := schemaObject(t, source, test.path...)
+			if test.remove {
+				delete(object, test.field)
+			} else {
+				object[test.field] = test.value
+			}
+			require.Error(t, compiled.Validate(source))
+			patch := toolSetPatchSchemaFixture(t)
+			schemaObject(t, patch, "spec")["definition"] = definition
+			require.Error(t, patchSchema.Validate(patch))
+		})
+	}
+}
+
+// TestOpenAPIDocumentSchemaInlineBoundary accepts any object while rejecting
+// text and scalar encodings, ambiguous document choices, and unusable fetch refs.
+func TestOpenAPIDocumentSchemaInlineBoundary(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPIDocument")
+	for _, value := range []any{nil, true, 3, "openapi: 3.1.0", []any{}} {
+		require.Error(t, compiled.Validate(map[string]any{"inline": value}))
+	}
+	for _, extra := range []map[string]any{
+		{"url": nil},
+		{"url": "https://example.com/schema.json"},
+		{"fetchConnectionRef": map[string]any{"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "id": "cxn_0123456789abcdef"}},
+	} {
+		extra["inline"] = map[string]any{}
+		require.Error(t, compiled.Validate(extra))
+	}
+	sourceSchema := compileToolSetSchema(t, "#/$defs/OpenAPISource")
+	for _, operations := range []map[string]any{
+		{}, {"excludeOperationIds": []any{}},
+		{"includeOperationIds": []any{" exact ID "}, "excludeOperationIds": []any{" exact ID "}},
+	} {
+		require.NoError(t, sourceSchema.Validate(map[string]any{
+			"document": map[string]any{"inline": map[string]any{}}, "operations": operations,
+		}))
+	}
+	require.NoError(t, sourceSchema.Validate(map[string]any{"document": map[string]any{"inline": map[string]any{}}}),
+		"operation filters and server overrides are optional")
+}
+
+// TestToolSetSourceSchemaExactlyOneVariant rejects competing sources even when
+// the extra field is explicitly null, independently of permission mapping rules.
+func TestToolSetSourceSchemaExactlyOneVariant(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/ToolSetSource")
+	variants := map[string]any{
+		"explicit": map[string]any{"tools": []any{}},
+		"mcp":      map[string]any{"endpoint": "https://example.com/mcp", "transport": "streamableHttp"},
+		"openapi":  map[string]any{"document": map[string]any{"inline": map[string]any{}}},
+	}
+	for name, value := range variants {
+		require.NoError(t, compiled.Validate(map[string]any{name: value}), name)
+		for other, otherValue := range variants {
+			if name != other {
+				require.Error(t, compiled.Validate(map[string]any{name: value, other: otherValue}), "%s with %s", name, other)
+				require.Error(t, compiled.Validate(map[string]any{name: value, other: nil}), "%s with null %s", name, other)
+			}
+		}
 	}
 }

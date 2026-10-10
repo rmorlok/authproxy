@@ -1,15 +1,14 @@
 # ToolSet resource contracts
 
 This package owns the `ToolSet` resource envelope, generation release fields,
-connection selectors, explicit templates, MCP source settings, imported permission
-mappings, patches, and generation selection policy. It is a contract foundation:
-management routes, registry/apply
-integration, publication transactions, persistence, and reconciliation are
-implemented in later slices.
-OpenAPI source contracts, imported defaults, and source diagnostics are also
-deferred. Strict input decoding and the JSON schema reject those fields until
-their contracts are implemented. MCP source validation does not connect to a
-provider, negotiate a protocol, or discover or execute tools.
+connection selectors, explicit templates, OpenAPI and MCP source settings,
+imported permission mappings, patches, and generation selection policy. It is
+a contract foundation: management routes, registry/apply integration, publication
+transactions, persistence, and reconciliation are implemented in later slices.
+Advanced OpenAPI import settings, imported defaults, and source diagnostics are
+also deferred. Strict input decoding and the JSON schema reject those fields
+until their contracts are implemented. Source validation does not fetch documents,
+resolve references, negotiate protocols, or discover or execute tools.
 
 `metadata` identifies the logical `tls_` resource and its addressed generation.
 `spec.connectionSelector` is shared across generations. `spec.release` and
@@ -99,9 +98,100 @@ Each template explicitly declares its verbs and HTTP or JavaScript executor.
 Definition validation checks native schemas and authored shape; publication will
 compile code/templates before installing an inventory.
 
+## OpenAPI sources
+
+Exactly one of `spec.definition.source.explicit`, `source.openapi`, or `source.mcp`
+is required. An OpenAPI source describes the document to snapshot for a generation:
+
+```yaml
+source:
+  openapi:
+    document:
+      url: https://api.example.com/openapi.json
+      fetchConnectionRef:
+        apiVersion: authproxy.net/v1alpha1
+        kind: Connection
+        namespace: root.documents
+        name: spec-reader
+    operations:
+      includeOperationIds: [listCalendars, createEvent]
+    server:
+      url: "https://{{cfg.apiHost}}"
+permissionMappings:
+  - match:
+      sourceKeys: [listCalendars]
+    addVerbs: ["tool:calendar.list"]
+```
+
+For an inline document, place the OpenAPI object directly under `document.inline`:
+
+```yaml
+source:
+  openapi:
+    document:
+      inline:
+        openapi: "3.1.0"
+        info:
+          title: Calendar API
+          version: "1.0.0"
+        paths:
+          /calendars:
+            get:
+              operationId: listCalendars
+              responses:
+                "200":
+                  description: The available calendars.
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, name]
+                          properties:
+                            id: {type: string}
+                            name: {type: string}
+    server:
+      url: "https://{{cfg.apiHost}}"
+permissionMappings:
+  - match:
+      sourceKeys: [listCalendars]
+    addVerbs: ["tool:calendar.list"]
+```
+
+`document` requires exactly one of `inline` and `url`. Inline content is a JSON
+object, also authorable as a YAML mapping. It remains opaque provider data:
+extensions, examples, security requirements, and `$ref` fields are retained.
+This layer checks object shape without validating an OpenAPI version, compiling
+provider schemas, or resolving references. Raw text strings are not accepted
+as inline documents.
+
+The acquisition URL is a literal absolute HTTP(S) URL, optionally including a
+query, with no user information, fragment, or template placeholders. Go validation
+parses the URL. `fetchConnectionRef` is allowed only with a URL and identifies a
+Connection by ID or namespaced name without a generation. This connection may
+be in a different namespace from the ToolSet and its installation connections.
+The acquisition service must check administrative authority before using it and
+keep its credentials out of snapshots and unrelated reference requests.
+
+`operations.includeOperationIds` and `excludeOperationIds` select exact document
+`operationId` values. Omitted inclusion is unrestricted; supplied inclusion must
+be nonempty. Exclusions take precedence, and an empty exclusion list is valid.
+Blank/duplicate IDs and null fields or elements are rejected. These filters do
+not treat method/path fallback source keys as operation IDs. The importer will
+check document identity, unsupported features, and actual operation membership.
+
+An optional `server.url` deliberately overrides the document-selected server
+base URL and may use connection `cfg` templates. Omission preserves the importer's
+operation/path/global server precedence and relative-URL rules. Rendered URL
+validation and template compilation happen later. Server selection and variable
+bindings, security mappings, source-key overrides, unsupported-operation policy,
+reference bundles/base URIs, and external-reference fetch settings remain separate
+contracts; those configuration fields are currently rejected. Actual acquisition,
+immutable snapshots, refresh, and operation compilation are also future work.
+
 ## MCP sources and imported permission mappings
 
-Exactly one of `spec.definition.source.explicit` and `source.mcp` is required.
 MCP settings belong to a published generation; the live catalog will be
 discovered separately through each bound connection. The endpoint template can
 read that connection's `cfg`, and `transport` must be `streamableHttp`.
@@ -134,8 +224,8 @@ Exclusions take precedence over inclusions. An empty exclusion list is allowed.
 Null fields/lists/elements, blank names, and duplicate names within a list are
 rejected. `tools: {}` imposes no name restrictions.
 
-`permissionMappings` is optional and currently permitted only with MCP sources;
-explicit templates declare their own verbs. Each rule requires a `match` with
+`permissionMappings` is optional for OpenAPI and MCP sources; explicit templates
+declare their own verbs. Each rule requires a `match` with
 at least one `sourceKeys` or `sourceKeyPatterns` entry and a nonempty `addVerbs`
 list. Keys remain exact, unnormalized identities. Patterns use Go regular
 expressions with full-string semantics (`\A(?:pattern)\z`), including across

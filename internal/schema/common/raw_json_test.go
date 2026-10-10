@@ -90,3 +90,29 @@ func TestRawJSONMarshalYAMLOrdersObjects(t *testing.T) {
 	require.Equal(t, string(first), string(second))
 	require.Equal(t, "a:\n    a: 3\n    z: 2\nz: 1\n", string(first))
 }
+
+// TestRawJSONUnmarshalYAMLStringifiesScalarKeys accepts unquoted numeric keys,
+// such as OpenAPI response codes, which yaml.v3 decodes as non-string keys.
+func TestRawJSONUnmarshalYAMLStringifiesScalarKeys(t *testing.T) {
+	var decoded RawJSON
+	require.NoError(t, yaml.Unmarshal([]byte("responses:\n  200:\n    description: ok\n  true: yes\n"), &decoded))
+	require.JSONEq(t, `{"responses":{"200":{"description":"ok"},"true":"yes"}}`, string(decoded))
+}
+
+// TestRawJSONUnmarshalYAMLPreservesNumberText keeps JSON-compatible numbers as
+// authored instead of rounding through float64 or dropping trailing zeros.
+func TestRawJSONUnmarshalYAMLPreservesNumberText(t *testing.T) {
+	var decoded RawJSON
+	require.NoError(t, yaml.Unmarshal([]byte("big: 12345678901234567890123\nversion: 1.0\nneg: -9007199254740993\nhex: 0x1F\n"), &decoded))
+	require.Equal(t, `{"big":12345678901234567890123,"hex":31,"neg":-9007199254740993,"version":1.0}`, string(decoded))
+}
+
+// TestRawJSONUnmarshalYAMLMergeKeys applies merges with explicit keys winning
+// and still rejects keys that collide once converted to JSON object keys.
+func TestRawJSONUnmarshalYAMLMergeKeys(t *testing.T) {
+	var decoded RawJSON
+	require.NoError(t, yaml.Unmarshal([]byte("base: &base {a: 1, b: 2}\nother: &other {b: 3, c: 4}\nvalue:\n  <<: [*base, *other]\n  a: 5\n"), &decoded))
+	require.JSONEq(t, `{"base":{"a":1,"b":2},"other":{"b":3,"c":4},"value":{"a":5,"b":2,"c":4}}`, string(decoded))
+
+	require.ErrorContains(t, yaml.Unmarshal([]byte("1: a\n\"1\": b\n"), &decoded), "already defined")
+}
