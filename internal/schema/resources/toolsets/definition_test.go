@@ -153,7 +153,7 @@ func importedDefinitionForTest() *ToolSetDefinition {
 			RefreshInterval: util.ToPtr("1.5s"),
 			Tools:           &MCPToolFilter{IncludeNames: []string{"list_calendars", "admin_reset"}, ExcludeNames: []string{"admin_reset"}},
 		}},
-		PermissionMappings: []PermissionMapping{{
+		PermissionMappings: &[]PermissionMapping{{
 			Match:    SourceKeyMatch{SourceKeys: []string{"list_calendars"}, SourceKeyPatterns: []string{"calendar_.*"}},
 			AddVerbs: []string{"tool:calendar.list", "tool:readonly"},
 		}},
@@ -169,7 +169,7 @@ func TestImportedDefinitionBoundary(t *testing.T) {
 	require.ErrorContains(t, definition.Validate(nil), "exactly one")
 	definition.Source.MCP = nil
 	require.ErrorContains(t, definition.Validate(nil), "permissionMappings")
-	definition.PermissionMappings = []PermissionMapping{}
+	definition.PermissionMappings = &[]PermissionMapping{}
 	require.ErrorContains(t, definition.Validate(nil), "permissionMappings", "even an empty imported policy is invalid on an explicit source")
 	encoded, err := json.Marshal(definition)
 	require.NoError(t, err)
@@ -181,7 +181,7 @@ func TestImportedDefinitionBoundary(t *testing.T) {
 	require.NoError(t, definition.Validate(nil))
 
 	definition = importedDefinitionForTest()
-	definition.PermissionMappings[0].Match = SourceKeyMatch{}
+	(*definition.PermissionMappings)[0].Match = SourceKeyMatch{}
 	require.ErrorContains(t, definition.Validate(&common.ValidationContext{Path: "definition"}), "definition.permissionMappings[0].match")
 
 	for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
@@ -215,6 +215,104 @@ func TestImportedDefinitionBoundary(t *testing.T) {
 	require.Equal(t, original, &decoded, "failed definition decoding is atomic")
 }
 
+// TestDefinitionYAMLRetainsMissingInventory prevents native YAML encoding of a
+// nil slice as [] from turning an invalid inventory into a valid empty one.
+func TestDefinitionYAMLRetainsMissingInventory(t *testing.T) {
+	definition := explicitDefinitionForTest()
+	definition.Source.Explicit.Tools = nil
+	encoded, err := yaml.Marshal(definition)
+	require.NoError(t, err)
+	require.Contains(t, string(encoded), "tools: null")
+	var decoded ToolSetDefinition
+	require.NoError(t, util.DecodeYAMLStrict(encoded, &decoded))
+	require.Nil(t, decoded.Source.Explicit.Tools)
+	require.ErrorContains(t, decoded.Validate(nil), "source.explicit.tools")
+}
+
+// TestPermissionMappingsPresence keeps omission distinct from an explicit empty
+// list in both encodings, including when decoding replaces an existing policy.
+func TestPermissionMappingsPresence(t *testing.T) {
+	for _, format := range []struct {
+		name   string
+		encode func(any) ([]byte, error)
+		decode func([]byte, any) error
+	}{
+		{"JSON", json.Marshal, util.DecodeJSONStrict},
+		{"YAML", yaml.Marshal, util.DecodeYAMLStrict},
+	} {
+		t.Run(format.name, func(t *testing.T) {
+			for _, policy := range []struct {
+				name     string
+				mappings *[]PermissionMapping
+			}{
+				{"omitted", nil},
+				{"empty", &[]PermissionMapping{}},
+				{"populated", importedDefinitionForTest().PermissionMappings},
+			} {
+				t.Run(policy.name, func(t *testing.T) {
+					original := importedDefinitionForTest()
+					original.PermissionMappings = policy.mappings
+					encoded, err := format.encode(original)
+					require.NoError(t, err)
+
+					// Inspect the wire object separately: value equality alone can
+					// miss an empty list accidentally omitted during serialization.
+					var fields map[string]any
+					require.NoError(t, format.decode(encoded, &fields))
+					value, present := fields["permissionMappings"]
+					require.Equal(t, policy.mappings != nil, present)
+					if present {
+						require.IsType(t, []any{}, value)
+						require.Len(t, value, len(*policy.mappings))
+					}
+
+					decoded := importedDefinitionForTest()
+					require.NoError(t, format.decode(encoded, decoded))
+					require.NoError(t, decoded.Validate(nil))
+					require.Equal(t, original, decoded)
+				})
+			}
+		})
+	}
+}
+
+// TestPermissionMappingsDecodeErrorsAreAtomic protects an existing policy from
+// malformed replacements, including invalid elements and noncanonical names.
+func TestPermissionMappingsDecodeErrorsAreAtomic(t *testing.T) {
+	for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
+		for _, input := range []string{
+			`{"permissionMappings":null}`,
+			`{"permissionMappings":{}}`,
+			`{"permissionMappings":[null]}`,
+			`{"permissionMappings":[{"match":null,"addVerbs":["tool:read"]}]}`,
+			`{"permissionMappings":[{"match":{"sourceKeys":[null]},"addVerbs":["tool:read"]}]}`,
+			`{"permissionMappings":[{"match":{"sourceKeys":["list"]},"addVerbs":[null]}]}`,
+			`{"permissionMappings":[{"unknown":true}]}`,
+			`{"PermissionMappings":[]}`,
+			`{"permissionMappings":[],"unknown":true}`,
+		} {
+			original := importedDefinitionForTest()
+			decoded := original.Clone()
+			require.Error(t, decode([]byte(input), decoded), input)
+			require.Equal(t, original, decoded, input)
+		}
+	}
+}
+
+// TestPermissionMappingsNilSliceIsInvalid rejects the additional in-memory
+// null state introduced by a pointer while retaining it for clone diagnostics.
+func TestPermissionMappingsNilSliceIsInvalid(t *testing.T) {
+	definition := importedDefinitionForTest()
+	definition.PermissionMappings = util.ToPtr([]PermissionMapping(nil))
+	require.ErrorContains(t, definition.Validate(&common.ValidationContext{Path: "definition"}), "definition.permissionMappings: must be an array, not null")
+	clone := definition.Clone()
+	require.Equal(t, definition, clone)
+	require.NotSame(t, definition.PermissionMappings, clone.PermissionMappings)
+	*clone.PermissionMappings = []PermissionMapping{}
+	require.Nil(t, *definition.PermissionMappings)
+	require.NoError(t, clone.Validate(nil))
+}
+
 // TestImportedDefinitionRoundTrip checks complete resources and definition
 // replacements, including empty imported policy and excluded-name lists.
 func TestImportedDefinitionRoundTrip(t *testing.T) {
@@ -222,7 +320,7 @@ func TestImportedDefinitionRoundTrip(t *testing.T) {
 		resource := authoredToolSetForResourceTest()
 		resource.Spec.Definition = *importedDefinitionForTest()
 		if emptyPolicies {
-			resource.Spec.Definition.PermissionMappings = []PermissionMapping{}
+			resource.Spec.Definition.PermissionMappings = &[]PermissionMapping{}
 			resource.Spec.Definition.Source.MCP.Tools.ExcludeNames = []string{}
 		}
 		for _, format := range []struct {
@@ -264,15 +362,15 @@ func TestImportedDefinitionCandidateOwnership(t *testing.T) {
 	*definition.Source.MCP.RefreshInterval = "1h"
 	definition.Source.MCP.Tools.IncludeNames[0] = "other"
 	definition.Source.MCP.Tools.ExcludeNames[0] = "other"
-	definition.PermissionMappings[0].Match.SourceKeys[0] = "other"
-	definition.PermissionMappings[0].Match.SourceKeyPatterns[0] = "other.*"
-	definition.PermissionMappings[0].AddVerbs[0] = "tool:other"
+	(*definition.PermissionMappings)[0].Match.SourceKeys[0] = "other"
+	(*definition.PermissionMappings)[0].Match.SourceKeyPatterns[0] = "other.*"
+	(*definition.PermissionMappings)[0].AddVerbs[0] = "tool:other"
 	require.Equal(t, beforeCurrent, current)
 	require.Equal(t, beforePatch, patch)
 
 	// Invalid/empty shapes remain inspectable when cloned instead of being
 	// normalized through serialization or treated as default policy.
-	for _, mappings := range [][]PermissionMapping{nil, {}, {{}}} {
+	for _, mappings := range []*[]PermissionMapping{nil, util.ToPtr([]PermissionMapping(nil)), &[]PermissionMapping{}, &[]PermissionMapping{{}}} {
 		definition := &ToolSetDefinition{PermissionMappings: mappings}
 		require.Equal(t, definition, definition.Clone())
 	}
@@ -306,7 +404,7 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 				Server: &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}"},
 			},
 		},
-		PermissionMappings: []PermissionMapping{
+		PermissionMappings: &[]PermissionMapping{
 			{
 				Match: SourceKeyMatch{
 					SourceKeys: []string{"listCalendars"},
@@ -419,7 +517,7 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 		clone.Source.OpenAPI.Operations.IncludeOperationIDs[0] = "other"
 		clone.Source.OpenAPI.Operations.ExcludeOperationIDs = append(clone.Source.OpenAPI.Operations.ExcludeOperationIDs, "other")
 		clone.Source.OpenAPI.Server.URL = "https://other.example"
-		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
+		(*clone.PermissionMappings)[0].AddVerbs[0] = "tool:other"
 
 		require.Equal(t, before, original)
 	}

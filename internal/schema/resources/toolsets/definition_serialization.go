@@ -10,19 +10,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// MarshalJSON preserves a supplied empty mapping list. Omitting that list would
-// hide an invalid explicit-source policy before lifecycle validation can run.
-func (d ToolSetDefinition) MarshalJSON() ([]byte, error) {
-	var mappings *[]PermissionMapping
-	if d.PermissionMappings != nil {
-		mappings = &d.PermissionMappings
-	}
-	return json.Marshal(struct {
-		Source             ToolSetSource        `json:"source"`
-		PermissionMappings *[]PermissionMapping `json:"permissionMappings,omitempty"`
-	}{d.Source, mappings})
-}
-
 // UnmarshalJSON accepts canonical definition fields and rejects null policy
 // values before slice decoding can erase their presence. Assignment is atomic.
 func (d *ToolSetDefinition) UnmarshalJSON(data []byte) error {
@@ -55,9 +42,10 @@ func (d *ToolSetDefinition) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalYAML follows JSON presence rules and preserves native schema numbers.
+// MarshalYAML follows JSON's null handling for required nested slices. Native
+// YAML encoding would turn an invalid nil explicit inventory into valid [].
 func (d ToolSetDefinition) MarshalYAML() (any, error) {
-	raw, err := d.MarshalJSON()
+	raw, err := json.Marshal(d)
 	if err != nil {
 		return nil, err
 	}

@@ -17,8 +17,10 @@ import (
 // Imported permission mappings are administrator-authored additions to each
 // generated Tool's canonical verb; explicit templates declare their own verbs.
 type ToolSetDefinition struct {
-	Source             ToolSetSource       `json:"source" yaml:"source"`
-	PermissionMappings []PermissionMapping `json:"permissionMappings,omitempty" yaml:"permissionMappings,omitempty"`
+	Source ToolSetSource `json:"source" yaml:"source"`
+	// PermissionMappings is nil when omitted. A supplied list must be non-nil;
+	// an empty list remains explicit so source-policy validation can reject it.
+	PermissionMappings *[]PermissionMapping `json:"permissionMappings,omitempty" yaml:"permissionMappings,omitempty"`
 }
 
 // ToolSetSource selects exactly one source of a generation's tool inventory.
@@ -67,12 +69,16 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 	var result *multierror.Error
 	result = multierror.Append(result, d.Source.Validate(vc.PushField("source")))
 
-	if d.PermissionMappings != nil && d.Source.MCP == nil && d.Source.OpenAPI == nil {
-		result = multierror.Append(result, vc.NewErrorForField("permissionMappings", "are only supported for imported sources; explicit templates declare their own verbs"))
-	}
-
-	for i := range d.PermissionMappings {
-		result = multierror.Append(result, d.PermissionMappings[i].Validate(vc.PushField("permissionMappings").PushIndex(i)))
+	if d.PermissionMappings != nil {
+		if *d.PermissionMappings == nil {
+			result = multierror.Append(result, vc.NewErrorForField("permissionMappings", "must be an array, not null"))
+		}
+		if d.Source.MCP == nil && d.Source.OpenAPI == nil {
+			result = multierror.Append(result, vc.NewErrorForField("permissionMappings", "are only supported for imported sources; explicit templates declare their own verbs"))
+		}
+		for i := range *d.PermissionMappings {
+			result = multierror.Append(result, (*d.PermissionMappings)[i].Validate(vc.PushField("permissionMappings").PushIndex(i)))
+		}
 	}
 
 	return result.ErrorOrNil()
@@ -198,9 +204,12 @@ func (d *ToolSetDefinition) Clone() *ToolSetDefinition {
 	clone := *d
 	clone.Source.OpenAPI = d.Source.OpenAPI.Clone()
 	clone.Source.MCP = d.Source.MCP.Clone()
-	clone.PermissionMappings = slices.Clone(d.PermissionMappings)
-	for i := range clone.PermissionMappings {
-		clone.PermissionMappings[i] = *d.PermissionMappings[i].Clone()
+	if d.PermissionMappings != nil {
+		mappings := slices.Clone(*d.PermissionMappings)
+		for i := range mappings {
+			mappings[i] = *mappings[i].Clone()
+		}
+		clone.PermissionMappings = &mappings
 	}
 
 	if d.Source.Explicit != nil {
