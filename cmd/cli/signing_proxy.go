@@ -13,6 +13,7 @@ import (
 
 	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/spf13/cobra"
 )
@@ -79,10 +80,10 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
+// writeJsonErrorResponse writes the shared error envelope with the supplied
+// status and message. An absent stack trace remains omitted from the response.
 func writeJsonErrorResponse(w http.ResponseWriter, statusCode int, message string) {
-	errorResponse := struct {
-		Error string `json:"error"`
-	}{
+	errorResponse := httperr.ErrorResponse{
 		Error: message,
 	}
 
