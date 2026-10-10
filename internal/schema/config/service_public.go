@@ -43,6 +43,8 @@ type ServicePublic struct {
 	CookieVal                *CookieConfig                     `json:"cookie,omitempty" yaml:"cookie,omitempty"`
 }
 
+// UnmarshalYAML strictly decodes HTTP and service-specific configuration into
+// a fresh value, replacing the receiver only after every field succeeds.
 func (s *ServicePublic) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
@@ -65,26 +67,17 @@ func (s *ServicePublic) UnmarshalYAML(value *yaml.Node) error {
 		return err
 	}
 
-	type rawServicePublic struct {
-		SessionTimeoutVal        *HumanDuration                    `yaml:"sessionTimeout"`
-		XsrfRequestQueueDepthVal *int                              `yaml:"xsrfRequestQueueDepth"`
-		EnableMarketplaceApisVal *bool                             `yaml:"enableMarketplaceApis,omitempty"`
-		EnableProxyVal           *bool                             `yaml:"enableProxy,omitempty"`
-		StaticVal                *ServicePublicStaticContentConfig `yaml:"static,omitempty"`
-		CookieVal                *CookieConfig                     `yaml:"cookie,omitempty"`
-	}
-	raw := &rawServicePublic{}
-	if err := util.DecodeYAMLNodeStrict(yamlMappingWithFields(value, publicFields...), raw); err != nil {
+	// plain retains the canonical fields and tags without recursively invoking
+	// UnmarshalYAML. Only this service's fields reach this decoder; HTTP and
+	// polymorphic TLS configuration have already been decoded separately.
+	type plain ServicePublic
+	var decoded plain
+	if err := util.DecodeYAMLNodeStrict(yamlMappingWithFields(value, publicFields...), &decoded); err != nil {
 		return err
 	}
 
-	s.ServiceHttp = hs
-	s.SessionTimeoutVal = raw.SessionTimeoutVal
-	s.XsrfRequestQueueDepthVal = raw.XsrfRequestQueueDepthVal
-	s.EnableMarketplaceApisVal = raw.EnableMarketplaceApisVal
-	s.EnableProxyVal = raw.EnableProxyVal
-	s.StaticVal = raw.StaticVal
-	s.CookieVal = raw.CookieVal
+	decoded.ServiceHttp = hs
+	*s = ServicePublic(decoded)
 
 	return nil
 }
