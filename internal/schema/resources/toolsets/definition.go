@@ -88,13 +88,12 @@ func (s *ToolSetSource) Validate(vc *common.ValidationContext) error {
 	}
 
 	var result *multierror.Error
-	sources := 0
-	for _, present := range []bool{s.Explicit != nil, s.OpenAPI != nil, s.MCP != nil} {
-		if present {
-			sources++
-		}
-	}
-	if sources != 1 {
+
+	if util.CountTrue([]bool{
+		s.Explicit != nil,
+		s.OpenAPI != nil,
+		s.MCP != nil,
+	}) != 1 {
 		result = multierror.Append(result, vc.NewError("must contain exactly one of explicit, openapi, or mcp"))
 	}
 
