@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -124,14 +125,9 @@ func (d *OpenAPIDocument) Clone() *OpenAPIDocument {
 // Fields inside inline remain arbitrary document data. Assignment is atomic so
 // an invalid replacement cannot partially change an existing acquisition source.
 func (d *OpenAPIDocument) UnmarshalJSON(data []byte) error {
-	var fields map[string]json.RawMessage
-
-	if err := util.DecodeJSONStrict(data, &fields); err != nil {
+	fields, err := decodeStrictObject(data, "OpenAPI document", "inline", "url", "fetchConnectionRef")
+	if err != nil {
 		return err
-	}
-
-	if fields == nil {
-		return fmt.Errorf("OpenAPI document must be an object")
 	}
 
 	var decoded OpenAPIDocument
@@ -145,15 +141,7 @@ func (d *OpenAPIDocument) UnmarshalJSON(data []byte) error {
 			destination = &decoded.URL
 		case "fetchConnectionRef":
 			destination = &decoded.FetchConnectionRef
-		default:
-			return fmt.Errorf("unknown OpenAPI document field %q", field)
-		}
 
-		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-			return fmt.Errorf("%s must not be null", field)
-		}
-
-		if field == "fetchConnectionRef" {
 			if err := validateOpenAPIFetchReferenceFields(raw); err != nil {
 				return err
 			}
@@ -179,6 +167,10 @@ func (d *OpenAPIDocument) UnmarshalYAML(node *yaml.Node) error {
 	return d.UnmarshalJSON(raw)
 }
 
+// openAPIFetchReferenceFields are the canonical meta.ObjectReference keys,
+// derived from its JSON tags so new reference fields are accepted here too.
+var openAPIFetchReferenceFields = jsonFieldNames(reflect.TypeOf(meta.ObjectReference{}))
+
 // validateOpenAPIFetchReferenceFields checks raw reference field presence before
 // typed decoding. Connections have no generation, including explicit zero/null;
 // other fields must use their canonical spelling and cannot be explicitly null.
@@ -189,18 +181,12 @@ func validateOpenAPIFetchReferenceFields(data []byte) error {
 		return err
 	}
 
-	for field, raw := range fields {
-		switch field {
-		case "apiVersion", "kind", "id", "name", "namespace":
-		case "generation":
-			return fmt.Errorf("fetchConnectionRef.generation does not apply to connections")
-		default:
-			return fmt.Errorf("unknown fetchConnectionRef field %q", field)
-		}
+	if _, ok := fields["generation"]; ok {
+		return fmt.Errorf("fetchConnectionRef.generation does not apply to connections")
+	}
 
-		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-			return fmt.Errorf("fetchConnectionRef.%s must not be null", field)
-		}
+	if _, err := decodeStrictObject(data, "fetchConnectionRef", openAPIFetchReferenceFields...); err != nil {
+		return fmt.Errorf("fetchConnectionRef: %w", err)
 	}
 
 	return nil

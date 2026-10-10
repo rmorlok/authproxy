@@ -259,3 +259,31 @@ func TestOpenAPIDocumentCloneAndDecodeOwnership(t *testing.T) {
 	require.Nil(t, document.FetchConnectionRef)
 	require.NoError(t, document.Validate(nil))
 }
+
+// TestOpenAPIDocumentYAMLInlineKeepsAuthoredValues accepts unquoted response
+// codes and keeps large or precise numbers through the full definition path.
+func TestOpenAPIDocumentYAMLInlineKeepsAuthoredValues(t *testing.T) {
+	input := []byte(`
+source:
+  openapi:
+    document:
+      inline:
+        openapi: 3.1.0
+        x-large: 12345678901234567890123
+        x-version: 1.0
+        paths:
+          /records:
+            get:
+              responses:
+                200:
+                  description: ok
+`)
+	var definition ToolSetDefinition
+	require.NoError(t, util.DecodeYAMLStrict(input, &definition))
+	require.NoError(t, definition.Validate(nil))
+	require.Equal(
+		t,
+		`{"openapi":"3.1.0","paths":{"/records":{"get":{"responses":{"200":{"description":"ok"}}}}},"x-large":12345678901234567890123,"x-version":1.0}`,
+		string(*definition.Source.OpenAPI.Document.Inline),
+	)
+}

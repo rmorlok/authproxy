@@ -696,6 +696,8 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "relative document URL", path: []string{"document"}, field: "url", value: "schema.json"},
 		{name: "file document URL", path: []string{"document"}, field: "url", value: "file:///tmp/schema.json"},
 		{name: "missing URL authority", path: []string{"document"}, field: "url", value: "https:///schema.json"},
+		{name: "URL port without host", path: []string{"document"}, field: "url", value: "https://:8080/schema.json"},
+		{name: "URL control character", path: []string{"document"}, field: "url", value: "https://example.com/schema\tv1.json"},
 		{name: "URL credentials", path: []string{"document"}, field: "url", value: "https://reader:secret@example.com/schema.json"},
 		{name: "URL fragment", path: []string{"document"}, field: "url", value: "https://example.com/schema.json#"},
 		{name: "URL template", path: []string{"document"}, field: "url", value: "https://{{cfg.host}}/schema.json"},

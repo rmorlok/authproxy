@@ -144,7 +144,7 @@
         },
         "url": {
           "type": "string",
-          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/?#@\\s]+(?:[/?][^#]*)?$",
+          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/?#@\\s:][^/?#@\\s]*(?:[/?][^#\u0000-\u001F\u007F]*)?$",
           "not": { "pattern": "\\{\\{|\\}\\}|\\s$" },
           "description": "A literal absolute HTTP(S) document URL without credentials, fragment, or templates. Go validation performs URL parsing and rejects surrounding whitespace."
         },

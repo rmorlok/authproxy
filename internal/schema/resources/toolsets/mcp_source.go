@@ -1,9 +1,7 @@
 package toolsets
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -84,32 +82,17 @@ func (f *MCPToolFilter) Validate(vc *common.ValidationContext) error {
 		return nil
 	}
 
-	vc = validationContext(vc)
+	return f.lists().validate(vc)
+}
 
-	var result *multierror.Error
-
-	if f.IncludeNames != nil && len(f.IncludeNames) == 0 {
-		result = multierror.Append(result, vc.NewErrorForField("includeNames", "must not be empty when supplied"))
+// lists views the filter through the shared include/exclude name rules.
+func (f MCPToolFilter) lists() exactNameLists {
+	return exactNameLists{
+		includeField: "includeNames",
+		include:      f.IncludeNames,
+		excludeField: "excludeNames",
+		exclude:      f.ExcludeNames,
 	}
-
-	for _, list := range []struct {
-		field string
-		names []string
-	}{{"includeNames", f.IncludeNames}, {"excludeNames", f.ExcludeNames}} {
-		seen := make(map[string]bool, len(list.names))
-		for i, name := range list.names {
-			path := vc.PushField(list.field).PushIndex(i)
-			if strings.TrimSpace(name) == "" {
-				result = multierror.Append(result, path.NewError("must not be blank"))
-			}
-			if seen[name] {
-				result = multierror.Append(result, path.NewError("must be unique within the list"))
-			}
-			seen[name] = true
-		}
-	}
-
-	return result.ErrorOrNil()
 }
 
 // Clone returns a detached source, preserving omitted fields and authored text.
@@ -137,7 +120,7 @@ func (f *MCPToolFilter) Clone() *MCPToolFilter {
 // UnmarshalJSON rejects unknown, mis-cased, and null configuration fields before
 // ordinary decoding could mistake a null optional value for omission.
 func (s *MCPSource) UnmarshalJSON(data []byte) error {
-	if _, err := decodeMCPObject(data, "endpoint", "transport", "refreshInterval", "tools"); err != nil {
+	if _, err := decodeStrictObject(data, "MCP configuration", "endpoint", "transport", "refreshInterval", "tools"); err != nil {
 		return err
 	}
 	type plain MCPSource
@@ -162,34 +145,12 @@ func (s *MCPSource) UnmarshalYAML(node *yaml.Node) error {
 // UnmarshalJSON retains list presence and rejects null list elements rather
 // than turning them into empty names. Validation handles blank and duplicate names.
 func (f *MCPToolFilter) UnmarshalJSON(data []byte) error {
-	fields, err := decodeMCPObject(data, "includeNames", "excludeNames")
-
-	if err != nil {
+	lists := MCPToolFilter{}.lists()
+	if err := lists.decode(data, "MCP configuration"); err != nil {
 		return err
 	}
 
-	var decoded MCPToolFilter
-
-	for field, raw := range fields {
-		var names []*string
-		if err := util.DecodeJSONStrict(raw, &names); err != nil {
-			return fmt.Errorf("decode %s: %w", field, err)
-		}
-		values := make([]string, len(names))
-		for i, name := range names {
-			if name == nil {
-				return fmt.Errorf("%s[%d] must be a string, not null", field, i)
-			}
-			values[i] = *name
-		}
-		if field == "includeNames" {
-			decoded.IncludeNames = values
-		} else {
-			decoded.ExcludeNames = values
-		}
-	}
-
-	*f = decoded
+	*f = MCPToolFilter{IncludeNames: lists.include, ExcludeNames: lists.exclude}
 
 	return nil
 }
@@ -206,49 +167,10 @@ func (f *MCPToolFilter) UnmarshalYAML(node *yaml.Node) error {
 // MarshalJSON retains explicitly empty lists, especially invalid includeNames:[]
 // which must never serialize as an omitted, unrestricted inclusion policy.
 func (f MCPToolFilter) MarshalJSON() ([]byte, error) {
-	return json.Marshal(f.fieldsForMarshal())
+	return json.Marshal(f.lists().fieldsForMarshal())
 }
 
 // MarshalYAML preserves the same list presence as JSON without exposing aliases.
 func (f MCPToolFilter) MarshalYAML() (any, error) {
-	return f.fieldsForMarshal(), nil
-}
-
-// fieldsForMarshal returns only supplied lists, retaining non-nil empty slices.
-func (f MCPToolFilter) fieldsForMarshal() map[string][]string {
-	fields := map[string][]string{}
-	if f.IncludeNames != nil {
-		fields["includeNames"] = slices.Clone(f.IncludeNames)
-	}
-	if f.ExcludeNames != nil {
-		fields["excludeNames"] = slices.Clone(f.ExcludeNames)
-	}
-	return fields
-}
-
-// decodeMCPObject checks owned field names and explicit nulls transactionally.
-// Required fields are checked by Validate after decoding a complete value.
-func decodeMCPObject(
-	data []byte,
-	allowed ...string,
-) (map[string]json.RawMessage, error) {
-	var fields map[string]json.RawMessage
-	if err := util.DecodeJSONStrict(data, &fields); err != nil {
-		return nil, err
-	}
-
-	if fields == nil {
-		return nil, fmt.Errorf("MCP configuration must be an object")
-	}
-
-	for field, raw := range fields {
-		if !slices.Contains(allowed, field) {
-			return nil, fmt.Errorf("unknown MCP configuration field %q", field)
-		}
-		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
-			return nil, fmt.Errorf("%s must not be null", field)
-		}
-	}
-
-	return fields, nil
+	return f.lists().fieldsForMarshal(), nil
 }

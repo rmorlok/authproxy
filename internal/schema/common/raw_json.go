@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -31,13 +32,25 @@ func (r *RawJSON) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// UnmarshalYAML converts YAML data to JSON bytes for storage.
+// UnmarshalYAML converts YAML data to JSON bytes for storage. Mapping keys are
+// emitted as their scalar text, so unquoted keys such as OpenAPI status codes
+// (200:) become JSON object keys. Integer and float scalars whose text is
+// already a JSON number are copied verbatim, keeping large integers and
+// authored precision; other numeric spellings use yaml.v3's native decoding.
 func (r *RawJSON) UnmarshalYAML(value *yaml.Node) error {
-	var raw interface{}
-	if err := value.Decode(&raw); err != nil {
+	// Native decoding is retained as a validation pass: it rejects duplicate
+	// keys, recursive anchors, and excessive alias expansion before conversion.
+	var native interface{}
+	if err := value.Decode(&native); err != nil {
 		return err
 	}
-	jsonBytes, err := json.Marshal(raw)
+
+	converted, err := yamlNodeJSONValue(value)
+	if err != nil {
+		return err
+	}
+
+	jsonBytes, err := json.Marshal(converted)
 	if err != nil {
 		return err
 	}
@@ -45,10 +58,136 @@ func (r *RawJSON) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// jsonNumberText matches the JSON number grammar, which is the subset of YAML
+// numeric scalars that can be stored without reinterpreting the authored text.
+var jsonNumberText = regexp.MustCompile(`^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?$`)
+
+// yamlNodeJSONValue converts a YAML node into a value json.Marshal accepts.
+// Aliases are expanded, merge keys are applied with explicit keys taking
+// precedence, and keys that collide after conversion to text are rejected.
+func yamlNodeJSONValue(node *yaml.Node) (any, error) {
+	switch node.Kind {
+	case 0:
+		return nil, nil
+	case yaml.DocumentNode:
+		if len(node.Content) == 0 {
+			return nil, nil
+		}
+		return yamlNodeJSONValue(node.Content[0])
+	case yaml.AliasNode:
+		return yamlNodeJSONValue(node.Alias)
+	case yaml.SequenceNode:
+		items := make([]any, 0, len(node.Content))
+		for _, child := range node.Content {
+			item, err := yamlNodeJSONValue(child)
+			if err != nil {
+				return nil, err
+			}
+			items = append(items, item)
+		}
+		return items, nil
+	case yaml.MappingNode:
+		return yamlMappingJSONValue(node)
+	case yaml.ScalarNode:
+		tag := node.ShortTag()
+		if (tag == "!!int" || tag == "!!float") &&
+			jsonNumberText.MatchString(node.Value) {
+			return json.Number(node.Value), nil
+		}
+
+		var scalar any
+		if err := node.Decode(&scalar); err != nil {
+			return nil, err
+		}
+		return scalar, nil
+	default:
+		return nil, fmt.Errorf("unsupported YAML node kind %d", node.Kind)
+	}
+}
+
+// yamlMappingJSONValue converts a mapping to a string-keyed object. Merged
+// mappings fill keys not set explicitly; earlier merge sources take precedence.
+func yamlMappingJSONValue(node *yaml.Node) (map[string]any, error) {
+	object := make(map[string]any, len(node.Content)/2)
+	merged := make(map[string]any)
+
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		keyNode, valueNode := resolveYAMLAlias(node.Content[i]), node.Content[i+1]
+
+		if keyNode.Kind == yaml.ScalarNode && keyNode.ShortTag() == "!!merge" {
+			if err := mergeYAMLMapping(merged, valueNode); err != nil {
+				return nil, err
+			}
+			continue
+		}
+
+		if keyNode.Kind != yaml.ScalarNode {
+			return nil, fmt.Errorf("line %d: YAML mapping keys must be scalars", keyNode.Line)
+		}
+		if _, exists := object[keyNode.Value]; exists {
+			return nil, fmt.Errorf("line %d: mapping key %q is defined more than once", keyNode.Line, keyNode.Value)
+		}
+
+		value, err := yamlNodeJSONValue(valueNode)
+		if err != nil {
+			return nil, err
+		}
+
+		object[keyNode.Value] = value
+	}
+
+	for key, value := range merged {
+		if _, exists := object[key]; !exists {
+			object[key] = value
+		}
+	}
+
+	return object, nil
+}
+
+// mergeYAMLMapping applies a << value, which is a mapping or a sequence of
+// mappings, adding only keys that an earlier merge source has not supplied.
+func mergeYAMLMapping(merged map[string]any, source *yaml.Node) error {
+	source = resolveYAMLAlias(source)
+
+	sources := []*yaml.Node{source}
+	if source.Kind == yaml.SequenceNode {
+		sources = source.Content
+	}
+
+	for _, item := range sources {
+		value, err := yamlNodeJSONValue(item)
+		if err != nil {
+			return err
+		}
+
+		object, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("line %d: merge values must be mappings", item.Line)
+		}
+
+		for key, entry := range object {
+			if _, exists := merged[key]; !exists {
+				merged[key] = entry
+			}
+		}
+	}
+
+	return nil
+}
+
+// resolveYAMLAlias follows alias nodes to the anchored node they reference.
+func resolveYAMLAlias(node *yaml.Node) *yaml.Node {
+	for node.Kind == yaml.AliasNode {
+		node = node.Alias
+	}
+	return node
+}
+
 // MarshalYAML emits structured YAML without decoding numbers through float64.
 // Keeping numeric nodes intact avoids rounding large integer schema constraints
 // or payload values merely by exporting a resource as YAML. This preserves
-// export precision; UnmarshalYAML still uses yaml.v3's native numeric decoding.
+// export precision, and UnmarshalYAML copies JSON-compatible numbers verbatim.
 func (r RawJSON) MarshalYAML() (interface{}, error) {
 	if r == nil {
 		return nil, nil
