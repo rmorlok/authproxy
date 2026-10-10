@@ -123,6 +123,42 @@ permissionMappings:
     addVerbs: ["tool:calendar.list"]
 ```
 
+For an inline document, place the OpenAPI object directly under `document.inline`:
+
+```yaml
+source:
+  openapi:
+    document:
+      inline:
+        openapi: "3.1.0"
+        info:
+          title: Calendar API
+          version: "1.0.0"
+        paths:
+          /calendars:
+            get:
+              operationId: listCalendars
+              responses:
+                "200":
+                  description: The available calendars.
+                  content:
+                    application/json:
+                      schema:
+                        type: array
+                        items:
+                          type: object
+                          required: [id, name]
+                          properties:
+                            id: {type: string}
+                            name: {type: string}
+    server:
+      url: "https://{{cfg.apiHost}}"
+permissionMappings:
+  - match:
+      sourceKeys: [listCalendars]
+    addVerbs: ["tool:calendar.list"]
+```
+
 `document` requires exactly one of `inline` and `url`. Inline content is a JSON
 object, also authorable as a YAML mapping. It remains opaque provider data:
 extensions, examples, security requirements, and `$ref` fields are retained.
