@@ -31,7 +31,7 @@ func TestOpenAPIServerConfigValidation(t *testing.T) {
 		{"missing selection", &OpenAPIServerConfig{}, false, ""},
 		{"two selections", &OpenAPIServerConfig{URL: util.ToPtr("https://example.test"), Index: util.ToPtr(0)}, false, ""},
 		{"negative index", &OpenAPIServerConfig{Index: util.ToPtr(-1)}, false, "index"},
-		{"variables without selection", &OpenAPIServerConfig{Variables: util.ToPtr(map[string]string{})}, false, ""},
+		{"variables without selection", &OpenAPIServerConfig{Variables: util.ToPtr(map[string]string{})}, false, "variables"},
 		{"URL with variables", &OpenAPIServerConfig{URL: util.ToPtr("https://example.test"), Variables: util.ToPtr(map[string]string{})}, false, "variables"},
 		{"nil variables map", &OpenAPIServerConfig{Index: util.ToPtr(0), Variables: util.ToPtr(map[string]string(nil))}, false, "variables"},
 		{"empty URL", &OpenAPIServerConfig{URL: util.ToPtr("")}, false, "url"},
@@ -53,6 +53,49 @@ func TestOpenAPIServerConfigValidation(t *testing.T) {
 				}
 			}
 			require.Equal(t, before, test.server, "validation preserves exact authored values")
+		})
+	}
+}
+
+// TestOpenAPIServerConfigVariableSelectionDiagnostics distinguishes an omitted
+// index from a conflicting URL override instead of implying that a URL exists.
+func TestOpenAPIServerConfigVariableSelectionDiagnostics(t *testing.T) {
+	server := &OpenAPIServerConfig{Variables: util.ToPtr(map[string]string{})}
+	vc := &common.ValidationContext{Path: "source.openapi.server"}
+	err := server.Validate(vc)
+	require.ErrorContains(t, err, "source.openapi.server.variables: requires index")
+	require.NotContains(t, err.Error(), "URL override")
+	server.URL = util.ToPtr("https://example.test")
+	err = server.Validate(vc)
+	require.ErrorContains(t, err, "source.openapi.server.variables: is only supported with index, not a URL override")
+}
+
+// TestOpenAPIServerConfigIntegerIndexNumbers accepts integer-valued decimal
+// and exponent spellings without passing through a floating-point conversion.
+func TestOpenAPIServerConfigIntegerIndexNumbers(t *testing.T) {
+	for _, test := range []struct {
+		token string
+		index int
+	}{
+		{"1.0", 1}, {"1e0", 1}, {"1.5e1", 15}, {"10e-1", 1},
+		{"1e+06", 1000000}, {"0.0", 0}, {"-0e5", 0},
+	} {
+		t.Run(test.token, func(t *testing.T) {
+			for _, format := range []struct {
+				name, input string
+				decode      func([]byte, any) error
+			}{
+				{"JSON", `{"index":` + test.token + `}`, util.DecodeJSONStrict},
+				{"YAML", "index: " + test.token, util.DecodeYAMLStrict},
+			} {
+				t.Run(format.name, func(t *testing.T) {
+					var server OpenAPIServerConfig
+					require.NoError(t, format.decode([]byte(format.input), &server))
+					require.NoError(t, server.Validate(nil))
+					require.NotNil(t, server.Index)
+					require.Equal(t, test.index, *server.Index)
+				})
+			}
 		})
 	}
 }
@@ -107,7 +150,7 @@ func TestOpenAPIServerConfigStrictDecoding(t *testing.T) {
 	for _, input := range []string{
 		`[]`, `false`, `{"unknown":true}`, `{"URL":"https://example.test"}`, `{"Index":0}`, `{"Variables":{}}`,
 		`{"url":null}`, `{"index":null}`, `{"variables":null}`,
-		`{"url":4}`, `{"url":false}`, `{"index":"0"}`, `{"index":0.5}`, `{"index":false}`,
+		`{"url":4}`, `{"url":false}`, `{"index":"0"}`, `{"index":0.5}`, `{"index":15e-1}`, `{"index":false}`,
 		`{"variables":[]}`, `{"variables":{"version":null}}`, `{"variables":{"version":1}}`,
 		`{"variables":{"version":true}}`, `{"variables":{"version":{}}}`,
 	} {
@@ -123,6 +166,28 @@ func TestOpenAPIServerConfigStrictDecoding(t *testing.T) {
 	// still fails required-selection validation.
 	require.NoError(t, util.DecodeYAMLStrict([]byte(`null`), &server))
 	require.Error(t, server.Validate(nil))
+}
+
+// TestOpenAPIServerConfigDuplicateVariables rejects repeated decoded names in
+// either format before a map can discard one binding, preserving prior state.
+func TestOpenAPIServerConfigDuplicateVariables(t *testing.T) {
+	for _, test := range []struct {
+		name, input string
+		decode      func([]byte, any) error
+	}{
+		{"JSON repeated name", `{"index":0,"variables":{"version":"v1","version":"v2"}}`, util.DecodeJSONStrict},
+		{"JSON repeated same value", `{"index":0,"variables":{"version":"v1","version":"v1"}}`, util.DecodeJSONStrict},
+		{"JSON escaped equivalent name", `{"index":0,"variables":{"version":"v1","\u0076ersion":"v2"}}`, util.DecodeJSONStrict},
+		{"YAML repeated name", "index: 0\nvariables:\n  version: v1\n  version: v2\n", util.DecodeYAMLStrict},
+		{"YAML escaped equivalent name", "index: 0\nvariables:\n  version: v1\n  \"\\u0076ersion\": v2\n", util.DecodeYAMLStrict},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := &OpenAPIServerConfig{Index: util.ToPtr(7), Variables: util.ToPtr(map[string]string{"region": "original"})}
+			before := server.Clone()
+			require.Error(t, test.decode([]byte(test.input), server))
+			require.Equal(t, before, server, "duplicate bindings must not partially replace the receiver")
+		})
+	}
 }
 
 // TestOpenAPIServerConfigYAMLComposition resolves aliases and merges before
@@ -176,8 +241,14 @@ func TestOpenAPIServerConfigCloneAndDecodeOwnership(t *testing.T) {
 	for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
 		server := &OpenAPIServerConfig{Index: util.ToPtr(1), Variables: util.ToPtr(map[string]string{"version": "v1"})}
 		before := server.Clone()
-		require.Error(t, decode([]byte(`{"index":0,"variables":{"version":null}}`), server))
-		require.Equal(t, before, server, "failed decoding preserves the receiver")
+		for _, input := range []string{
+			`{"index":0,"variables":{"version":null}}`,
+			`{"index":1.5,"variables":{"version":"v2"}}`,
+			`{"index":9223372036854775808,"variables":{"version":"v2"}}`,
+		} {
+			require.Error(t, decode([]byte(input), server))
+			require.Equal(t, before, server, "failed decoding preserves the receiver")
+		}
 		require.NoError(t, decode([]byte(`{"url":"https://example.test"}`), server))
 		require.Equal(t, &OpenAPIServerConfig{URL: util.ToPtr("https://example.test")}, server)
 		require.NoError(t, decode([]byte(`{"index":0}`), server))

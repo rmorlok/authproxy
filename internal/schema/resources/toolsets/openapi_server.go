@@ -1,8 +1,11 @@
 package toolsets
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -62,8 +65,10 @@ func (s *OpenAPIServerConfig) Validate(vc *common.ValidationContext) error {
 		result = multierror.Append(result, vc.NewErrorForField("index", "must not be negative"))
 	}
 	if s.Variables != nil {
-		if s.Index == nil || s.URL != nil {
+		if s.URL != nil {
 			result = multierror.Append(result, vc.NewErrorForField("variables", "is only supported with index, not a URL override"))
+		} else if s.Index == nil {
+			result = multierror.Append(result, vc.NewErrorForField("variables", "requires index"))
 		}
 		if *s.Variables == nil {
 			result = multierror.Append(result, vc.NewErrorForField("variables", "must be an object, not null"))
@@ -93,41 +98,73 @@ func (s *OpenAPIServerConfig) Clone() *OpenAPIServerConfig {
 	return &clone
 }
 
-// UnmarshalJSON rejects noncanonical keys, null fields, and null bindings before
-// decoding can mistake them for omitted settings or empty string values. The
-// receiver is replaced only after all fields have decoded successfully.
+// UnmarshalJSON rejects noncanonical keys, null fields, and duplicate or
+// non-string bindings. Integral decimal/exponent indices follow JSON Schema's
+// integer semantics. The receiver is replaced only after decoding succeeds.
 func (s *OpenAPIServerConfig) UnmarshalJSON(data []byte) error {
-	fields, err := decodeStrictObject(data, "OpenAPI server configuration", "url", "index", "variables")
+	fields, err := decodeStrictObject(data, "OpenAPI server configuration", jsonFieldNames(reflect.TypeOf(OpenAPIServerConfig{}))...)
 	if err != nil {
 		return err
 	}
-	var decoded OpenAPIServerConfig
-	for field, raw := range fields {
-		switch field {
-		case "url":
-			if err := util.DecodeJSONStrict(raw, &decoded.URL); err != nil {
-				return fmt.Errorf("decode url: %w", err)
-			}
-		case "index":
-			if err := util.DecodeJSONStrict(raw, &decoded.Index); err != nil {
-				return fmt.Errorf("decode index: %w", err)
-			}
-		case "variables":
-			var bindings map[string]*string
-			if err := util.DecodeJSONStrict(raw, &bindings); err != nil {
-				return fmt.Errorf("decode variables: %w", err)
-			}
-			values := make(map[string]string, len(bindings))
-			for name, value := range bindings {
-				if value == nil {
-					return fmt.Errorf("variables[%q] must be a string, not null", name)
-				}
-				values[name] = *value
-			}
-			decoded.Variables = &values
+	if raw, ok := fields["index"]; ok {
+		fields["index"], err = normalizeJSONInteger(raw)
+		if err != nil {
+			return fmt.Errorf("decode index: %w", err)
 		}
 	}
-	*s = decoded
+	if raw, ok := fields["variables"]; ok {
+		if err := validateOpenAPIServerBindingsJSON(raw); err != nil {
+			return err
+		}
+	}
+
+	// Decode the canonical struct once, without calling this method recursively.
+	// New fields automatically participate instead of needing a second wire type
+	// or another case in a per-field decoder.
+	normalized, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	type plain OpenAPIServerConfig
+	var decoded plain
+	if err := util.DecodeJSONStrict(normalized, &decoded); err != nil {
+		return err
+	}
+	*s = OpenAPIServerConfig(decoded)
+	return nil
+}
+
+// validateOpenAPIServerBindingsJSON checks a syntactically valid JSON value
+// from decodeStrictObject before map decoding can erase duplicate names or turn
+// null values into empty strings. Escaped names are compared after decoding.
+func validateOpenAPIServerBindingsJSON(raw json.RawMessage) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	token, err := decoder.Token()
+	if err != nil {
+		return err
+	}
+	if token != json.Delim('{') {
+		return fmt.Errorf("variables must be an object")
+	}
+	seen := make(map[string]bool)
+	for decoder.More() {
+		token, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		name := token.(string) // Object keys in valid JSON are always strings.
+		if seen[name] {
+			return fmt.Errorf("variables[%q] must not be repeated", name)
+		}
+		seen[name] = true
+		value, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		if _, ok := value.(string); !ok {
+			return fmt.Errorf("variables[%q] must be a string", name)
+		}
+	}
 	return nil
 }
 
