@@ -768,11 +768,6 @@ func TestOpenAPIServerConfigSchemaAndDecoding(t *testing.T) {
 		{"URL override", `{"url":"https://{{cfg.host}}/v1"}`, true},
 		{"whole URL template", `{"url":"{{ cfg.baseURL }}"}`, true},
 		{"zero index", `{"index":0}`, true},
-		{"decimal integer index", `{"index":1.0}`, true},
-		{"exponent integer index", `{"index":1e0}`, true},
-		{"fractional significand integer index", `{"index":1.5e1}`, true},
-		{"negative exponent integer index", `{"index":10e-1}`, true},
-		{"decimal zero index", `{"index":0.0}`, true},
 		{"document bounds deferred", `{"index":1000000}`, true},
 		{"empty bindings", `{"index":1,"variables":{}}`, true},
 		{"exact literal bindings", `{"index":0,"variables":{" region ":" eu ","empty":"","spaces":" \t\n","single-braces":"{literal}"}}`, true},
@@ -831,6 +826,24 @@ func TestOpenAPIServerConfigSchemaAndDecoding(t *testing.T) {
 					require.JSONEq(t, test.input, string(roundTrip))
 				})
 			}
+		})
+	}
+}
+
+// TestOpenAPIServerConfigSchemaIntegerSpellingBoundary records the intentional
+// difference between JSON Schema's integer-valued numbers and standard Go int
+// decoding. YAML preserves these numeric spellings through the JSON boundary.
+func TestOpenAPIServerConfigSchemaIntegerSpellingBoundary(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPIServerConfig")
+	for _, token := range []string{"1.0", "1e0"} {
+		t.Run(token, func(t *testing.T) {
+			input := []byte(`{"index":` + token + `}`)
+			var document any
+			require.NoError(t, json.Unmarshal(input, &document))
+			require.NoError(t, compiled.Validate(document), "the schema checks numeric value, not spelling")
+			var fromJSON, fromYAML toolsets.OpenAPIServerConfig
+			require.Error(t, util.DecodeJSONStrict(input, &fromJSON), "standard int decoding requires integer syntax")
+			require.Error(t, util.DecodeYAMLStrict([]byte("index: "+token), &fromYAML), "YAML uses the same JSON integer boundary")
 		})
 	}
 }

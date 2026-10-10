@@ -70,36 +70,6 @@ func TestOpenAPIServerConfigVariableSelectionDiagnostics(t *testing.T) {
 	require.ErrorContains(t, err, "source.openapi.server.variables: is only supported with index, not a URL override")
 }
 
-// TestOpenAPIServerConfigIntegerIndexNumbers accepts integer-valued decimal
-// and exponent spellings without passing through a floating-point conversion.
-func TestOpenAPIServerConfigIntegerIndexNumbers(t *testing.T) {
-	for _, test := range []struct {
-		token string
-		index int
-	}{
-		{"1.0", 1}, {"1e0", 1}, {"1.5e1", 15}, {"10e-1", 1},
-		{"1e+06", 1000000}, {"0.0", 0}, {"-0e5", 0},
-	} {
-		t.Run(test.token, func(t *testing.T) {
-			for _, format := range []struct {
-				name, input string
-				decode      func([]byte, any) error
-			}{
-				{"JSON", `{"index":` + test.token + `}`, util.DecodeJSONStrict},
-				{"YAML", "index: " + test.token, util.DecodeYAMLStrict},
-			} {
-				t.Run(format.name, func(t *testing.T) {
-					var server OpenAPIServerConfig
-					require.NoError(t, format.decode([]byte(format.input), &server))
-					require.NoError(t, server.Validate(nil))
-					require.NotNil(t, server.Index)
-					require.Equal(t, test.index, *server.Index)
-				})
-			}
-		})
-	}
-}
-
 // TestOpenAPIServerConfigRoundTrip protects zero-index and map presence in both
 // formats, including invalid unions that export must not silently repair.
 func TestOpenAPIServerConfigRoundTrip(t *testing.T) {
@@ -188,6 +158,15 @@ func TestOpenAPIServerConfigDuplicateVariables(t *testing.T) {
 			require.Equal(t, before, server, "duplicate bindings must not partially replace the receiver")
 		})
 	}
+}
+
+// TestOpenAPIServerConfigRepeatedVariablesObject preserves the strict object's
+// last-field-wins behavior without merging unchecked bindings from an earlier
+// occurrence of the variables field.
+func TestOpenAPIServerConfigRepeatedVariablesObject(t *testing.T) {
+	var server OpenAPIServerConfig
+	require.NoError(t, util.DecodeJSONStrict([]byte(`{"index":0,"variables":{"ignored":null},"variables":{"region":"eu"}}`), &server))
+	require.Equal(t, &OpenAPIServerConfig{Index: util.ToPtr(0), Variables: util.ToPtr(map[string]string{"region": "eu"})}, &server)
 }
 
 // TestOpenAPIServerConfigYAMLComposition resolves aliases and merges before

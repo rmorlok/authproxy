@@ -14,6 +14,7 @@ This directory owns AuthProxy's public and internal data contracts. Keep schema 
 ## Conventions
 
 - Every schema package with Go contract types should have a `schema.go`, `schema.json`, tests that compile/validate the JSON schema, and a README explaining what belongs there.
+- JSON schemas are usage references. For Go integer fields (such as the OpenAPI server `index`), we accept that JSON Schema permits whole-number decimal/exponent forms like `1.0` and `1e0` while Go's JSON decoder rejects them. Keep ordinary Go integer decoding; do not add numeric normalization solely to eliminate this specific difference. Tests may document this exception instead of requiring schema/codec parity for these spellings.
 - Go structs that represent serialized contracts should carry both `json` and `yaml` tags unless a field is deliberately not serialized.
 - Prefer moving shared/resource contract types into `resources/...` or `common` instead of defining route-local DTOs in `internal/routes`.
 - When an endpoint body is exactly a canonical resource or resource patch, routes should use that type directly. Do not add an alias in `internal/schema/api` merely to give the resource an endpoint-specific name.

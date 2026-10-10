@@ -99,18 +99,11 @@ func (s *OpenAPIServerConfig) Clone() *OpenAPIServerConfig {
 }
 
 // UnmarshalJSON rejects noncanonical keys, null fields, and duplicate or
-// non-string bindings. Integral decimal/exponent indices follow JSON Schema's
-// integer semantics. The receiver is replaced only after decoding succeeds.
+// non-string bindings. The receiver is replaced only after decoding succeeds.
 func (s *OpenAPIServerConfig) UnmarshalJSON(data []byte) error {
 	fields, err := decodeStrictObject(data, "OpenAPI server configuration", jsonFieldNames(reflect.TypeOf(OpenAPIServerConfig{}))...)
 	if err != nil {
 		return err
-	}
-	if raw, ok := fields["index"]; ok {
-		fields["index"], err = normalizeJSONInteger(raw)
-		if err != nil {
-			return fmt.Errorf("decode index: %w", err)
-		}
 	}
 	if raw, ok := fields["variables"]; ok {
 		if err := validateOpenAPIServerBindingsJSON(raw); err != nil {
@@ -121,13 +114,15 @@ func (s *OpenAPIServerConfig) UnmarshalJSON(data []byte) error {
 	// Decode the canonical struct once, without calling this method recursively.
 	// New fields automatically participate instead of needing a second wire type
 	// or another case in a per-field decoder.
-	normalized, err := json.Marshal(fields)
+	// Use the checked fields: decoding the original JSON could merge earlier,
+	// unchecked objects when a top-level map field is repeated.
+	checked, err := json.Marshal(fields)
 	if err != nil {
 		return err
 	}
 	type plain OpenAPIServerConfig
 	var decoded plain
-	if err := util.DecodeJSONStrict(normalized, &decoded); err != nil {
+	if err := util.DecodeJSONStrict(checked, &decoded); err != nil {
 		return err
 	}
 	*s = OpenAPIServerConfig(decoded)
