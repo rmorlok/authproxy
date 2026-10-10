@@ -88,6 +88,8 @@ func yamlMappingWithFields(value *yaml.Node, fieldNames ...string) *yaml.Node {
 	return filtered
 }
 
+// httpServiceUnmarshalYAML decodes shared HTTP fields and dispatches TLS to its
+// concrete configuration type without changing the caller's YAML mapping.
 func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
@@ -112,32 +114,16 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 		}
 	}
 
-	// Decode only the common HTTP fields. TlsVal is an interface and is handled
-	// above, so deliberately omit it from the raw type.
-	type rawServiceHttp struct {
-		HealthCheckPortVal *IntegerValue `yaml:"healthCheckPort,omitempty"`
-		PortVal            *IntegerValue `yaml:"port"`
-		BaseUrl            *StringValue  `yaml:"baseUrl,omitempty"`
-		DomainVal          string        `yaml:"domain"`
-		IsHttpsVal         bool          `yaml:"https"`
-		CorsVal            *CorsConfig   `yaml:"cors,omitempty"`
-	}
-
-	raw := &rawServiceHttp{}
+	// Decode the canonical HTTP fields directly. The filtered mapping excludes
+	// TLS because its interface value requires the dispatch above.
+	var decoded ServiceHttp
 	httpFields := yamlMappingWithFields(value, httpServiceYAMLFields[:len(httpServiceYAMLFields)-1]...)
-	if err := util.DecodeYAMLNodeStrict(httpFields, raw); err != nil {
+	if err := util.DecodeYAMLNodeStrict(httpFields, &decoded); err != nil {
 		return ServiceHttp{}, err
 	}
 
-	return ServiceHttp{
-		ServiceCommon: ServiceCommon{HealthCheckPortVal: raw.HealthCheckPortVal},
-		PortVal:       raw.PortVal,
-		BaseUrl:       raw.BaseUrl,
-		DomainVal:     raw.DomainVal,
-		IsHttpsVal:    raw.IsHttpsVal,
-		CorsVal:       raw.CorsVal,
-		TlsVal:        tlsConfig,
-	}, nil
+	decoded.TlsVal = tlsConfig
+	return decoded, nil
 }
 
 func (s *ServiceHttp) Port() uint64 {
