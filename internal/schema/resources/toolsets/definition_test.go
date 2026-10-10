@@ -282,9 +282,14 @@ func TestImportedDefinitionCandidateOwnership(t *testing.T) {
 // opaque document content without depending on an OpenAPI parser or importer.
 func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 	document := &OpenAPIDocument{URL: util.ToPtr("https://example.com/openapi.json")}
+	server := &OpenAPIServerConfig{URL: util.ToPtr("https://{{cfg.apiHost}}")}
 	if inline {
 		document.URL = nil
 		document.Inline = util.ToPtr(common.RawJSON(`{"openapi":"3.1.0","paths":{},"x-provider":{"example":9007199254740993,"schema":{"$ref":"https://never-fetch.invalid/schema.json"}}}`))
+		server = &OpenAPIServerConfig{
+			Index:     util.ToPtr(0),
+			Variables: util.ToPtr(map[string]string{"version": "v1", "tenant": ""}),
+		}
 	} else {
 		// Acquisition authority is checked later; this independent connection
 		// intentionally belongs to a different namespace than the ToolSet.
@@ -303,7 +308,7 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 					IncludeOperationIDs: []string{"listCalendars"},
 					ExcludeOperationIDs: []string{},
 				},
-				Server: &OpenAPIServerOverride{URL: "https://{{cfg.apiHost}}"},
+				Server: server,
 			},
 		},
 		PermissionMappings: []PermissionMapping{
@@ -318,7 +323,8 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 }
 
 // TestOpenAPIDefinitionIntegration exercises the complete resource and patch
-// boundaries for URL and inline sources, including imported permission mappings.
+// boundaries for URL and inline sources, including server override/selection
+// modes and imported permission mappings. Document-dependent checks are deferred.
 func TestOpenAPIDefinitionIntegration(t *testing.T) {
 	for _, inline := range []bool{false, true} {
 		current := storedToolSetForResourceTest()
@@ -367,7 +373,15 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, candidate.Spec.Definition.Source.OpenAPI)
 			require.Nil(t, candidate.Spec.Definition.Source.Explicit)
+			require.Equal(t, current.Spec.Definition.Source.OpenAPI.Server, candidate.Spec.Definition.Source.OpenAPI.Server)
 			require.True(t, GenerationPolicy().ChangesGeneration(&decodedPatch))
+			if inline {
+				// Changing a candidate's selection must not alter the decoded
+				// patch or the original generation from which it was prepared.
+				*candidate.Spec.Definition.Source.OpenAPI.Server.Index = 1
+				(*candidate.Spec.Definition.Source.OpenAPI.Server.Variables)["version"] = "v2"
+				require.Equal(t, current.Spec.Definition.Source.OpenAPI.Server, decodedPatch.Spec.Definition.Source.OpenAPI.Server)
+			}
 		}
 	}
 }
@@ -411,14 +425,16 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 
 		if inline {
 			(*clone.Source.OpenAPI.Document.Inline)[0] = '['
+			*clone.Source.OpenAPI.Server.Index = 1
+			(*clone.Source.OpenAPI.Server.Variables)["version"] = "v2"
 		} else {
 			*clone.Source.OpenAPI.Document.URL = "https://other.example/spec.json"
 			clone.Source.OpenAPI.Document.FetchConnectionRef.Namespace = "root.other"
+			*clone.Source.OpenAPI.Server.URL = "https://other.example"
 		}
 
 		clone.Source.OpenAPI.Operations.IncludeOperationIDs[0] = "other"
 		clone.Source.OpenAPI.Operations.ExcludeOperationIDs = append(clone.Source.OpenAPI.Operations.ExcludeOperationIDs, "other")
-		clone.Source.OpenAPI.Server.URL = "https://other.example"
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
 
 		require.Equal(t, before, original)

@@ -5,7 +5,7 @@ connection selectors, explicit templates, OpenAPI and MCP source settings,
 imported permission mappings, patches, and generation selection policy. It is
 a contract foundation: management routes, registry/apply integration, publication
 transactions, persistence, and reconciliation are implemented in later slices.
-Advanced OpenAPI import settings, imported defaults, and source diagnostics are
+Other OpenAPI import settings, imported defaults, and source diagnostics are
 also deferred. Strict input decoding and the JSON schema reject those fields
 until their contracts are implemented. Source validation does not fetch documents,
 resolve references, negotiate protocols, or discover or execute tools.
@@ -181,14 +181,55 @@ Blank/duplicate IDs and null fields or elements are rejected. These filters do
 not treat method/path fallback source keys as operation IDs. The importer will
 check document identity, unsupported features, and actual operation membership.
 
-An optional `server.url` deliberately overrides the document-selected server
-base URL and may use connection `cfg` templates. Omission preserves the importer's
-operation/path/global server precedence and relative-URL rules. Rendered URL
-validation and template compilation happen later. Server selection and variable
-bindings, security mappings, source-key overrides, unsupported-operation policy,
-reference bundles/base URIs, and external-reference fetch settings remain separate
-contracts; those configuration fields are currently rejected. Actual acquisition,
-immutable snapshots, refresh, and operation compilation are also future work.
+### Server selection and overrides
+
+An optional `server` object requires exactly one of `url` or `index`. Omitting
+the entire object preserves the importer's default server selection and document
+variable defaults; `server: {}` is invalid. The existing `server.url` form
+deliberately replaces the document-selected server base URL and may use connection
+`cfg` templates, including a whole-URL template. Rendered URL validation and
+template compilation happen later.
+
+To select a document server and bind its variables instead, use a zero-based
+`index` and optional literal `variables`:
+
+```yaml
+source:
+  openapi:
+    document:
+      url: https://api.example.com/openapi.json
+    server:
+      index: 0
+      variables:
+        region: us
+        version: v1
+```
+
+For each OAS 3 operation, the importer first chooses the effective `servers`
+list using operation/path/document precedence, then selects the requested index.
+The index does not select from a merged list or fall back to a parent list if
+out of range. A per-operation override can therefore make an index invalid for
+that operation. Relative URLs still require resolution against the document's
+base URI. Bounds, base URI availability, variable names, defaults, and enum
+membership are document-dependent import checks, not authoring-schema checks.
+Swagger 2 has `schemes`/`host`/`basePath` instead of `servers`; a later importer
+must diagnose `index`/`variables` for that format rather than reinterpret the
+index as a scheme choice. Omitting `server` or using `url` remains applicable.
+
+`variables` requires `index`, including an explicit `index: 0` when binding the
+first server. Omitted bindings preserve the document's defaults; `{}` supplies
+no overrides. Names must be nonblank and are matched exactly without trimming.
+Values are strings preserved verbatim, including empty strings and whitespace.
+They are literal import-time bindings: text such as `{{cfg.region}}` is not
+evaluated. Use `server.url` for runtime connection configuration instead. Null
+fields or map values, unknown fields, negative indices, and mixed URL/selection
+modes are rejected. Explicit zero and an empty variables object survive ordinary
+JSON/YAML serialization; clones detach both pointers and the bindings map.
+
+Security mappings, source-key overrides, unsupported-operation policy, reference
+bundles/base URIs, and external-reference fetch settings remain separate contracts;
+those configuration fields are currently rejected. Actual acquisition, immutable
+snapshots, refresh, server resolution, and operation compilation are future work.
 
 ## MCP sources and imported permission mappings
 

@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/schema"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/rmorlok/authproxy/internal/util"
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
@@ -730,7 +732,8 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "null server URL", path: []string{"server"}, field: "url", value: nil},
 		{name: "padded server URL", path: []string{"server"}, field: "url", value: " https://example.com/"},
 		{name: "multiline server URL", path: []string{"server"}, field: "url", value: "https://example.com/\nv1"},
-		{name: "unknown server field", path: []string{"server"}, field: "variables", value: map[string]any{}},
+		{name: "variables conflict with URL override", path: []string{"server"}, field: "variables", value: map[string]any{}},
+		{name: "unknown server field", path: []string{"server"}, field: "name", value: "production"},
 		{name: "unsupported security", field: "security", value: map[string]any{}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -750,6 +753,135 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 			patch := toolSetPatchSchemaFixture(t)
 			schemaObject(t, patch, "spec")["definition"] = definition
 			require.Error(t, patchSchema.Validate(patch))
+		})
+	}
+}
+
+// TestOpenAPIServerConfigSchemaAndDecoding compares the authoring schema with
+// both Go codecs, including source choice, literal bindings, and explicit nulls.
+func TestOpenAPIServerConfigSchemaAndDecoding(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPIServerConfig")
+	for _, test := range []struct {
+		name, input string
+		valid       bool
+	}{
+		{"URL override", `{"url":"https://{{cfg.host}}/v1"}`, true},
+		{"whole URL template", `{"url":"{{ cfg.baseURL }}"}`, true},
+		{"zero index", `{"index":0}`, true},
+		{"document bounds deferred", `{"index":1000000}`, true},
+		{"empty bindings", `{"index":1,"variables":{}}`, true},
+		{"exact literal bindings", `{"index":0,"variables":{" region ":" eu ","empty":"","spaces":" \t\n","single-braces":"{literal}"}}`, true},
+		{"template-looking literals", `{"index":0,"variables":{"region":"{{cfg.region}}","opening":"literal{{value","closing":"value}}literal"}}`, true},
+		{"null object", `null`, false},
+		{"missing choice", `{}`, false},
+		{"competing choices", `{"url":"https://example.com","index":0}`, false},
+		{"empty URL", `{"url":""}`, false},
+		{"null URL", `{"url":null}`, false},
+		{"negative index", `{"index":-1}`, false},
+		{"fractional index", `{"index":0.5}`, false},
+		{"string index", `{"index":"0"}`, false},
+		{"null index", `{"index":null}`, false},
+		{"bindings without choice", `{"variables":{}}`, false},
+		{"bindings with URL", `{"url":"https://example.com","variables":{}}`, false},
+		{"null bindings", `{"index":0,"variables":null}`, false},
+		{"array bindings", `{"index":0,"variables":[]}`, false},
+		{"null binding", `{"index":0,"variables":{"region":null}}`, false},
+		{"numeric binding", `{"index":0,"variables":{"region":1}}`, false},
+		{"empty name", `{"index":0,"variables":{"":"eu"}}`, false},
+		{"blank name", `{"index":0,"variables":{" \t\n":"eu"}}`, false},
+		{"Unicode blank name", `{"index":0,"variables":{"\u0085\u00a0\u2003":"eu"}}`, false},
+		{"vertical tab name", `{"index":0,"variables":{"\u000b":"eu"}}`, false},
+		{"miscased index", `{"Index":0}`, false},
+		{"unknown option", `{"index":0,"unknown":true}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var document any
+			require.NoError(t, json.Unmarshal([]byte(test.input), &document))
+			schemaErr := compiled.Validate(document)
+			asYAML, err := yaml.Marshal(common.RawJSON(test.input))
+			require.NoError(t, err)
+			for _, format := range []struct {
+				name   string
+				decode func(any) error
+			}{
+				{"JSON", func(value any) error { return util.DecodeJSONStrict([]byte(test.input), value) }},
+				{"YAML", func(value any) error { return util.DecodeYAMLStrict(asYAML, value) }},
+			} {
+				t.Run(format.name, func(t *testing.T) {
+					var value toolsets.OpenAPIServerConfig
+					err := format.decode(&value)
+					if err == nil {
+						err = value.Validate(nil)
+					}
+					if !test.valid {
+						require.Error(t, schemaErr)
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, schemaErr)
+					require.NoError(t, err)
+					roundTrip, err := json.Marshal(value)
+					require.NoError(t, err)
+					require.JSONEq(t, test.input, string(roundTrip))
+				})
+			}
+		})
+	}
+}
+
+// TestToolSetOpenAPIServerSelectionSchemaRoundTrip preserves indexed selection
+// in full definitions, resources, and replacement patches. Document bounds and
+// variable declarations remain importer checks, even for an empty document.
+func TestToolSetOpenAPIServerSelectionSchemaRoundTrip(t *testing.T) {
+	for _, envelope := range []struct {
+		name, fragment string
+		newValue       func() any
+	}{
+		{"definition", "#/$defs/ToolSetDefinition", func() any { return &toolsets.ToolSetDefinition{} }},
+		{"resource", "", func() any { return &toolsets.ToolSet{} }},
+		{"patch", "#/$defs/ToolSetPatch", func() any { return &toolsets.ToolSetPatch{} }},
+	} {
+		t.Run(envelope.name, func(t *testing.T) {
+			compiled := compileToolSetSchema(t, envelope.fragment)
+			for _, server := range []map[string]any{
+				{"index": 0},
+				{"index": 1, "variables": map[string]any{}},
+				{"index": 2, "variables": map[string]any{" region ": " eu ", "suffix": "", "literal": "{{cfg.host}}"}},
+			} {
+				definition := toolSetOpenAPIDefinitionSchemaFixture(t, map[string]any{"inline": map[string]any{}})
+				schemaObject(t, definition, "source", "openapi")["server"] = server
+				document := definition
+				if envelope.name != "definition" {
+					document = toolSetSchemaFixture(t)
+					delete(document, "status")
+					metadata := schemaObject(t, document, "metadata")
+					delete(metadata, "id")
+					delete(metadata, "generation")
+					schemaObject(t, document, "spec")["definition"] = definition
+				}
+				require.NoError(t, compiled.Validate(document))
+				encoded, err := json.Marshal(document)
+				require.NoError(t, err)
+				value := envelope.newValue()
+				require.NoError(t, util.DecodeJSONStrict(encoded, value))
+				asYAML, err := yaml.Marshal(value)
+				require.NoError(t, err)
+				fromYAML := envelope.newValue()
+				require.NoError(t, util.DecodeYAMLStrict(asYAML, fromYAML))
+				for _, decoded := range []any{value, fromYAML} {
+					switch decoded := decoded.(type) {
+					case *toolsets.ToolSetDefinition:
+						require.NoError(t, decoded.Validate(nil))
+					case *toolsets.ToolSet:
+						require.NoError(t, decoded.Validate(nil))
+					case *toolsets.ToolSetPatch:
+						require.NoError(t, decoded.ValidateFor(meta.ValidationModeUpdate, nil))
+					}
+					roundTrip, err := json.Marshal(decoded)
+					require.NoError(t, err)
+					require.JSONEq(t, string(encoded), string(roundTrip))
+				}
+			}
 		})
 	}
 }
