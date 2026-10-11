@@ -41,22 +41,27 @@ func (r *OpenAPIReferenceConfig) Validate(vc *common.ValidationContext) error {
 	if r == nil {
 		return nil
 	}
+
 	vc = validationContext(vc)
+
 	var result *multierror.Error
 	if r.BaseURI != nil {
 		if err := validateOpenAPIReferenceURI(*r.BaseURI); err != nil {
 			result = multierror.Append(result, vc.NewErrorForField("baseUri", err.Error()))
 		}
 	}
+
 	// Stable ordering makes diagnostics reproducible for authored bundles.
 	for _, uri := range slices.Sorted(maps.Keys(r.Bundle)) {
 		if err := validateOpenAPIReferenceURI(uri); err != nil {
 			result = multierror.Append(result, vc.NewErrorfForField("bundle", "document URI %q: %s", uri, err))
 		}
+
 		if !json.Valid(r.Bundle[uri]) {
 			result = multierror.Append(result, vc.NewErrorfForField("bundle", "document %q must contain one JSON value", uri))
 		}
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -64,18 +69,24 @@ func (r *OpenAPIReferenceConfig) Validate(vc *common.ValidationContext) error {
 // Non-HTTP schemes are allowed for supplied documents; fragments belong on
 // references to locations inside a document, not on its retrieval identity.
 func validateOpenAPIReferenceURI(value string) error {
-	if strings.Contains(value, "{{") || strings.Contains(value, "}}") ||
-		strings.ContainsFunc(value, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) {
+	if strings.Contains(value, "{{") ||
+		strings.Contains(value, "}}") ||
+		strings.ContainsFunc(value, func(r rune) bool {
+			return unicode.IsSpace(r) || unicode.IsControl(r)
+		}) {
 		return fmt.Errorf("must be a literal URI without whitespace, control characters, or templates")
 	}
+
 	parsed, err := url.Parse(value)
 	if err != nil || !parsed.IsAbs() {
 		return fmt.Errorf("must be an absolute URI")
 	}
+
 	// Presence matters even for an empty fragment: URL.Parse discards a bare #.
 	if parsed.User != nil || strings.Contains(value, "#") {
 		return fmt.Errorf("must not contain user information or a fragment")
 	}
+
 	return nil
 }
 
@@ -85,12 +96,15 @@ func (r *OpenAPIReferenceConfig) Clone() *OpenAPIReferenceConfig {
 	if r == nil {
 		return nil
 	}
+
 	clone := *r
 	clone.BaseURI = util.CloneValue(r.BaseURI)
 	clone.Bundle = maps.Clone(r.Bundle)
+
 	for uri, raw := range clone.Bundle {
 		clone.Bundle[uri] = slices.Clone(raw)
 	}
+
 	return &clone
 }
 
@@ -98,27 +112,37 @@ func (r *OpenAPIReferenceConfig) Clone() *OpenAPIReferenceConfig {
 // and duplicate bundle identities. Bundle payloads remain arbitrary JSON.
 // Failed decoding preserves the receiver rather than applying a partial update.
 func (r *OpenAPIReferenceConfig) UnmarshalJSON(data []byte) error {
-	fields, err := decodeStrictObject(data, "OpenAPI reference configuration", jsonFieldNames(reflect.TypeOf(OpenAPIReferenceConfig{}))...)
+	fields, err := decodeStrictObject(
+		data,
+		"OpenAPI reference configuration",
+		jsonFieldNames(reflect.TypeOf(OpenAPIReferenceConfig{}))...,
+	)
 	if err != nil {
 		return err
 	}
+
 	if raw, ok := fields["bundle"]; ok {
 		if err := validateOpenAPIReferenceBundleJSON(raw); err != nil {
 			return err
 		}
 	}
+
 	// Decode exactly the checked fields so repeated top-level map fields cannot
 	// merge earlier, unchecked documents into the resulting bundle.
 	checked, err := json.Marshal(fields)
 	if err != nil {
 		return err
 	}
+
 	type plain OpenAPIReferenceConfig
 	var decoded plain
+
 	if err := util.DecodeJSONStrict(checked, &decoded); err != nil {
 		return err
 	}
+
 	*r = OpenAPIReferenceConfig(decoded)
+
 	return nil
 }
 
@@ -127,29 +151,38 @@ func (r *OpenAPIReferenceConfig) UnmarshalJSON(data []byte) error {
 // URI escape spellings are compared as decoded JSON strings; payloads are opaque.
 func validateOpenAPIReferenceBundleJSON(raw json.RawMessage) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
+
 	token, err := decoder.Token()
 	if err != nil {
 		return err
 	}
+
 	if token != json.Delim('{') {
 		return fmt.Errorf("bundle must be an object")
 	}
+
 	seen := make(map[string]bool)
+
 	for decoder.More() {
 		token, err := decoder.Token()
 		if err != nil {
 			return err
 		}
+
 		uri := token.(string) // Object keys in valid JSON are always strings.
 		if seen[uri] {
 			return fmt.Errorf("bundle document URI %q must not be repeated", uri)
 		}
+
 		seen[uri] = true
+
 		var document json.RawMessage
+
 		if err := decoder.Decode(&document); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -160,5 +193,6 @@ func (r *OpenAPIReferenceConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := raw.UnmarshalYAML(node); err != nil {
 		return err
 	}
+	
 	return r.UnmarshalJSON(raw)
 }
