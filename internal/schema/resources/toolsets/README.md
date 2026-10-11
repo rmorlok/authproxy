@@ -2,13 +2,14 @@
 
 This package owns the `ToolSet` resource envelope, generation release fields,
 connection selectors, explicit templates, OpenAPI and MCP source settings,
-imported defaults and permission mappings, patches, and generation selection policy. It is
-a contract foundation: management routes, registry/apply integration, publication
-transactions, persistence, and reconciliation are implemented in later slices.
-Other OpenAPI import settings and source diagnostics are
-also deferred. Strict input decoding and the JSON schema reject those fields
-until their contracts are implemented. Source validation does not fetch documents,
-resolve references, negotiate protocols, or discover or execute tools.
+imported defaults and permission mappings, source diagnostics, patches, and
+generation selection policy. It is a contract foundation: management routes,
+registry/apply integration, publication transactions, persistence, and
+reconciliation are implemented in later slices.
+Other OpenAPI import settings are deferred. Strict input decoding and the JSON
+schema reject those fields until their contracts are implemented. Source
+validation does not fetch documents, resolve references, negotiate protocols,
+or discover or execute tools.
 
 `metadata` identifies the logical `tls_` resource and its addressed generation.
 `spec.connectionSelector` is shared across generations. `spec.release` and
@@ -142,8 +143,63 @@ metadata and limits. Defaults cannot change names, schemas, executors, source
 keys, permission verbs, or connection references.
 
 This package validates and preserves the settings. Applying them to provider
-content will be implemented with the importers. Hint provenance and source
-diagnostics remain separate contracts.
+content will be implemented with the importers. Hint provenance remains a
+separate contract.
+
+## Source diagnostics
+
+An OpenAPI generation can report import findings under server-owned
+`status.importDiagnostics`. Each entry explains a problem or warning and can
+identify the affected operation and its location:
+
+```yaml
+status:
+  release:
+    state: draft
+  importDiagnostics:
+    - severity: error
+      code: UNSUPPORTED_PARAMETER_SERIALIZATION
+      message: This parameter serialization is not supported.
+      sourceKey: listCalendars
+      location:
+        documentUri: https://api.example.com/openapi.json
+        jsonPointer: /paths/~1calendars/get/parameters/0
+```
+
+`severity` is `warning` or `error`. `code` is a nonblank machine-readable reason;
+consumers must accept new codes. The code above is illustrative; importers will
+define the codes they emit. `message` is the human-readable explanation.
+`sourceKey` is optional because document acquisition, parsing, or identity
+validation can fail before an operation key is known. Keys are preserved exactly.
+
+`location` is optional. When supplied, it needs a document URI, a JSON pointer,
+or both. The URI identifies a document and does not authorize fetching it.
+It must be absolute and omit user information and fragments. The pointer uses
+[JSON Pointer string syntax](https://www.rfc-editor.org/rfc/rfc6901#section-3):
+`~1` represents a slash in a key and `~0` represents a tilde. An empty string
+identifies the document root. An omitted pointer identifies no particular value;
+an omitted document URI uses the report's source document. This also locates
+failures in supplied or acquired reference documents.
+
+The list describes the latest import attempt for the addressed generation.
+A failed refresh may report errors while preserving the previous successful
+snapshot. An empty or omitted list means only that no diagnostics are recorded;
+it does not prove a snapshot exists or is ready to publish. Severity alone does
+not determine publication or skip policy. The importer owns those decisions,
+snapshot/attempt provenance, and replacing or clearing obsolete diagnostics
+when a draft definition changes. Patch candidates preserve detached status;
+the service must update observations before persisting a changed source.
+
+MCP catalogs differ by connection, so their reports belong to binding status,
+not `ToolSet.status.importDiagnostics`. Future binding/API reports can reuse
+`SourceDiagnostic`. Nonempty generation import reports are rejected for MCP
+and explicit sources. Authors cannot write diagnostics through configuration,
+create, or update requests. Producers must omit credentials, private URL query
+values, connection configuration, and raw upstream error bodies from messages
+and locations; validation checks shape and syntax, not redaction.
+
+This slice defines the report and its validation/cloning behavior. Importers,
+binding reports, source artifact storage, and management routes follow later.
 
 ## OpenAPI sources
 
