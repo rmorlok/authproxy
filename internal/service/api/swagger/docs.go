@@ -1899,7 +1899,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Get a specific connector by its UUID",
+                "description": "Get a connector's primary generation by its ID. Connectors without a primary generation (draft-only, archiving, or archived) return 404; use the generation endpoints to read those generations.",
                 "consumes": [
                     "application/json"
                 ],

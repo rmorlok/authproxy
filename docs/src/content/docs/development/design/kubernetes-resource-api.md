@@ -227,7 +227,7 @@ for every concrete registration in the audited route set.
 | Resource | Registered method and path | Target |
 | --- | --- | --- |
 | Connector | `GET|POST /api/v1/connectors` | `ConnectorList` or `Connector` |
-| Connector | `GET|PATCH /api/v1/connectors/:id` | `Connector`; patch metadata/spec |
+| Connector | `GET|PATCH /api/v1/connectors/:id` | `Connector`; GET returns the primary generation (404 when none); patch metadata/spec |
 | Connector generation | `GET|POST /api/v1/connectors/:id/generations` | `ConnectorList` or `Connector`; use `metadata.generation` |
 | Connector generation | `GET|PATCH /api/v1/connectors/:id/generations/:generation` | `Connector`; path generation matches `metadata.generation` |
 | Connector action | `POST /api/v1/connectors/:id/_disconnectAll` | `ConnectorDisconnectAll` action; task/workflow result in status |

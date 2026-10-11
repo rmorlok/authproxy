@@ -80,10 +80,17 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	ns, err := r.core.GetNamespace(ctx, path)
+	// A namespace's immutable ID is its canonical path.
+	ns, err := r.core.ResolveNamespaceReference(ctx, idObjectReference(namespace.NamespaceKind, path))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid namespace path", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}

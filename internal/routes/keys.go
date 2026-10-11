@@ -114,7 +114,7 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	ek, err := r.core.GetKey(ctx, id)
+	ek, err := r.core.ResolveKeyReference(ctx, idObjectReference(keyschema.KeyKind, id.String()))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(
@@ -122,6 +122,16 @@ func (r *KeysRoutes) get(gctx *gin.Context) {
 				nil, // logger
 				httperr.NotFound(fmt.Sprintf("key '%s' not found", id),
 					httperr.WithInternalErr(err)),
+			)
+			val.MarkErrorReturn()
+			return
+		}
+
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(
+				gctx,
+				nil, // logger
+				httperr.BadRequest("invalid id", httperr.WithInternalErr(err)),
 			)
 			val.MarkErrorReturn()
 			return

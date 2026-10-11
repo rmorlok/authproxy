@@ -152,15 +152,38 @@ const draftConnectorGeneration: ConnectorResource = {
   status: {release: {state: ConnectorReleaseState.DRAFT}},
 };
 
+// A connector whose only generation is a draft. `GET /connectors/:id` returns
+// 404 for it because it has no primary generation.
+const draftOnlyConnector: ConnectorResource = {
+  ...draftConnectorGeneration,
+  metadata: {...draftConnectorGeneration.metadata, id: 'cxr_payments_adyen', name: 'adyen', generation: 1},
+  spec: {
+    ...draftConnectorGeneration.spec,
+    definition: {...connector.spec.definition, displayName: 'Adyen', highlight: undefined},
+  },
+};
+
+// Sentinel returned by responseData for URLs the mock API answers with 404.
+const NOT_FOUND = Symbol('not found');
+
 configureClient({
   axiosConfigOverride: {
-    adapter: async (config) => ({
-      data: responseData(config.url || ''),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config,
-    }),
+    adapter: async (config) => {
+      const data = responseData(config.url || '', config.params);
+      if (data === NOT_FOUND) {
+        throw Object.assign(new Error('Request failed with status code 404'), {
+          config,
+          response: {data: {error: 'not found'}, status: 404, statusText: 'Not Found', headers: {}, config},
+        });
+      }
+      return {
+        data,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      };
+    },
   },
 });
 
@@ -178,6 +201,10 @@ export const Namespace: Story = {
 
 export const Connector: Story = {
   render: () => <DetailCanvas><ConnectorDetail connectorId={connector.metadata.id}/></DetailCanvas>,
+};
+
+export const ConnectorWithoutPrimary: Story = {
+  render: () => <DetailCanvas><ConnectorDetail connectorId={draftOnlyConnector.metadata.id}/></DetailCanvas>,
 };
 
 export const ConnectorGeneration: Story = {
@@ -204,7 +231,12 @@ function DetailCanvas({children}: {children: React.ReactNode}) {
   return <Box sx={{maxWidth: 960, minHeight: '100vh', mx: 'auto', bgcolor: 'background.default'}}>{children}</Box>;
 }
 
-function responseData(url: string) {
+function responseData(url: string, params?: {state?: string}) {
+  if (url === `/api/v1/connectors/${draftOnlyConnector.metadata.id}`) return NOT_FOUND;
+  if (url === `/api/v1/connectors/${draftOnlyConnector.metadata.id}/generations`) {
+    const items = !params?.state || params.state === ConnectorReleaseState.DRAFT ? [draftOnlyConnector] : [];
+    return {apiVersion: API_VERSION, kind: 'ConnectorList', metadata: {}, items};
+  }
   if (url === `/api/v1/namespaces/${namespace.metadata.id}`) return namespace;
   if (url === `/api/v1/connectors/${connector.metadata.id}`) return connector;
   if (url === `/api/v1/connectors/${connector.metadata.id}/generations`) {

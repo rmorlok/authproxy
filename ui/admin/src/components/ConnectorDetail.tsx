@@ -23,6 +23,7 @@ import {
   Connector,
   CONNECTOR_KIND,
   API_VERSION,
+  ConnectorReleaseState,
   connectors,
   PollForTaskResult,
   Task,
@@ -58,6 +59,44 @@ interface AdminConnectorDefinition extends Record<string, unknown> {
   logo?: {publicUrl?: string; base64?: string; mimeType?: string};
 }
 
+/**
+ * Generation states to try, in priority order, when a connector has no primary
+ * generation. This mirrors the ranking the connector list uses so the detail
+ * page shows the same generation a user clicked on in the list.
+ */
+const FALLBACK_GENERATION_STATES = [
+  ConnectorReleaseState.DRAFT,
+  ConnectorReleaseState.ACTIVE,
+  ConnectorReleaseState.ARCHIVED,
+];
+
+/**
+ * Loads the connector generation to display on the detail page.
+ *
+ * `GET /connectors/:id` only returns the primary generation and responds 404
+ * when there is none (draft-only, archiving, or archived connectors). In that
+ * case this falls back to the newest generation in the highest-priority state
+ * that has one. Returns `fallback: true` when a non-primary generation was
+ * used. Errors other than 404 from the primary lookup are rethrown, and the
+ * original 404 is rethrown if no generation exists in any fallback state.
+ */
+export async function loadConnectorForDetail(connectorId: string): Promise<{connector: Connector, fallback: boolean}> {
+  try {
+    const res = await connectors.get(connectorId);
+    return {connector: res.data, fallback: false};
+  } catch (err: any) {
+    if (err?.response?.status !== 404) throw err;
+
+    for (const state of FALLBACK_GENERATION_STATES) {
+      const resp = await connectors.listGenerations(connectorId, {state, limit: 1, orderBy: 'generation desc'});
+      const generation = resp.data.items?.[0];
+      if (generation) return {connector: generation, fallback: true};
+    }
+
+    throw err;
+  }
+}
+
 function connectorLogoUrl(definition: AdminConnectorDefinition): string {
   if (definition.logo?.publicUrl) return definition.logo.publicUrl;
   if (!definition.logo?.base64) return '';
@@ -68,6 +107,9 @@ export default function ConnectorDetail({connectorId, initialGeneration}: { conn
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [conn, setConn] = useState<Connector | null>(null);
+  // True when the connector has no primary generation and `conn` is a
+  // fallback draft, active, or archived generation.
+  const [noPrimary, setNoPrimary] = useState(false);
   const [confirmDisconnectAllOpen, setConfirmDisconnectAllOpen] = useState(false);
   const [confirmArchiveOpen, setConfirmArchiveOpen] = useState(false);
   const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleStatus | null>(null);
@@ -86,10 +128,11 @@ export default function ConnectorDetail({connectorId, initialGeneration}: { conn
     let cancelled = false;
     setLoading(true);
     setError(null);
-    connectors.get(connectorId)
-      .then(res => {
+    loadConnectorForDetail(connectorId)
+      .then(({connector, fallback}) => {
         if (cancelled) return;
-        setConn(res.data);
+        setConn(connector);
+        setNoPrimary(fallback);
       })
       .catch(err => {
         if (cancelled) return;
@@ -279,6 +322,12 @@ export default function ConnectorDetail({connectorId, initialGeneration}: { conn
           />
         </Menu>
       </Stack>
+
+      {noPrimary && (
+        <Alert severity="info">
+          This connector has no primary generation. Showing generation {conn.metadata.generation} ({conn.status.release.state}).
+        </Alert>
+      )}
 
       {definition.displayName && (
         <Typography variant="body2" color="text.secondary">Definition display name: {definition.displayName}</Typography>

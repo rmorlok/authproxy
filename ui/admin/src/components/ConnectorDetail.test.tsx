@@ -100,4 +100,78 @@ describe('ConnectorDetail', () => {
     expect(namespace).not.toBeNull();
     expect(within(namespace!).getByText('root')).toBeTruthy();
   });
+  describe('when the connector has no primary generation', () => {
+    const notFound = Object.assign(new Error('Request failed with status code 404'), {
+      response: {status: 404, data: {error: "connector 'cxr_test' not found"}},
+    });
+    const draft = {...connector, metadata: {...connector.metadata, generation: 5}, status: {release: {state: ConnectorReleaseState.DRAFT}}};
+    const archived = {...connector, metadata: {...connector.metadata, generation: 2}, status: {release: {state: ConnectorReleaseState.ARCHIVED}}};
+
+    // Responds to state-filtered generation queries with the matching
+    // generations, and to the unfiltered list with every generation.
+    const mockGenerationsByState = (items: typeof connector[]) => {
+      vi.mocked(connectors.listGenerations).mockImplementation(((_id: string, params?: {state?: string}) => Promise.resolve({
+        status: 200,
+        data: {
+          apiVersion: 'authproxy.net/v1alpha1',
+          kind: 'ConnectorList',
+          metadata: {},
+          items: params?.state ? items.filter(g => g.status.release.state === params.state) : items,
+        },
+      })) as never);
+    };
+
+    const renderDetail = () => render(
+      <MemoryRouter>
+        <ConnectorDetail connectorId={connector.metadata.id}/>
+      </MemoryRouter>,
+    );
+
+    it('falls back to the newest draft generation', async () => {
+      vi.mocked(connectors.get).mockRejectedValue(notFound);
+      mockGenerationsByState([draft, archived]);
+
+      renderDetail();
+
+      await screen.findByRole('heading', {name: 'example-connector'});
+      expect(screen.getByText('This connector has no primary generation. Showing generation 5 (draft).')).toBeTruthy();
+      expect(connectors.listGenerations).toHaveBeenCalledWith(
+        connector.metadata.id,
+        {state: ConnectorReleaseState.DRAFT, limit: 1, orderBy: 'generation desc'},
+      );
+    });
+
+    it('falls back to an archived generation when nothing higher priority exists', async () => {
+      vi.mocked(connectors.get).mockRejectedValue(notFound);
+      mockGenerationsByState([archived]);
+
+      renderDetail();
+
+      await screen.findByText('This connector has no primary generation. Showing generation 2 (archived).');
+    });
+
+    it('shows the not-found error when no generation exists', async () => {
+      vi.mocked(connectors.get).mockRejectedValue(notFound);
+      mockGenerationsByState([]);
+
+      renderDetail();
+
+      await screen.findByText("connector 'cxr_test' not found");
+    });
+
+    it('does not fall back for errors other than not found', async () => {
+      vi.mocked(connectors.get).mockRejectedValue(Object.assign(new Error('boom'), {
+        response: {status: 500, data: {error: 'Internal Server Error'}},
+      }));
+      mockGenerationsByState([draft]);
+
+      renderDetail();
+
+      await screen.findByText('Internal Server Error');
+      expect(connectors.listGenerations).not.toHaveBeenCalledWith(
+        connector.metadata.id,
+        expect.objectContaining({state: expect.anything()}),
+      );
+    });
+  });
 });

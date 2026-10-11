@@ -142,10 +142,15 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	rl, err := r.core.GetRateLimit(ctx, id)
+	rl, err := r.core.ResolveRateLimitReference(ctx, idObjectReference(rlschema.RateLimitKind, id.String()))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("rate limit '%s' not found", id), httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}

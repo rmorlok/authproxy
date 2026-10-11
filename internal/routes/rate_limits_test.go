@@ -212,6 +212,21 @@ func TestRateLimits(t *testing.T) {
 			require.Equal(t, http.StatusNotFound, w.Code)
 		})
 
+		t.Run("id for another resource kind", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/rate-limits/%s", apid.New(apid.PrefixKey)),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+		})
+
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

@@ -102,7 +102,7 @@ func parseConnectorGenerationID(gctx *gin.Context) (connectorGenerationID, *http
 }
 
 // @Summary		Get connector
-// @Description	Get a specific connector by its UUID
+// @Description	Get a connector's primary generation by its ID. Connectors without a primary generation (draft-only, archiving, or archived) return 404; use the generation endpoints to read those generations.
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
@@ -125,10 +125,19 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	c, err := r.loadConnectorByID(ctx, connectorId)
+	// A generationless reference resolves to the connector's primary
+	// generation. Connectors without a primary generation (e.g. draft-only)
+	// are reported as not found; specific generations remain reachable via
+	// /connectors/:id/generations/:generation.
+	c, err := r.connectors.ResolveConnectorReference(ctx, idObjectReference(cschema.ConnectorKind, connectorId.String()))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -280,29 +289,25 @@ func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 	connectorId := generationID.ConnectorID
 	generation := generationID.Generation
 
-	b := r.connectors.
-		ListConnectorGenerationsBuilder().
-		ForId(connectorId).
-		Limit(1)
+	reference := idObjectReference(cschema.ConnectorKind, connectorId.String())
+	reference.Generation = generation
 
-	b = b.ForGeneration(generation)
-
-	// TODO: support lookup by certain states
-
-	result := b.FetchPage(ctx)
-	if result.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
+	c, err := r.connectors.ResolveConnectorReference(ctx, reference)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connector generation reference", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
-
-	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector generation '%s:%d' not found", connectorId, generation))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)

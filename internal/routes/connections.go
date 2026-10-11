@@ -558,10 +558,16 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	c, err := r.core.GetConnection(ctx, id)
+	c, err := r.core.ResolveConnectionReference(ctx, idObjectReference(connectionschema.ConnectionKind, id.String()))
 	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
+		if errors.Is(err, coreIface.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
+			val.MarkErrorReturn()
+			return
+		}
+
+		if errors.Is(err, coreIface.ErrInvalidArgument) {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}

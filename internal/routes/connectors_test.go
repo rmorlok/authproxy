@@ -1840,19 +1840,25 @@ func TestConnectors(t *testing.T) {
 		tu.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusConflict, w.Code, w.Body.String())
 
-		for _, path := range []string{
-			"/connectors/" + custom.GetId().String(),
-			fmt.Sprintf("/connectors/%s/generations/%d", custom.GetId(), custom.Metadata.Generation),
-		} {
-			w = httptest.NewRecorder()
-			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-				http.MethodGet, path, nil, "root", "some-actor", aschema.AllPermissions(),
-			)
-			require.NoError(t, err)
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
-			require.Contains(t, w.Body.String(), `"name":"renamed-connector"`)
-		}
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, fmt.Sprintf("/connectors/%s/generations/%d", custom.GetId(), custom.Metadata.Generation),
+			nil, "root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		require.Contains(t, w.Body.String(), `"name":"renamed-connector"`)
+
+		// The connector only has a draft generation, and a generationless GET
+		// resolves to the primary generation, so it is not found.
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet, "/connectors/"+custom.GetId().String(), nil, "root", "some-actor", aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
 
 		w = httptest.NewRecorder()
 		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
