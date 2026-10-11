@@ -193,10 +193,82 @@ Retaining the snapshot lets administrators inspect that state; it does not grant
 execution permission. Invocation admission must recheck the live context.
 
 Validation checks the projection's shape. Routes, reconciliation, migration and
-refresh actions, atomic inventory activation, freshness calculation, and context
+refresh execution, atomic inventory activation, freshness calculation, and context
 checks follow in later slices. Producers must bound and redact diagnostics;
 credentials, context fingerprints, internal epochs, and raw catalog contents do
 not belong in this response.
+
+## ToolSet migration and catalog refresh actions
+
+These connection management actions select one ToolSet binding and start
+background work:
+
+| Planned endpoint | Action kind | ToolSet reference |
+| --- | --- | --- |
+| `POST /connections/{id}/_migrateToolSetGeneration` | `ConnectionToolSetGenerationMigration` | Selects an exact generation. |
+| `POST /connections/{id}/_refreshToolSet` | `ConnectionToolSetRefresh` | Selects the logical ToolSet, without a generation. |
+
+For example, migrate one connection's binding to generation 5:
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: ConnectionToolSetGenerationMigration
+metadata:
+  target:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    id: cxn_01example0000001
+spec:
+  toolSetRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: ToolSet
+    id: tls_01example0000001
+    generation: 5
+  timeoutSeconds: 600
+```
+
+The target generation must be positive. An older active generation can be a
+rollback target; the contract imposes no increasing-generation rule. Both
+references follow the existing management convention: an ID or a namespace/name
+pair, with a typed `apiVersion` and `kind`. A Connection target never carries a
+generation.
+
+For an MCP catalog refresh, use `kind: ConnectionToolSetRefresh` with the same
+Connection target and omit the ToolSet generation:
+
+```yaml
+spec:
+  toolSetRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: ToolSet
+    id: tls_01example0000001
+```
+
+Refresh uses that binding's current source configuration. It does not migrate
+the binding or refresh an OpenAPI draft. Both actions accept an optional positive
+`timeoutSeconds` for the background operation. Omission uses the service default;
+the value does not tell the HTTP request to wait for completion.
+
+Responses keep the same action kind, target, and safe request spec, and add:
+
+```yaml
+status:
+  taskId: opaque-encrypted-tracking-token
+```
+
+`taskId` follows connector migration: it is an actor-bound tracking token for
+`GET /tasks/{token}`, not a raw workflow or queue identifier. It acknowledges
+accepted durable work, not successful inventory activation. Poll task status for
+completion and inspect the binding for its installed generation, migration
+conditions, or retained MCP catalog. Requests must omit server-owned status.
+
+Use strict JSON/YAML decoding and the action's `ValidateRequest` or
+`ValidateResponse` method with its kind constant. Validation checks references,
+generation/timeout shape, and the response token; it does not resolve references
+or authenticate tokens. Routes and workers must enforce URL-target agreement,
+management permissions, binding/source eligibility, published-generation state,
+and atomic activation with context/epoch checks. These runtime behaviors and
+OpenAPI draft refresh remain later implementation work.
 
 ## Tool invocation
 
