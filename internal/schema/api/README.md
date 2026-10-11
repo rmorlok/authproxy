@@ -27,6 +27,88 @@ runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
 or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
 contract ownership stays clear.
 
+## Tool discovery
+
+`ToolDescriptor` is the usage information an agent can read through a tool grant.
+It contains the Tool ID and revision, display name and description, minimal
+connection identity, readiness, and optional hints and schemas. It has no fields
+for executable definitions, permission verbs, credentials, connection
+configuration, or arbitrary metadata. Management resources remain separate.
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: ToolDescriptor
+toolId: tol_01example0000001
+revision: 7
+name: list-events
+description: List calendar events for a team.
+connection:
+  id: cxn_01example0000001
+  name: work-calendar
+readiness:
+  state: ready
+hints:
+  readOnly: {value: true, provenance: administrator}
+  idempotent: {value: false, provenance: provider}
+schema: full
+inputSchema:
+  type: object
+  properties:
+    team: {type: string}
+  required: [team]
+examples: [{team: engineering}]
+usage: Use the connection name to select the intended account.
+```
+
+Generated tools add `toolSet: {id, name, generation}`. MCP tools can also include
+their connection's positive `catalogRevision`; a catalog revision requires a
+ToolSet identity. These fields describe the captured definition's provenance.
+
+Readiness is `ready`, `unavailable`, or `unknown`, with an optional extensible
+`reason` and safe `message`. Optional `connectionHealth: {state: unhealthy}`
+records probe/credential health separately: an unhealthy probe can coexist with
+a ready tool. An omitted health observation makes no health claim. Readiness
+does not promise that a later invocation will succeed.
+
+Each behavioral hint has its own `administrator` or `provider` provenance, so
+overriding one imported hint does not imply that all hints are trusted. Explicit
+false differs from an omitted hint. Hints never grant permission or enable
+automatic retries.
+
+The required `schema` field identifies the descriptor's detail level:
+
+- `none` omits input and output schemas, examples, and usage guidance.
+- `compact` includes an input schema and optional output schema. The producer
+  removes verbose descriptions/examples while preserving validation constraints.
+- `full` includes unchanged schemas and can add bounded usage guidance and
+  `examples`, an array of invocation argument objects.
+
+The API validator checks JSON shapes, not JSON Schema semantics or example
+conformance. Producers compile schemas before publication, enforce size bounds,
+and construct safe projections. Raw schemas and examples preserve nested nulls
+and number precision through JSON/YAML. A boolean output schema is supported.
+
+`ToolSearchQuery` selects one page using `query`, `labelSelector`, optional
+`toolSetId`, `schema`, `includeUnavailable`, `limit`, and `continue`.
+`WithDefaults()` selects `schema=none` and a limit of five; explicit limits must
+be between 1 and 100. `includeUnavailable` defaults to false and can include
+permitted tools with unavailable or unknown readiness. Connection selection uses
+`labelSelector=apxy/cxn/-/id=cxn_01example0000001`; there is no separate connection
+list option. Selectors narrow permissions and are applied before pagination.
+
+`ToolDescriptorList` uses the shared v1alpha1 list envelope and an opaque
+`metadata.continue` token. Single describe responses use `ToolDescriptor` itself.
+`AgentConnectionList` similarly returns minimal `AgentConnection` summaries with
+`id`, `name`, and server-computed `canProxy`. Visibility through a tool grant does
+not imply proxy access.
+
+These are contracts for the future discovery service. The service must parse
+the existing label-selector syntax, authorize before ranking/counting/pagination,
+derive connection labels, bind cursors to caller/query/catalog context, and
+evaluate `canProxy` using the actor/JWT intersection. DTO validation performs
+none of those runtime decisions. It also does not sanitize provider descriptions;
+clients must treat descriptions, schemas, examples, and guidance as data.
+
 ## Tool invocation
 
 `ToolInvokeRequest` targets a Tool by its immutable ID. Its `spec.arguments`
