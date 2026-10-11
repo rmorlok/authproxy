@@ -363,8 +363,9 @@ importer can retrieve it. Each entry names one document, rather than allowing
 access to an entire host or every URL found in the specification.
 
 For example, if the root document contains
-`$ref: https://schemas.example.test/item.json#/$defs/Item`, configure the
-document URL without the fragment:
+`$ref: https://api.example.test/schemas/item.json#/$defs/Item`, configure the
+document URL without the fragment. The root document and reference can use
+the same connection:
 
 ```yaml
 # Under source.openapi:
@@ -377,20 +378,26 @@ document:
     name: specification-reader
 references:
   fetch:
-    - url: https://schemas.example.test/item.json
+    - url: https://api.example.test/schemas/item.json
       fetchConnectionRef:
         apiVersion: authproxy.net/v1alpha1
         kind: Connection
-        namespace: root.schemas
-        name: schema-reader
+        namespace: root.documents
+        name: specification-reader
     - url: https://public.example.test/common.json
 ```
 
-The root document uses `specification-reader`; `item.json` uses `schema-reader`.
-`common.json` is fetched without credentials. Omitting an entry's
-`fetchConnectionRef` never inherits credentials from the root document or
-another entry. These connections are separately resolved and authorized for
-acquisition; they are independent of connections that will receive tools.
+Both the root document and `item.json` use `specification-reader`. A separate
+connection is useful when a reference needs different credentials, such
+as a shared schema service with its own authentication. A public reference
+can omit `fetchConnectionRef`, as `common.json` does here.
+
+Each authenticated entry explicitly names its connection, even when reusing
+the root document's connection. Omitting `fetchConnectionRef` means no
+credentials; it never inherits them from another fetch. This prevents root
+document credentials from being sent to an unrelated reference URL by default.
+The importer resolves and authorizes each acquisition connection separately
+from the target connections that will receive tools.
 
 The importer will snapshot the fetched documents along with supplied bundle
 content. If `item.json` refers to `common.json` at the public URL above, the
