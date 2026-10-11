@@ -42,11 +42,13 @@ func (f *OpenAPIReferenceFetch) Validate(vc *common.ValidationContext) error {
 	if err := validateOpenAPIDocumentURL(f.URL); err != nil {
 		result = multierror.Append(result, vc.NewErrorForField("url", err.Error()))
 	}
+
 	if f.FetchConnectionRef != nil {
 		result = multierror.Append(result, tools.ValidateConnectionReference(
 			*f.FetchConnectionRef, "", vc.PushField("fetchConnectionRef"),
 		))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -54,10 +56,15 @@ func (f *OpenAPIReferenceFetch) Validate(vc *common.ValidationContext) error {
 // connection reference before typed decoding can discard forbidden generation
 // or null fields. Failed decoding leaves the receiver unchanged.
 func (f *OpenAPIReferenceFetch) UnmarshalJSON(data []byte) error {
-	fields, err := decodeStrictObject(data, "OpenAPI reference fetch", jsonFieldNames(reflect.TypeOf(OpenAPIReferenceFetch{}))...)
+	fields, err := decodeStrictObject(
+		data,
+		"OpenAPI reference fetch",
+		jsonFieldNames(reflect.TypeOf(OpenAPIReferenceFetch{}))...,
+	)
 	if err != nil {
 		return err
 	}
+
 	if raw, ok := fields["fetchConnectionRef"]; ok {
 		if err := validateOpenAPIFetchReferenceFields(raw); err != nil {
 			return err
@@ -70,12 +77,15 @@ func (f *OpenAPIReferenceFetch) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
+
 	type plain OpenAPIReferenceFetch
 	var decoded plain
 	if err := util.DecodeJSONStrict(checked, &decoded); err != nil {
 		return err
 	}
+
 	*f = OpenAPIReferenceFetch(decoded)
+
 	return nil
 }
 

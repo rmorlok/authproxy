@@ -73,15 +73,18 @@ func (r *OpenAPIReferenceConfig) Validate(vc *common.ValidationContext) error {
 		fetch := &r.Fetch[i]
 		path := vc.PushField("fetch").PushIndex(i)
 		result = multierror.Append(result, fetch.Validate(path))
+
 		// Only exact authored addresses are checked here; the importer resolves
 		// normalized URI identities and content-defined aliases during import.
 		// Errors omit the address because its query may contain private data.
 		if seen[fetch.URL] {
 			result = multierror.Append(result, path.NewErrorForField("url", "must not be repeated in fetch"))
 		}
+
 		if _, supplied := r.Bundle[fetch.URL]; supplied {
 			result = multierror.Append(result, path.NewErrorForField("url", "must not also appear in bundle"))
 		}
+
 		seen[fetch.URL] = true
 	}
 
