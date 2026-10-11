@@ -486,6 +486,7 @@ func (s *service) recomputeToolSetLabelsTx(ctx context.Context, id apid.ID) (boo
 		return false, err
 	}
 	defer tx.Rollback()
+
 	toolSet, err := s.getToolSet(ctx, tx, sq.Eq{"id": id})
 	if errors.Is(err, ErrNotFound) {
 		return false, nil
@@ -493,22 +494,28 @@ func (s *service) recomputeToolSetLabelsTx(ctx context.Context, id apid.ID) (boo
 	if err != nil {
 		return false, err
 	}
+
 	userLabels, _ := SplitUserAndApxyLabels(toolSet.Labels)
+
 	nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
 		"path": toolSet.Namespace, "deleted_at": nil,
 	})
 	if err != nil {
 		return false, err
 	}
+
 	newLabels := ApplyParentCarryForward(userLabels, ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels})
 	newLabels = InjectSelfImplicitLabels(toolSet.Id, toolSet.Name, toolSet.Namespace, newLabels)
+
 	corrected, err := s.writeRecomputedLabels(ctx, tx, ToolSetsTable, sq.Eq{"id": id, "deleted_at": nil}, toolSet.Labels, newLabels)
 	if err != nil {
 		return false, err
 	}
+
 	if err := tx.Commit(); err != nil {
 		return false, err
 	}
+
 	return corrected, nil
 }
 
@@ -774,19 +781,31 @@ func (s *service) reconcileRateLimits(ctx context.Context, batchSize int32, limi
 // reconcileToolSets walks live IDs in bounded, ascending pages. Reading IDs
 // instead of sorting by updated_at keeps label writes from shifting the cursor.
 // The caller supplies a positive batchSize; rate limiting applies to each row.
-func (s *service) reconcileToolSets(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+func (s *service) reconcileToolSets(
+	ctx context.Context,
+	batchSize int32,
+	limiter *rate.Limiter,
+) (int64, error) {
 	var corrected int64
 	var lastID apid.ID
 	for {
-		query := s.sq.Select("id").From(ToolSetsTable).
-			Where(sq.Eq{"deleted_at": nil}).OrderBy("id").Limit(uint64(batchSize))
+		query := s.sq.
+			Select("id").
+			From(ToolSetsTable).
+			Where(sq.Eq{"deleted_at": nil}).
+			OrderBy("id").
+			Limit(uint64(batchSize))
 		if lastID != "" {
 			query = query.Where(sq.Gt{"id": lastID})
 		}
-		rows, err := query.RunWith(s.db).QueryContext(ctx)
+
+		rows, err := query.
+			RunWith(s.db).
+			QueryContext(ctx)
 		if err != nil {
 			return corrected, err
 		}
+
 		ids := make([]apid.ID, 0, batchSize)
 		for rows.Next() {
 			var id apid.ID
@@ -794,27 +813,33 @@ func (s *service) reconcileToolSets(ctx context.Context, batchSize int32, limite
 				rows.Close()
 				return corrected, err
 			}
+
 			ids = append(ids, id)
 		}
+
 		// Release the read cursor before opening any per-row write transaction.
 		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
 			return corrected, err
 		}
+
 		for _, id := range ids {
 			if limiter != nil {
 				if err := limiter.Wait(ctx); err != nil {
 					return corrected, err
 				}
 			}
+
 			wasCorrected, err := s.recomputeToolSetLabelsTx(ctx, id)
 			if err != nil {
 				return corrected, err
 			}
+
 			if wasCorrected {
 				corrected++
 				s.logger.Info("reconciled drifted carry-forward labels", "type", "tool_set", "id", id)
 			}
 		}
+
 		if len(ids) < int(batchSize) {
 			return corrected, nil
 		}
