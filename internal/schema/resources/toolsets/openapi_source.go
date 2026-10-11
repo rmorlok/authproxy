@@ -102,7 +102,11 @@ func (f *OpenAPIOperationFilter) Clone() *OpenAPIOperationFilter {
 // UnmarshalJSON rejects noncanonical fields and null objects before ordinary
 // pointer decoding could erase their presence. Failed decoding is atomic.
 func (s *OpenAPISource) UnmarshalJSON(data []byte) error {
-	if _, err := decodeStrictObject(data, "OpenAPI source", jsonFieldNames(reflect.TypeOf(OpenAPISource{}))...); err != nil {
+	if _, err := decodeStrictObject(
+		data,
+		"OpenAPI source",
+		jsonFieldNames(reflect.TypeOf(OpenAPISource{}))...,
+	); err != nil {
 		return err
 	}
 	type plain OpenAPISource
