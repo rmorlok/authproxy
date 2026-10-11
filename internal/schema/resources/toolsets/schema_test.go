@@ -391,6 +391,11 @@ func toolSetMCPDefinitionSchemaFixture(t *testing.T) map[string]any {
 			"endpoint":"https://{{cfg.host}}/mcp","transport":"streamableHttp","refreshInterval":"1.5s",
 			"tools":{"includeNames":["list_records"," exact name "],"excludeNames":[]}
 		}},
+		"defaults":{
+			"labels":{"capability":"records","empty":""},
+			"annotations":{"docs.example.com/path":"/records","note":"Read records\nwith pagination."},
+			"limits":{"timeoutMillis":1500,"maxRequests":3,"maxInputBytes":4096,"maxOutputBytes":8192,"maxResponseBytes":16384,"maxEncodedResultBytes":24576,"maxStackDepth":50}
+		},
 		"permissionMappings":[{
 			"match":{"sourceKeys":["list_records"],"sourceKeyPatterns":["read_.*"]},
 			"addVerbs":["tool:records.read","custom verb"]
@@ -422,6 +427,7 @@ func TestToolSetMCPSchemaRoundTrip(t *testing.T) {
 					}
 					if shape == "minimal" {
 						delete(definition, "permissionMappings")
+						delete(definition, "defaults")
 						mcp := schemaObject(t, definition, "source", "mcp")
 						delete(mcp, "refreshInterval")
 						delete(mcp, "tools")
@@ -513,6 +519,150 @@ func TestToolSetMCPSchemaRejectsInvalidFields(t *testing.T) {
 			patch := toolSetPatchSchemaFixture(t)
 			schemaObject(t, patch, "spec")["definition"] = definition
 			require.Error(t, patchSchema.Validate(patch), "patch definitions must use the same complete source contract")
+		})
+	}
+}
+
+// TestImportedToolDefaultsSchemaAndDecoding exercises the complete definition
+// boundary so null wrappers and maps cannot disappear during either decoding.
+// Empty maps omit cleanly on encoding; an explicit empty limits object remains.
+func TestImportedToolDefaultsSchemaAndDecoding(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/ToolSetDefinition")
+	for _, test := range []struct {
+		name, input, want string
+		valid             bool
+	}{
+		{name: "omitted", valid: true},
+		{name: "empty", input: `{}`, valid: true},
+		{name: "empty maps", input: `{"labels":{},"annotations":{}}`, want: `{}`, valid: true},
+		{name: "empty limits", input: `{"limits":{}}`, valid: true},
+		{name: "labels", input: `{"labels":{"capability":"records","empty":""}}`, valid: true},
+		{name: "annotations", input: `{"annotations":{"note":" literal {{cfg.value}}\n","empty":""}}`, valid: true},
+		{name: "limits", input: `{"limits":{"timeoutMillis":1500,"maxRequests":2,"maxOutputBytes":4096}}`, valid: true},
+		{name: "null defaults", input: `null`},
+		{name: "array defaults", input: `[]`},
+		{name: "null labels", input: `{"labels":null}`},
+		{name: "array labels", input: `{"labels":[]}`},
+		{name: "null label", input: `{"labels":{"capability":null}}`},
+		{name: "numeric label", input: `{"labels":{"capability":1}}`},
+		{name: "reserved label", input: `{"labels":{"apxy/connection/-/id":"cxn_example"}}`},
+		{name: "invalid label key", input: `{"labels":{"invalid key":"value"}}`},
+		{name: "invalid label value", input: `{"labels":{"capability":"invalid value"}}`},
+		{name: "null annotations", input: `{"annotations":null}`},
+		{name: "array annotations", input: `{"annotations":[]}`},
+		{name: "null annotation", input: `{"annotations":{"note":null}}`},
+		{name: "boolean annotation", input: `{"annotations":{"note":false}}`},
+		{name: "invalid annotation key", input: `{"annotations":{"invalid key":"value"}}`},
+		{name: "null limits", input: `{"limits":null}`},
+		{name: "array limits", input: `{"limits":[]}`},
+		{name: "null limit", input: `{"limits":{"timeoutMillis":null}}`},
+		{name: "zero limit", input: `{"limits":{"maxRequests":0}}`},
+		{name: "negative limit", input: `{"limits":{"maxInputBytes":-1}}`},
+		{name: "fractional limit", input: `{"limits":{"maxOutputBytes":1.5}}`},
+		{name: "string limit", input: `{"limits":{"maxResponseBytes":"4096"}}`},
+		{name: "miscased limit", input: `{"limits":{"MaxRequests":1}}`},
+		{name: "unknown limit", input: `{"limits":{"maxTokens":100}}`},
+		{name: "miscased field", input: `{"Labels":{}}`},
+		{name: "unsupported hints", input: `{"hints":{}}`},
+		{name: "unsupported name", input: `{"name":"records"}`},
+		{name: "unsupported description", input: `{"description":"Read records"}`},
+		{name: "unsupported input schema", input: `{"inputSchema":{}}`},
+		{name: "unsupported output schema", input: `{"outputSchema":{}}`},
+		{name: "unsupported verbs", input: `{"verbs":["tool:records.read"]}`},
+		{name: "unsupported executor", input: `{"javascript":"return 1;"}`},
+		{name: "unsupported source key", input: `{"sourceKey":"records"}`},
+		{name: "unsupported connection", input: `{"connectionRef":{}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			input := `{"source":{"mcp":{"endpoint":"https://example.com/mcp","transport":"streamableHttp"}}`
+			if test.input != "" {
+				input += `,"defaults":` + test.input
+			}
+			input += "}"
+			var document any
+			require.NoError(t, json.Unmarshal([]byte(input), &document))
+			schemaErr := compiled.Validate(document)
+			asYAML, err := yaml.Marshal(common.RawJSON(input))
+			require.NoError(t, err)
+			for _, format := range []struct {
+				name   string
+				data   []byte
+				decode func([]byte, any) error
+			}{
+				{"JSON", []byte(input), util.DecodeJSONStrict},
+				{"YAML", asYAML, util.DecodeYAMLStrict},
+			} {
+				t.Run(format.name, func(t *testing.T) {
+					var decoded toolsets.ToolSetDefinition
+					err := format.decode(format.data, &decoded)
+					if err == nil {
+						err = decoded.Validate(nil)
+					}
+					if !test.valid {
+						require.Error(t, schemaErr)
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, schemaErr)
+					require.NoError(t, err)
+					roundTrip, err := json.Marshal(decoded)
+					require.NoError(t, err)
+					want := input
+					if test.want != "" {
+						want = `{"source":{"mcp":{"endpoint":"https://example.com/mcp","transport":"streamableHttp"}},"defaults":` + test.want + `}`
+					}
+					require.JSONEq(t, want, string(roundTrip))
+				})
+			}
+		})
+	}
+}
+
+// TestImportedToolDefaultsSchemaSourceRestrictions preserves the imported-only
+// presence rule for defaults and permission mappings in every resource envelope.
+// Even empty settings are invalid on an explicit source.
+func TestImportedToolDefaultsSchemaSourceRestrictions(t *testing.T) {
+	for _, envelope := range []struct{ name, fragment string }{
+		{"definition", "#/$defs/ToolSetDefinition"},
+		{"resource", ""},
+		{"patch", "#/$defs/ToolSetPatch"},
+	} {
+		t.Run(envelope.name, func(t *testing.T) {
+			compiled := compileToolSetSchema(t, envelope.fragment)
+			for _, source := range []struct {
+				name  string
+				value map[string]any
+			}{
+				{"explicit", map[string]any{"tools": []any{}}},
+				{"mcp", map[string]any{"endpoint": "https://example.com/mcp", "transport": "streamableHttp"}},
+				{"openapi", map[string]any{"document": map[string]any{"inline": map[string]any{}}}},
+			} {
+				for _, settings := range []string{"omitted", "defaults", "mappings", "both"} {
+					t.Run(source.name+"/"+settings, func(t *testing.T) {
+						definition := map[string]any{"source": map[string]any{source.name: source.value}}
+						if settings == "defaults" || settings == "both" {
+							definition["defaults"] = map[string]any{}
+						}
+						if settings == "mappings" || settings == "both" {
+							definition["permissionMappings"] = []any{}
+						}
+						document := definition
+						if envelope.name != "definition" {
+							document = toolSetSchemaFixture(t)
+							schemaObject(t, document, "spec")["definition"] = definition
+							if envelope.name == "patch" {
+								delete(document, "status")
+							}
+						}
+						err := compiled.Validate(document)
+						if source.name == "explicit" && settings != "omitted" {
+							require.Error(t, err)
+						} else {
+							require.NoError(t, err)
+						}
+					})
+				}
+			}
 		})
 	}
 }

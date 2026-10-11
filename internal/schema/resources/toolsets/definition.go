@@ -16,9 +16,11 @@ import (
 // is a logical ToolSet property and deliberately lives outside this definition.
 // Imported permission mappings are administrator-authored additions to each
 // generated Tool's canonical verb; explicit templates declare their own verbs.
+// Defaults supplies shared metadata and limits only for imported tools.
 type ToolSetDefinition struct {
-	Source             ToolSetSource       `json:"source" yaml:"source"`
-	PermissionMappings []PermissionMapping `json:"permissionMappings,omitempty" yaml:"permissionMappings,omitempty"`
+	Source             ToolSetSource         `json:"source" yaml:"source"`
+	PermissionMappings []PermissionMapping   `json:"permissionMappings,omitempty" yaml:"permissionMappings,omitempty"`
+	Defaults           *ImportedToolDefaults `json:"defaults,omitempty" yaml:"defaults,omitempty"`
 }
 
 // ToolSetSource selects exactly one source of a generation's tool inventory.
@@ -74,6 +76,10 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 	for i := range d.PermissionMappings {
 		result = multierror.Append(result, d.PermissionMappings[i].Validate(vc.PushField("permissionMappings").PushIndex(i)))
 	}
+	if d.Defaults != nil && d.Source.MCP == nil && d.Source.OpenAPI == nil {
+		result = multierror.Append(result, vc.NewErrorForField("defaults", "are only supported for imported sources; explicit templates declare their own metadata and limits"))
+	}
+	result = multierror.Append(result, d.Defaults.Validate(vc.PushField("defaults")))
 
 	return result.ErrorOrNil()
 }
@@ -198,6 +204,7 @@ func (d *ToolSetDefinition) Clone() *ToolSetDefinition {
 	clone := *d
 	clone.Source.OpenAPI = d.Source.OpenAPI.Clone()
 	clone.Source.MCP = d.Source.MCP.Clone()
+	clone.Defaults = d.Defaults.Clone()
 	clone.PermissionMappings = slices.Clone(d.PermissionMappings)
 	for i := range clone.PermissionMappings {
 		clone.PermissionMappings[i] = *d.PermissionMappings[i].Clone()

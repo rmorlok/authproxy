@@ -60,19 +60,28 @@ func (d *ToolDefinition) Clone() *ToolDefinition {
 		clone.Hints.Idempotent = util.CloneValue(d.Hints.Idempotent)
 	}
 
-	if d.Limits != nil {
-		clone.Limits = util.CloneValue(d.Limits)
-		clone.Limits.TimeoutMillis = util.CloneValue(d.Limits.TimeoutMillis)
-		clone.Limits.MaxRequests = util.CloneValue(d.Limits.MaxRequests)
-		clone.Limits.MaxInputBytes = util.CloneValue(d.Limits.MaxInputBytes)
-		clone.Limits.MaxOutputBytes = util.CloneValue(d.Limits.MaxOutputBytes)
-		clone.Limits.MaxResponseBytes = util.CloneValue(d.Limits.MaxResponseBytes)
-		clone.Limits.MaxEncodedResultBytes = util.CloneValue(d.Limits.MaxEncodedResultBytes)
-		clone.Limits.MaxStackDepth = util.CloneValue(d.Limits.MaxStackDepth)
-	}
+	clone.Limits = d.Limits.Clone()
 
 	clone.ProxyHTTP = d.ProxyHTTP.Clone()
 
+	return &clone
+}
+
+// Clone detaches all limit pointers while preserving omission and invalid
+// values for later validation. It does not apply runtime defaults or ceilings.
+func (l *ExecutionLimits) Clone() *ExecutionLimits {
+	if l == nil {
+		return nil
+	}
+
+	clone := *l
+	clone.TimeoutMillis = util.CloneValue(l.TimeoutMillis)
+	clone.MaxRequests = util.CloneValue(l.MaxRequests)
+	clone.MaxInputBytes = util.CloneValue(l.MaxInputBytes)
+	clone.MaxOutputBytes = util.CloneValue(l.MaxOutputBytes)
+	clone.MaxResponseBytes = util.CloneValue(l.MaxResponseBytes)
+	clone.MaxEncodedResultBytes = util.CloneValue(l.MaxEncodedResultBytes)
+	clone.MaxStackDepth = util.CloneValue(l.MaxStackDepth)
 	return &clone
 }
 

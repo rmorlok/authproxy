@@ -18,13 +18,15 @@ func (d ToolSetDefinition) MarshalJSON() ([]byte, error) {
 		mappings = &d.PermissionMappings
 	}
 	return json.Marshal(struct {
-		Source             ToolSetSource        `json:"source"`
-		PermissionMappings *[]PermissionMapping `json:"permissionMappings,omitempty"`
-	}{d.Source, mappings})
+		Source             ToolSetSource         `json:"source"`
+		PermissionMappings *[]PermissionMapping  `json:"permissionMappings,omitempty"`
+		Defaults           *ImportedToolDefaults `json:"defaults,omitempty"`
+	}{d.Source, mappings, d.Defaults})
 }
 
 // UnmarshalJSON accepts canonical definition fields and rejects null policy
-// values before slice decoding can erase their presence. Assignment is atomic.
+// values before slice or pointer decoding can erase their presence. Assignment
+// is atomic.
 func (d *ToolSetDefinition) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
 	if err := util.DecodeJSONStrict(data, &fields); err != nil {
@@ -41,6 +43,8 @@ func (d *ToolSetDefinition) UnmarshalJSON(data []byte) error {
 			destination = &decoded.Source
 		case "permissionMappings":
 			destination = &decoded.PermissionMappings
+		case "defaults":
+			destination = &decoded.Defaults
 		default:
 			return fmt.Errorf("unknown tool set definition field %q", name)
 		}

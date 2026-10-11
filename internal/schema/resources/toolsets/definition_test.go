@@ -144,6 +144,16 @@ func TestExplicitDefinitionWireBoundary(t *testing.T) {
 	}
 }
 
+// importedDefaultsForDefinitionTest supplies generation-owned metadata and
+// execution policy for complete resource and patch round trips.
+func importedDefaultsForDefinitionTest() *ImportedToolDefaults {
+	return &ImportedToolDefaults{
+		Labels:      map[string]string{"capability": "calendar"},
+		Annotations: map[string]string{"owner": "platform"},
+		Limits:      &tools.ExecutionLimits{TimeoutMillis: util.ToPtr(int64(30000)), MaxRequests: util.ToPtr(10)},
+	}
+}
+
 // importedDefinitionForTest includes every mutable imported-policy field while
 // keeping source names exact and publication independent of a sample catalog.
 func importedDefinitionForTest() *ToolSetDefinition {
@@ -157,6 +167,7 @@ func importedDefinitionForTest() *ToolSetDefinition {
 			Match:    SourceKeyMatch{SourceKeys: []string{"list_calendars"}, SourceKeyPatterns: []string{"calendar_.*"}},
 			AddVerbs: []string{"tool:calendar.list", "tool:readonly"},
 		}},
+		Defaults: importedDefaultsForDefinitionTest(),
 	}
 }
 
@@ -178,6 +189,8 @@ func TestImportedDefinitionBoundary(t *testing.T) {
 	require.NoError(t, util.DecodeJSONStrict(encoded, &decoded))
 	require.ErrorContains(t, decoded.Validate(nil), "permissionMappings")
 	definition.PermissionMappings = nil
+	require.ErrorContains(t, definition.Validate(nil), "defaults")
+	definition.Defaults = nil
 	require.NoError(t, definition.Validate(nil))
 
 	definition = importedDefinitionForTest()
@@ -191,7 +204,7 @@ func TestImportedDefinitionBoundary(t *testing.T) {
 			`{"source":{"explicit":{"tools":[]},"mcp":null}}`,
 			`{"source":{"mcp":{"endpoint":"https://example.com/mcp","transport":"streamableHttp"},"explicit":null}}`,
 			`{"permissionMappings":null}`, `{"permissionMappings":[null]}`,
-			`{"defaults":{}}`,
+			`{"defaults":null}`,
 		} {
 			require.Error(t, decode([]byte(input), &decoded), input)
 		}
@@ -224,6 +237,7 @@ func TestImportedDefinitionRoundTrip(t *testing.T) {
 		if emptyPolicies {
 			resource.Spec.Definition.PermissionMappings = []PermissionMapping{}
 			resource.Spec.Definition.Source.MCP.Tools.ExcludeNames = &[]string{}
+			resource.Spec.Definition.Defaults = &ImportedToolDefaults{}
 		}
 		for _, format := range []struct {
 			encode func(any) ([]byte, error)
@@ -267,6 +281,9 @@ func TestImportedDefinitionCandidateOwnership(t *testing.T) {
 	definition.PermissionMappings[0].Match.SourceKeys[0] = "other"
 	definition.PermissionMappings[0].Match.SourceKeyPatterns[0] = "other.*"
 	definition.PermissionMappings[0].AddVerbs[0] = "tool:other"
+	definition.Defaults.Labels["capability"] = "other"
+	definition.Defaults.Annotations["owner"] = "other"
+	*definition.Defaults.Limits.MaxRequests = 1
 	require.Equal(t, beforeCurrent, current)
 	require.Equal(t, beforePatch, patch)
 
@@ -342,6 +359,7 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 				AddVerbs: []string{"tool:calendar.list"},
 			},
 		},
+		Defaults: importedDefaultsForDefinitionTest(),
 	}
 }
 
@@ -396,6 +414,11 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 
 			candidate, err := decodedPatch.ApplyTo(storedToolSetForResourceTest(), nil)
 			require.NoError(t, err)
+			require.Equal(t, current.Spec.Definition.Defaults, candidate.Spec.Definition.Defaults)
+			candidate.Spec.Definition.Defaults.Labels["capability"] = "other"
+			candidate.Spec.Definition.Defaults.Annotations["owner"] = "other"
+			*candidate.Spec.Definition.Defaults.Limits.TimeoutMillis = 1000
+			require.Equal(t, current.Spec.Definition.Defaults, decodedPatch.Spec.Definition.Defaults)
 			require.NotNil(t, candidate.Spec.Definition.Source.OpenAPI)
 			require.Nil(t, candidate.Spec.Definition.Source.Explicit)
 			require.Equal(t, current.Spec.Definition.Source.OpenAPI.Server, candidate.Spec.Definition.Source.OpenAPI.Server)
@@ -486,6 +509,9 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 		clone.Source.OpenAPI.SourceKeyOverrides[0].Path = "/other"
 		*clone.Source.OpenAPI.UnsupportedOperations = OpenAPIUnsupportedOperationSkip
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
+		clone.Defaults.Labels["capability"] = "other"
+		clone.Defaults.Annotations["owner"] = "other"
+		*clone.Defaults.Limits.TimeoutMillis = 1000
 
 		require.Equal(t, before, original)
 	}
