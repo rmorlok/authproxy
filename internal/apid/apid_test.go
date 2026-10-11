@@ -34,6 +34,23 @@ func TestNewConnectorGenerationPrefix(t *testing.T) {
 	require.Len(t, string(id), 4+suffixLen)
 }
 
+// TestToolInvocationPrefix verifies that correlation IDs use the shared ID
+// allocation, parsing, and serialization rules without a resource registration.
+func TestToolInvocationPrefix(t *testing.T) {
+	id := New(PrefixToolInvocation)
+	require.Equal(t, PrefixToolInvocation, id.Prefix())
+	require.Len(t, id.String(), len(PrefixToolInvocation)+suffixLen)
+	parsed, err := Parse(id.String())
+	require.NoError(t, err)
+	require.Equal(t, id, parsed)
+	data, err := json.Marshal(id)
+	require.NoError(t, err)
+	var decoded ID
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	require.Equal(t, id, decoded)
+	require.Error(t, id.ValidatePrefix(PrefixTool))
+}
+
 func TestParse(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		id, err := Parse("act_7Ks9mPqR2xvN3bXY")

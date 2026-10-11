@@ -27,6 +27,75 @@ runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
 or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
 contract ownership stays clear.
 
+## Tool results
+
+`ToolResult` defines the outcome that a future `ToolInvoke` action returns in
+`status.result`. It is an endpoint contract, not a stored resource or background
+task. The surrounding `v1alpha1` API versions the result and its content union;
+there is no separate per-block version field. This package defines validation,
+serialization, and cloning; invocation routes and execution follow later.
+
+```json
+{
+  "toolId": "tol_01example0000001",
+  "revision": 7,
+  "invocationId": "tiv_01example0000001",
+  "isError": false,
+  "structuredContent": null,
+  "content": [
+    {"type": "text", "text": "The provider returned JSON null."},
+    {"type": "resource_link", "uri": "provider://reports/42", "name": "Report"}
+  ],
+  "metadata": {"connectionId": "cxn_01example0000001"}
+}
+```
+
+`structuredContent` accepts any JSON value. Omitting it differs from supplying
+`null`; JSON/YAML round trips preserve both that distinction and large numbers.
+`content` is always an array, including `[]`, and preserves block order. The
+connection ID is required. Imported results can include positive
+`toolSetGeneration` and `catalogRevision` values in `metadata`; a catalog
+revision requires its ToolSet generation. `tiv_` identifies one invocation for
+correlation and does not imply an asynchronous task or retrieval endpoint.
+
+| Content type | Payload |
+| --- | --- |
+| `text` | Required `text`, which can be empty. |
+| `image`, `audio` | Required base64 `data` and `mimeType`. |
+| `resource_link` | Required `uri` and `name`; optional title, description, media type, size hint, and icons. |
+| `resource` | Required `resource` object with `uri`, optional `mimeType`, and exactly one of `text` or base64 `blob`. |
+
+The normalized union rejects mixed variants. Empty text, binary payloads, and
+link names are preserved. Resource and icon URIs can use custom schemes. They
+identify content without authorizing a fetch; an invocation-scoped URI for
+inline bytes does not promise a download endpoint. Provider size hints do not
+determine execution byte accounting.
+
+All blocks can carry `annotations`: `audience` (`user` and/or `assistant`),
+`priority` from zero to one, and an opaque `lastModified` string. These are
+presentation hints. Optional `provider` objects preserve redacted extension
+metadata separately at result, block, and embedded-resource levels. Protocol
+adapters map upstream metadata into these fields; it does not become AuthProxy
+instructions or authorization. The field shapes preserve the rich blocks in
+the [MCP schema](https://modelcontextprotocol.io/specification/2026-07-28/schema),
+without making MCP SDK types part of this API.
+
+Failures set `isError: true` and require an `error` object. Success forbids it.
+The error includes nonblank `code` and `message`, optional JSON `details`, a
+required `retryable` boolean, and `executionState`:
+
+- `notStarted`: execution has not started.
+- `mayHaveExecuted`: upstream effects are possible or uncertain.
+- `completed`: execution completed, even if result processing later failed.
+
+Error results can retain the original rich blocks and structured content.
+`retryable` is advice, not a guarantee that replay is safe. Error details also
+preserve omission versus explicit JSON null. Producers own code selection,
+reserved-code policy, redaction, output-schema checks, and encoded/decoded byte
+limits. Validation checks the public shape and encodings; it does not sanitize
+messages or run output schemas. Existing HTTP errors before result formation
+remain separate from this outcome contract.
+
 ## Notifications
 Notifications and search make their non-resource semantics explicit here.
 `NotificationJson` is a read-only, resource-shaped projection of a durable
