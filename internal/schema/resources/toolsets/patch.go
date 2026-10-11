@@ -213,7 +213,7 @@ func (p *ToolSetPatch) Clone() *ToolSetPatch {
 	}
 	clone := *p
 	clone.Metadata = cloneMetadataPatch(p.Metadata)
-	clone.Status = util.CloneValue(p.Status)
+	clone.Status = p.Status.Clone()
 	if p.Spec != nil {
 		clone.Spec = util.CloneValue(p.Spec)
 		clone.Spec.ConnectionSelector = p.Spec.ConnectionSelector.Clone()

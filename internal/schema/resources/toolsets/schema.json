@@ -408,11 +408,55 @@
       },
       "additionalProperties": false
     },
+    "SourceDiagnosticLocation": {
+      "type": "object",
+      "properties": {
+        "documentUri": {
+          "anyOf": [{ "const": "" }, { "$ref": "#/$defs/OpenAPIReferenceURI" }],
+          "description": "The source document's literal absolute URI without a fragment. Empty or omitted uses the current document context. This identity does not authorize fetching."
+        },
+        "jsonPointer": {
+          "type": "string",
+          "pattern": "^(?:/(?:[^~]|~[01])*)*$",
+          "description": "An RFC 6901 JSON Pointer within the document. An empty string identifies the document root; URI-fragment syntax is not accepted."
+        }
+      },
+      "anyOf": [
+        { "required": ["documentUri"], "properties": { "documentUri": { "$ref": "#/$defs/OpenAPIReferenceURI" } } },
+        { "required": ["jsonPointer"] }
+      ],
+      "additionalProperties": false,
+      "description": "A diagnostic location must identify a document or provide a JSON Pointer, including an empty root pointer."
+    },
+    "SourceDiagnostic": {
+      "type": "object",
+      "required": ["severity", "code", "message"],
+      "properties": {
+        "severity": { "type": "string", "enum": ["warning", "error"] },
+        "code": {
+          "$ref": "../tools/schema.json#/$defs/NonBlankString",
+          "description": "An extensible machine-readable diagnostic code. Consumers must tolerate codes they do not recognize."
+        },
+        "message": { "$ref": "../tools/schema.json#/$defs/NonBlankString" },
+        "sourceKey": {
+          "anyOf": [{ "const": "" }, { "$ref": "../tools/schema.json#/$defs/NonBlankString" }],
+          "description": "The exact affected source key when known. Empty or omitted means the diagnostic is not attached to a source key."
+        },
+        "location": { "$ref": "#/$defs/SourceDiagnosticLocation" }
+      },
+      "additionalProperties": false,
+      "description": "Server-observed import feedback with optional source identity and document location."
+    },
     "ToolSetStatus": {
       "type": "object",
       "required": ["release"],
       "properties": {
-        "release": { "$ref": "#/$defs/ToolSetReleaseStatus" }
+        "release": { "$ref": "#/$defs/ToolSetReleaseStatus" },
+        "importDiagnostics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SourceDiagnostic" },
+          "description": "Diagnostics from the latest OpenAPI import attempt for this generation. A nonempty list requires an OpenAPI source; an omitted or empty list carries no diagnostics."
+        }
       },
       "additionalProperties": false
     },
@@ -477,6 +521,24 @@
           }
         }
       ],
+      "if": {
+        "required": ["status"],
+        "properties": {
+          "status": {
+            "required": ["importDiagnostics"],
+            "properties": { "importDiagnostics": { "minItems": 1 } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "spec": {
+            "properties": {
+              "definition": { "properties": { "source": { "required": ["openapi"] } } }
+            }
+          }
+        }
+      },
       "unevaluatedProperties": false,
       "description": "The logical selector remains outside the generation-owned definition. Lifecycle validation applies server-owned metadata/status rules and stored-generation requirements."
     }

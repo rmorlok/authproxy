@@ -53,6 +53,12 @@ type ToolSetReleaseSpec struct {
 // A release state does not describe the generations pinned by individual connections.
 type ToolSetStatus struct {
 	Release ToolSetReleaseStatus `json:"release" yaml:"release"`
+
+	// ImportDiagnostics records findings from the latest OpenAPI import
+	// attempt for this generation. A failed refresh can report errors while
+	// retaining an earlier snapshot; empty diagnostics do not prove readiness.
+	// MCP catalog findings belong to each connection binding, never here.
+	ImportDiagnostics []SourceDiagnostic `json:"importDiagnostics,omitempty" yaml:"importDiagnostics,omitempty"`
 }
 
 // ToolSetReleaseStatus records the server-owned lifecycle state of a generation.
@@ -143,10 +149,7 @@ func (t *ToolSet) Clone() *ToolSet {
 	clone.Spec.ConnectionSelector = t.Spec.ConnectionSelector.Clone()
 	clone.Spec.Definition = *t.Spec.Definition.Clone()
 
-	if t.Status != nil {
-		status := *t.Status
-		clone.Status = &status
-	}
+	clone.Status = t.Status.Clone()
 
 	return &clone
 }
@@ -205,6 +208,14 @@ func (t *ToolSet) ValidateFor(mode meta.ValidationMode, vc *common.ValidationCon
 			result = multierror.Append(result, vc.NewErrorForField("status", "is required"))
 		}
 		return result.ErrorOrNil()
+	}
+
+	if len(t.Status.ImportDiagnostics) > 0 && t.Spec.Definition.Source.OpenAPI == nil {
+		result = multierror.Append(result, vc.NewErrorForField("status.importDiagnostics", "are only supported for OpenAPI sources; MCP catalog diagnostics belong to connection bindings"))
+	}
+
+	for i := range t.Status.ImportDiagnostics {
+		result = multierror.Append(result, t.Status.ImportDiagnostics[i].Validate(vc.PushField("status").PushField("importDiagnostics").PushIndex(i)))
 	}
 
 	observed := t.Status.Release.State
