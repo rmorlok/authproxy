@@ -63,42 +63,78 @@ type ConnectionToolSetRefreshAction struct {
 
 // NewConnectionToolSetGenerationMigrationResponse wraps an accepted operation.
 // It neither schedules work nor validates or resolves the supplied references.
-func NewConnectionToolSetGenerationMigrationResponse(target meta.ObjectReference, spec ConnectionToolSetGenerationMigrationSpec, status ConnectionToolSetActionStatus) ConnectionToolSetGenerationMigrationAction {
-	return ConnectionToolSetGenerationMigrationAction{Action: apiv1alpha1.NewActionResponse(
-		ConnectionToolSetGenerationMigrationActionKind, target, spec, status,
-	)}
+func NewConnectionToolSetGenerationMigrationResponse(
+	target meta.ObjectReference,
+	spec ConnectionToolSetGenerationMigrationSpec,
+	status ConnectionToolSetActionStatus,
+) ConnectionToolSetGenerationMigrationAction {
+	return ConnectionToolSetGenerationMigrationAction{
+		Action: apiv1alpha1.NewActionResponse(
+			ConnectionToolSetGenerationMigrationActionKind,
+			target,
+			spec,
+			status,
+		),
+	}
 }
 
 // NewConnectionToolSetRefreshResponse wraps an accepted catalog refresh without
 // scheduling work, copying the timeout pointer, or claiming a catalog revision.
-func NewConnectionToolSetRefreshResponse(target meta.ObjectReference, spec ConnectionToolSetRefreshSpec, status ConnectionToolSetActionStatus) ConnectionToolSetRefreshAction {
-	return ConnectionToolSetRefreshAction{Action: apiv1alpha1.NewActionResponse(
-		ConnectionToolSetRefreshActionKind, target, spec, status,
-	)}
+func NewConnectionToolSetRefreshResponse(
+	target meta.ObjectReference,
+	spec ConnectionToolSetRefreshSpec,
+	status ConnectionToolSetActionStatus,
+) ConnectionToolSetRefreshAction {
+	return ConnectionToolSetRefreshAction{
+		Action: apiv1alpha1.NewActionResponse(
+			ConnectionToolSetRefreshActionKind,
+			target,
+			spec,
+			status,
+		),
+	}
 }
 
 // ValidateRequest checks the migration transport without resolving references,
 // authorizing access, or deciding whether the requested generation is eligible.
-func (a *ConnectionToolSetGenerationMigrationAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionToolSetGenerationMigrationAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if a == nil {
 		return fmt.Errorf("$: action is required")
 	}
+
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
-	return validateConnectionToolSetActionSpec(a.Metadata.Target, a.Spec.ToolSetRef, a.Spec.TimeoutSeconds, true)
+
+	return validateConnectionToolSetActionSpec(
+		a.Metadata.Target,
+		a.Spec.ToolSetRef,
+		a.Spec.TimeoutSeconds,
+		true, // migration
+	)
 }
 
 // ValidateResponse requires a valid migration spec and a tracking token. The
 // eventual outcome belongs in task and binding status, not this acknowledgment.
-func (a *ConnectionToolSetGenerationMigrationAction) ValidateResponse(expectedKind meta.Kind) error {
+func (a *ConnectionToolSetGenerationMigrationAction) ValidateResponse(
+	expectedKind meta.Kind,
+) error {
 	if a == nil {
 		return fmt.Errorf("$: action is required")
 	}
+
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
 		return err
 	}
-	if err := validateConnectionToolSetActionSpec(a.Metadata.Target, a.Spec.ToolSetRef, a.Spec.TimeoutSeconds, true); err != nil {
+
+	if err := validateConnectionToolSetActionSpec(
+		a.Metadata.Target,
+		a.Spec.ToolSetRef,
+		a.Spec.TimeoutSeconds,
+		true, // migration
+	); err != nil {
 		return err
 	}
 	return validateConnectionToolSetActionStatus(a.Status)
@@ -106,28 +142,47 @@ func (a *ConnectionToolSetGenerationMigrationAction) ValidateResponse(expectedKi
 
 // ValidateRequest checks a logical binding refresh request. MCP source checks,
 // binding eligibility, URL-target agreement, and authorization are service work.
-func (a *ConnectionToolSetRefreshAction) ValidateRequest(expectedKind meta.Kind) error {
+func (a *ConnectionToolSetRefreshAction) ValidateRequest(
+	expectedKind meta.Kind,
+) error {
 	if a == nil {
 		return fmt.Errorf("$: action is required")
 	}
+
 	if err := a.Action.ValidateRequest(expectedKind); err != nil {
 		return err
 	}
-	return validateConnectionToolSetActionSpec(a.Metadata.Target, a.Spec.ToolSetRef, a.Spec.TimeoutSeconds, false)
+
+	return validateConnectionToolSetActionSpec(
+		a.Metadata.Target,
+		a.Spec.ToolSetRef,
+		a.Spec.TimeoutSeconds,
+		false, // migration
+	)
 }
 
 // ValidateResponse requires a valid refresh spec and a tracking token. It cannot
 // verify token authenticity or establish that a complete catalog was published.
-func (a *ConnectionToolSetRefreshAction) ValidateResponse(expectedKind meta.Kind) error {
+func (a *ConnectionToolSetRefreshAction) ValidateResponse(
+	expectedKind meta.Kind,
+) error {
 	if a == nil {
 		return fmt.Errorf("$: action is required")
 	}
+
 	if err := a.Action.ValidateResponse(expectedKind); err != nil {
 		return err
 	}
-	if err := validateConnectionToolSetActionSpec(a.Metadata.Target, a.Spec.ToolSetRef, a.Spec.TimeoutSeconds, false); err != nil {
+
+	if err := validateConnectionToolSetActionSpec(
+		a.Metadata.Target,
+		a.Spec.ToolSetRef,
+		a.Spec.TimeoutSeconds,
+		false, // migration
+	); err != nil {
 		return err
 	}
+
 	return validateConnectionToolSetActionStatus(a.Status)
 }
 
@@ -135,39 +190,56 @@ func (a *ConnectionToolSetRefreshAction) ValidateResponse(expectedKind meta.Kind
 // reference and timeout rules. Migration requires an exact generation; refresh
 // forbids one. Name resolution, namespace ownership, and liveness are not shape
 // checks and must be enforced when the service resolves the references.
-func validateConnectionToolSetActionSpec(target, toolSetRef meta.ObjectReference, timeoutSeconds *int64, migration bool) error {
+func validateConnectionToolSetActionSpec(
+	target, toolSetRef meta.ObjectReference,
+	timeoutSeconds *int64,
+	migration bool,
+) error {
 	if err := validateConnectionActionTarget(target); err != nil {
 		return err
 	}
+
 	vc := &common.ValidationContext{Path: "$.spec.toolSetRef"}
-	if err := meta.ValidateObjectReferenceWithOptions(toolSetRef, meta.ObjectReferenceValidationOptions{
-		ExpectedAPIVersion: meta.APIVersionV1Alpha1,
-		ExpectedKind:       toolsetschema.ToolSetKind,
-		IDValidator:        toolsetschema.ValidateID,
-		NamespaceValidator: namespaceschema.ValidatePath,
-	}, vc); err != nil {
+	if err := meta.ValidateObjectReferenceWithOptions(
+		toolSetRef,
+		meta.ObjectReferenceValidationOptions{
+			ExpectedAPIVersion: meta.APIVersionV1Alpha1,
+			ExpectedKind:       toolsetschema.ToolSetKind,
+			IDValidator:        toolsetschema.ValidateID,
+			NamespaceValidator: namespaceschema.ValidatePath,
+		},
+		vc,
+	); err != nil {
 		return err
 	}
+
 	if migration && toolSetRef.Generation == 0 {
 		return vc.NewErrorForField("generation", "must select a positive target generation")
 	}
+
 	if !migration && toolSetRef.Generation != 0 {
 		return vc.NewErrorForField("generation", "must be omitted; refresh uses the binding's current generation")
 	}
+
 	if timeoutSeconds != nil && *timeoutSeconds <= 0 {
 		return fmt.Errorf("$.spec.timeoutSeconds: must be greater than zero")
 	}
+
 	return nil
 }
 
 // validateConnectionToolSetActionStatus checks only the public acknowledgment
 // shape. It deliberately does not interpret the opaque task tracking token.
-func validateConnectionToolSetActionStatus(status *ConnectionToolSetActionStatus) error {
+func validateConnectionToolSetActionStatus(
+	status *ConnectionToolSetActionStatus,
+) error {
 	if status == nil {
 		return fmt.Errorf("$.status: is required")
 	}
+
 	if strings.TrimSpace(status.TaskID) == "" {
 		return fmt.Errorf("$.status.taskId: must not be blank")
 	}
+
 	return nil
 }
