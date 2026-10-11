@@ -18,6 +18,7 @@ type OpenAPISource struct {
 	Operations *OpenAPIOperationFilter `json:"operations,omitempty" yaml:"operations,omitempty"`
 	Server     *OpenAPIServerConfig    `json:"server,omitempty" yaml:"server,omitempty"`
 	References *OpenAPIReferenceConfig `json:"references,omitempty" yaml:"references,omitempty"`
+	Security   *OpenAPISecurityConfig  `json:"security,omitempty" yaml:"security,omitempty"`
 }
 
 // OpenAPIOperationFilter selects exact document operationId values. Omitted
@@ -44,6 +45,7 @@ func (s *OpenAPISource) Validate(vc *common.ValidationContext) error {
 	result = multierror.Append(result, s.Operations.Validate(vc.PushField("operations")))
 	result = multierror.Append(result, s.Server.Validate(vc.PushField("server")))
 	result = multierror.Append(result, s.References.Validate(vc.PushField("references")))
+	result = multierror.Append(result, s.Security.Validate(vc.PushField("security")))
 
 	return result.ErrorOrNil()
 }
@@ -80,6 +82,7 @@ func (s *OpenAPISource) Clone() *OpenAPISource {
 	clone.Operations = s.Operations.Clone()
 	clone.Server = s.Server.Clone()
 	clone.References = s.References.Clone()
+	clone.Security = s.Security.Clone()
 	return &clone
 }
 

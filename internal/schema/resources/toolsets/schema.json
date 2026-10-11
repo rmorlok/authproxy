@@ -241,6 +241,19 @@
       },
       "additionalProperties": false
     },
+    "OpenAPISecurityConfig": {
+      "type": "object",
+      "properties": {
+        "connectionSchemes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "../tools/schema.json#/$defs/NonBlankString" },
+          "description": "Exact security scheme identifiers mapped to the target connection's authentication. Names and URI identifiers retain their spelling, case, and whitespace. Compatibility with the connection and selection among document security requirements are importer checks."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Maps document security schemes to the existing connection authentication. Omission, an empty object, or an empty connectionSchemes array maps no schemes; none bypasses document requirements or disables connection authentication. Credentials, scopes, and credential placement are not authored here."
+    },
     "OpenAPISource": {
       "type": "object",
       "required": ["document"],
@@ -248,7 +261,8 @@
         "document": { "$ref": "#/$defs/OpenAPIDocument" },
         "operations": { "$ref": "#/$defs/OpenAPIOperationFilter" },
         "server": { "$ref": "#/$defs/OpenAPIServerConfig" },
-        "references": { "$ref": "#/$defs/OpenAPIReferenceConfig" }
+        "references": { "$ref": "#/$defs/OpenAPIReferenceConfig" },
+        "security": { "$ref": "#/$defs/OpenAPISecurityConfig" }
       },
       "additionalProperties": false
     },

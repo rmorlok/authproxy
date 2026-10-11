@@ -20,7 +20,8 @@ func openAPISourceForTest() *OpenAPISource {
 			IncludeOperationIDs: &[]string{"listCalendars", "createEvent"},
 			ExcludeOperationIDs: &[]string{"createEvent"},
 		},
-		Server: &OpenAPIServerConfig{URL: util.ToPtr("https://{{cfg.apiHost}}/v1")},
+		Server:   &OpenAPIServerConfig{URL: util.ToPtr("https://{{cfg.apiHost}}/v1")},
+		Security: &OpenAPISecurityConfig{ConnectionSchemes: []string{"calendarOAuth"}},
 	}
 }
 
@@ -33,7 +34,8 @@ func TestOpenAPISourceValidation(t *testing.T) {
 		field  string
 	}{
 		{"valid", func(s *OpenAPISource) {}, ""},
-		{"optional omitted", func(s *OpenAPISource) { s.Operations = nil; s.Server = nil }, ""},
+		{"optional omitted", func(s *OpenAPISource) { s.Operations = nil; s.Server = nil; s.Security = nil }, ""},
+		{"blank security scheme", func(s *OpenAPISource) { s.Security.ConnectionSchemes = []string{" "} }, "security.connectionSchemes[0]"},
 		{"whole URL template", func(s *OpenAPISource) { *s.Server.URL = "{{cfg.serverUrl}}" }, ""},
 		{"document server selection", func(s *OpenAPISource) { s.Server = &OpenAPIServerConfig{Index: util.ToPtr(0)} }, ""},
 		{"negative server index", func(s *OpenAPISource) { s.Server = &OpenAPIServerConfig{Index: util.ToPtr(-1)} }, "server.index"},
@@ -111,7 +113,7 @@ func TestOpenAPISourceStrictDecoding(t *testing.T) {
 		`{"operations":{"includeMethods":["GET"]}}`,
 		`{"server":{"url":null}}`, `{"server":{"URL":"https://example.test"}}`, `{"server":{"url":5}}`,
 		`{"server":{"index":null}}`, `{"server":{"variables":{"version":null}}}`,
-		`{"security":{}}`, `{"references":[]}`, `{"skipUnsupported":true}`, `[]`,
+		`{"security":null}`, `{"security":{"unknown":true}}`, `{"references":[]}`, `{"skipUnsupported":true}`, `[]`,
 	} {
 		for _, decode := range []func([]byte, any) error{util.DecodeJSONStrict, util.DecodeYAMLStrict} {
 			var source OpenAPISource
@@ -164,6 +166,7 @@ func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	(*clone.Operations.IncludeOperationIDs)[0] = "changed"
 	(*clone.Operations.ExcludeOperationIDs)[0] = "changed"
 	*clone.Server.URL = "changed"
+	clone.Security.ConnectionSchemes[0] = "changed"
 	require.Equal(t, openAPISourceForTest(), source)
 	require.Nil(t, (*OpenAPISource)(nil).Clone())
 	require.Nil(t, (*OpenAPIOperationFilter)(nil).Clone())
@@ -180,6 +183,7 @@ func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(`{"document":{"url":"https://example.test/openapi.json"}}`), source))
 	require.Nil(t, source.Operations)
 	require.Nil(t, source.Server)
+	require.Nil(t, source.Security)
 }
 
 // TestOpenAPIOperationFilterListOwnership preserves supplied list pointers and independently
