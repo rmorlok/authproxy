@@ -102,7 +102,7 @@ func parseConnectorGenerationID(gctx *gin.Context) (connectorGenerationID, *http
 }
 
 // @Summary		Get connector
-// @Description	Get a connector's primary generation by its ID. Connectors without a primary generation (draft-only, archiving, or archived) return 404; use the generation endpoints to read those generations.
+// @Description	Get a connector by its ID. Returns the primary generation when one exists; otherwise the newest draft, then active, then archived generation.
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
@@ -125,19 +125,14 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	// A generationless reference resolves to the connector's primary
-	// generation. Connectors without a primary generation (e.g. draft-only)
-	// are reported as not found; specific generations remain reachable via
-	// /connectors/:id/generations/:generation.
-	c, err := r.connectors.ResolveConnectorReference(ctx, idObjectReference(cschema.ConnectorKind, connectorId.String()))
+	// Unlike a generationless connector reference, which resolves only to the
+	// primary generation, this route ranks generations (primary, draft, active,
+	// archived) so draft-only and archived connectors remain readable by ID.
+	// Clients such as `ap apply` rely on this to adopt and prune connectors.
+	c, err := r.loadConnectorByID(ctx, connectorId)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-			val.MarkErrorReturn()
-			return
-		}
-		if errors.Is(err, core.ErrInvalidArgument) {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -844,6 +839,10 @@ func (r *ConnectorsRoutes) forceGenerationState(gctx *gin.Context) {
 	}
 }
 
+// loadConnectorByID loads a connector by ID, selecting the generation the
+// connector list would show: primary first, then draft, active, and archived,
+// newest generation first within a state. Returns core.ErrNotFound when the
+// connector does not exist or has been deleted.
 func (r *ConnectorsRoutes) loadConnectorByID(ctx context.Context, connectorId apid.ID) (connIface.Connector, error) {
 	result := r.connectors.
 		ListConnectorsBuilder().
