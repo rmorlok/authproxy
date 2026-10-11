@@ -1,21 +1,5 @@
 # Migrations
 
-## ToolSet logical storage
-
-Migration 17 adds `tool_sets`, the logical identity and connection-selection
-policy shared by a ToolSet's generations. Live names are unique within a
-namespace; soft deletion releases the name while retaining the ID.
-
-`connection_selector` stores the canonical selector JSON, preserving an explicit
-empty `matchLabels` map. `selector_revision` starts at one and changes atomically
-with each accepted selector replacement. It is independent of generation
-numbers and lets membership work detect stale selection policies. Namespace
-label propagation changes metadata without changing this revision.
-
-This table contains no executable definitions or encrypted source artifacts.
-Generation storage and its encryption registration follow separately, as do
-binding cleanup, namespace-deletion/purge integration, and management APIs.
-
 ## Creating and running migrations
 
 AuthProxy uses [golang-migrate](https://github.com/golang-migrate/migrate) for migrations. To add a new migration,
