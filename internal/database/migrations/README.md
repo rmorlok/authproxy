@@ -1,7 +1,5 @@
 # Migrations
 
-## Creating and running migrations
-
 AuthProxy uses [golang-migrate](https://github.com/golang-migrate/migrate) for migrations. To add a new migration,
 use the following command:
 
