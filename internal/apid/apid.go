@@ -40,9 +40,7 @@ const (
 	PrefixNotification        Prefix = "ntf_"
 	PrefixTool                Prefix = "tol_"
 	PrefixToolSet             Prefix = "tls_"
-	// PrefixToolInvocation identifies a synchronous tool attempt for correlation,
-	// not a durable task or a separately addressable resource.
-	PrefixToolInvocation Prefix = "tiv_"
+	PrefixToolInvocation      Prefix = "tiv_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.

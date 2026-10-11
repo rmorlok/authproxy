@@ -126,8 +126,10 @@ func (b *ToolContentBlock) Validate(vc *common.ValidationContext) error {
 	if invalidFields {
 		result = multierror.Append(result, vc.NewError("contains fields belonging to another content type"))
 	}
+
 	result = multierror.Append(result, validateToolMIMEType(b.MIMEType, vc.PushField("mimeType")))
 	result = multierror.Append(result, b.Annotations.Validate(vc.PushField("annotations")))
+
 	if err := validateOptionalToolJSON(b.Provider, true); err != nil {
 		result = multierror.Append(result, vc.NewErrorForField("provider", err.Error()))
 	}
@@ -146,12 +148,15 @@ func (r *ToolResourceContent) Validate(vc *common.ValidationContext) error {
 	var result *multierror.Error
 	result = multierror.Append(result, validateToolContentURI(r.URI, vc.PushField("uri")))
 	result = multierror.Append(result, validateToolMIMEType(r.MIMEType, vc.PushField("mimeType")))
+
 	if (r.Text == nil) == (r.Blob == nil) {
 		result = multierror.Append(result, vc.NewError("requires exactly one of text or blob"))
 	}
+
 	if r.Blob != nil {
 		result = multierror.Append(result, validateToolBase64(*r.Blob, vc.PushField("blob")))
 	}
+
 	if err := validateOptionalToolJSON(r.Provider, true); err != nil {
 		result = multierror.Append(result, vc.NewErrorForField("provider", err.Error()))
 	}
@@ -173,7 +178,12 @@ func (a *ToolContentAnnotations) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.PushField("audience").PushIndex(i).NewError("must be user or assistant"))
 		}
 	}
-	if a.Priority != nil && (math.IsNaN(*a.Priority) || math.IsInf(*a.Priority, 0) || *a.Priority < 0 || *a.Priority > 1) {
+
+	if a.Priority != nil &&
+		(math.IsNaN(*a.Priority) ||
+			math.IsInf(*a.Priority, 0) ||
+			*a.Priority < 0 ||
+			*a.Priority > 1) {
 		result = multierror.Append(result, vc.NewErrorForField("priority", "must be between zero and one"))
 	}
 
@@ -184,15 +194,20 @@ func (a *ToolContentAnnotations) Validate(vc *common.ValidationContext) error {
 // provider size hints as authorization to read files or network locations.
 func (i *ToolContentIcon) Validate(vc *common.ValidationContext) error {
 	vc = toolResultValidationContext(vc)
+
 	if i == nil {
 		return vc.NewError("icon is required")
 	}
+
 	var result *multierror.Error
+
 	result = multierror.Append(result, validateToolContentURI(i.Src, vc.PushField("src")))
 	result = multierror.Append(result, validateToolMIMEType(i.MIMEType, vc.PushField("mimeType")))
+
 	if i.Theme != "" && i.Theme != "light" && i.Theme != "dark" {
 		result = multierror.Append(result, vc.NewErrorForField("theme", "must be light or dark"))
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -200,9 +215,13 @@ func (i *ToolContentIcon) Validate(vc *common.ValidationContext) error {
 // and fragments. It never resolves them or treats them as local file paths.
 func validateToolContentURI(value string, vc *common.ValidationContext) error {
 	parsed, err := url.Parse(value)
-	if err != nil || !parsed.IsAbs() || strings.ContainsAny(value, " \t\r\n") {
+
+	if err != nil ||
+		!parsed.IsAbs() ||
+		strings.ContainsAny(value, " \t\r\n") {
 		return vc.NewError("must be an absolute URI")
 	}
+
 	return nil
 }
 
@@ -213,9 +232,11 @@ func validateToolMIMEType(value string, vc *common.ValidationContext) error {
 		return nil
 	}
 	mediaType, _, err := mime.ParseMediaType(value)
+
 	if err != nil || !strings.Contains(mediaType, "/") {
 		return vc.NewError("must be a media type")
 	}
+
 	return nil
 }
 
@@ -234,6 +255,7 @@ func (b *ToolContentBlock) Clone() *ToolContentBlock {
 	if b == nil {
 		return nil
 	}
+
 	clone := *b
 	clone.Text = util.CloneValue(b.Text)
 	clone.Name = util.CloneValue(b.Name)
@@ -241,20 +263,25 @@ func (b *ToolContentBlock) Clone() *ToolContentBlock {
 	clone.Size = util.CloneValue(b.Size)
 	clone.Provider = slices.Clone(b.Provider)
 	clone.Icons = slices.Clone(b.Icons)
+
 	for i := range clone.Icons {
 		clone.Icons[i].Sizes = slices.Clone(b.Icons[i].Sizes)
 	}
+
 	clone.Annotations = util.CloneValue(b.Annotations)
+
 	if clone.Annotations != nil {
 		clone.Annotations.Audience = slices.Clone(b.Annotations.Audience)
 		clone.Annotations.Priority = util.CloneValue(b.Annotations.Priority)
 	}
+
 	clone.Resource = util.CloneValue(b.Resource)
 	if clone.Resource != nil {
 		clone.Resource.Text = util.CloneValue(b.Resource.Text)
 		clone.Resource.Blob = util.CloneValue(b.Resource.Blob)
 		clone.Resource.Provider = slices.Clone(b.Resource.Provider)
 	}
+
 	return &clone
 }
 
@@ -265,11 +292,13 @@ func (b *ToolContentBlock) UnmarshalYAML(node *yaml.Node) error {
 	if err := raw.UnmarshalYAML(node); err != nil {
 		return err
 	}
+
 	var decoded ToolContentBlock
 	if err := util.DecodeJSONStrict(raw, &decoded); err != nil {
 		return err
 	}
 	*b = decoded
+
 	return nil
 }
 
@@ -277,13 +306,17 @@ func (b *ToolContentBlock) UnmarshalYAML(node *yaml.Node) error {
 // is decoded directly, using the same boundary as complete results and blocks.
 func (r *ToolResourceContent) UnmarshalYAML(node *yaml.Node) error {
 	var raw common.RawJSON
+
 	if err := raw.UnmarshalYAML(node); err != nil {
 		return err
 	}
+
 	var decoded ToolResourceContent
 	if err := util.DecodeJSONStrict(raw, &decoded); err != nil {
 		return err
 	}
+
 	*r = decoded
+
 	return nil
 }
