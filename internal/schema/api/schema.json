@@ -1056,6 +1056,107 @@
         }
       ]
     },
+    "ConnectionToolSetGenerationMigrationSpec": {
+      "type": "object",
+      "required": ["toolSetRef"],
+      "properties": {
+        "toolSetRef": {
+          "allOf": [
+            { "$ref": "../resources/toolsets/schema.json#/$defs/ToolSetReference" },
+            { "required": ["generation"] }
+          ],
+          "description": "Identifies the published ToolSet generation to apply to this connection."
+        },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionToolSetRefreshSpec": {
+      "type": "object",
+      "required": ["toolSetRef"],
+      "properties": {
+        "toolSetRef": {
+          "allOf": [
+            { "$ref": "../resources/toolsets/schema.json#/$defs/ToolSetReference" },
+            { "properties": { "generation": false } }
+          ],
+          "description": "Identifies the logical ToolSet whose MCP catalog should be refreshed for this connection's applied generation."
+        },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionToolSetActionStatus": {
+      "type": "object",
+      "required": ["taskId"],
+      "properties": {
+        "taskId": {
+          "$ref": "#/$defs/ToolResultNonBlankString",
+          "description": "Opaque token for tracking the submitted task."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConnectionToolSetGenerationMigrationActionRequest": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionToolSetGenerationMigration" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionToolSetGenerationMigrationSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionToolSetGenerationMigrationActionResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionToolSetGenerationMigration" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionToolSetGenerationMigrationSpec" },
+            "status": { "$ref": "#/$defs/ConnectionToolSetActionStatus" }
+          }
+        }
+      ]
+    },
+    "ConnectionToolSetRefreshActionRequest": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionToolSetRefresh" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionToolSetRefreshSpec" }
+          }
+        }
+      ]
+    },
+    "ConnectionToolSetRefreshActionResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionToolSetRefresh" },
+            "metadata": { "$ref": "#/$defs/ConnectionActionTarget" },
+            "spec": { "$ref": "#/$defs/ConnectionToolSetRefreshSpec" },
+            "status": { "$ref": "#/$defs/ConnectionToolSetActionStatus" }
+          }
+        }
+      ]
+    },
     "ConnectionForceStateSpec": {
       "type": "object",
       "properties": {
