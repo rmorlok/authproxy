@@ -314,6 +314,84 @@
       "additionalProperties": false,
       "description": "The normalized result of one tool invocation. Rich content remains ordered, and structured content/error details distinguish omission from an explicit JSON null. The API version owns this content vocabulary."
     },
+    "ToolInvokeActionTarget": {
+      "type": "object",
+      "required": ["target"],
+      "properties": {
+        "target": {
+          "allOf": [
+            { "$ref": "../resources/meta/schema.json#/$defs/ObjectReference" },
+            {
+              "type": "object",
+              "required": ["id"],
+              "properties": {
+                "apiVersion": { "const": "authproxy.net/v1alpha1" },
+                "kind": { "const": "Tool" },
+                "id": { "type": "string", "pattern": "^tol_" },
+                "name": false,
+                "namespace": false,
+                "generation": false
+              }
+            }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "Invocations target one Tool by ID. Revision preconditions belong in spec.expectedRevision rather than the resource reference."
+    },
+    "ToolInvokeSpec": {
+      "type": "object",
+      "required": ["arguments"],
+      "properties": {
+        "arguments": {
+          "type": "object",
+          "description": "The tool's input object, retaining provider-defined keys and arbitrary nested JSON values."
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional precondition requiring the captured tool revision to match this value."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolInvokeStatus": {
+      "type": "object",
+      "required": ["result"],
+      "properties": { "result": { "$ref": "#/$defs/ToolResult" } },
+      "additionalProperties": false
+    },
+    "ToolInvokeActionRequest": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionRequest" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolInvoke" },
+            "metadata": { "$ref": "#/$defs/ToolInvokeActionTarget" },
+            "spec": { "$ref": "#/$defs/ToolInvokeSpec" }
+          }
+        }
+      ]
+    },
+    "ToolInvokeActionResponse": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ActionResponse" },
+        {
+          "type": "object",
+          "required": ["status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolInvoke" },
+            "metadata": { "$ref": "#/$defs/ToolInvokeActionTarget" },
+            "spec": { "type": "object", "additionalProperties": false },
+            "status": { "$ref": "#/$defs/ToolInvokeStatus" }
+          }
+        }
+      ],
+      "description": "Returns the normalized result with an empty spec so invocation arguments are not echoed. Go validation requires result.toolId to match the target ID."
+    },
     "Connection": {
       "$ref": "../resources/connection/schema.json"
     },

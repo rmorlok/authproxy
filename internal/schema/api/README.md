@@ -27,9 +27,71 @@ runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
 or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
 contract ownership stays clear.
 
+## Tool invocation
+
+`ToolInvokeRequest` targets a Tool by its immutable ID. Its `spec.arguments`
+must be a JSON object; use `{}` when there are no inputs. Values stay intact,
+including nested nulls and large numbers. The contract validator checks this
+shape; the future admission path will validate against the tool's input schema.
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: ToolInvoke
+metadata:
+  target:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Tool
+    id: tol_01example0000001
+spec:
+  expectedRevision: 7
+  arguments:
+    team: engineering
+```
+
+`expectedRevision` is optional and must be positive when supplied. It means
+“execute only if the current revision is still 7.” A mismatch will return HTTP
+409 `TOOL_REVISION_CHANGED` before execution. Omit it to use the current revision.
+It does not select an old revision or prevent repeated execution on retry.
+The target accepts an ID only: names, namespaces, and generations are rejected.
+
+`ToolInvokeResponse` uses the same kind and target, an empty `spec`, and the rich
+result in `status.result`. Keeping the response spec empty avoids echoing request
+arguments. The result's `toolId` must agree with the target ID.
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: ToolInvoke
+metadata:
+  target:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Tool
+    id: tol_01example0000001
+spec: {}
+status:
+  result:
+    toolId: tol_01example0000001
+    revision: 7
+    invocationId: tiv_01example0000001
+    isError: false
+    structuredContent: {team: engineering}
+    content: []
+    metadata: {connectionId: cxn_01example0000001}
+```
+
+Use strict JSON/YAML decoding followed by `ValidateRequest(ToolInvokeActionKind)`
+or `ValidateResponse(ToolInvokeActionKind)`. Request status is server-owned;
+response status and its result are required. These types follow existing action
+decoding: explicit null for `expectedRevision` or request `status` is treated as
+omission. Constructors wrap supplied values without copying or validating them.
+
+This slice defines contracts only. Routes, permission checks, URL-target
+agreement, execution snapshots, and revision comparison follow in the invocation
+implementation. Producers remain responsible for keeping connection credentials
+and resolved configuration out of result content and diagnostics.
+
 ## Tool results
 
-`ToolResult` defines the outcome that a future `ToolInvoke` action returns in
+`ToolResult` defines the outcome that a `ToolInvoke` action returns in
 `status.result`. It is an endpoint contract, not a stored resource or background
 task. The surrounding `v1alpha1` API versions the result and its content union;
 there is no separate per-block version field. This package defines validation,
