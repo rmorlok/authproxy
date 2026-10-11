@@ -349,17 +349,37 @@
       },
       "additionalProperties": false
     },
+    "ImportedToolDefaults": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "$ref": "#/$defs/TemplateLabels",
+          "description": "Administrator-authored labels for each imported tool. Authored keys replace matching provider keys; omitted keys remain. An empty map clears nothing."
+        },
+        "annotations": {
+          "$ref": "../meta/schema.json#/$defs/Annotations",
+          "description": "Administrator-authored annotations for each imported tool, with the same key precedence and empty-map behavior as labels."
+        },
+        "limits": {
+          "$ref": "../tools/schema.json#/$defs/ExecutionLimits",
+          "description": "Per-tool execution limits, subject to operator caps. Provider metadata cannot override these settings."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Defaults for tools imported from OpenAPI or MCP. Omission or empty settings add no labels, annotations, or limits. Explicit tool sources author these settings in their individual templates."
+    },
     "ToolSetDefinition": {
       "type": "object",
       "required": ["source"],
       "properties": {
         "source": { "$ref": "#/$defs/ToolSetSource" },
+        "defaults": { "$ref": "#/$defs/ImportedToolDefaults" },
         "permissionMappings": {
           "type": "array",
           "items": { "$ref": "#/$defs/PermissionMapping" }
         }
       },
-      "if": { "required": ["permissionMappings"] },
+      "if": { "anyOf": [{ "required": ["permissionMappings"] }, { "required": ["defaults"] }] },
       "then": { "properties": { "source": { "anyOf": [{ "required": ["mcp"] }, { "required": ["openapi"] }] } } },
       "additionalProperties": false
     },

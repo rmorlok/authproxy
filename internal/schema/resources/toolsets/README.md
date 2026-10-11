@@ -2,10 +2,10 @@
 
 This package owns the `ToolSet` resource envelope, generation release fields,
 connection selectors, explicit templates, OpenAPI and MCP source settings,
-imported permission mappings, patches, and generation selection policy. It is
+imported defaults and permission mappings, patches, and generation selection policy. It is
 a contract foundation: management routes, registry/apply integration, publication
 transactions, persistence, and reconciliation are implemented in later slices.
-Other OpenAPI import settings, imported defaults, and source diagnostics are
+Other OpenAPI import settings and source diagnostics are
 also deferred. Strict input decoding and the JSON schema reject those fields
 until their contracts are implemented. Source validation does not fetch documents,
 resolve references, negotiate protocols, or discover or execute tools.
@@ -97,6 +97,53 @@ IDs, namespaces, generations, timestamps, and ownership are not authorable.
 Each template explicitly declares its verbs and HTTP or JavaScript executor.
 Definition validation checks native schemas and authored shape; publication will
 compile code/templates before installing an inventory.
+
+## Imported tool defaults
+
+Use `spec.definition.defaults` to supply labels, annotations, and execution
+limits for every tool imported from OpenAPI or MCP:
+
+```yaml
+source:
+  mcp:
+    endpoint: "https://{{cfg.apiHost}}/mcp"
+    transport: streamableHttp
+defaults:
+  labels:
+    capability: calendar
+  annotations:
+    owner: platform
+  limits:
+    timeoutMillis: 30000
+    maxRequests: 10
+```
+
+Labels and annotations merge by exact key. The administrator's defaults win
+when a provider supplies the same key; other permitted provider metadata stays
+in place. For example, `owner: platform` replaces a provider's `owner: vendor`,
+but leaves its unrelated annotation keys intact. Omitted keys and empty maps
+add nothing and do not delete provider metadata. Reserved `apxy/` labels cannot
+be supplied. Generated identity, connection binding, and system provenance
+remain controller-owned. The importer must validate the final merged metadata,
+including annotation size limits.
+
+`limits` uses the same positive execution limits as an individual Tool. In this
+example, each generated tool can run for at most 30 seconds and make at most
+10 requests, subject to operator ceilings. These are per-tool caps, not a budget
+shared by the ToolSet. Omitted limits inherit runtime policy; provider metadata
+cannot loosen administrator limits. An empty `limits: {}` adds no caps.
+
+Defaults belong to the published generation. Changing them follows the normal
+draft and publication process; existing bindings receive them when migrated to
+that generation. Replacing `spec.definition` also replaces its defaults, so
+omitting them from a replacement removes the previous authored defaults.
+Explicit sources reject `defaults`, even `{}`: their templates declare their own
+metadata and limits. Defaults cannot change names, schemas, executors, source
+keys, permission verbs, or connection references.
+
+This package validates and preserves the settings. Applying them to provider
+content will be implemented with the importers. Hint provenance and source
+diagnostics remain separate contracts.
 
 ## OpenAPI sources
 
