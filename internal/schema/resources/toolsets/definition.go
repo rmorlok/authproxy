@@ -76,9 +76,11 @@ func (d *ToolSetDefinition) Validate(vc *common.ValidationContext) error {
 	for i := range d.PermissionMappings {
 		result = multierror.Append(result, d.PermissionMappings[i].Validate(vc.PushField("permissionMappings").PushIndex(i)))
 	}
+
 	if d.Defaults != nil && d.Source.MCP == nil && d.Source.OpenAPI == nil {
 		result = multierror.Append(result, vc.NewErrorForField("defaults", "are only supported for imported sources; explicit templates declare their own metadata and limits"))
 	}
+
 	result = multierror.Append(result, d.Defaults.Validate(vc.PushField("defaults")))
 
 	return result.ErrorOrNil()

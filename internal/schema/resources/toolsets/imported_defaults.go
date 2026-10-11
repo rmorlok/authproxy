@@ -42,10 +42,13 @@ func (d *ImportedToolDefaults) Validate(vc *common.ValidationContext) error {
 	if err := meta.ValidateUserLabels(d.Labels); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("labels", "%v", err))
 	}
+
 	if err := meta.ValidateAnnotations(d.Annotations); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("annotations", "%v", err))
 	}
+
 	result = multierror.Append(result, d.Limits.Validate(vc.PushField("limits")))
+
 	return result.ErrorOrNil()
 }
 
@@ -55,10 +58,12 @@ func (d *ImportedToolDefaults) Clone() *ImportedToolDefaults {
 	if d == nil {
 		return nil
 	}
+
 	clone := *d
 	clone.Labels = maps.Clone(d.Labels)
 	clone.Annotations = maps.Clone(d.Annotations)
 	clone.Limits = d.Limits.Clone()
+
 	return &clone
 }
 
@@ -101,7 +106,9 @@ func (d *ImportedToolDefaults) UnmarshalJSON(data []byte) error {
 			}
 		}
 	}
+
 	*d = decoded
+
 	return nil
 }
 
