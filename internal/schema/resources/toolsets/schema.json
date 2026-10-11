@@ -254,6 +254,31 @@
       "additionalProperties": false,
       "description": "Maps document security schemes to the existing connection authentication. Omission, an empty object, or an empty connectionSchemes array maps no schemes; none bypasses document requirements or disables connection authentication. Credentials, scopes, and credential placement are not authored here."
     },
+    "OpenAPISourceKeyOverride": {
+      "type": "object",
+      "required": ["method", "path", "sourceKey"],
+      "properties": {
+        "method": {
+          "type": "string",
+          "pattern": "^[!#$%&'*+.^_`|~0-9A-Za-z-]+$",
+          "description": "The operation's HTTP method token, preserved exactly including case. Custom methods are permitted."
+        },
+        "path": {
+          "type": "string",
+          "pattern": "^/",
+          "description": "The exact key in the OpenAPI paths object, including path templates. It must begin with a slash; operation lookup is an importer check."
+        },
+        "sourceKey": { "$ref": "../tools/schema.json#/$defs/NonBlankString" }
+      },
+      "additionalProperties": false,
+      "description": "Assigns a stable source key to one exact method/path pair. It does not change operationId filtering or select the operation for import."
+    },
+    "OpenAPIUnsupportedOperationPolicy": {
+      "type": "string",
+      "enum": ["error", "skip"],
+      "default": "error",
+      "description": "Import behavior for unsupported operations. Omission defaults to error. Skip permits omission of unsupported operations, but an explicitly included unsupported operation still fails import."
+    },
     "OpenAPISource": {
       "type": "object",
       "required": ["document"],
@@ -262,7 +287,13 @@
         "operations": { "$ref": "#/$defs/OpenAPIOperationFilter" },
         "server": { "$ref": "#/$defs/OpenAPIServerConfig" },
         "references": { "$ref": "#/$defs/OpenAPIReferenceConfig" },
-        "security": { "$ref": "#/$defs/OpenAPISecurityConfig" }
+        "security": { "$ref": "#/$defs/OpenAPISecurityConfig" },
+        "sourceKeyOverrides": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OpenAPISourceKeyOverride" },
+          "description": "An omitted or empty list applies no source-key overrides. Go validation rejects duplicate exact method/path pairs and duplicate source keys; final imported key collisions are importer checks."
+        },
+        "unsupportedOperations": { "$ref": "#/$defs/OpenAPIUnsupportedOperationPolicy" }
       },
       "additionalProperties": false
     },

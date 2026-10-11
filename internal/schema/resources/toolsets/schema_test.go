@@ -604,7 +604,12 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 			"includeOperationIds": []any{"list_records", " exact ID "},
 			"excludeOperationIds": []any{},
 		},
-		"server": map[string]any{"url": "https://{{ cfg.host }}/v1"},
+		"sourceKeyOverrides": []any{
+			map[string]any{"method": "get", "path": "/records/{recordId}", "sourceKey": " record key "},
+			map[string]any{"method": "QUERY", "path": "/records/search", "sourceKey": "records.query"},
+		},
+		"unsupportedOperations": "skip",
+		"server":                map[string]any{"url": "https://{{ cfg.host }}/v1"},
 		"security": map[string]any{"connectionSchemes": []any{
 			"providerOAuth", " exact identifier ", "https://schemas.example.com/security.json#/OAuth",
 		}},
@@ -647,6 +652,7 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 // fetch reference forms in full resources, definitions, and replacement patches.
 // External fetches retain their own credentials regardless of the root source.
 // Security scheme mappings remain exact identifiers independent of acquisition.
+// Overrides and unsupported-operation policy coexist with operationId filters.
 func TestToolSetOpenAPISchemaRoundTrip(t *testing.T) {
 	for _, envelope := range []struct {
 		name, fragment string
@@ -795,6 +801,99 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 			patch := toolSetPatchSchemaFixture(t)
 			schemaObject(t, patch, "spec")["definition"] = definition
 			require.Error(t, patchSchema.Validate(patch))
+		})
+	}
+}
+
+// TestOpenAPIOperationImportSettingsSchemaAndDecoding checks exact override
+// identities and unsupported-operation policy through both source codecs.
+// Document lookup and the consequences of skip remain importer decisions.
+func TestOpenAPIOperationImportSettingsSchemaAndDecoding(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPISource")
+	for _, test := range []struct {
+		name, fields string
+		valid        bool
+	}{
+		{"omitted settings", "", true},
+		{"empty overrides", `"sourceKeyOverrides":[]`, true},
+		{"exact override", `"sourceKeyOverrides":[{"method":"get","path":"/records/{id}","sourceKey":" records.read "}]`, true},
+		{"custom method", `"sourceKeyOverrides":[{"method":"m-Search","path":"/","sourceKey":"root"}]`, true},
+		{"case-sensitive method identities", `"sourceKeyOverrides":[{"method":"GET","path":"/records","sourceKey":"upper"},{"method":"get","path":"/records","sourceKey":"lower"}]`, true},
+		{"uninterpreted path", `"sourceKeyOverrides":[{"method":"GET","path":"/literal path?value=1#section","sourceKey":"literal"}]`, true},
+		{"explicit error policy", `"unsupportedOperations":"error"`, true},
+		{"explicit skip policy", `"unsupportedOperations":"skip"`, true},
+		{"skip with explicit inclusion", `"unsupportedOperations":"skip","operations":{"includeOperationIds":["selected"]}`, true},
+		{"null overrides", `"sourceKeyOverrides":null`, false},
+		{"object overrides", `"sourceKeyOverrides":{}`, false},
+		{"null override", `"sourceKeyOverrides":[null]`, false},
+		{"scalar override", `"sourceKeyOverrides":["records"]`, false},
+		{"missing method", `"sourceKeyOverrides":[{"path":"/records","sourceKey":"records"}]`, false},
+		{"missing path", `"sourceKeyOverrides":[{"method":"GET","sourceKey":"records"}]`, false},
+		{"missing source key", `"sourceKeyOverrides":[{"method":"GET","path":"/records"}]`, false},
+		{"null method", `"sourceKeyOverrides":[{"method":null,"path":"/records","sourceKey":"records"}]`, false},
+		{"null path", `"sourceKeyOverrides":[{"method":"GET","path":null,"sourceKey":"records"}]`, false},
+		{"null source key", `"sourceKeyOverrides":[{"method":"GET","path":"/records","sourceKey":null}]`, false},
+		{"numeric method", `"sourceKeyOverrides":[{"method":1,"path":"/records","sourceKey":"records"}]`, false},
+		{"numeric path", `"sourceKeyOverrides":[{"method":"GET","path":1,"sourceKey":"records"}]`, false},
+		{"numeric source key", `"sourceKeyOverrides":[{"method":"GET","path":"/records","sourceKey":1}]`, false},
+		{"empty method", `"sourceKeyOverrides":[{"method":"","path":"/records","sourceKey":"records"}]`, false},
+		{"padded method", `"sourceKeyOverrides":[{"method":" GET","path":"/records","sourceKey":"records"}]`, false},
+		{"invalid method token", `"sourceKeyOverrides":[{"method":"GET/POST","path":"/records","sourceKey":"records"}]`, false},
+		{"empty path", `"sourceKeyOverrides":[{"method":"GET","path":"","sourceKey":"records"}]`, false},
+		{"path without leading slash", `"sourceKeyOverrides":[{"method":"GET","path":"records","sourceKey":"records"}]`, false},
+		{"empty source key", `"sourceKeyOverrides":[{"method":"GET","path":"/records","sourceKey":""}]`, false},
+		{"blank source key", `"sourceKeyOverrides":[{"method":"GET","path":"/records","sourceKey":" \t\n"}]`, false},
+		{"unknown override field", `"sourceKeyOverrides":[{"method":"GET","path":"/records","sourceKey":"records","operationId":"read"}]`, false},
+		{"miscased override field", `"sourceKeyOverrides":[{"Method":"GET","path":"/records","sourceKey":"records"}]`, false},
+		{"miscased overrides", `"SourceKeyOverrides":[]`, false},
+		{"null policy", `"unsupportedOperations":null`, false},
+		{"empty policy", `"unsupportedOperations":""`, false},
+		{"miscased policy value", `"unsupportedOperations":"Skip"`, false},
+		{"unknown policy", `"unsupportedOperations":"warn"`, false},
+		{"object policy", `"unsupportedOperations":{}`, false},
+		{"miscased policy field", `"UnsupportedOperations":"skip"`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := `{"document":{"inline":{}}`
+			if test.fields != "" {
+				source += "," + test.fields
+			}
+			source += "}"
+			var document any
+			require.NoError(t, json.Unmarshal([]byte(source), &document))
+			schemaErr := compiled.Validate(document)
+			asYAML, err := yaml.Marshal(common.RawJSON(source))
+			require.NoError(t, err)
+			for _, format := range []struct {
+				name   string
+				data   []byte
+				decode func([]byte, any) error
+			}{
+				{"JSON", []byte(source), util.DecodeJSONStrict},
+				{"YAML", asYAML, util.DecodeYAMLStrict},
+			} {
+				t.Run(format.name, func(t *testing.T) {
+					var decoded toolsets.OpenAPISource
+					err := format.decode(format.data, &decoded)
+					if err == nil {
+						err = decoded.Validate(nil)
+					}
+					if !test.valid {
+						require.Error(t, schemaErr)
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, schemaErr)
+					require.NoError(t, err)
+					roundTrip, err := json.Marshal(decoded)
+					require.NoError(t, err)
+					want := source
+					if test.name == "empty overrides" {
+						want = `{"document":{"inline":{}}}`
+					}
+					require.JSONEq(t, want, string(roundTrip))
+				})
+			}
 		})
 	}
 }

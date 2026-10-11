@@ -119,7 +119,7 @@ func (p *ProxyHTTP) Validate(vc *common.ValidationContext) error {
 
 	var result *multierror.Error
 
-	if !isHTTPToken(p.Method) {
+	if !IsHTTPToken(p.Method) {
 		result = multierror.Append(result, vc.NewErrorForField("method", "must be an HTTP token"))
 	}
 
@@ -128,7 +128,7 @@ func (p *ProxyHTTP) Validate(vc *common.ValidationContext) error {
 	}
 
 	for name, value := range p.Headers {
-		if !isHTTPToken(name) || strings.ContainsAny(value, "\r\n") {
+		if !IsHTTPToken(name) || strings.ContainsAny(value, "\r\n") {
 			result = multierror.Append(result, vc.PushField("headers").PushField(name).NewError("must have a valid header name and no newline characters"))
 		}
 	}
@@ -426,9 +426,10 @@ func validateMediaType(value string, vc *common.ValidationContext) error {
 	return nil
 }
 
-// isHTTPToken accepts extension methods and header names supported by HTTP;
-// restricting methods to an enumeration would narrow existing proxy behavior.
-func isHTTPToken(value string) bool {
+// IsHTTPToken reports whether value is a nonempty HTTP token, without changing
+// its case. It accepts extension methods and header names; restricting methods
+// to an enumeration would narrow the proxy and OpenAPI operation contracts.
+func IsHTTPToken(value string) bool {
 	if value == "" {
 		return false
 	}

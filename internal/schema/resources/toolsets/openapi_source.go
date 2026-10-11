@@ -19,6 +19,15 @@ type OpenAPISource struct {
 	Server     *OpenAPIServerConfig    `json:"server,omitempty" yaml:"server,omitempty"`
 	References *OpenAPIReferenceConfig `json:"references,omitempty" yaml:"references,omitempty"`
 	Security   *OpenAPISecurityConfig  `json:"security,omitempty" yaml:"security,omitempty"`
+
+	// SourceKeyOverrides pins generated identity independently of operationId.
+	// These mappings do not include or exclude operations from the inventory.
+	SourceKeyOverrides []OpenAPISourceKeyOverride `json:"sourceKeyOverrides,omitempty" yaml:"sourceKeyOverrides,omitempty"`
+
+	// UnsupportedOperations defaults to error when omitted. Skip only permits
+	// broad imports to omit unsupported operations with diagnostics; explicitly
+	// included operations still block publication unless excluded or repaired.
+	UnsupportedOperations *OpenAPIUnsupportedOperationPolicy `json:"unsupportedOperations,omitempty" yaml:"unsupportedOperations,omitempty"`
 }
 
 // OpenAPIOperationFilter selects exact document operationId values. Omitted
@@ -46,6 +55,10 @@ func (s *OpenAPISource) Validate(vc *common.ValidationContext) error {
 	result = multierror.Append(result, s.Server.Validate(vc.PushField("server")))
 	result = multierror.Append(result, s.References.Validate(vc.PushField("references")))
 	result = multierror.Append(result, s.Security.Validate(vc.PushField("security")))
+	result = multierror.Append(result, validateOpenAPISourceKeyOverrides(s.SourceKeyOverrides, vc.PushField("sourceKeyOverrides")))
+	if s.UnsupportedOperations != nil && *s.UnsupportedOperations != OpenAPIUnsupportedOperationError && *s.UnsupportedOperations != OpenAPIUnsupportedOperationSkip {
+		result = multierror.Append(result, vc.NewErrorForField("unsupportedOperations", "must be error or skip"))
+	}
 
 	return result.ErrorOrNil()
 }
@@ -83,6 +96,8 @@ func (s *OpenAPISource) Clone() *OpenAPISource {
 	clone.Server = s.Server.Clone()
 	clone.References = s.References.Clone()
 	clone.Security = s.Security.Clone()
+	clone.SourceKeyOverrides = slices.Clone(s.SourceKeyOverrides)
+	clone.UnsupportedOperations = util.CloneValue(s.UnsupportedOperations)
 	return &clone
 }
 
