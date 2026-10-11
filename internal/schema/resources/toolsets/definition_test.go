@@ -310,6 +310,10 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 				},
 				Server:   server,
 				Security: &OpenAPISecurityConfig{ConnectionSchemes: []string{"calendarOAuth"}},
+				SourceKeyOverrides: []OpenAPISourceKeyOverride{
+					{Method: "GET", Path: "/calendars", SourceKey: "calendar.list"},
+				},
+				UnsupportedOperations: util.ToPtr(OpenAPIUnsupportedOperationError),
 				References: &OpenAPIReferenceConfig{
 					BaseURI: util.ToPtr("https://example.com/openapi.json"),
 					Bundle: map[string]common.RawJSON{
@@ -407,6 +411,12 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			require.Equal(t, current.Spec.Definition.Source.OpenAPI.Security, candidate.Spec.Definition.Source.OpenAPI.Security)
 			candidate.Spec.Definition.Source.OpenAPI.Security.ConnectionSchemes[0] = "changed"
 			require.Equal(t, current.Spec.Definition.Source.OpenAPI.Security, decodedPatch.Spec.Definition.Source.OpenAPI.Security)
+			require.Equal(t, current.Spec.Definition.Source.OpenAPI.SourceKeyOverrides, candidate.Spec.Definition.Source.OpenAPI.SourceKeyOverrides)
+			require.Equal(t, current.Spec.Definition.Source.OpenAPI.UnsupportedOperations, candidate.Spec.Definition.Source.OpenAPI.UnsupportedOperations)
+			candidate.Spec.Definition.Source.OpenAPI.SourceKeyOverrides[0].SourceKey = "changed"
+			*candidate.Spec.Definition.Source.OpenAPI.UnsupportedOperations = OpenAPIUnsupportedOperationSkip
+			require.Equal(t, current.Spec.Definition.Source.OpenAPI.SourceKeyOverrides, decodedPatch.Spec.Definition.Source.OpenAPI.SourceKeyOverrides)
+			require.Equal(t, current.Spec.Definition.Source.OpenAPI.UnsupportedOperations, decodedPatch.Spec.Definition.Source.OpenAPI.UnsupportedOperations)
 			if inline {
 				// Changing a candidate's selection must not alter the decoded
 				// patch or the original generation from which it was prepared.
@@ -473,6 +483,8 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 		clone.Source.OpenAPI.References.Fetch[0].URL = "https://changed.example/schema.json"
 		clone.Source.OpenAPI.References.Fetch[1].FetchConnectionRef.Name = "other-reader"
 		clone.Source.OpenAPI.Security.ConnectionSchemes[0] = "other"
+		clone.Source.OpenAPI.SourceKeyOverrides[0].Path = "/other"
+		*clone.Source.OpenAPI.UnsupportedOperations = OpenAPIUnsupportedOperationSkip
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
 
 		require.Equal(t, before, original)

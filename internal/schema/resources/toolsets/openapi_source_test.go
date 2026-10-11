@@ -22,6 +22,10 @@ func openAPISourceForTest() *OpenAPISource {
 		},
 		Server:   &OpenAPIServerConfig{URL: util.ToPtr("https://{{cfg.apiHost}}/v1")},
 		Security: &OpenAPISecurityConfig{ConnectionSchemes: []string{"calendarOAuth"}},
+		SourceKeyOverrides: []OpenAPISourceKeyOverride{
+			{Method: "GET", Path: "/calendars", SourceKey: "calendar.list"},
+		},
+		UnsupportedOperations: util.ToPtr(OpenAPIUnsupportedOperationError),
 	}
 }
 
@@ -34,7 +38,15 @@ func TestOpenAPISourceValidation(t *testing.T) {
 		field  string
 	}{
 		{"valid", func(s *OpenAPISource) {}, ""},
-		{"optional omitted", func(s *OpenAPISource) { s.Operations = nil; s.Server = nil; s.Security = nil }, ""},
+		{"optional omitted", func(s *OpenAPISource) {
+			s.Operations = nil
+			s.Server = nil
+			s.Security = nil
+			s.SourceKeyOverrides = nil
+			s.UnsupportedOperations = nil
+		}, ""},
+		{"invalid override", func(s *OpenAPISource) { s.SourceKeyOverrides[0].Path = "calendars" }, "sourceKeyOverrides[0].path"},
+		{"invalid unsupported policy", func(s *OpenAPISource) { *s.UnsupportedOperations = "ignore" }, "unsupportedOperations"},
 		{"blank security scheme", func(s *OpenAPISource) { s.Security.ConnectionSchemes = []string{" "} }, "security.connectionSchemes[0]"},
 		{"whole URL template", func(s *OpenAPISource) { *s.Server.URL = "{{cfg.serverUrl}}" }, ""},
 		{"document server selection", func(s *OpenAPISource) { s.Server = &OpenAPIServerConfig{Index: util.ToPtr(0)} }, ""},
@@ -167,6 +179,8 @@ func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	(*clone.Operations.ExcludeOperationIDs)[0] = "changed"
 	*clone.Server.URL = "changed"
 	clone.Security.ConnectionSchemes[0] = "changed"
+	clone.SourceKeyOverrides[0].SourceKey = "changed"
+	*clone.UnsupportedOperations = OpenAPIUnsupportedOperationSkip
 	require.Equal(t, openAPISourceForTest(), source)
 	require.Nil(t, (*OpenAPISource)(nil).Clone())
 	require.Nil(t, (*OpenAPIOperationFilter)(nil).Clone())
@@ -184,6 +198,8 @@ func TestOpenAPISourceCloneAndDecodeOwnership(t *testing.T) {
 	require.Nil(t, source.Operations)
 	require.Nil(t, source.Server)
 	require.Nil(t, source.Security)
+	require.Nil(t, source.SourceKeyOverrides)
+	require.Nil(t, source.UnsupportedOperations)
 }
 
 // TestOpenAPIOperationFilterListOwnership preserves supplied list pointers and independently

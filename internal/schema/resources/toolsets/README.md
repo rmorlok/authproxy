@@ -181,6 +181,73 @@ Blank/duplicate IDs and null fields or elements are rejected. These filters do
 not treat method/path fallback source keys as operation IDs. The importer will
 check document identity, unsupported features, and actual operation membership.
 
+### Stable operation identities
+
+OpenAPI identifies an operation by its HTTP method and path. It can also supply
+an `operationId`, such as `listCalendars`. AuthProxy uses that ID as the generated
+tool's source key, or a deterministic method/path key when the ID is absent.
+The source key contributes to the tool's identity and canonical permission verb.
+Changing it creates a different generated tool.
+
+Use `sourceKeyOverrides` to keep the same source key after a provider renames
+an operation. For example, if `GET /calendars` changes its `operationId` from
+`listCalendars` to `listCalendarsV2`:
+
+```yaml
+# Under source.openapi, alongside document:
+operations:
+  includeOperationIds: [listCalendarsV2]
+sourceKeyOverrides:
+  - method: GET
+    path: /calendars
+    sourceKey: listCalendars
+```
+
+The filter uses the new provider ID, while the override retains the existing
+generated identity and verb. Overrides do not select operations or change how
+the include/exclude filters match. The same mechanism assigns a stable key to
+an operation that has no `operationId`. Permission mappings match the resulting
+source key, so they can continue referring to `listCalendars` in this example.
+
+Each override has an exact `method`, `path`, and nonblank `sourceKey`. Use the
+method's wire spelling: `GET` for OpenAPI's `get` field. For OpenAPI 3.2
+`additionalOperations`, use the exact method key, preserving its case. Paths
+must start with `/` and retain their parameter names, such as `/calendars/{id}`.
+No method uppercasing, path cleaning, percent-decoding, or template substitution
+is performed. See the [OpenAPI Path Item rules](https://spec.openapis.org/oas/v3.2.1.html#path-item-object).
+
+Duplicate method/path targets and duplicate override source keys are rejected.
+The importer must also check that each override identifies an operation and
+that the final keys do not collide with other operations' IDs or fallback keys.
+Overrides do not repair duplicate `operationId` values in an invalid document.
+Omitting the list or supplying `sourceKeyOverrides: []` applies no overrides;
+null fields, null entries, and unknown fields are invalid.
+
+### Unsupported operations
+
+The importer will default to blocking publication when a selected operation
+uses a feature it cannot compile. A broad import can explicitly opt into
+skipping unsupported operations and retaining their diagnostics:
+
+```yaml
+# Under source.openapi, with no includeOperationIds filter:
+unsupportedOperations: skip
+```
+
+Omission and `unsupportedOperations: error` keep the blocking policy. `skip`
+does not allow an explicitly included unsupported operation to disappear:
+that operation still blocks publication until repaired or excluded. Exclusions
+take precedence over inclusion. Setting `skip` with an inclusion list is valid
+configuration, but does not relax this requirement. A source-key override alone
+does not count as inclusion because it only changes identity.
+
+Skipping applies to unsupported operation features, not invalid documents,
+identity conflicts, failed acquisition or reference resolution, or ambiguous
+security requirements. The importer must produce an inspectable report for
+skipped operations. This package validates and preserves the configuration;
+operation matching, identity derivation, diagnostics, and publication decisions
+remain importer work.
+
 ### Server selection and overrides
 
 OpenAPI 3 describes an HTTP API, including its endpoints and the base URLs where
@@ -483,8 +550,6 @@ document's retrieval context, subject to content-defined identities such as
 This package defines and validates acquisition instructions; it performs no
 fetching. Actual acquisition, reference resolution, immutable snapshots,
 refresh, server resolution, and operation compilation are future work.
-Source-key overrides and unsupported-operation policy remain separate contracts;
-those configuration fields are currently rejected.
 
 ## MCP sources and imported permission mappings
 
