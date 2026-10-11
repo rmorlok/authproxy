@@ -11,6 +11,7 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"golang.org/x/time/rate"
 )
@@ -130,6 +131,16 @@ type DB interface {
 	ListConnectorGenerationsFromCursor(ctx context.Context, cursor string) (ListConnectorGenerationsExecutor, error)
 	ListConnectorsBuilder() ListConnectorsBuilder
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
+
+	/*
+	 * ToolSets (logical identity and membership policy)
+	 */
+
+	CreateToolSet(ctx context.Context, toolSet *ToolSet) error
+	GetToolSet(ctx context.Context, id apid.ID) (*ToolSet, error)
+	GetToolSetByName(ctx context.Context, namespace string, name scommon.ResourceName) (*ToolSet, error)
+	UpdateToolSetConnectionSelector(ctx context.Context, id apid.ID, expectedRevision uint64, selector toolsetschema.ConnectionSelector) (*ToolSet, error)
+	DeleteToolSet(ctx context.Context, id apid.ID) error
 
 	/*
 	 *  Connections
