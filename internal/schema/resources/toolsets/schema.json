@@ -135,6 +135,12 @@
       ],
       "description": "A Connection ID or namespaced name used to fetch the document. It has no generation and may belong to a different namespace from the ToolSet; access checks happen during fetching."
     },
+    "OpenAPIDocumentURL": {
+      "type": "string",
+      "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/?#@\\s:][^/?#@\\s]*(?:[/?][^#\u0000-\u001F\u007F]*)?$",
+      "not": { "pattern": "\\{\\{|\\}\\}|\\s$" },
+      "description": "A literal absolute HTTP(S) document URL without credentials, fragment, or templates. Go validation performs URL parsing and rejects surrounding whitespace."
+    },
     "OpenAPIDocument": {
       "type": "object",
       "properties": {
@@ -142,12 +148,7 @@
           "type": "object",
           "description": "An opaque document object. This authoring contract does not validate OpenAPI versions, compile schemas, or resolve references."
         },
-        "url": {
-          "type": "string",
-          "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^/?#@\\s:][^/?#@\\s]*(?:[/?][^#\u0000-\u001F\u007F]*)?$",
-          "not": { "pattern": "\\{\\{|\\}\\}|\\s$" },
-          "description": "A literal absolute HTTP(S) document URL without credentials, fragment, or templates. Go validation performs URL parsing and rejects surrounding whitespace."
-        },
+        "url": { "$ref": "#/$defs/OpenAPIDocumentURL" },
         "fetchConnectionRef": { "$ref": "#/$defs/OpenAPIFetchConnectionReference" }
       },
       "oneOf": [{ "required": ["inline"] }, { "required": ["url"] }],
@@ -209,6 +210,16 @@
       },
       "description": "A literal absolute document URI without a fragment, user information, whitespace, controls, or templates. It identifies content rather than authorizing a fetch; URNs and file URIs are permitted. These patterns guide authoring; Go validation additionally parses the URI."
     },
+    "OpenAPIReferenceFetch": {
+      "type": "object",
+      "required": ["url"],
+      "properties": {
+        "url": { "$ref": "#/$defs/OpenAPIDocumentURL" },
+        "fetchConnectionRef": { "$ref": "#/$defs/OpenAPIFetchConnectionReference" }
+      },
+      "additionalProperties": false,
+      "description": "An explicit external reference retrieval. It is unauthenticated unless this entry supplies fetchConnectionRef; credentials are never inherited from the root document or another entry. Redirects are not followed."
+    },
     "OpenAPIReferenceConfig": {
       "type": "object",
       "properties": {
@@ -221,6 +232,11 @@
           "propertyNames": { "$ref": "#/$defs/OpenAPIReferenceURI" },
           "additionalProperties": true,
           "description": "Opaque JSON documents indexed by their absolute document identities. Values may be any JSON, including boolean schemas, arrays, scalars, and null. Target compatibility and reference resolution are importer checks; no URI here enables network or filesystem access."
+        },
+        "fetch": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OpenAPIReferenceFetch" },
+          "description": "The complete list of external reference URLs authorized for import-time retrieval. Omission or an empty array permits no external reference fetches. Go validation rejects exact duplicate URLs and exact overlap with bundle keys; normalized identity collisions remain importer checks."
         }
       },
       "additionalProperties": false
