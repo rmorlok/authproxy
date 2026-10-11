@@ -149,7 +149,10 @@ type reencryptInterleavingDB struct {
 
 // BatchUpdateReEncryptedFields inserts the edit after enumeration and encryption
 // have captured the old value, then delegates every batch to the real writer.
-func (db *reencryptInterleavingDB) BatchUpdateReEncryptedFields(ctx context.Context, updates []database.ReEncryptedFieldUpdate) error {
+func (db *reencryptInterleavingDB) BatchUpdateReEncryptedFields(
+	ctx context.Context,
+	updates []database.ReEncryptedFieldUpdate,
+) error {
 	if !db.replaced {
 		// Both test drivers accept numbered dollar placeholders.
 		_, err := db.rawDb.ExecContext(ctx,
@@ -161,6 +164,7 @@ func (db *reencryptInterleavingDB) BatchUpdateReEncryptedFields(ctx context.Cont
 		}
 		db.replaced = true
 	}
+	
 	return db.DB.BatchUpdateReEncryptedFields(ctx, updates)
 }
 
