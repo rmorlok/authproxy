@@ -275,6 +275,67 @@ This slice defines and validates the configuration. Server resolution, variable
 substitution, and URL template execution will be implemented in the importer
 and execution layers.
 
+### Security scheme mappings
+
+OpenAPI names authentication methods in `components.securitySchemes`
+(`securityDefinitions` in Swagger 2). An operation's `security` field says which
+methods it requires. An operation can override the document-wide requirements;
+`security: []` removes them. Each object in the array is an alternative, and all
+schemes within that object are required together. For example:
+
+```yaml
+# Inside the provider's OpenAPI document:
+security:
+  - calendarOAuth: [calendars.read]
+  - apiKey: []
+```
+
+This allows OAuth with the `calendars.read` scope **or** an API key. Putting both
+names in one object would require **both** methods. An empty object (`{}`) is an
+alternative that allows anonymous access. See the
+[OpenAPI security requirement rules](https://spec.openapis.org/oas/v3.2.1.html#security-requirement-object)
+and [operation overrides](https://spec.openapis.org/oas/v3.2.1.html#operation-object).
+
+AuthProxy needs an explicit mapping from those provider identifiers to the
+connection that will receive the tools:
+
+```yaml
+# Under source.openapi, alongside document:
+security:
+  connectionSchemes: [calendarOAuth]
+```
+
+This tells the importer to satisfy `calendarOAuth` through the bound connection's
+existing authentication. It does not select the connection that downloads the
+OpenAPI document, add credentials, or change how the proxy injects them. There
+is no second execution connection: every tool remains bound to one connection.
+
+For the provider example above, the importer must verify that this connection
+can satisfy the OAuth alternative, including `calendars.read`. Listing `apiKey`
+as well would map that scheme to the same connection; it would not supply another
+credential or make an unsupported combination work. Mapping membership alone
+does not prove compatibility. The importer and binding layer must check the
+scheme type, credential placement, and required scopes or roles, and reject
+requirements they cannot support. They must satisfy a complete alternative,
+not combine parts of different alternatives. List order does not choose one.
+
+`connectionSchemes` contains unique, nonblank, exact Security Requirement keys.
+Case and spelling are preserved, including URI references supported by OpenAPI
+3.2; this field does not use patterns or URI normalization. Resolution of those
+identifiers belongs to the importer. Null fields or list entries and unknown
+configuration fields are rejected.
+
+Omitting `security`, supplying `security: {}`, or using `connectionSchemes: []`
+maps no schemes. None of these forms disables the provider's requirements or
+suppresses the connection's normal authentication. Required scopes and roles
+come from the provider document, so they are not repeated in this configuration.
+AuthProxy's `permissionMappings` separately controls tool verb aliases; security
+scheme mappings do not grant an actor permission to invoke a tool.
+
+This package validates and preserves the mapping configuration. Document
+resolution, alternative selection, compatibility checks, and execution are
+implemented in later importer and binding slices.
+
 ### Reference bundles
 
 OpenAPI uses `$ref` to reuse schemas and other definitions. A fragment-only
@@ -422,8 +483,8 @@ document's retrieval context, subject to content-defined identities such as
 This package defines and validates acquisition instructions; it performs no
 fetching. Actual acquisition, reference resolution, immutable snapshots,
 refresh, server resolution, and operation compilation are future work.
-Security mappings, source-key overrides, and unsupported-operation policy
-remain separate contracts; those configuration fields are currently rejected.
+Source-key overrides and unsupported-operation policy remain separate contracts;
+those configuration fields are currently rejected.
 
 ## MCP sources and imported permission mappings
 

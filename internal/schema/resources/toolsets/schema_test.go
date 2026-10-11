@@ -605,6 +605,9 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 			"excludeOperationIds": []any{},
 		},
 		"server": map[string]any{"url": "https://{{ cfg.host }}/v1"},
+		"security": map[string]any{"connectionSchemes": []any{
+			"providerOAuth", " exact identifier ", "https://schemas.example.com/security.json#/OAuth",
+		}},
 		"references": map[string]any{
 			"baseUri": "https://schemas.example.com/provider/openapi.json",
 			"bundle": map[string]any{
@@ -643,6 +646,7 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 // TestToolSetOpenAPISchemaRoundTrip preserves opaque inline documents and both
 // fetch reference forms in full resources, definitions, and replacement patches.
 // External fetches retain their own credentials regardless of the root source.
+// Security scheme mappings remain exact identifiers independent of acquisition.
 func TestToolSetOpenAPISchemaRoundTrip(t *testing.T) {
 	for _, envelope := range []struct {
 		name, fragment string
@@ -772,7 +776,7 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "unknown server field", path: []string{"server"}, field: "name", value: "production"},
 		{name: "null references", field: "references", value: nil},
 		{name: "object fetch list", path: []string{"references"}, field: "fetch", value: map[string]any{}},
-		{name: "unsupported security", field: "security", value: map[string]any{}},
+		{name: "unsupported security option", path: []string{"security"}, field: "credentials", value: map[string]any{}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			definition := toolSetOpenAPIDefinitionSchemaFixture(t, map[string]any{
@@ -791,6 +795,85 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 			patch := toolSetPatchSchemaFixture(t)
 			schemaObject(t, patch, "spec")["definition"] = definition
 			require.Error(t, patchSchema.Validate(patch))
+		})
+	}
+}
+
+// TestOpenAPISecurityConfigSchemaAndDecoding keeps scheme mappings exact across
+// the source's JSON and YAML boundaries. Empty mappings impose no new shape
+// requirements; document and connection compatibility remain importer checks.
+func TestOpenAPISecurityConfigSchemaAndDecoding(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPISource")
+	for _, test := range []struct {
+		name, input string
+		valid       bool
+	}{
+		{"omitted configuration", "", true},
+		{"empty configuration", `{}`, true},
+		{"empty mappings", `{"connectionSchemes":[]}`, true},
+		{"one scheme", `{"connectionSchemes":["providerOAuth"]}`, true},
+		{"exact identifiers", `{"connectionSchemes":["OAuth","oauth"," OAuth ","scheme name"]}`, true},
+		{"URI identifiers", `{"connectionSchemes":["https://schemas.example.com/security.json#/OAuth","./security.json#/ApiKey","urn:example:scheme"]}`, true},
+		{"literal pattern characters", `{"connectionSchemes":["^oauth.*$","{{scheme}}"]}`, true},
+		{"null configuration", `null`, false},
+		{"array configuration", `[]`, false},
+		{"scalar configuration", `"oauth"`, false},
+		{"null mappings", `{"connectionSchemes":null}`, false},
+		{"object mappings", `{"connectionSchemes":{"oauth":true}}`, false},
+		{"string mappings", `{"connectionSchemes":"oauth"}`, false},
+		{"null mapping", `{"connectionSchemes":[null]}`, false},
+		{"numeric mapping", `{"connectionSchemes":[1]}`, false},
+		{"empty identifier", `{"connectionSchemes":[""]}`, false},
+		{"blank identifier", `{"connectionSchemes":[" \t\n"]}`, false},
+		{"duplicate identifier", `{"connectionSchemes":["oauth","oauth"]}`, false},
+		{"miscased field", `{"ConnectionSchemes":["oauth"]}`, false},
+		{"unknown field", `{"schemes":["oauth"]}`, false},
+		{"separate connection", `{"connectionRef":{}}`, false},
+		{"credentials", `{"credentials":{"token":"secret"}}`, false},
+		{"scopes", `{"scopes":["records:read"]}`, false},
+		{"credential placement", `{"placement":"header"}`, false},
+		{"auth bypass", `{"disabled":true}`, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := `{"document":{"inline":{}}}`
+			if test.input != "" {
+				source = `{"document":{"inline":{}},"security":` + test.input + `}`
+			}
+			var document any
+			require.NoError(t, json.Unmarshal([]byte(source), &document))
+			schemaErr := compiled.Validate(document)
+			asYAML, err := yaml.Marshal(common.RawJSON(source))
+			require.NoError(t, err)
+			for _, format := range []struct {
+				name   string
+				data   []byte
+				decode func([]byte, any) error
+			}{
+				{"JSON", []byte(source), util.DecodeJSONStrict},
+				{"YAML", asYAML, util.DecodeYAMLStrict},
+			} {
+				t.Run(format.name, func(t *testing.T) {
+					var decoded toolsets.OpenAPISource
+					err := format.decode(format.data, &decoded)
+					if err == nil {
+						err = decoded.Validate(nil)
+					}
+					if !test.valid {
+						require.Error(t, schemaErr)
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, schemaErr)
+					require.NoError(t, err)
+					roundTrip, err := json.Marshal(decoded)
+					require.NoError(t, err)
+					want := source
+					if test.name == "empty mappings" {
+						want = `{"document":{"inline":{}},"security":{}}`
+					}
+					require.JSONEq(t, want, string(roundTrip))
+				})
+			}
 		})
 	}
 }
