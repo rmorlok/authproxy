@@ -314,6 +314,155 @@
       "additionalProperties": false,
       "description": "The normalized result of one tool invocation. Rich content remains ordered, and structured content/error details distinguish omission from an explicit JSON null. The API version owns this content vocabulary."
     },
+    "ToolSchemaDetail": {
+      "type": "string",
+      "enum": ["none", "compact", "full"]
+    },
+    "ToolConnectionIdentity": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^cxn_" },
+        "name": { "$ref": "#/$defs/ToolResultNonBlankString" }
+      },
+      "additionalProperties": false
+    },
+    "ToolSetIdentity": {
+      "type": "object",
+      "required": ["id", "name", "generation"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^tls_" },
+        "name": { "$ref": "#/$defs/ToolResultNonBlankString" },
+        "generation": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "ToolReadiness": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "type": "string", "enum": ["ready", "unavailable", "unknown"] },
+        "reason": { "$ref": "#/$defs/ToolResultNonBlankString" },
+        "message": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "Observed tool availability, independent of connection health. Discovery does not guarantee that a later invocation will succeed."
+    },
+    "ToolHint": {
+      "type": "object",
+      "required": ["value", "provenance"],
+      "properties": {
+        "value": { "type": "boolean" },
+        "provenance": { "type": "string", "enum": ["administrator", "provider"] }
+      },
+      "additionalProperties": false,
+      "description": "A presentation hint with its source. False is a supplied value; hints do not grant permissions."
+    },
+    "ToolDescriptorHints": {
+      "type": "object",
+      "properties": {
+        "readOnly": { "$ref": "#/$defs/ToolHint" },
+        "destructive": { "$ref": "#/$defs/ToolHint" },
+        "idempotent": { "$ref": "#/$defs/ToolHint" }
+      },
+      "additionalProperties": false
+    },
+    "ToolDescriptor": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["toolId", "revision", "name", "description", "connection", "readiness", "schema"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolDescriptor" },
+            "toolId": { "type": "string", "pattern": "^tol_" },
+            "revision": { "type": "integer", "minimum": 1 },
+            "name": { "$ref": "#/$defs/ToolResultNonBlankString" },
+            "description": { "$ref": "#/$defs/ToolResultNonBlankString" },
+            "connection": { "$ref": "#/$defs/ToolConnectionIdentity" },
+            "toolSet": { "$ref": "#/$defs/ToolSetIdentity" },
+            "catalogRevision": { "type": "integer", "minimum": 1 },
+            "readiness": { "$ref": "#/$defs/ToolReadiness" },
+            "connectionHealth": { "$ref": "../resources/connection/schema.json#/$defs/ConnectionHealthStatus" },
+            "hints": { "$ref": "#/$defs/ToolDescriptorHints" },
+            "schema": { "$ref": "#/$defs/ToolSchemaDetail" },
+            "inputSchema": { "type": "object" },
+            "outputSchema": { "type": ["object", "boolean"] },
+            "usage": { "type": "string" },
+            "examples": { "type": "array", "items": { "type": "object" } }
+          },
+          "dependentRequired": { "catalogRevision": ["toolSet"] },
+          "if": { "properties": { "schema": { "const": "none" } } },
+          "then": { "properties": { "inputSchema": false, "outputSchema": false } },
+          "else": { "required": ["inputSchema"] }
+        },
+        {
+          "if": { "properties": { "schema": { "const": "full" } } },
+          "else": { "properties": { "usage": false, "examples": false } }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "A discovery projection with no executor or connection configuration. Full schemas retain their original content; compact schemas retain validation constraints while omitting verbose descriptions and examples. Neither is compiled by this contract."
+    },
+    "AgentConnectionSummary": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["id", "name", "canProxy"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "AgentConnection" },
+            "id": { "type": "string", "pattern": "^cxn_" },
+            "name": { "$ref": "#/$defs/ToolResultNonBlankString" },
+            "canProxy": { "type": "boolean" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "A minimal connection discovery projection. canProxy reports the caller's raw proxy permission independently of access to individual tools."
+    },
+    "ToolDescriptorList": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolDescriptorList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/ToolDescriptor" } }
+          }
+        }
+      ]
+    },
+    "AgentConnectionList": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "AgentConnectionList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/AgentConnectionSummary" } }
+          }
+        }
+      ]
+    },
+    "ToolSearchQuery": {
+      "type": "object",
+      "properties": {
+        "query": { "type": "string" },
+        "labelSelector": { "type": "string", "description": "Further restricts tools by labels, including connection identity labels." },
+        "toolSetId": { "type": "string", "pattern": "^tls_" },
+        "schema": { "type": "string", "enum": ["", "none", "compact", "full"], "default": "none" },
+        "includeUnavailable": { "type": "boolean" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 100, "default": 5 },
+        "continue": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "description": "Tool discovery filters. Omitted or empty schema uses none; an omitted limit uses five. Connections are filtered through labelSelector rather than a separate connection ID field."
+    },
     "ToolInvokeActionTarget": {
       "type": "object",
       "required": ["target"],
