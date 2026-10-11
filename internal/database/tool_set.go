@@ -99,27 +99,35 @@ func (t *ToolSet) Validate() error {
 	if t == nil {
 		return errors.New("toolset is required")
 	}
+
 	if err := validateToolSetID(t.Id); err != nil {
 		return err
 	}
+
 	if err := namespace.ValidatePath(t.Namespace); err != nil {
 		return fmt.Errorf("invalid toolset namespace: %w", err)
 	}
+
 	if err := t.Name.Validate(); err != nil {
 		return fmt.Errorf("invalid toolset name: %w", err)
 	}
+
 	if err := t.Labels.Validate(); err != nil {
 		return fmt.Errorf("invalid toolset labels: %w", err)
 	}
+
 	if err := t.Annotations.Validate(); err != nil {
 		return fmt.Errorf("invalid toolset annotations: %w", err)
 	}
+
 	if err := t.ConnectionSelector.ValidateForNamespace(t.Namespace, nil); err != nil {
 		return fmt.Errorf("invalid toolset connection selector: %w", err)
 	}
+
 	if t.SelectorRevision == 0 || t.SelectorRevision > math.MaxInt64 {
 		return errors.New("toolset selector revision must be a positive signed 64-bit integer")
 	}
+
 	return nil
 }
 
@@ -145,6 +153,7 @@ func (d *toolSetSelectorDB) Scan(src any) error {
 	default:
 		return fmt.Errorf("toolSetSelectorDB: cannot scan %T", src)
 	}
+
 	return json.Unmarshal(data, (*toolsetschema.ConnectionSelector)(d))
 }
 
@@ -156,6 +165,7 @@ func validateToolSetID(id apid.ID) error {
 	if err := id.ValidatePrefix(apid.PrefixToolSet); err != nil {
 		return fmt.Errorf("invalid toolset id: %w", err)
 	}
+
 	return nil
 }
 
@@ -166,16 +176,20 @@ func (s *service) CreateToolSet(ctx context.Context, toolSet *ToolSet) error {
 	if toolSet == nil {
 		return errors.New("toolset is required")
 	}
+
 	candidate := *toolSet
 	candidate.ConnectionSelector = *toolSet.ConnectionSelector.Clone()
 	candidate.Labels = toolSet.Labels.Copy()
+
 	if candidate.Name == "" {
 		candidate.Name = common.ResourceName(candidate.Id.String())
 	}
+
 	candidate.SelectorRevision = 1
 	candidate.DeletedAt = nil
 	candidate.CreatedAt = apctx.GetClock(ctx).Now()
 	candidate.UpdatedAt = candidate.CreatedAt
+
 	if err := candidate.Validate(); err != nil {
 		return err
 	}
@@ -185,11 +199,15 @@ func (s *service) CreateToolSet(ctx context.Context, toolSet *ToolSet) error {
 		return err
 	}
 	defer tx.Rollback()
+
 	var parentLabels Labels
 	err = s.sq.
 		Select("labels").
 		From(NamespacesTable).
-		Where(sq.Eq{"path": candidate.Namespace, "deleted_at": nil}).
+		Where(sq.Eq{
+			"path":       candidate.Namespace,
+			"deleted_at": nil,
+		}).
 		RunWith(tx).
 		QueryRowContext(ctx).
 		Scan(&parentLabels)
@@ -199,11 +217,21 @@ func (s *service) CreateToolSet(ctx context.Context, toolSet *ToolSet) error {
 	if err != nil {
 		return err
 	}
+
 	candidate.Labels = ApplyParentCarryForward(
 		candidate.Labels,
-		ParentCarryForward{Rt: NamespaceLabelToken, Labels: parentLabels},
+		ParentCarryForward{
+			Rt:     NamespaceLabelToken,
+			Labels: parentLabels,
+		},
 	)
-	candidate.Labels = InjectSelfImplicitLabels(candidate.Id, candidate.Name, candidate.Namespace, candidate.Labels)
+
+	candidate.Labels = InjectSelfImplicitLabels(
+		candidate.Id,
+		candidate.Name,
+		candidate.Namespace,
+		candidate.Labels,
+	)
 	_, err = s.sq.
 		Insert(ToolSetsTable).
 		Columns(candidate.cols()...).
@@ -213,10 +241,13 @@ func (s *service) CreateToolSet(ctx context.Context, toolSet *ToolSet) error {
 	if err != nil {
 		return wrapDatabaseMutationError("failed to create toolset", err)
 	}
+
 	if err := tx.Commit(); err != nil {
 		return wrapDatabaseMutationError("failed to commit toolset", err)
 	}
+
 	*toolSet = candidate
+
 	return nil
 }
 
@@ -242,6 +273,7 @@ func (s *service) getToolSet(
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
@@ -266,6 +298,7 @@ func (s *service) GetToolSetByName(
 	if err := name.Validate(); err != nil {
 		return nil, err
 	}
+
 	return s.getToolSet(ctx, s.db, sq.Eq{"namespace": ns, "name": name})
 }
 
@@ -282,14 +315,20 @@ func (s *service) UpdateToolSetConnectionSelector(
 	if expectedRevision == 0 || expectedRevision >= math.MaxInt64 {
 		return nil, errors.New("expected selector revision must be positive and allow a signed 64-bit increment")
 	}
+
 	existing, err := s.GetToolSet(ctx, id)
 	if err != nil {
 		return nil, err
 	}
+
 	if existing.SelectorRevision != expectedRevision {
 		return nil, ErrToolSetSelectorRevisionConflict
 	}
-	if err := selector.ValidateForNamespace(existing.Namespace, nil); err != nil {
+
+	if err := selector.ValidateForNamespace(
+		existing.Namespace,
+		nil, // validation context
+	); err != nil {
 		return nil, fmt.Errorf("invalid toolset connection selector: %w", err)
 	}
 
@@ -301,7 +340,11 @@ func (s *service) UpdateToolSetConnectionSelector(
 		Set("connection_selector", toolSetSelectorDB(selector)).
 		Set("selector_revision", sq.Expr("selector_revision + 1")).
 		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"id": id, "selector_revision": expectedRevision, "deleted_at": nil}).
+		Where(sq.Eq{
+			"id":                id,
+			"selector_revision": expectedRevision,
+			"deleted_at":        nil,
+		}).
 		Suffix("RETURNING " + strings.Join(result.cols(), ", ")).
 		RunWith(s.db).
 		QueryRowContext(ctx).
@@ -315,6 +358,7 @@ func (s *service) UpdateToolSetConnectionSelector(
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
@@ -325,6 +369,7 @@ func (s *service) DeleteToolSet(ctx context.Context, id apid.ID) error {
 	if err := validateToolSetID(id); err != nil {
 		return err
 	}
+
 	now := apctx.GetClock(ctx).Now()
 	result, err := s.sq.
 		Update(ToolSetsTable).
@@ -336,12 +381,15 @@ func (s *service) DeleteToolSet(ctx context.Context, id apid.ID) error {
 	if err != nil {
 		return err
 	}
+
 	affected, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
+
 	if affected == 0 {
 		return ErrNotFound
 	}
+
 	return nil
 }
