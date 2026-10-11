@@ -1,10 +1,12 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -363,6 +365,7 @@ func TestReEncryptRegistry(t *testing.T) {
 				PrimaryKeyCols:   []string{"id"},
 				PrimaryKeyValues: []any{string(actorId)},
 				FieldColumn:      "encrypted_key",
+				ExpectedValue:    ef,
 				NewValue:         newEf,
 			},
 		})
@@ -437,10 +440,162 @@ func TestReEncryptRegistry(t *testing.T) {
 				PrimaryKeyCols:   []string{"id"},
 				PrimaryKeyValues: []any{"fake_id"},
 				FieldColumn:      "fake_col",
+				ExpectedValue:    encfield.EncryptedField{ID: "dek_old", Data: "old"},
 				NewValue:         encfield.EncryptedField{ID: "dek_x", Data: "data"},
 			},
 		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "not a registered encrypted field")
 	})
+}
+
+// TestReEncryptCompareAndSwap compares encrypted payload values rather than
+// serialized JSON, preserving later writes, cleared credentials, and deletions.
+func TestReEncryptCompareAndSwap(t *testing.T) {
+	old := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "b2xk"}
+	replacement := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "cm90YXRlZA=="}
+	differentData := encfield.EncryptedField{ID: old.ID, Data: "bmV3LWRhdGE="}
+	differentKey := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: old.Data}
+	for _, test := range []struct {
+		name      string
+		current   *encfield.EncryptedField
+		deleted   bool
+		formatted bool
+	}{
+		{name: "same key with changed ciphertext", current: &differentData},
+		{name: "changed key with same ciphertext", current: &differentKey},
+		{name: "cleared field"},
+		{name: "deleted row", current: &old, deleted: true},
+		{name: "equivalent JSON formatting", current: &old, formatted: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			_, db, rawDB := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.WithFixedClock(context.Background(), now)
+			id := apid.New(apid.PrefixActor)
+			require.NoError(t, db.CreateActor(ctx, &Actor{
+				Id:           id,
+				Namespace:    "root",
+				ExternalId:   "cas",
+				EncryptedKey: &old,
+			}))
+
+			// Simulate a write after the rotation job captured old. Reordered,
+			// spaced JSON must still match semantically on SQLite and Postgres.
+			var stored any
+			if test.current != nil {
+				stored = *test.current
+			}
+			if test.formatted {
+				stored = fmt.Sprintf("{\n  \"d\": %q, \"id\": %q\n}", old.Data, old.ID)
+			}
+			_, err := db.(*service).sq.
+				Update(ActorTable).
+				Set("encrypted_key", stored).
+				Set("encrypted_at", now).
+				Where(sq.Eq{"id": id}).
+				RunWith(rawDB).
+				ExecContext(ctx)
+			require.NoError(t, err)
+			if test.deleted {
+				require.NoError(t, db.DeleteActor(ctx, id))
+			}
+
+			later := now.Add(time.Hour)
+			require.NoError(t, db.BatchUpdateReEncryptedFields(apctx.WithFixedClock(ctx, later), []ReEncryptedFieldUpdate{{
+				Table:            ActorTable,
+				PrimaryKeyCols:   []string{"id"},
+				PrimaryKeyValues: []any{id.String()},
+				FieldColumn:      "encrypted_key",
+				ExpectedValue:    old,
+				NewValue:         replacement,
+			}}))
+			var actual *encfield.EncryptedField
+			var encryptedAt time.Time
+			err = db.(*service).sq.
+				Select("encrypted_key", "encrypted_at").
+				From(ActorTable).
+				Where(sq.Eq{"id": id}).
+				RunWith(rawDB).
+				QueryRowContext(ctx).
+				Scan(&actual, &encryptedAt)
+			require.NoError(t, err)
+			if test.formatted {
+				require.Equal(t, &replacement, actual)
+				require.True(t, later.Equal(encryptedAt))
+			} else {
+				require.Equal(t, test.current, actual)
+				require.True(t, now.Equal(encryptedAt), "skipped rotations must not touch encrypted_at")
+			}
+		})
+	}
+}
+
+// TestReEncryptBatchPreservesPublishedDefinition reproduces a draft edit and
+// publication after capture, while allowing unrelated current rows to rotate.
+// Replaying the captured batch must also preserve the first rotation timestamp.
+func TestReEncryptBatchPreservesPublishedDefinition(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	ctx := apctx.WithFixedClock(context.Background(), now)
+	old := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "b2xk"}
+	rotated := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "cm90YXRlZA=="}
+	connector := testConnectorWithDefinition(apid.New(apid.PrefixConnector), "root", "published", 1)
+	connector.EncryptedDefinition = old
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
+	actorID := apid.New(apid.PrefixActor)
+	require.NoError(t, db.CreateActor(ctx, &Actor{
+		Id:           actorID,
+		Namespace:    "root",
+		ExternalId:   "batch",
+		EncryptedKey: &old,
+	}))
+	actorUpdate := ReEncryptedFieldUpdate{
+		Table:            ActorTable,
+		PrimaryKeyCols:   []string{"id"},
+		PrimaryKeyValues: []any{actorID.String()},
+		FieldColumn:      "encrypted_key",
+		ExpectedValue:    old,
+		NewValue:         rotated,
+	}
+	missingExpectation := actorUpdate
+	missingExpectation.ExpectedValue = encfield.EncryptedField{}
+	require.ErrorContains(t, db.BatchUpdateReEncryptedFields(ctx, []ReEncryptedFieldUpdate{missingExpectation}), "expected encrypted value is required")
+	actor, err := db.GetActor(ctx, actorID)
+	require.NoError(t, err)
+	require.Equal(t, &old, actor.EncryptedKey)
+
+	editedAt := now.Add(time.Minute)
+	ctx = apctx.WithFixedClock(ctx, editedAt)
+	newDefinition := encfield.EncryptedField{ID: old.ID, Data: "bmV3LWRlZmluaXRpb24="}
+	connector.EncryptedDefinition = newDefinition
+	connector.EncryptedAt = &editedAt
+	require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
+	require.NoError(t, db.SetConnectorGenerationState(ctx, connector.Id, connector.Generation, ConnectorGenerationStatePrimary))
+	updates := []ReEncryptedFieldUpdate{
+		{
+			Table:            ConnectorGenerationsTable,
+			PrimaryKeyCols:   []string{"id"},
+			PrimaryKeyValues: []any{connector.DefinitionGenerationId.String()},
+			FieldColumn:      "encrypted_definition",
+			ExpectedValue:    old,
+			NewValue:         rotated,
+		},
+		actorUpdate, actorUpdate,
+	}
+	rotatedAt := now.Add(time.Hour)
+	for _, attemptAt := range []time.Time{rotatedAt, rotatedAt.Add(time.Hour)} {
+		require.NoError(t, db.BatchUpdateReEncryptedFields(apctx.WithFixedClock(ctx, attemptAt), updates))
+		published, err := db.GetConnectorGeneration(ctx, connector.Id, connector.Generation)
+		require.NoError(t, err)
+		require.Equal(t, ConnectorGenerationStatePrimary, published.State)
+		require.Equal(t, newDefinition, published.EncryptedDefinition)
+		require.NotNil(t, published.EncryptedAt)
+		require.True(t, editedAt.Equal(*published.EncryptedAt))
+		actor, err := db.GetActor(ctx, actorID)
+		require.NoError(t, err)
+		require.Equal(t, &rotated, actor.EncryptedKey)
+		require.NotNil(t, actor.EncryptedAt)
+		require.True(t, rotatedAt.Equal(*actor.EncryptedAt))
+	}
 }

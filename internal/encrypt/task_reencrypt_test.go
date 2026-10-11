@@ -135,6 +135,35 @@ func (env *reencryptTestEnv) runReencrypt(t *testing.T) error {
 	return handler.handleReencryptAll(env.ctx, asynq.NewTask(TaskTypeReencryptAll, nil))
 }
 
+// reencryptInterleavingDB edits an actor's secret immediately before the first
+// rotation batch is written, deterministically reproducing a concurrent edit.
+// All other operations use the real database, including conditional writes.
+type reencryptInterleavingDB struct {
+	database.DB
+	rawDb       *sql.DB
+	actorID     apid.ID
+	replacement encfield.EncryptedField
+	replacedAt  time.Time
+	replaced    bool
+}
+
+// BatchUpdateReEncryptedFields inserts the edit after enumeration and encryption
+// have captured the old value, then delegates every batch to the real writer.
+func (db *reencryptInterleavingDB) BatchUpdateReEncryptedFields(ctx context.Context, updates []database.ReEncryptedFieldUpdate) error {
+	if !db.replaced {
+		// Both test drivers accept numbered dollar placeholders.
+		_, err := db.rawDb.ExecContext(ctx,
+			`UPDATE actors SET encrypted_key = $1, encrypted_at = $2 WHERE id = $3`,
+			db.replacement, db.replacedAt, db.actorID,
+		)
+		if err != nil {
+			return err
+		}
+		db.replaced = true
+	}
+	return db.DB.BatchUpdateReEncryptedFields(ctx, updates)
+}
+
 func TestHandleReencryptAll(t *testing.T) {
 	t.Run("re-encrypts actor with mismatched DEK", func(t *testing.T) {
 		env := setupReencryptTest(t)
@@ -165,6 +194,59 @@ func TestHandleReencryptAll(t *testing.T) {
 		decrypted, err := env.enc.DecryptString(env.ctx, *actor.EncryptedKey)
 		require.NoError(t, err)
 		require.Equal(t, "my-secret-key", decrypted)
+	})
+
+	t.Run("preserves an edited secret until the next sweep", func(t *testing.T) {
+		env := setupReencryptTest(t)
+		originalNow := apctx.GetClock(env.ctx).Now()
+		v2DEKID, _ := env.addGlobalV2(t)
+		actorID := apid.New(apid.PrefixActor)
+		original := env.encryptWithV1(t, []byte("original-secret"))
+		require.NoError(t, env.db.CreateActor(env.ctx, &database.Actor{
+			Id:           actorID,
+			Namespace:    "root",
+			ExternalId:   "edited-user",
+			EncryptedKey: &original,
+		}))
+		env.setNamespaceTarget(t, "root", v2DEKID)
+
+		// The edit uses the same DEK as the scanned value: checking only key IDs
+		// would overwrite this new plaintext with the old re-encrypted secret.
+		replacement := env.encryptWithV1(t, []byte("latest-secret"))
+		replacedAt := originalNow.Add(time.Minute)
+		interleaving := &reencryptInterleavingDB{
+			DB:          env.db,
+			rawDb:       env.rawDb,
+			actorID:     actorID,
+			replacement: replacement,
+			replacedAt:  replacedAt,
+		}
+		env.db = interleaving
+		env.ctx = apctx.NewBuilder(env.ctx).WithClock(clock.NewFakeClock(originalNow.Add(time.Hour))).Build()
+		require.NoError(t, env.runReencrypt(t))
+		require.True(t, interleaving.replaced)
+
+		actor, err := env.db.GetActor(env.ctx, actorID)
+		require.NoError(t, err)
+		require.NotNil(t, actor.EncryptedKey)
+		require.Equal(t, replacement, *actor.EncryptedKey)
+		require.NotNil(t, actor.EncryptedAt)
+		require.True(t, replacedAt.Equal(*actor.EncryptedAt), "a skipped stale write must preserve encrypted_at")
+		plaintext, err := env.enc.DecryptString(env.ctx, *actor.EncryptedKey)
+		require.NoError(t, err)
+		require.Equal(t, "latest-secret", plaintext)
+
+		// A later sweep captures the edited value and can safely rotate it.
+		require.NoError(t, env.runReencrypt(t))
+		actor, err = env.db.GetActor(env.ctx, actorID)
+		require.NoError(t, err)
+		require.NotNil(t, actor.EncryptedKey)
+		require.Equal(t, v2DEKID, actor.EncryptedKey.ID)
+		require.NotNil(t, actor.EncryptedAt)
+		require.True(t, apctx.GetClock(env.ctx).Now().Equal(*actor.EncryptedAt))
+		plaintext, err = env.enc.DecryptString(env.ctx, *actor.EncryptedKey)
+		require.NoError(t, err)
+		require.Equal(t, "latest-secret", plaintext)
 	})
 
 	t.Run("skips actor already at target", func(t *testing.T) {

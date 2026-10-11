@@ -306,8 +306,9 @@ type DB interface {
 		callback func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 	) error
 
-	// BatchUpdateReEncryptedFields updates encrypted field values after re-encryption,
-	// setting the new value and updating encrypted_at.
+	// BatchUpdateReEncryptedFields sets the new value and encrypted_at only on live
+	// rows whose encrypted field still matches ExpectedValue. Stale updates are
+	// skipped without error; earlier updates may be applied if a later one fails.
 	BatchUpdateReEncryptedFields(ctx context.Context, updates []ReEncryptedFieldUpdate) error
 
 	/*
