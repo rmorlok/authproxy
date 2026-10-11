@@ -109,6 +109,95 @@ evaluate `canProxy` using the actor/JWT intersection. DTO validation performs
 none of those runtime decisions. It also does not sanitize provider descriptions;
 clients must treat descriptions, schemas, examples, and guidance as data.
 
+## Connection ToolSet bindings
+
+`ConnectionToolSetBinding` reports one ToolSet's installation on a connection.
+The planned `GET /connections/{id}/toolsets` endpoint returns these objects in a
+`ConnectionToolSetBindingList`, with an opaque `metadata.continue` cursor.
+The binding uses the standard resource envelope, but all fields are produced by
+the server. It is not a resource callers create or edit.
+
+```yaml
+apiVersion: authproxy.net/v1alpha1
+kind: ConnectionToolSetBinding
+metadata:
+  namespace: root.product.user-1
+spec:
+  connectionRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    id: cxn_01example0000001
+  toolSetRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: ToolSet
+    id: tls_01example0000001
+status:
+  appliedGeneration: 4
+  conditions:
+    - type: Installed
+      status: "True"
+      observedGeneration: 4
+      lastTransitionTime: 2026-10-11T10:00:00Z
+    - type: MigrationSucceeded
+      status: "False"
+      observedGeneration: 5
+      lastTransitionTime: 2026-10-11T10:01:00Z
+      reason: ImportFailed
+      message: The previous generation remains installed.
+```
+
+The references identify the pair by immutable IDs. They have no generation;
+`status.appliedGeneration` records the inventory currently installed. A failed
+migration leaves that value unchanged and reports the attempted target through
+the condition's `observedGeneration`. A rollback can target an older generation.
+
+Before installation, `appliedGeneration` is absent. An `Installed` condition can
+report `False` or `Unknown` with a reason such as `WaitingForPrimary` or
+`ConnectionNotConfigured`. `Ready` reports execution readiness separately.
+Condition types are extensible and unique within the binding. Omitted conditions
+make no claim about their state.
+
+`metadata.namespace` is the connection namespace. If a reference includes a
+namespace, the connection reference must match it and the ToolSet reference must
+be in that namespace or an ancestor. Bindings have no separate public ID, name,
+or generation in metadata. The service resolves references and enforces access.
+
+MCP bindings can also include `status.catalog`:
+
+```yaml
+catalog:
+  lastAttemptAt: 2026-10-11T10:02:00Z
+  lastComplete:
+    revision: 7
+    sourceDigest: sha256:opaque-catalog-digest
+    lastSuccessAt: 2026-10-11T10:00:01Z
+    freshness: stale
+    contextMatches: "False"
+  diagnostics:
+    - severity: error
+      code: catalog.refresh.failed
+      message: The last complete catalog was retained.
+```
+
+Catalogs belong to individual connections. A failed refresh advances
+`lastAttemptAt` and reports diagnostics while retaining `lastComplete` and marking
+it stale. A failed first discovery can report an attempt and diagnostics without
+a complete catalog or applied generation. A complete catalog requires both an
+attempt timestamp and the enclosing binding's applied generation. The attempt
+time is its start, so it can precede the successful completion time.
+
+`freshness` and `contextMatches` describe different things. A stale catalog can
+remain usable if its authentication context still matches. `False` or `Unknown`
+context agreement makes it unavailable even when the last enumeration is fresh.
+Retaining the snapshot lets administrators inspect that state; it does not grant
+execution permission. Invocation admission must recheck the live context.
+
+Validation checks the projection's shape. Routes, reconciliation, migration and
+refresh actions, atomic inventory activation, freshness calculation, and context
+checks follow in later slices. Producers must bound and redact diagnostics;
+credentials, context fingerprints, internal epochs, and raw catalog contents do
+not belong in this response.
+
 ## Tool invocation
 
 `ToolInvokeRequest` targets a Tool by its immutable ID. Its `spec.arguments`

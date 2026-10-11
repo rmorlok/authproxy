@@ -45,6 +45,8 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/actor/schema.json")
 	_ = loadSchema(t, c, "../resources/connection/schema.json")
 	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
+	_ = loadSchema(t, c, "../resources/tools/schema.json")
+	_ = loadSchema(t, c, "../resources/toolsets/schema.json")
 	_ = loadSchema(t, c, "./v1alpha1/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdAPI, sid)

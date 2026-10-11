@@ -463,6 +463,116 @@
       "additionalProperties": false,
       "description": "Tool discovery filters. Omitted or empty schema uses none; an omitted limit uses five. Connections are filtered through labelSelector rather than a separate connection ID field."
     },
+    "ConnectionToolSetBindingMetadata": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/ObjectMeta" },
+        {
+          "type": "object",
+          "required": ["namespace"],
+          "properties": {
+            "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+            "id": false,
+            "name": false,
+            "generation": false
+          }
+        }
+      ],
+      "description": "Read-only metadata scoped to the connection namespace. A binding is identified by its connection and ToolSet references, without an independent public ID, name, or generation."
+    },
+    "ConnectionToolSetBindingSpec": {
+      "type": "object",
+      "required": ["connectionRef", "toolSetRef"],
+      "properties": {
+        "connectionRef": {
+          "allOf": [
+            { "$ref": "../resources/connection/schema.json#/$defs/ConnectionReference" },
+            {
+              "type": "object",
+              "required": ["id"],
+              "properties": { "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" } }
+            }
+          ]
+        },
+        "toolSetRef": {
+          "allOf": [
+            { "$ref": "../resources/toolsets/schema.json#/$defs/ToolSetReference" },
+            { "type": "object", "required": ["id"], "properties": { "generation": false } }
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "description": "Resolved typed identities. Go validation requires a supplied connection namespace to equal metadata.namespace and a supplied ToolSet namespace to be the same namespace or an ancestor."
+    },
+    "MCPCatalogSnapshot": {
+      "type": "object",
+      "required": ["revision", "sourceDigest", "lastSuccessAt", "freshness", "contextMatches"],
+      "properties": {
+        "revision": { "type": "integer", "minimum": 1 },
+        "sourceDigest": { "$ref": "#/$defs/ToolResultNonBlankString" },
+        "lastSuccessAt": { "type": "string", "format": "date-time" },
+        "freshness": { "type": "string", "enum": ["fresh", "stale"] },
+        "contextMatches": { "type": "string", "enum": ["True", "False", "Unknown"] }
+      },
+      "additionalProperties": false,
+      "description": "The last complete MCP catalog retained for this connection. Freshness and context agreement are independent observations; a failed refresh does not erase this snapshot."
+    },
+    "MCPCatalogStatus": {
+      "type": "object",
+      "properties": {
+        "lastAttemptAt": { "type": "string", "format": "date-time" },
+        "lastComplete": { "$ref": "#/$defs/MCPCatalogSnapshot" },
+        "diagnostics": { "type": "array", "items": { "$ref": "../resources/toolsets/schema.json#/$defs/SourceDiagnostic" } }
+      },
+      "dependentRequired": { "lastComplete": ["lastAttemptAt"] },
+      "additionalProperties": false,
+      "description": "Connection-specific catalog observations. The attempt timestamp may precede successful completion; this contract imposes no timestamp ordering."
+    },
+    "ConnectionToolSetBindingStatus": {
+      "type": "object",
+      "properties": {
+        "appliedGeneration": { "type": "integer", "minimum": 1 },
+        "conditions": {
+          "type": "array",
+          "items": { "$ref": "../resources/meta/schema.json#/$defs/Condition" },
+          "description": "Shared observed conditions such as Installed, Ready, and MigrationSucceeded. Go validation requires unique condition types. observedGeneration identifies the relevant ToolSet generation and need not equal appliedGeneration."
+        },
+        "catalog": { "$ref": "#/$defs/MCPCatalogStatus" }
+      },
+      "if": { "required": ["catalog"], "properties": { "catalog": { "required": ["lastComplete"] } } },
+      "then": { "required": ["appliedGeneration"] },
+      "additionalProperties": false
+    },
+    "ConnectionToolSetBinding": {
+      "allOf": [
+        { "$ref": "../resources/meta/schema.json#/$defs/TypeMeta" },
+        {
+          "type": "object",
+          "required": ["metadata", "spec", "status"],
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionToolSetBinding" },
+            "metadata": { "$ref": "#/$defs/ConnectionToolSetBindingMetadata" },
+            "spec": { "$ref": "#/$defs/ConnectionToolSetBindingSpec" },
+            "status": { "$ref": "#/$defs/ConnectionToolSetBindingStatus" }
+          }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "A read-only projection of one connection's ToolSet binding, applied generation, and optional MCP catalog observations. This shape does not create or modify a binding."
+    },
+    "ConnectionToolSetBindingList": {
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ConnectionToolSetBindingList" },
+            "items": { "type": "array", "items": { "$ref": "#/$defs/ConnectionToolSetBinding" } }
+          }
+        }
+      ]
+    },
     "ToolInvokeActionTarget": {
       "type": "object",
       "required": ["target"],
