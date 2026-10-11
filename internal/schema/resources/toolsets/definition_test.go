@@ -314,6 +314,18 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 					Bundle: map[string]common.RawJSON{
 						"urn:example:calendar": common.RawJSON(`{"type":"object","example":9007199254740993}`),
 					},
+					Fetch: []OpenAPIReferenceFetch{
+						{URL: "https://public.example/common.json"},
+						{
+							URL: "https://schemas.example/calendar.json",
+							FetchConnectionRef: &meta.ObjectReference{
+								APIVersion: meta.APIVersionV1Alpha1,
+								Kind:       "Connection",
+								Namespace:  "root.schemas",
+								Name:       "schema-reader",
+							},
+						},
+					},
 				},
 			},
 		},
@@ -388,6 +400,8 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			*references.BaseURI = "urn:example:changed"
 			references.Bundle["urn:example:calendar"][0] = '['
 			references.Bundle["urn:example:added"] = common.RawJSON(`false`)
+			references.Fetch[0].URL = "https://changed.example/schema.json"
+			references.Fetch[1].FetchConnectionRef.Namespace = "root.changed"
 			require.Equal(t, beforeReferences, decodedPatch.Spec.Definition.Source.OpenAPI.References)
 			if inline {
 				// Changing a candidate's selection must not alter the decoded
@@ -452,6 +466,8 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 		*clone.Source.OpenAPI.References.BaseURI = "urn:example:changed"
 		clone.Source.OpenAPI.References.Bundle["urn:example:calendar"][0] = '['
 		clone.Source.OpenAPI.References.Bundle["urn:example:added"] = common.RawJSON(`false`)
+		clone.Source.OpenAPI.References.Fetch[0].URL = "https://changed.example/schema.json"
+		clone.Source.OpenAPI.References.Fetch[1].FetchConnectionRef.Name = "other-reader"
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
 
 		require.Equal(t, before, original)

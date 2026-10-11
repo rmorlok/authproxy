@@ -18,8 +18,9 @@ import (
 )
 
 // OpenAPIReferenceConfig supplies document identities and in-memory reference
-// content for a generation snapshot. URI identifiers never authorize fetching.
-// Resolving references and checking their targets belong to the importer.
+// content for a generation snapshot, plus explicit external fetch instructions.
+// URI identifiers alone never authorize fetching. Resolving references and
+// checking their targets belong to the importer.
 type OpenAPIReferenceConfig struct {
 	// BaseURI supplies the entry document's retrieval context. When omitted,
 	// the importer uses its retrieval URI. It does not override OpenAPI $self or
@@ -32,10 +33,15 @@ type OpenAPIReferenceConfig struct {
 	// JSON, including boolean schemas, until the importer checks target types.
 	// An empty bundle and an omitted bundle both supply no additional documents.
 	Bundle map[string]common.RawJSON `json:"bundle,omitempty" yaml:"bundle,omitempty"`
+
+	// Fetch lists documents to acquire during import, with independent optional
+	// authentication for each URL. Omission or an empty list allows no external
+	// fetches. References in acquired documents do not authorize further fetching.
+	Fetch []OpenAPIReferenceFetch `json:"fetch,omitempty" yaml:"fetch,omitempty"`
 }
 
-// Validate checks literal URI identities and JSON syntax without resolving
-// references, interpreting document identifiers, or performing network/file I/O.
+// Validate checks literal identities, fetch instructions, and JSON syntax without
+// resolving references, interpreting document identifiers, or performing I/O.
 // A nil configuration preserves the document's existing reference context.
 func (r *OpenAPIReferenceConfig) Validate(vc *common.ValidationContext) error {
 	if r == nil {
@@ -60,6 +66,26 @@ func (r *OpenAPIReferenceConfig) Validate(vc *common.ValidationContext) error {
 		if !json.Valid(r.Bundle[uri]) {
 			result = multierror.Append(result, vc.NewErrorfForField("bundle", "document %q must contain one JSON value", uri))
 		}
+	}
+
+	seen := make(map[string]bool, len(r.Fetch))
+	for i := range r.Fetch {
+		fetch := &r.Fetch[i]
+		path := vc.PushField("fetch").PushIndex(i)
+		result = multierror.Append(result, fetch.Validate(path))
+
+		// Only exact authored addresses are checked here; the importer resolves
+		// normalized URI identities and content-defined aliases during import.
+		// Errors omit the address because its query may contain private data.
+		if seen[fetch.URL] {
+			result = multierror.Append(result, path.NewErrorForField("url", "must not be repeated in fetch"))
+		}
+
+		if _, supplied := r.Bundle[fetch.URL]; supplied {
+			result = multierror.Append(result, path.NewErrorForField("url", "must not also appear in bundle"))
+		}
+
+		seen[fetch.URL] = true
 	}
 
 	return result.ErrorOrNil()
@@ -90,7 +116,7 @@ func validateOpenAPIReferenceURI(value string) error {
 	return nil
 }
 
-// Clone detaches the base pointer, bundle map, and each document's raw bytes.
+// Clone detaches the base pointer, bundle bytes, and fetch connection references.
 // It retains invalid content and nil/empty states for subsequent diagnostics.
 func (r *OpenAPIReferenceConfig) Clone() *OpenAPIReferenceConfig {
 	if r == nil {
@@ -103,6 +129,10 @@ func (r *OpenAPIReferenceConfig) Clone() *OpenAPIReferenceConfig {
 
 	for uri, raw := range clone.Bundle {
 		clone.Bundle[uri] = slices.Clone(raw)
+	}
+	clone.Fetch = slices.Clone(r.Fetch)
+	for i := range clone.Fetch {
+		clone.Fetch[i].FetchConnectionRef = util.CloneValue(r.Fetch[i].FetchConnectionRef)
 	}
 
 	return &clone

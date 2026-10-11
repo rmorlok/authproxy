@@ -352,13 +352,78 @@ case-sensitive ([RFC 3986](https://www.rfc-editor.org/rfc/rfc3986.html#section-6
 The authoring codec preserves all URI spellings. Detecting equivalent URI
 identities, such as host-case variants, belongs to the later importer.
 Omitting `references`, supplying `references: {}`, or supplying `bundle: {}`
-adds no bundled documents; these forms do not permit external fetching.
+adds no bundled documents. Bundle configuration alone does not permit external
+fetching.
 
-Explicit network reference-fetch settings, security mappings, source-key
-overrides, and unsupported-operation policy remain separate contracts; those
-configuration fields are currently rejected. Actual acquisition, reference
-resolution, immutable snapshots, refresh, server resolution, and operation
-compilation are future work.
+### External reference acquisition
+
+An OpenAPI document can refer to a schema hosted at another URL. AuthProxy
+requires each external document to be listed in `references.fetch` before the
+importer can retrieve it. Each entry names one document, rather than allowing
+access to an entire host or every URL found in the specification.
+
+For example, if the root document contains
+`$ref: https://api.example.test/schemas/item.json#/$defs/Item`, configure the
+document URL without the fragment. The root document and reference can use
+the same connection:
+
+```yaml
+# Under source.openapi:
+document:
+  url: https://api.example.test/openapi.yaml
+  fetchConnectionRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    namespace: root.documents
+    name: specification-reader
+references:
+  fetch:
+    - url: https://api.example.test/schemas/item.json
+      fetchConnectionRef:
+        apiVersion: authproxy.net/v1alpha1
+        kind: Connection
+        namespace: root.documents
+        name: specification-reader
+    - url: https://public.example.test/common.json
+```
+
+Both the root document and `item.json` use `specification-reader`. A separate
+connection is useful when a reference needs different credentials, such
+as a shared schema service with its own authentication. A public reference
+can omit `fetchConnectionRef`, as `common.json` does here.
+
+Each authenticated entry explicitly names its connection, even when reusing
+the root document's connection. Omitting `fetchConnectionRef` means no
+credentials; it never inherits them from another fetch. This prevents root
+document credentials from being sent to an unrelated reference URL by default.
+The importer resolves and authorizes each acquisition connection separately
+from the target connections that will receive tools.
+
+The importer will snapshot the fetched documents along with supplied bundle
+content. If `item.json` refers to `common.json` at the public URL above, the
+second entry permits that fetch. Any further external document must also be
+listed or supplied in `bundle`. Relative references use their containing
+document's retrieval context, subject to content-defined identities such as
+`$id`; `baseUri` does not turn relative fetch entries into absolute URLs.
+
+- URLs must be literal absolute HTTP(S) addresses without user information,
+  fragments, or AuthProxy templates. Configure the final URL: this initial
+  acquisition contract does not permit redirects.
+- Each URL may occur once in `fetch` and cannot also be a `bundle` key. Go
+  validation checks these exact-string conflicts; the importer will detect
+  equivalent URI identities and content-defined aliases.
+- Omitting `fetch` or supplying `fetch: []` permits no external reference
+  fetches. Null fields, null entries, and unknown configuration fields are
+  invalid. Connection references have no generation.
+- Fetch instructions belong to the ToolSet generation. They apply during
+  import only; validation and tool invocation use no network reference
+  fetching, and invocation uses the published snapshot.
+
+This package defines and validates acquisition instructions; it performs no
+fetching. Actual acquisition, reference resolution, immutable snapshots,
+refresh, server resolution, and operation compilation are future work.
+Security mappings, source-key overrides, and unsupported-operation policy
+remain separate contracts; those configuration fields are currently rejected.
 
 ## MCP sources and imported permission mappings
 

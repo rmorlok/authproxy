@@ -620,6 +620,21 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 					map[string]any{"type": "string"}, true, nil,
 				},
 			},
+			"fetch": []any{
+				map[string]any{"url": "https://schemas.example.com/public.json"},
+				map[string]any{
+					"url": "https://schemas.example.com/private.json",
+					"fetchConnectionRef": map[string]any{
+						"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "id": "cxn_0123456789abcdef",
+					},
+				},
+				map[string]any{
+					"url": "https://schemas.example.com/shared.json",
+					"fetchConnectionRef": map[string]any{
+						"apiVersion": "authproxy.net/v1alpha1", "kind": "Connection", "namespace": "root.docs", "name": "document-reader",
+					},
+				},
+			},
 		},
 	}}
 	return definition
@@ -627,6 +642,7 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 
 // TestToolSetOpenAPISchemaRoundTrip preserves opaque inline documents and both
 // fetch reference forms in full resources, definitions, and replacement patches.
+// External fetches retain their own credentials regardless of the root source.
 func TestToolSetOpenAPISchemaRoundTrip(t *testing.T) {
 	for _, envelope := range []struct {
 		name, fragment string
@@ -755,7 +771,7 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "variables conflict with URL override", path: []string{"server"}, field: "variables", value: map[string]any{}},
 		{name: "unknown server field", path: []string{"server"}, field: "name", value: "production"},
 		{name: "null references", field: "references", value: nil},
-		{name: "external reference fetching deferred", path: []string{"references"}, field: "fetch", value: map[string]any{}},
+		{name: "object fetch list", path: []string{"references"}, field: "fetch", value: map[string]any{}},
 		{name: "unsupported security", field: "security", value: map[string]any{}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -780,7 +796,8 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 }
 
 // TestOpenAPIReferenceConfigSchemaAndDecoding keeps owned reference settings
-// strict while accepting arbitrary bundled JSON through either source codec.
+// strict while accepting arbitrary bundled JSON and explicit external fetches
+// through either source codec. Schema compilation and validation remain offline.
 func TestOpenAPIReferenceConfigSchemaAndDecoding(t *testing.T) {
 	compiled := compileToolSetSchema(t, "#/$defs/OpenAPIReferenceConfig")
 	tests := []struct {
@@ -796,6 +813,11 @@ func TestOpenAPIReferenceConfigSchemaAndDecoding(t *testing.T) {
 		{"opaque at sign", `{"baseUri":"urn:example:user@example.com"}`, true},
 		{"escaped fragment character", `{"baseUri":"https://example.com/schema%23name.json"}`, true},
 		{"arbitrary bundled values", `{"bundle":{"urn:test:object":{"$schema":"unknown","$id":"relative","$ref":"https://never-fetch.invalid/schema","unknown_field":null},"urn:test:false":false,"urn:test:true":true,"urn:test:null":null,"urn:test:array":[1,null,"literal"],"urn:test:number":2.5,"urn:test:string":"{{cfg.literal}}"}}`, true},
+		{"empty fetch list", `{"fetch":[]}`, true},
+		{"public external fetch", `{"fetch":[{"url":"HTTP://schemas.example.com/shared.json?revision=2"}]}`, true},
+		{"external fetch by ID", `{"fetch":[{"url":"https://schemas.example.com/shared.json","fetchConnectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_0123456789abcdef"}}]}`, true},
+		{"external fetch by namespaced name", `{"fetch":[{"url":"https://schemas.example.com/shared.json","fetchConnectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","namespace":"root.docs","name":"document-reader"}}]}`, true},
+		{"bundle and external fetch", `{"bundle":{"urn:example:part":false},"fetch":[{"url":"https://schemas.example.com/shared.json"}]}`, true},
 		{"null configuration", `null`, false},
 		{"array configuration", `[]`, false},
 		{"null base", `{"baseUri":null}`, false},
@@ -805,7 +827,29 @@ func TestOpenAPIReferenceConfigSchemaAndDecoding(t *testing.T) {
 		{"string bundle", `{"bundle":"{}"}`, false},
 		{"miscased base", `{"baseURI":"urn:example:root"}`, false},
 		{"unknown field", `{"unknown":true}`, false},
-		{"external fetching deferred", `{"fetch":{"urn:example:part":{"url":"https://example.com/part.json"}}}`, false},
+		{"object fetch list", `{"fetch":{"urn:example:part":{"url":"https://example.com/part.json"}}}`, false},
+		{"null fetch list", `{"fetch":null}`, false},
+		{"null fetch entry", `{"fetch":[null]}`, false},
+		{"string fetch entry", `{"fetch":["https://example.com/part.json"]}`, false},
+		{"missing fetch URL", `{"fetch":[{}]}`, false},
+		{"null fetch URL", `{"fetch":[{"url":null}]}`, false},
+		{"numeric fetch URL", `{"fetch":[{"url":42}]}`, false},
+		{"relative fetch URL", `{"fetch":[{"url":"./part.json"}]}`, false},
+		{"file fetch URL", `{"fetch":[{"url":"file:///schemas/part.json"}]}`, false},
+		{"opaque fetch URL", `{"fetch":[{"url":"urn:example:part"}]}`, false},
+		{"fetch URL fragment", `{"fetch":[{"url":"https://example.com/part.json#/properties/id"}]}`, false},
+		{"fetch URL credentials", `{"fetch":[{"url":"https://reader:secret@example.com/part.json"}]}`, false},
+		{"fetch URL template", `{"fetch":[{"url":"https://{{cfg.host}}/part.json"}]}`, false},
+		{"fetch URL padding", `{"fetch":[{"url":" https://example.com/part.json"}]}`, false},
+		{"miscased fetch field", `{"Fetch":[]}`, false},
+		{"miscased fetch URL", `{"fetch":[{"URL":"https://example.com/part.json"}]}`, false},
+		{"unknown fetch option", `{"fetch":[{"url":"https://example.com/part.json","followRedirects":true}]}`, false},
+		{"inline fetch entry", `{"fetch":[{"url":"https://example.com/part.json","inline":{}}]}`, false},
+		{"null external fetch reference", `{"fetch":[{"url":"https://example.com/part.json","fetchConnectionRef":null}]}`, false},
+		{"missing external fetch identity", `{"fetch":[{"url":"https://example.com/part.json","fetchConnectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection"}}]}`, false},
+		{"wrong external fetch kind", `{"fetch":[{"url":"https://example.com/part.json","fetchConnectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connector","id":"cxn_0123456789abcdef"}}]}`, false},
+		{"external fetch generation", `{"fetch":[{"url":"https://example.com/part.json","fetchConnectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","id":"cxn_0123456789abcdef","generation":0}}]}`, false},
+		{"external fetch wildcard namespace", `{"fetch":[{"url":"https://example.com/part.json","fetchConnectionRef":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","namespace":"root.docs.**","name":"document-reader"}}]}`, false},
 	}
 	for _, uri := range []struct {
 		name, value string
