@@ -605,6 +605,22 @@ func toolSetOpenAPIDefinitionSchemaFixture(t *testing.T, document map[string]any
 			"excludeOperationIds": []any{},
 		},
 		"server": map[string]any{"url": "https://{{ cfg.host }}/v1"},
+		"references": map[string]any{
+			"baseUri": "https://schemas.example.com/provider/openapi.json",
+			"bundle": map[string]any{
+				"https://schemas.example.com/provider/record.json": map[string]any{
+					"$schema": "provider-dialect", "$id": "urn:provider:record", "$ref": "./other.json",
+					"x-provider": map[string]any{"large": json.Number("9007199254740993")},
+				},
+				"urn:provider:boolean": false,
+				"urn:provider:null":    nil,
+				"urn:provider:string":  "literal {{cfg.value}}",
+				"urn:provider:number":  json.Number("0.12345678901234567890123456789"),
+				"file:///schemas/items.json": []any{
+					map[string]any{"type": "string"}, true, nil,
+				},
+			},
+		},
 	}}
 	return definition
 }
@@ -665,6 +681,8 @@ func TestToolSetOpenAPISchemaRoundTrip(t *testing.T) {
 					roundTrip, err := json.Marshal(value)
 					require.NoError(t, err)
 					require.JSONEq(t, string(encoded), string(roundTrip))
+					require.Contains(t, string(roundTrip), "9007199254740993")
+					require.Contains(t, string(roundTrip), "0.12345678901234567890123456789")
 					asYAML, err := yaml.Marshal(value)
 					require.NoError(t, err)
 					fromYAML := envelope.newValue()
@@ -672,6 +690,8 @@ func TestToolSetOpenAPISchemaRoundTrip(t *testing.T) {
 					roundTrip, err = json.Marshal(fromYAML)
 					require.NoError(t, err)
 					require.JSONEq(t, string(encoded), string(roundTrip))
+					require.Contains(t, string(roundTrip), "9007199254740993")
+					require.Contains(t, string(roundTrip), "0.12345678901234567890123456789")
 				})
 			}
 		})
@@ -734,6 +754,8 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 		{name: "multiline server URL", path: []string{"server"}, field: "url", value: "https://example.com/\nv1"},
 		{name: "variables conflict with URL override", path: []string{"server"}, field: "variables", value: map[string]any{}},
 		{name: "unknown server field", path: []string{"server"}, field: "name", value: "production"},
+		{name: "null references", field: "references", value: nil},
+		{name: "external reference fetching deferred", path: []string{"references"}, field: "fetch", value: map[string]any{}},
 		{name: "unsupported security", field: "security", value: map[string]any{}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -755,6 +777,114 @@ func TestOpenAPISourceSchemaRejectsInvalidFields(t *testing.T) {
 			require.Error(t, patchSchema.Validate(patch))
 		})
 	}
+}
+
+// TestOpenAPIReferenceConfigSchemaAndDecoding keeps owned reference settings
+// strict while accepting arbitrary bundled JSON through either source codec.
+func TestOpenAPIReferenceConfigSchemaAndDecoding(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPIReferenceConfig")
+	tests := []struct {
+		name, input string
+		valid       bool
+	}{
+		{"empty configuration", `{}`, true},
+		{"empty bundle", `{"bundle":{}}`, true},
+		{"HTTP base", `{"baseUri":"https://example.com/spec.json?revision=2"}`, true},
+		{"opaque base", `{"baseUri":"urn:example:openapi"}`, true},
+		{"file identity", `{"baseUri":"file:///schemas/openapi.json"}`, true},
+		{"generic absolute URI", `{"baseUri":"urn:"}`, true},
+		{"opaque at sign", `{"baseUri":"urn:example:user@example.com"}`, true},
+		{"escaped fragment character", `{"baseUri":"https://example.com/schema%23name.json"}`, true},
+		{"arbitrary bundled values", `{"bundle":{"urn:test:object":{"$schema":"unknown","$id":"relative","$ref":"https://never-fetch.invalid/schema","unknown_field":null},"urn:test:false":false,"urn:test:true":true,"urn:test:null":null,"urn:test:array":[1,null,"literal"],"urn:test:number":2.5,"urn:test:string":"{{cfg.literal}}"}}`, true},
+		{"null configuration", `null`, false},
+		{"array configuration", `[]`, false},
+		{"null base", `{"baseUri":null}`, false},
+		{"numeric base", `{"baseUri":1}`, false},
+		{"null bundle", `{"bundle":null}`, false},
+		{"array bundle", `{"bundle":[]}`, false},
+		{"string bundle", `{"bundle":"{}"}`, false},
+		{"miscased base", `{"baseURI":"urn:example:root"}`, false},
+		{"unknown field", `{"unknown":true}`, false},
+		{"external fetching deferred", `{"fetch":{"urn:example:part":{"url":"https://example.com/part.json"}}}`, false},
+	}
+	for _, uri := range []struct {
+		name, value string
+	}{
+		{"empty", ""},
+		{"relative", "./schema.json"},
+		{"fragment", "urn:example:schema#part"},
+		{"empty fragment", "https://example.com/schema.json#"},
+		{"userinfo", "https://reader:secret@example.com/schema.json"},
+		{"file userinfo", "file://reader@localhost/schema.json"},
+		{"space", "urn:example: schema"},
+		{"newline", "urn:example:schema\n"},
+		{"control", "urn:example:schema\u007f"},
+		{"Unicode whitespace", "urn:example:schema\u2003"},
+		{"template", "urn:example:{{cfg.schema}}"},
+	} {
+		for _, location := range []string{"baseUri", "bundle"} {
+			value := map[string]any{"baseUri": uri.value}
+			if location == "bundle" {
+				value = map[string]any{"bundle": map[string]any{uri.value: false}}
+			}
+			encoded, err := json.Marshal(value)
+			require.NoError(t, err)
+			tests = append(tests, struct {
+				name, input string
+				valid       bool
+			}{location + " " + uri.name, string(encoded), false})
+		}
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var document any
+			require.NoError(t, json.Unmarshal([]byte(test.input), &document))
+			schemaErr := compiled.Validate(document)
+			// The enclosing source observes null reference wrappers even where
+			// yaml.v3 would skip a root value's custom UnmarshalYAML method.
+			source := []byte(`{"document":{"inline":{}},"references":` + test.input + `}`)
+			asYAML, err := yaml.Marshal(common.RawJSON(source))
+			require.NoError(t, err)
+			for _, format := range []struct {
+				name   string
+				data   []byte
+				decode func([]byte, any) error
+			}{
+				{"JSON", source, util.DecodeJSONStrict},
+				{"YAML", asYAML, util.DecodeYAMLStrict},
+			} {
+				t.Run(format.name, func(t *testing.T) {
+					var decoded toolsets.OpenAPISource
+					err := format.decode(format.data, &decoded)
+					if err == nil {
+						err = decoded.Validate(nil)
+					}
+					if !test.valid {
+						require.Error(t, schemaErr)
+						require.Error(t, err)
+						return
+					}
+					require.NoError(t, schemaErr)
+					require.NoError(t, err)
+					roundTrip, err := json.Marshal(decoded)
+					require.NoError(t, err)
+					var output map[string]any
+					require.NoError(t, json.Unmarshal(roundTrip, &output))
+					require.NoError(t, compiled.Validate(output["references"]))
+				})
+			}
+		})
+	}
+}
+
+// TestOpenAPIReferenceURISchemaGuideBoundary leaves complete URI parsing to Go
+// instead of duplicating net/url's percent-encoding rules in a schema regex.
+func TestOpenAPIReferenceURISchemaGuideBoundary(t *testing.T) {
+	compiled := compileToolSetSchema(t, "#/$defs/OpenAPIReferenceConfig")
+	require.NoError(t, compiled.Validate(map[string]any{"baseUri": "https://example.com/%invalid"}))
+	var source toolsets.OpenAPISource
+	require.NoError(t, util.DecodeJSONStrict([]byte(`{"document":{"inline":{}},"references":{"baseUri":"https://example.com/%invalid"}}`), &source))
+	require.Error(t, source.Validate(nil), "Go URI parsing remains authoritative")
 }
 
 // TestOpenAPIServerConfigSchemaAndDecoding compares the authoring schema with

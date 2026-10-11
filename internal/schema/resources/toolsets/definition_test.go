@@ -309,6 +309,12 @@ func openAPIDefinitionForTest(inline bool) *ToolSetDefinition {
 					ExcludeOperationIDs: &[]string{},
 				},
 				Server: server,
+				References: &OpenAPIReferenceConfig{
+					BaseURI: util.ToPtr("https://example.com/openapi.json"),
+					Bundle: map[string]common.RawJSON{
+						"urn:example:calendar": common.RawJSON(`{"type":"object","example":9007199254740993}`),
+					},
+				},
 			},
 		},
 		PermissionMappings: []PermissionMapping{
@@ -360,6 +366,7 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			if inline {
 				require.Contains(t, string(*decoded.Spec.Definition.Source.OpenAPI.Document.Inline), "9007199254740993")
 			}
+			require.Contains(t, string(decoded.Spec.Definition.Source.OpenAPI.References.Bundle["urn:example:calendar"]), "9007199254740993")
 
 			patch := NewToolSetPatch()
 			patch.Spec.Definition = current.Spec.Definition.Clone()
@@ -368,6 +375,7 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 
 			var decodedPatch ToolSetPatch
 			require.NoError(t, format.decode(encoded, &decodedPatch))
+			beforeReferences := decodedPatch.Spec.Definition.Source.OpenAPI.References.Clone()
 
 			candidate, err := decodedPatch.ApplyTo(storedToolSetForResourceTest(), nil)
 			require.NoError(t, err)
@@ -375,6 +383,12 @@ func TestOpenAPIDefinitionIntegration(t *testing.T) {
 			require.Nil(t, candidate.Spec.Definition.Source.Explicit)
 			require.Equal(t, current.Spec.Definition.Source.OpenAPI.Server, candidate.Spec.Definition.Source.OpenAPI.Server)
 			require.True(t, GenerationPolicy().ChangesGeneration(&decodedPatch))
+			references := candidate.Spec.Definition.Source.OpenAPI.References
+			require.Equal(t, beforeReferences, references)
+			*references.BaseURI = "urn:example:changed"
+			references.Bundle["urn:example:calendar"][0] = '['
+			references.Bundle["urn:example:added"] = common.RawJSON(`false`)
+			require.Equal(t, beforeReferences, decodedPatch.Spec.Definition.Source.OpenAPI.References)
 			if inline {
 				// Changing a candidate's selection must not alter the decoded
 				// patch or the original generation from which it was prepared.
@@ -435,6 +449,9 @@ func TestOpenAPIDefinitionClone(t *testing.T) {
 
 		(*clone.Source.OpenAPI.Operations.IncludeOperationIDs)[0] = "other"
 		*clone.Source.OpenAPI.Operations.ExcludeOperationIDs = append(*clone.Source.OpenAPI.Operations.ExcludeOperationIDs, "other")
+		*clone.Source.OpenAPI.References.BaseURI = "urn:example:changed"
+		clone.Source.OpenAPI.References.Bundle["urn:example:calendar"][0] = '['
+		clone.Source.OpenAPI.References.Bundle["urn:example:added"] = common.RawJSON(`false`)
 		clone.PermissionMappings[0].AddVerbs[0] = "tool:other"
 
 		require.Equal(t, before, original)
