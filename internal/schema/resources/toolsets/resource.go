@@ -224,6 +224,7 @@ func (t *ToolSet) ValidateFor(mode meta.ValidationMode, vc *common.ValidationCon
 	default:
 		result = multierror.Append(result, vc.NewErrorForField("status.release.state", "is not a recognized tool set release state"))
 	}
+
 	if stored {
 		switch desired {
 		case ToolSetReleaseStateDraft:
@@ -231,7 +232,9 @@ func (t *ToolSet) ValidateFor(mode meta.ValidationMode, vc *common.ValidationCon
 				result = multierror.Append(result, vc.NewErrorForField("status.release.state", "must be draft when desiredState is draft"))
 			}
 		case ToolSetReleaseStatePrimary:
-			if observed != ToolSetReleaseStatePrimary && observed != ToolSetReleaseStateActive && observed != ToolSetReleaseStateArchived {
+			if observed != ToolSetReleaseStatePrimary &&
+				observed != ToolSetReleaseStateActive &&
+				observed != ToolSetReleaseStateArchived {
 				result = multierror.Append(result, vc.NewErrorForField("status.release.state", "must be primary, active, or archived when desiredState is primary"))
 			}
 		}
