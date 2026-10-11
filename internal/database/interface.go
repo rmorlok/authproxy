@@ -133,7 +133,7 @@ type DB interface {
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
 
 	/*
-	 * ToolSets (logical identity and membership policy)
+	 * ToolSets (logical identity, membership policy, and definition generations)
 	 */
 
 	CreateToolSet(ctx context.Context, toolSet *ToolSet) error
@@ -141,6 +141,25 @@ type DB interface {
 	GetToolSetByName(ctx context.Context, namespace string, name scommon.ResourceName) (*ToolSet, error)
 	UpdateToolSetConnectionSelector(ctx context.Context, id apid.ID, expectedRevision uint64, selector toolsetschema.ConnectionSelector) (*ToolSet, error)
 	DeleteToolSet(ctx context.Context, id apid.ID) error
+
+	// CreateToolSetGeneration allocates a new draft under a live parent. Only one
+	// live draft may exist, and historical generation numbers are never reused.
+	CreateToolSetGeneration(ctx context.Context, id apid.ID, definition encfield.EncryptedField) (*ToolSetGeneration, error)
+
+	// GetToolSetGeneration returns one generation if it and its parent are live.
+	GetToolSetGeneration(ctx context.Context, id apid.ID, generation uint64) (*ToolSetGeneration, error)
+
+	// GetToolSetGenerationByState finds the sole draft or primary generation.
+	GetToolSetGenerationByState(ctx context.Context, id apid.ID, state toolsetschema.ToolSetReleaseState) (*ToolSetGeneration, error)
+
+	// UpdateToolSetGenerationDraft replaces only the expected editable revision
+	// and advances its revision. Published plaintext cannot be changed here.
+	UpdateToolSetGenerationDraft(ctx context.Context, id apid.ID, generation uint64, expectedRevision uint64, definition encfield.EncryptedField) (*ToolSetGeneration, error)
+
+	// PublishToolSetGeneration atomically promotes the expected draft revision and
+	// demotes the former primary. The caller must validate the definition and any
+	// imported source snapshot before publishing; bindings are not migrated here.
+	PublishToolSetGeneration(ctx context.Context, id apid.ID, generation uint64, expectedRevision uint64) (*ToolSetGeneration, error)
 
 	/*
 	 *  Connections
