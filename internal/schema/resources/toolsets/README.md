@@ -346,6 +346,11 @@ reference target. The importer will check document versions, target types,
 authoring schema and Go validation perform no I/O or provider-schema validation.
 Unknown configuration fields, null configuration fields, and duplicate bundle
 keys are rejected; a null value inside a bundled document remains opaque data.
+Duplicate-key detection compares decoded JSON strings exactly, including case.
+URI schemes and hosts are case-insensitive, while paths and queries can be
+case-sensitive ([RFC 3986](https://www.rfc-editor.org/rfc/rfc3986.html#section-6.2.2.1)).
+The authoring codec preserves all URI spellings. Detecting equivalent URI
+identities, such as host-case variants, belongs to the later importer.
 Omitting `references`, supplying `references: {}`, or supplying `bundle: {}`
 adds no bundled documents; these forms do not permit external fetching.
 

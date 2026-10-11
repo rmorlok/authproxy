@@ -109,7 +109,7 @@ func (r *OpenAPIReferenceConfig) Clone() *OpenAPIReferenceConfig {
 }
 
 // UnmarshalJSON rejects unknown, noncanonical, and null configuration fields
-// and duplicate bundle identities. Bundle payloads remain arbitrary JSON.
+// and duplicate bundle keys. Bundle payloads remain arbitrary JSON.
 // Failed decoding preserves the receiver rather than applying a partial update.
 func (r *OpenAPIReferenceConfig) UnmarshalJSON(data []byte) error {
 	fields, err := decodeStrictObject(
@@ -147,8 +147,8 @@ func (r *OpenAPIReferenceConfig) UnmarshalJSON(data []byte) error {
 }
 
 // validateOpenAPIReferenceBundleJSON checks a syntactically valid value from
-// decodeStrictObject before ordinary map decoding can hide duplicate identities.
-// URI escape spellings are compared as decoded JSON strings; payloads are opaque.
+// decodeStrictObject before ordinary map decoding can hide duplicate JSON keys.
+// JSON escapes are decoded, but URI spelling and case remain as authored.
 func validateOpenAPIReferenceBundleJSON(raw json.RawMessage) error {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 
@@ -170,6 +170,9 @@ func validateOpenAPIReferenceBundleJSON(raw json.RawMessage) error {
 		}
 
 		uri := token.(string) // Object keys in valid JSON are always strings.
+		// This is exact JSON-key comparison, not URI equivalence. Lowercasing
+		// the whole URI would conflate potentially distinct paths or queries.
+		// Scheme/host normalization and identity collisions are importer checks.
 		if seen[uri] {
 			return fmt.Errorf("bundle document URI %q must not be repeated", uri)
 		}
@@ -193,6 +196,6 @@ func (r *OpenAPIReferenceConfig) UnmarshalYAML(node *yaml.Node) error {
 	if err := raw.UnmarshalYAML(node); err != nil {
 		return err
 	}
-	
+
 	return r.UnmarshalJSON(raw)
 }

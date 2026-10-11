@@ -139,6 +139,39 @@ func TestOpenAPIReferenceConfigStrictDecodeAndOwnership(t *testing.T) {
 	require.NoError(t, config.Validate(nil))
 }
 
+// TestOpenAPIReferenceConfigPreservesKeyCase distinguishes exact JSON-key
+// duplicates from URI equivalence. The importer will check equivalent identities;
+// authoring retains both spellings, including potentially distinct paths/queries.
+func TestOpenAPIReferenceConfigPreservesKeyCase(t *testing.T) {
+	for _, test := range []struct {
+		name, first, second string
+	}{
+		{"path", "https://example.test/Item.json", "https://example.test/item.json"},
+		{"query", "https://example.test/schema.json?name=Item", "https://example.test/schema.json?name=item"},
+		{"scheme and host", "HTTPS://EXAMPLE.TEST/schema.json", "https://example.test/schema.json"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			original := &OpenAPIReferenceConfig{Bundle: map[string]common.RawJSON{
+				test.first: common.RawJSON(`true`), test.second: common.RawJSON(`false`),
+			}}
+			for _, format := range []struct {
+				name   string
+				encode func(any) ([]byte, error)
+				decode func([]byte, any) error
+			}{{"JSON", json.Marshal, util.DecodeJSONStrict}, {"YAML", yaml.Marshal, util.DecodeYAMLStrict}} {
+				t.Run(format.name, func(t *testing.T) {
+					data, err := format.encode(original)
+					require.NoError(t, err)
+					var decoded OpenAPIReferenceConfig
+					require.NoError(t, format.decode(data, &decoded))
+					require.NoError(t, decoded.Validate(nil))
+					require.Equal(t, original.Bundle, decoded.Bundle)
+				})
+			}
+		})
+	}
+}
+
 // TestOpenAPIReferenceConfigCheckedFields prevents unchecked entries in an
 // earlier bundle object from merging into the final authored bundle.
 func TestOpenAPIReferenceConfigCheckedFields(t *testing.T) {
