@@ -15,19 +15,61 @@ import (
 // field, including empty payloads and provider metadata at both resource levels.
 func richToolContentForTest() []ToolContentBlock {
 	return []ToolContentBlock{
-		{Type: ToolContentTypeText, Text: util.ToPtr(""), Annotations: &ToolContentAnnotations{
-			Audience: []string{"user", "assistant"}, Priority: util.ToPtr(0.0), LastModified: "provider timestamp",
-		}, Provider: common.RawJSON(`{"example":9007199254740993}`)},
-		{Type: ToolContentTypeImage, Data: util.ToPtr("AAEC"), MIMEType: "image/png"},
-		{Type: ToolContentTypeAudio, Data: util.ToPtr(""), MIMEType: "audio/wav"},
-		{Type: ToolContentTypeResourceLink, URI: "custom:report#section", Name: util.ToPtr(""), Title: "Report", Description: "A provider resource",
-			MIMEType: "application/pdf", Size: util.ToPtr(int64(-1)), Icons: []ToolContentIcon{{
-				Src: "data:image/png;base64,AAEC", MIMEType: "image/png", Sizes: []string{"any"}, Theme: "dark",
-			}}},
-		{Type: ToolContentTypeResource, Resource: &ToolResourceContent{
-			URI: "urn:authproxy:invocation:example:text", MIMEType: "text/plain; charset=utf-8", Text: util.ToPtr(""), Provider: common.RawJSON(`{"tenant_note":true}`),
-		}, Provider: common.RawJSON(`{"outer":false}`)},
-		{Type: ToolContentTypeResource, Resource: &ToolResourceContent{URI: "custom:binary", Blob: util.ToPtr(""), MIMEType: "application/octet-stream"}},
+		{
+			Type: ToolContentTypeText,
+			Text: util.ToPtr(""),
+			Annotations: &ToolContentAnnotations{
+				Audience:     []string{"user", "assistant"},
+				Priority:     util.ToPtr(0.0),
+				LastModified: "provider timestamp",
+			},
+			Provider: common.RawJSON(`{"example":9007199254740993}`),
+		},
+		{
+			Type:     ToolContentTypeImage,
+			Data:     util.ToPtr("AAEC"),
+			MIMEType: "image/png",
+		},
+		{
+			Type:     ToolContentTypeAudio,
+			Data:     util.ToPtr(""),
+			MIMEType: "audio/wav",
+		},
+		{
+			Type:        ToolContentTypeResourceLink,
+			URI:         "custom:report#section",
+			Name:        util.ToPtr(""),
+			Title:       "Report",
+			Description: "A provider resource",
+			MIMEType:    "application/pdf",
+			Size:        util.ToPtr(int64(-1)),
+			Icons: []ToolContentIcon{
+				{
+					Src:      "data:image/png;base64,AAEC",
+					MIMEType: "image/png",
+					Sizes:    []string{"any"},
+					Theme:    "dark",
+				},
+			},
+		},
+		{
+			Type: ToolContentTypeResource,
+			Resource: &ToolResourceContent{
+				URI:      "urn:authproxy:invocation:example:text",
+				MIMEType: "text/plain; charset=utf-8",
+				Text:     util.ToPtr(""),
+				Provider: common.RawJSON(`{"tenant_note":true}`),
+			},
+			Provider: common.RawJSON(`{"outer":false}`),
+		},
+		{
+			Type: ToolContentTypeResource,
+			Resource: &ToolResourceContent{
+				URI:      "custom:binary",
+				Blob:     util.ToPtr(""),
+				MIMEType: "application/octet-stream",
+			},
+		},
 	}
 }
 
@@ -39,7 +81,10 @@ func TestToolContentRoundTrip(t *testing.T) {
 		for _, format := range []struct {
 			encode func(any) ([]byte, error)
 			decode func([]byte, any) error
-		}{{json.Marshal, util.DecodeJSONStrict}, {yaml.Marshal, util.DecodeYAMLStrict}} {
+		}{
+			{json.Marshal, util.DecodeJSONStrict},
+			{yaml.Marshal, util.DecodeYAMLStrict},
+		} {
 			encoded, err := format.encode(block)
 			require.NoError(t, err)
 
