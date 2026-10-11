@@ -173,6 +173,147 @@
       ],
       "additionalProperties": false
     },
+    "ToolResultNonBlankString": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "ToolContentURI": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^[A-Za-z][A-Za-z0-9+.-]*:",
+      "description": "An absolute resource identifier, including custom schemes, data URIs, and fragments. This value does not authorize retrieval."
+    },
+    "ToolContentBase64": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "description": "Base64-encoded bytes; an empty string is valid. Go validation checks the encoding."
+    },
+    "ToolResultProvider": {
+      "type": "object",
+      "description": "Opaque provider metadata, preserved without interpreting its keys or numeric values."
+    },
+    "ToolContentAnnotations": {
+      "type": "object",
+      "properties": {
+        "audience": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["user", "assistant"] }
+        },
+        "priority": { "type": "number", "minimum": 0, "maximum": 1 },
+        "lastModified": { "type": "string", "description": "An opaque provider timestamp; ISO 8601 is recommended but not required." }
+      },
+      "additionalProperties": false
+    },
+    "ToolContentIcon": {
+      "type": "object",
+      "required": ["src"],
+      "properties": {
+        "src": { "$ref": "#/$defs/ToolContentURI" },
+        "mimeType": { "type": "string" },
+        "sizes": { "type": "array", "items": { "type": "string" } },
+        "theme": { "type": "string", "enum": ["light", "dark"] }
+      },
+      "additionalProperties": false
+    },
+    "ToolResourceContent": {
+      "type": "object",
+      "required": ["uri"],
+      "properties": {
+        "uri": { "$ref": "#/$defs/ToolContentURI" },
+        "mimeType": { "type": "string" },
+        "text": { "type": "string" },
+        "blob": { "$ref": "#/$defs/ToolContentBase64" },
+        "provider": { "$ref": "#/$defs/ToolResultProvider" }
+      },
+      "oneOf": [{ "required": ["text"] }, { "required": ["blob"] }],
+      "additionalProperties": false,
+      "description": "Embedded resource content with exactly one text or binary payload, including an explicitly empty payload."
+    },
+    "ToolContentBlock": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "enum": ["text", "image", "audio", "resource_link", "resource"] },
+        "annotations": { "$ref": "#/$defs/ToolContentAnnotations" },
+        "provider": { "$ref": "#/$defs/ToolResultProvider" }
+      },
+      "oneOf": [
+        {
+          "required": ["text"],
+          "properties": { "type": { "const": "text" }, "text": { "type": "string" } }
+        },
+        {
+          "required": ["data", "mimeType"],
+          "properties": {
+            "type": { "enum": ["image", "audio"] },
+            "data": { "$ref": "#/$defs/ToolContentBase64" },
+            "mimeType": { "$ref": "#/$defs/ToolResultNonBlankString" }
+          }
+        },
+        {
+          "required": ["uri", "name"],
+          "properties": {
+            "type": { "const": "resource_link" },
+            "uri": { "$ref": "#/$defs/ToolContentURI" },
+            "name": { "type": "string" },
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "mimeType": { "type": "string" },
+            "size": { "type": "integer", "description": "The provider's size hint, retained as supplied rather than used for execution byte accounting." },
+            "icons": { "type": "array", "items": { "$ref": "#/$defs/ToolContentIcon" } }
+          }
+        },
+        {
+          "required": ["resource"],
+          "properties": { "type": { "const": "resource" }, "resource": { "$ref": "#/$defs/ToolResourceContent" } }
+        }
+      ],
+      "unevaluatedProperties": false,
+      "description": "An ordered rich-content item. Fields belong only to their declared variant; provider extensions use the explicit provider object."
+    },
+    "ToolResultMetadata": {
+      "type": "object",
+      "required": ["connectionId"],
+      "properties": {
+        "connectionId": { "type": "string", "pattern": "^cxn_" },
+        "toolSetGeneration": { "type": "integer", "minimum": 1 },
+        "catalogRevision": { "type": "integer", "minimum": 1 }
+      },
+      "dependentRequired": { "catalogRevision": ["toolSetGeneration"] },
+      "additionalProperties": false
+    },
+    "ToolResultError": {
+      "type": "object",
+      "required": ["code", "message", "retryable", "executionState"],
+      "properties": {
+        "code": { "$ref": "#/$defs/ToolResultNonBlankString" },
+        "message": { "$ref": "#/$defs/ToolResultNonBlankString" },
+        "details": true,
+        "retryable": { "type": "boolean" },
+        "executionState": { "type": "string", "enum": ["notStarted", "mayHaveExecuted", "completed"] }
+      },
+      "additionalProperties": false
+    },
+    "ToolResult": {
+      "type": "object",
+      "required": ["toolId", "revision", "invocationId", "isError", "content", "metadata"],
+      "properties": {
+        "toolId": { "type": "string", "pattern": "^tol_" },
+        "revision": { "type": "integer", "minimum": 1 },
+        "invocationId": { "type": "string", "pattern": "^tiv_" },
+        "isError": { "type": "boolean" },
+        "structuredContent": true,
+        "content": { "type": "array", "items": { "$ref": "#/$defs/ToolContentBlock" } },
+        "metadata": { "$ref": "#/$defs/ToolResultMetadata" },
+        "error": { "$ref": "#/$defs/ToolResultError" },
+        "provider": { "$ref": "#/$defs/ToolResultProvider" }
+      },
+      "if": { "properties": { "isError": { "const": true } } },
+      "then": { "required": ["error"] },
+      "else": { "properties": { "error": false } },
+      "additionalProperties": false,
+      "description": "The normalized result of one tool invocation. Rich content remains ordered, and structured content/error details distinguish omission from an explicit JSON null. The API version owns this content vocabulary."
+    },
     "Connection": {
       "$ref": "../resources/connection/schema.json"
     },

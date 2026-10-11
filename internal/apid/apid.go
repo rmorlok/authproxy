@@ -40,6 +40,7 @@ const (
 	PrefixNotification        Prefix = "ntf_"
 	PrefixTool                Prefix = "tol_"
 	PrefixToolSet             Prefix = "tls_"
+	PrefixToolInvocation      Prefix = "tiv_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
@@ -64,6 +65,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixNotification:        true,
 	PrefixTool:                true,
 	PrefixToolSet:             true,
+	PrefixToolInvocation:      true,
 }
 
 // ID is a prefixed identifier string. The zero value is Nil (empty string).
