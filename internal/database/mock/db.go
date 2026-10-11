@@ -18,6 +18,7 @@ import (
 	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	meta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	rate_limit "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	toolsets "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
 	rate "golang.org/x/time/rate"
 )
@@ -415,6 +416,20 @@ func (mr *MockDBMockRecorder) CreateRateLimit(ctx, rl interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRateLimit", reflect.TypeOf((*MockDB)(nil).CreateRateLimit), ctx, rl)
 }
 
+// CreateToolSet mocks base method.
+func (m *MockDB) CreateToolSet(ctx context.Context, toolSet *database.ToolSet) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateToolSet", ctx, toolSet)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateToolSet indicates an expected call of CreateToolSet.
+func (mr *MockDBMockRecorder) CreateToolSet(ctx, toolSet interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateToolSet", reflect.TypeOf((*MockDB)(nil).CreateToolSet), ctx, toolSet)
+}
+
 // DeleteActor mocks base method.
 func (m *MockDB) DeleteActor(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
@@ -718,6 +733,20 @@ func (m *MockDB) DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []s
 func (mr *MockDBMockRecorder) DeleteRateLimitLabels(ctx, id, keys interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimitLabels", reflect.TypeOf((*MockDB)(nil).DeleteRateLimitLabels), ctx, id, keys)
+}
+
+// DeleteToolSet mocks base method.
+func (m *MockDB) DeleteToolSet(ctx context.Context, id apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteToolSet", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteToolSet indicates an expected call of DeleteToolSet.
+func (mr *MockDBMockRecorder) DeleteToolSet(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteToolSet", reflect.TypeOf((*MockDB)(nil).DeleteToolSet), ctx, id)
 }
 
 // DeleteUnusedKey mocks base method.
@@ -1057,6 +1086,36 @@ func (m *MockDB) GetRecentProbeOutcomes(ctx context.Context, connectionId apid.I
 func (mr *MockDBMockRecorder) GetRecentProbeOutcomes(ctx, connectionId, probeId, limit interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecentProbeOutcomes", reflect.TypeOf((*MockDB)(nil).GetRecentProbeOutcomes), ctx, connectionId, probeId, limit)
+}
+
+// GetToolSet mocks base method.
+func (m *MockDB) GetToolSet(ctx context.Context, id apid.ID) (*database.ToolSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolSet", ctx, id)
+	ret0, _ := ret[0].(*database.ToolSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolSet indicates an expected call of GetToolSet.
+func (mr *MockDBMockRecorder) GetToolSet(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSet", reflect.TypeOf((*MockDB)(nil).GetToolSet), ctx, id)
+}
+
+// GetToolSetByName mocks base method.
+func (m *MockDB) GetToolSetByName(ctx context.Context, namespace string, name common.ResourceName) (*database.ToolSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolSetByName", ctx, namespace, name)
+	ret0, _ := ret[0].(*database.ToolSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolSetByName indicates an expected call of GetToolSetByName.
+func (mr *MockDBMockRecorder) GetToolSetByName(ctx, namespace, name interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSetByName", reflect.TypeOf((*MockDB)(nil).GetToolSetByName), ctx, namespace, name)
 }
 
 // HasNonceBeenUsed mocks base method.
@@ -2229,6 +2288,21 @@ func (m *MockDB) UpdateRateLimitName(ctx context.Context, id apid.ID, name commo
 func (mr *MockDBMockRecorder) UpdateRateLimitName(ctx, id, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitName", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitName), ctx, id, name)
+}
+
+// UpdateToolSetConnectionSelector mocks base method.
+func (m *MockDB) UpdateToolSetConnectionSelector(ctx context.Context, id apid.ID, expectedRevision uint64, selector toolsets.ConnectionSelector) (*database.ToolSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateToolSetConnectionSelector", ctx, id, expectedRevision, selector)
+	ret0, _ := ret[0].(*database.ToolSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateToolSetConnectionSelector indicates an expected call of UpdateToolSetConnectionSelector.
+func (mr *MockDBMockRecorder) UpdateToolSetConnectionSelector(ctx, id, expectedRevision, selector interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateToolSetConnectionSelector", reflect.TypeOf((*MockDB)(nil).UpdateToolSetConnectionSelector), ctx, id, expectedRevision, selector)
 }
 
 // UpsertActor mocks base method.

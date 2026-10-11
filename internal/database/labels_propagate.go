@@ -56,6 +56,9 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 	if err := s.refreshRateLimitsInNamespace(ctx, nsPath); err != nil {
 		return err
 	}
+	if err := s.refreshToolSetsInNamespace(ctx, nsPath); err != nil {
+		return err
+	}
 
 	childPaths, err := s.directChildNamespacePaths(ctx, nsPath)
 	if err != nil {
@@ -221,6 +224,21 @@ func (s *service) refreshConnectorsInNamespace(ctx context.Context, nsPath strin
 	}
 	for _, id := range ids {
 		if _, err := s.recomputeConnectorLabelsTx(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// refreshToolSetsInNamespace refreshes each live ToolSet in the exact namespace.
+// Per-row transactions preserve the existing propagation consistency model.
+func (s *service) refreshToolSetsInNamespace(ctx context.Context, nsPath string) error {
+	ids, err := s.scanIdsByNamespace(ToolSetsTable, nsPath)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := s.recomputeToolSetLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -459,6 +477,41 @@ func (s *service) recomputeConnectorLabelsTx(ctx context.Context, id apid.ID) (b
 	return corrected, err
 }
 
+// recomputeToolSetLabelsTx re-derives namespace and self labels in a short
+// transaction. Only drifted labels and updated_at are written; selector state
+// and its revision remain unchanged. Concurrent deletion is a harmless no-op.
+func (s *service) recomputeToolSetLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	toolSet, err := s.getToolSet(ctx, tx, sq.Eq{"id": id})
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	userLabels, _ := SplitUserAndApxyLabels(toolSet.Labels)
+	nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+		"path": toolSet.Namespace, "deleted_at": nil,
+	})
+	if err != nil {
+		return false, err
+	}
+	newLabels := ApplyParentCarryForward(userLabels, ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels})
+	newLabels = InjectSelfImplicitLabels(toolSet.Id, toolSet.Name, toolSet.Namespace, newLabels)
+	corrected, err := s.writeRecomputedLabels(ctx, tx, ToolSetsTable, sq.Eq{"id": id, "deleted_at": nil}, toolSet.Labels, newLabels)
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return corrected, nil
+}
+
 // recomputeNamespaceLabelsTx opens a short transaction and re-derives a
 // namespace's full labels from its immediate parent and its own user labels.
 // Returns true if drift was detected and corrected.
@@ -574,6 +627,7 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 		{name: "actors", walk: s.reconcileActors},
 		{name: "keys", walk: s.reconcileEncryptionKeys},
 		{name: "rate_limits", walk: s.reconcileRateLimits},
+		{name: "tool_sets", walk: s.reconcileToolSets},
 	}
 
 	for _, step := range steps {
@@ -715,4 +769,55 @@ func (s *service) reconcileRateLimits(ctx context.Context, batchSize int32, limi
 			return nil
 		})
 	return corrected, err
+}
+
+// reconcileToolSets walks live IDs in bounded, ascending pages. Reading IDs
+// instead of sorting by updated_at keeps label writes from shifting the cursor.
+// The caller supplies a positive batchSize; rate limiting applies to each row.
+func (s *service) reconcileToolSets(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+	var corrected int64
+	var lastID apid.ID
+	for {
+		query := s.sq.Select("id").From(ToolSetsTable).
+			Where(sq.Eq{"deleted_at": nil}).OrderBy("id").Limit(uint64(batchSize))
+		if lastID != "" {
+			query = query.Where(sq.Gt{"id": lastID})
+		}
+		rows, err := query.RunWith(s.db).QueryContext(ctx)
+		if err != nil {
+			return corrected, err
+		}
+		ids := make([]apid.ID, 0, batchSize)
+		for rows.Next() {
+			var id apid.ID
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return corrected, err
+			}
+			ids = append(ids, id)
+		}
+		// Release the read cursor before opening any per-row write transaction.
+		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+			return corrected, err
+		}
+		for _, id := range ids {
+			if limiter != nil {
+				if err := limiter.Wait(ctx); err != nil {
+					return corrected, err
+				}
+			}
+			wasCorrected, err := s.recomputeToolSetLabelsTx(ctx, id)
+			if err != nil {
+				return corrected, err
+			}
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "tool_set", "id", id)
+			}
+		}
+		if len(ids) < int(batchSize) {
+			return corrected, nil
+		}
+		lastID = ids[len(ids)-1]
+	}
 }
