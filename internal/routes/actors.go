@@ -177,10 +177,16 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	a, err := r.core.GetActor(ctx, id)
+	a, err := r.core.ResolveActorReference(ctx, idObjectReference(actorschema.ActorKind, id.String()))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
 			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
+			val.MarkErrorReturn()
+			return
+		}
+
+		if errors.Is(err, core.ErrInvalidArgument) {
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}

@@ -216,6 +216,15 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, http.StatusNotFound, w.Code)
 		})
 
+		t.Run("id for another resource kind", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+apid.New(apid.PrefixConnector).String(), nil, "root", "some-actor", aschema.AllPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+		})
+
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+u.String(), nil, "root", "some-actor", aschema.AllPermissions())
