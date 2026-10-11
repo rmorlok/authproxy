@@ -122,6 +122,7 @@ func runReencryptAll(ctx context.Context, env *helpers.IntegrationTestEnv) error
 				PrimaryKeyCols:   target.PrimaryKeyCols,
 				PrimaryKeyValues: target.PrimaryKeyValues,
 				FieldColumn:      target.FieldColumn,
+				ExpectedValue:    target.EncryptedFieldValue,
 				NewValue:         newEF,
 			})
 		}

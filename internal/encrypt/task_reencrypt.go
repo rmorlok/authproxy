@@ -55,8 +55,11 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 				PrimaryKeyCols:   target.PrimaryKeyCols,
 				PrimaryKeyValues: target.PrimaryKeyValues,
 				FieldColumn:      target.FieldColumn,
+				ExpectedValue:    target.EncryptedFieldValue,
 				NewValue:         newEF,
 			})
+			// Count prepared transformations; conditional writes may skip values
+			// edited since enumeration, leaving them for a later sweep.
 			totalProcessed++
 		}
 

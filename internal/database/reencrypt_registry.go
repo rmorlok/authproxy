@@ -124,13 +124,18 @@ type ReEncryptionTarget struct {
 	TargetDataEncryptionKeyId apid.ID                 // target DEK for the namespace
 }
 
-// ReEncryptedFieldUpdate carries the data to update a single encrypted field after re-encryption.
+// ReEncryptedFieldUpdate carries a re-encrypted value and the captured value it
+// replaces. The update is skipped if the stored value changed in the meantime.
 type ReEncryptedFieldUpdate struct {
 	Table            string
 	PrimaryKeyCols   []string
 	PrimaryKeyValues []any
 	FieldColumn      string
-	NewValue         encfield.EncryptedField
+
+	// ExpectedValue is the nonzero encrypted value read before re-encryption.
+	// Both its key ID and ciphertext must still match when NewValue is written.
+	ExpectedValue encfield.EncryptedField
+	NewValue      encfield.EncryptedField
 }
 
 func (s *service) EnumerateFieldsRequiringReEncryption(
@@ -321,6 +326,11 @@ func (s *service) queryReEncryptionPage(
 	return targets, totalRows, nil
 }
 
+// BatchUpdateReEncryptedFields replaces captured encrypted values only on live
+// rows whose key ID and ciphertext still match. Concurrent edits, cleared fields,
+// and deleted rows are skipped without changing encrypted_at; a later sweep can
+// re-encrypt any current values still using an old key. Updates are independent,
+// so a validation or database error may leave earlier updates applied.
 func (s *service) BatchUpdateReEncryptedFields(ctx context.Context, updates []ReEncryptedFieldUpdate) error {
 	now := apctx.GetClock(ctx).Now()
 
@@ -333,9 +343,23 @@ func (s *service) BatchUpdateReEncryptedFields(ctx context.Context, updates []Re
 			return fmt.Errorf("PrimaryKeyCols and PrimaryKeyValues length mismatch for table %q", u.Table)
 		}
 
-		whereClause := sq.Eq{}
+		if u.ExpectedValue.IsZero() {
+			return fmt.Errorf("expected encrypted value is required for %s.%s", u.Table, u.FieldColumn)
+		}
+
+		whereClause := sq.Eq{"deleted_at": nil}
 		for i, col := range u.PrimaryKeyCols {
 			whereClause[col] = u.PrimaryKeyValues[i]
+		}
+
+		// Compare the JSON members, not the serialized object: SQLite preserves
+		// whitespace and property order, while PostgreSQL stores normalized JSONB.
+		if s.cfg.GetProvider() == config.DatabaseProviderPostgres {
+			whereClause[u.FieldColumn+" ->> 'id'"] = u.ExpectedValue.ID
+			whereClause[u.FieldColumn+" ->> 'd'"] = u.ExpectedValue.Data
+		} else {
+			whereClause["json_extract("+u.FieldColumn+", '$.id')"] = u.ExpectedValue.ID
+			whereClause["json_extract("+u.FieldColumn+", '$.d')"] = u.ExpectedValue.Data
 		}
 
 		_, err := s.sq.
@@ -344,7 +368,7 @@ func (s *service) BatchUpdateReEncryptedFields(ctx context.Context, updates []Re
 			Set("encrypted_at", now).
 			Where(whereClause).
 			RunWith(s.db).
-			Exec()
+			ExecContext(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to update re-encrypted field %s.%s: %w", u.Table, u.FieldColumn, err)
 		}
