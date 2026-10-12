@@ -430,6 +430,21 @@ func (mr *MockDBMockRecorder) CreateToolSet(ctx, toolSet interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateToolSet", reflect.TypeOf((*MockDB)(nil).CreateToolSet), ctx, toolSet)
 }
 
+// CreateToolSetGeneration mocks base method.
+func (m *MockDB) CreateToolSetGeneration(ctx context.Context, id apid.ID, definition encfield.EncryptedField) (*database.ToolSetGeneration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateToolSetGeneration", ctx, id, definition)
+	ret0, _ := ret[0].(*database.ToolSetGeneration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateToolSetGeneration indicates an expected call of CreateToolSetGeneration.
+func (mr *MockDBMockRecorder) CreateToolSetGeneration(ctx, id, definition interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateToolSetGeneration", reflect.TypeOf((*MockDB)(nil).CreateToolSetGeneration), ctx, id, definition)
+}
+
 // DeleteActor mocks base method.
 func (m *MockDB) DeleteActor(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
@@ -1118,6 +1133,36 @@ func (mr *MockDBMockRecorder) GetToolSetByName(ctx, namespace, name interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSetByName", reflect.TypeOf((*MockDB)(nil).GetToolSetByName), ctx, namespace, name)
 }
 
+// GetToolSetGeneration mocks base method.
+func (m *MockDB) GetToolSetGeneration(ctx context.Context, id apid.ID, generation uint64) (*database.ToolSetGeneration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolSetGeneration", ctx, id, generation)
+	ret0, _ := ret[0].(*database.ToolSetGeneration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolSetGeneration indicates an expected call of GetToolSetGeneration.
+func (mr *MockDBMockRecorder) GetToolSetGeneration(ctx, id, generation interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSetGeneration", reflect.TypeOf((*MockDB)(nil).GetToolSetGeneration), ctx, id, generation)
+}
+
+// GetToolSetGenerationByState mocks base method.
+func (m *MockDB) GetToolSetGenerationByState(ctx context.Context, id apid.ID, state toolsets.ToolSetReleaseState) (*database.ToolSetGeneration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolSetGenerationByState", ctx, id, state)
+	ret0, _ := ret[0].(*database.ToolSetGeneration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolSetGenerationByState indicates an expected call of GetToolSetGenerationByState.
+func (mr *MockDBMockRecorder) GetToolSetGenerationByState(ctx, id, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSetGenerationByState", reflect.TypeOf((*MockDB)(nil).GetToolSetGenerationByState), ctx, id, state)
+}
+
 // HasNonceBeenUsed mocks base method.
 func (m *MockDB) HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (bool, error) {
 	m.ctrl.T.Helper()
@@ -1496,6 +1541,21 @@ func (m *MockDB) Ping(ctx context.Context) bool {
 func (mr *MockDBMockRecorder) Ping(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDB)(nil).Ping), ctx)
+}
+
+// PublishToolSetGeneration mocks base method.
+func (m *MockDB) PublishToolSetGeneration(ctx context.Context, id apid.ID, generation, expectedRevision uint64) (*database.ToolSetGeneration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PublishToolSetGeneration", ctx, id, generation, expectedRevision)
+	ret0, _ := ret[0].(*database.ToolSetGeneration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PublishToolSetGeneration indicates an expected call of PublishToolSetGeneration.
+func (mr *MockDBMockRecorder) PublishToolSetGeneration(ctx, id, generation, expectedRevision interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PublishToolSetGeneration", reflect.TypeOf((*MockDB)(nil).PublishToolSetGeneration), ctx, id, generation, expectedRevision)
 }
 
 // PurgeSoftDeletedRecords mocks base method.
@@ -2303,6 +2363,21 @@ func (m *MockDB) UpdateToolSetConnectionSelector(ctx context.Context, id apid.ID
 func (mr *MockDBMockRecorder) UpdateToolSetConnectionSelector(ctx, id, expectedRevision, selector interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateToolSetConnectionSelector", reflect.TypeOf((*MockDB)(nil).UpdateToolSetConnectionSelector), ctx, id, expectedRevision, selector)
+}
+
+// UpdateToolSetGenerationDraft mocks base method.
+func (m *MockDB) UpdateToolSetGenerationDraft(ctx context.Context, id apid.ID, generation, expectedRevision uint64, definition encfield.EncryptedField) (*database.ToolSetGeneration, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateToolSetGenerationDraft", ctx, id, generation, expectedRevision, definition)
+	ret0, _ := ret[0].(*database.ToolSetGeneration)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateToolSetGenerationDraft indicates an expected call of UpdateToolSetGenerationDraft.
+func (mr *MockDBMockRecorder) UpdateToolSetGenerationDraft(ctx, id, generation, expectedRevision, definition interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateToolSetGenerationDraft", reflect.TypeOf((*MockDB)(nil).UpdateToolSetGenerationDraft), ctx, id, generation, expectedRevision, definition)
 }
 
 // UpsertActor mocks base method.

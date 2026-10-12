@@ -164,7 +164,7 @@ func (db *reencryptInterleavingDB) BatchUpdateReEncryptedFields(
 		}
 		db.replaced = true
 	}
-	
+
 	return db.DB.BatchUpdateReEncryptedFields(ctx, updates)
 }
 
