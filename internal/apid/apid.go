@@ -41,6 +41,9 @@ const (
 	PrefixTool                Prefix = "tol_"
 	PrefixToolSet             Prefix = "tls_"
 	PrefixToolInvocation      Prefix = "tiv_"
+
+	// PrefixToolSetBinding identifies an internal assignment, not a public resource.
+	PrefixToolSetBinding Prefix = "tsb_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
@@ -65,6 +68,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixNotification:        true,
 	PrefixTool:                true,
 	PrefixToolSet:             true,
+	PrefixToolSetBinding:      true,
 	PrefixToolInvocation:      true,
 }
 
