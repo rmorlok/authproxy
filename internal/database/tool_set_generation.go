@@ -107,12 +107,15 @@ func (g *ToolSetGeneration) Validate() error {
 	if g == nil {
 		return errors.New("toolset generation is required")
 	}
+
 	if err := validateToolSetGenerationAddress(g.ToolSetId, g.Generation); err != nil {
 		return err
 	}
+
 	if err := validateToolSetGenerationRevision(g.Revision); err != nil {
 		return err
 	}
+
 	switch g.State {
 	case toolsetschema.ToolSetReleaseStateDraft,
 		toolsetschema.ToolSetReleaseStatePrimary,
@@ -121,9 +124,11 @@ func (g *ToolSetGeneration) Validate() error {
 	default:
 		return errors.New("invalid toolset generation state")
 	}
+
 	if g.EncryptedDefinition.IsZero() {
 		return errors.New("encrypted toolset definition is required")
 	}
+
 	return nil
 }
 
@@ -133,9 +138,11 @@ func validateToolSetGenerationAddress(id apid.ID, generation uint64) error {
 	if err := validateToolSetID(id); err != nil {
 		return err
 	}
+
 	if generation == 0 || generation > math.MaxInt64 {
 		return errors.New("toolset generation must be a positive signed 64-bit integer")
 	}
+
 	return nil
 }
 
@@ -144,6 +151,7 @@ func validateToolSetGenerationRevision(revision uint64) error {
 	if revision == 0 || revision > math.MaxInt64 {
 		return errors.New("toolset generation revision must be a positive signed 64-bit integer")
 	}
+
 	return nil
 }
 
@@ -160,12 +168,16 @@ func (s *service) lockToolSetForGenerationWrite(
 	result, err := s.sq.
 		Update(ToolSetsTable).
 		Set("id", id).
-		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		Where(sq.Eq{
+			"id":         id,
+			"deleted_at": nil,
+		}).
 		RunWith(tx).
 		ExecContext(ctx)
 	if err != nil {
 		return err
 	}
+
 	count, err := result.RowsAffected()
 	if err != nil {
 		return err
@@ -173,6 +185,7 @@ func (s *service) lockToolSetForGenerationWrite(
 	if count == 0 {
 		return ErrNotFound
 	}
+
 	return nil
 }
 
@@ -185,6 +198,7 @@ func (s *service) CreateToolSetGeneration(
 	definition encfield.EncryptedField,
 ) (*ToolSetGeneration, error) {
 	now := apctx.GetClock(ctx).Now()
+
 	result := ToolSetGeneration{
 		ToolSetId:           id,
 		Generation:          1,
@@ -204,6 +218,7 @@ func (s *service) CreateToolSetGeneration(
 		return nil, err
 	}
 	defer tx.Rollback()
+
 	if err := s.lockToolSetForGenerationWrite(ctx, tx, id); err != nil {
 		return nil, err
 	}
@@ -233,9 +248,11 @@ func (s *service) CreateToolSetGeneration(
 	if err != nil {
 		return nil, wrapDatabaseMutationError("failed to create toolset generation", err)
 	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, wrapDatabaseMutationError("failed to commit toolset generation", err)
 	}
+
 	return &result, nil
 }
 
@@ -247,16 +264,21 @@ func (s *service) getToolSetGeneration(
 	where sq.Eq,
 ) (*ToolSetGeneration, error) {
 	var result ToolSetGeneration
+
 	columns := result.cols()
 	for i := range columns {
 		columns[i] = "g." + columns[i]
 	}
+
 	err := s.sq.
 		Select(columns...).
 		From(ToolSetGenerationsTable + " g").
 		Join(ToolSetsTable + " t ON t.id = g.tool_set_id").
 		Where(where).
-		Where(sq.Eq{"g.deleted_at": nil, "t.deleted_at": nil}).
+		Where(sq.Eq{
+			"g.deleted_at": nil,
+			"t.deleted_at": nil,
+		}).
 		RunWith(runner).
 		QueryRowContext(ctx).
 		Scan(result.fields()...)
@@ -266,6 +288,7 @@ func (s *service) getToolSetGeneration(
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
@@ -278,6 +301,7 @@ func (s *service) GetToolSetGeneration(
 	if err := validateToolSetGenerationAddress(id, generation); err != nil {
 		return nil, err
 	}
+
 	return s.getToolSetGeneration(ctx, s.db, sq.Eq{"g.tool_set_id": id, "g.generation": generation})
 }
 
@@ -291,9 +315,12 @@ func (s *service) GetToolSetGenerationByState(
 	if err := validateToolSetID(id); err != nil {
 		return nil, err
 	}
-	if state != toolsetschema.ToolSetReleaseStateDraft && state != toolsetschema.ToolSetReleaseStatePrimary {
+
+	if state != toolsetschema.ToolSetReleaseStateDraft &&
+		state != toolsetschema.ToolSetReleaseStatePrimary {
 		return nil, errors.New("toolset generation lookup requires draft or primary state")
 	}
+
 	return s.getToolSetGeneration(ctx, s.db, sq.Eq{"g.tool_set_id": id, "g.state": state})
 }
 
@@ -310,9 +337,11 @@ func (s *service) UpdateToolSetGenerationDraft(
 	if err := validateToolSetGenerationAddress(id, generation); err != nil {
 		return nil, err
 	}
+
 	if err := validateToolSetGenerationRevision(expectedRevision); err != nil {
 		return nil, err
 	}
+
 	if definition.IsZero() {
 		return nil, errors.New("encrypted toolset definition is required")
 	}
@@ -322,14 +351,21 @@ func (s *service) UpdateToolSetGenerationDraft(
 		return nil, err
 	}
 	defer tx.Rollback()
+
 	if err := s.lockToolSetForGenerationWrite(ctx, tx, id); err != nil {
 		return nil, err
 	}
-	current, err := s.getToolSetGeneration(ctx, tx, sq.Eq{"g.tool_set_id": id, "g.generation": generation})
+	current, err := s.getToolSetGeneration(ctx, tx, sq.Eq{
+		"g.tool_set_id": id,
+		"g.generation":  generation,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if current.State != toolsetschema.ToolSetReleaseStateDraft || current.Revision != expectedRevision || expectedRevision == math.MaxInt64 {
+
+	if current.State != toolsetschema.ToolSetReleaseStateDraft ||
+		current.Revision != expectedRevision ||
+		expectedRevision == math.MaxInt64 {
 		return nil, ErrToolSetGenerationRevisionConflict
 	}
 
@@ -358,9 +394,11 @@ func (s *service) UpdateToolSetGenerationDraft(
 	if err != nil {
 		return nil, fmt.Errorf("failed to update toolset draft: %w", err)
 	}
+
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit toolset draft: %w", err)
 	}
+
 	return &result, nil
 }
 
@@ -378,6 +416,7 @@ func (s *service) PublishToolSetGeneration(
 	if err := validateToolSetGenerationAddress(id, generation); err != nil {
 		return nil, err
 	}
+
 	if err := validateToolSetGenerationRevision(expectedRevision); err != nil {
 		return nil, err
 	}
@@ -387,10 +426,15 @@ func (s *service) PublishToolSetGeneration(
 		return nil, err
 	}
 	defer tx.Rollback()
+
 	if err := s.lockToolSetForGenerationWrite(ctx, tx, id); err != nil {
 		return nil, err
 	}
-	current, err := s.getToolSetGeneration(ctx, tx, sq.Eq{"g.tool_set_id": id, "g.generation": generation})
+
+	current, err := s.getToolSetGeneration(ctx, tx, sq.Eq{
+		"g.tool_set_id": id,
+		"g.generation": generation,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -438,6 +482,7 @@ func (s *service) PublishToolSetGeneration(
 	if err != nil {
 		return nil, fmt.Errorf("failed to publish toolset generation: %w", err)
 	}
+	
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("failed to commit toolset publication: %w", err)
 	}
