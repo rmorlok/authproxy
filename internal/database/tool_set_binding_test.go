@@ -28,6 +28,7 @@ func toolSetBindingParentsForTest(t *testing.T) (context.Context, DB, *ToolSet, 
 	toolSet := toolSetForDatabaseTest("root.product", "tools")
 	toolSet.ConnectionSelector.MatchLabels = map[string]string{"env": "prod"}
 	require.NoError(t, db.CreateToolSet(ctx, toolSet))
+
 	connection := &Connection{
 		Id:                  apid.New(apid.PrefixConnection),
 		Namespace:           "root.product.owner",
@@ -39,10 +40,13 @@ func toolSetBindingParentsForTest(t *testing.T) (context.Context, DB, *ToolSet, 
 		Annotations:         Annotations{"note": "unchanged"},
 	}
 	require.NoError(t, db.CreateConnection(ctx, connection))
+
 	toolSet, err := db.GetToolSet(ctx, toolSet.Id)
 	require.NoError(t, err)
+
 	connection, err = db.GetConnection(ctx, connection.Id)
 	require.NoError(t, err)
+
 	return ctx, db, toolSet, connection
 }
 
@@ -51,10 +55,14 @@ func toolSetBindingParentsForTest(t *testing.T) (context.Context, DB, *ToolSet, 
 func TestToolSetBindingCreateAndRead(t *testing.T) {
 	ctx, db, toolSet, connection := toolSetBindingParentsForTest(t)
 	createdAt := apctx.GetClock(ctx).Now().Add(time.Hour)
+
+	// Create the binding
 	binding, err := db.CreateToolSetBinding(apctx.WithFixedClock(ctx, createdAt), toolSet.Id, connection.Id, 1)
 	require.NoError(t, err)
 	require.NoError(t, binding.Validate())
 	require.True(t, binding.Id.HasPrefix(apid.PrefixToolSetBinding))
+
+	// Validate id format
 	parsed, err := apid.Parse(binding.Id.String())
 	require.NoError(t, err)
 	require.Equal(t, binding.Id, parsed)
@@ -63,8 +71,11 @@ func TestToolSetBindingCreateAndRead(t *testing.T) {
 	require.True(t, createdAt.Equal(binding.UpdatedAt))
 	require.Nil(t, binding.DeletedAt)
 
+	// Get the binding directly
 	byID, err := db.GetToolSetBinding(ctx, binding.Id)
 	require.NoError(t, err)
+
+	// Get the binding for the toolset/connection pair
 	byPair, err := db.GetToolSetBindingForConnection(ctx, toolSet.Id, connection.Id)
 	require.NoError(t, err)
 	for _, stored := range []*ToolSetBinding{byID, byPair} {
@@ -74,23 +85,33 @@ func TestToolSetBindingCreateAndRead(t *testing.T) {
 		require.Equal(t, uint64(1), stored.Epoch)
 		require.True(t, createdAt.Equal(stored.CreatedAt))
 	}
+
+	// Verify we can't create another beinding between these two
 	_, err = db.CreateToolSetBinding(ctx, toolSet.Id, connection.Id, 1)
 	require.ErrorIs(t, err, ErrDuplicate)
+
+	// Previous one still there
 	storedToolSet, err := db.GetToolSet(ctx, toolSet.Id)
 	require.NoError(t, err)
 	require.Equal(t, toolSet, storedToolSet)
+
+	// Get the connection
 	storedConnection, err := db.GetConnection(ctx, connection.Id)
 	require.NoError(t, err)
 	require.Equal(t, connection, storedConnection)
 
+	// Multiple toolsets can bind to same connection
 	otherToolSet := toolSetForDatabaseTest(toolSet.Namespace, "other-tools")
 	require.NoError(t, db.CreateToolSet(ctx, otherToolSet))
 	_, err = db.CreateToolSetBinding(ctx, otherToolSet.Id, connection.Id, 1)
 	require.NoError(t, err, "multiple ToolSets can attach to one connection")
+
 	otherConnection := *connection
 	otherConnection.Id = apid.New(apid.PrefixConnection)
 	otherConnection.Name = "other-account"
 	require.NoError(t, db.CreateConnection(ctx, &otherConnection))
+
+	// Toolsets can bind to multiple connections
 	_, err = db.CreateToolSetBinding(ctx, toolSet.Id, otherConnection.Id, 1)
 	require.NoError(t, err, "a ToolSet can attach to multiple connections")
 }

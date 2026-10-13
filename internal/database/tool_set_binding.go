@@ -20,6 +20,7 @@ const ToolSetBindingsTable = "tool_set_bindings"
 var (
 	// ErrToolSetBindingEpochConflict means a worker's captured binding is stale.
 	ErrToolSetBindingEpochConflict = errors.New("toolset binding epoch changed")
+
 	// ErrToolSetBindingMembershipConflict means current namespace/label matching
 	// contradicts the requested creation or removal. Recompute desired membership.
 	ErrToolSetBindingMembershipConflict = errors.New("toolset binding membership changed")
@@ -89,15 +90,19 @@ func (b *ToolSetBinding) Validate() error {
 	if b == nil {
 		return errors.New("toolset binding is required")
 	}
+
 	if err := validateToolSetBindingID(b.Id); err != nil {
 		return err
 	}
+
 	if err := validateToolSetBindingParents(b.ToolSetId, b.ConnectionId); err != nil {
 		return err
 	}
+
 	if b.Epoch == 0 || b.Epoch > math.MaxInt64 {
 		return errors.New("toolset binding epoch must be a positive signed 64-bit integer")
 	}
+
 	return nil
 }
 
@@ -106,6 +111,7 @@ func validateToolSetBindingID(id apid.ID) error {
 	if id.IsNil() {
 		return errors.New("toolset binding id is required")
 	}
+
 	return id.ValidatePrefix(apid.PrefixToolSetBinding)
 }
 
@@ -114,9 +120,11 @@ func validateToolSetBindingParents(toolSetId, connectionId apid.ID) error {
 	if err := validateToolSetID(toolSetId); err != nil {
 		return err
 	}
+
 	if connectionId.IsNil() {
 		return errors.New("connection id is required")
 	}
+
 	return connectionId.ValidatePrefix(apid.PrefixConnection)
 }
 
@@ -125,6 +133,7 @@ func validateBindingSelectorRevision(revision uint64) error {
 	if revision == 0 || revision > math.MaxInt64 {
 		return errors.New("expected selector revision must be a positive signed 64-bit integer")
 	}
+
 	return nil
 }
 
@@ -156,6 +165,7 @@ func (s *service) lockToolSetBindingMembership(
 		if err != nil {
 			return 0, false, false, err
 		}
+
 		count, err := result.RowsAffected()
 		if err != nil {
 			return 0, false, false, err
@@ -167,26 +177,46 @@ func (s *service) lockToolSetBindingMembership(
 
 	var toolSet ToolSet
 	err = s.sq.
-		Select("namespace", "connection_selector", "selector_revision", "deleted_at").
+		Select(
+			"namespace",
+			"connection_selector",
+			"selector_revision",
+			"deleted_at",
+		).
 		From(ToolSetsTable).
 		Where(sq.Eq{"id": toolSetId}).
 		RunWith(tx).
 		QueryRowContext(ctx).
-		Scan(&toolSet.Namespace, (*toolSetSelectorDB)(&toolSet.ConnectionSelector), &toolSet.SelectorRevision, &toolSet.DeletedAt)
+		Scan(
+			&toolSet.Namespace,
+			(*toolSetSelectorDB)(&toolSet.ConnectionSelector),
+			&toolSet.SelectorRevision,
+			&toolSet.DeletedAt,
+		)
 	if err != nil {
 		return 0, false, false, err
 	}
+
 	var connection Connection
 	err = s.sq.
-		Select("namespace", "labels", "deleted_at").
+		Select(
+			"namespace",
+			"labels",
+			"deleted_at",
+		).
 		From(ConnectionsTable).
 		Where(sq.Eq{"id": connectionId}).
 		RunWith(tx).
 		QueryRowContext(ctx).
-		Scan(&connection.Namespace, &connection.Labels, &connection.DeletedAt)
+		Scan(
+			&connection.Namespace,
+			&connection.Labels,
+			&connection.DeletedAt,
+		)
 	if err != nil {
 		return 0, false, false, err
 	}
+
 	if toolSet.DeletedAt != nil || connection.DeletedAt != nil {
 		return toolSet.SelectorRevision, false, false, nil
 	}
@@ -195,11 +225,15 @@ func (s *service) lockToolSetBindingMembership(
 	if err != nil {
 		return 0, false, false, err
 	}
+
 	labels, err := ParseLabelSelector(labelSelector)
 	if err != nil {
 		return 0, false, false, err
 	}
-	selected = namespaceschema.Matches(namespaceMatcher, connection.Namespace) && labels.Matches(connection.Labels)
+
+	selected = namespaceschema.Matches(namespaceMatcher, connection.Namespace) &&
+		labels.Matches(connection.Labels)
+
 	return toolSet.SelectorRevision, selected, true, nil
 }
 
@@ -303,7 +337,10 @@ func (s *service) getToolSetBinding(
 
 // GetToolSetBinding finds an assignment by its internal lifetime identity.
 // A selector change alone does not hide it; reconciliation performs removal.
-func (s *service) GetToolSetBinding(ctx context.Context, id apid.ID) (*ToolSetBinding, error) {
+func (s *service) GetToolSetBinding(
+	ctx context.Context,
+	id apid.ID,
+) (*ToolSetBinding, error) {
 	if err := validateToolSetBindingID(id); err != nil {
 		return nil, err
 	}
@@ -359,10 +396,12 @@ func (s *service) DeleteToolSetBinding(
 	if err != nil {
 		return err
 	}
+
 	current, err := s.getToolSetBinding(ctx, tx, sq.Eq{"b.id": id}, false)
 	if err != nil {
 		return err
 	}
+
 	if current.Epoch != expectedEpoch {
 		return ErrToolSetBindingEpochConflict
 	}
@@ -390,15 +429,19 @@ func (s *service) DeleteToolSetBinding(
 	if err != nil {
 		return fmt.Errorf("failed to remove toolset binding: %w", err)
 	}
+
 	count, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
+
 	if count == 0 {
 		return ErrToolSetBindingEpochConflict
 	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit toolset binding removal: %w", err)
 	}
+
 	return nil
 }
