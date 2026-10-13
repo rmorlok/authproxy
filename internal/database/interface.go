@@ -161,6 +161,20 @@ type DB interface {
 	// imported source snapshot before publishing; bindings are not migrated here.
 	PublishToolSetGeneration(ctx context.Context, id apid.ID, generation uint64, expectedRevision uint64) (*ToolSetGeneration, error)
 
+	// CreateToolSetBinding creates a pending assignment from the current matched
+	// selector snapshot. It does not install a generation or inventory.
+	CreateToolSetBinding(ctx context.Context, toolSetId apid.ID, connectionId apid.ID, expectedSelectorRevision uint64) (*ToolSetBinding, error)
+
+	// GetToolSetBinding returns a live assignment whose two parents are live.
+	GetToolSetBinding(ctx context.Context, id apid.ID) (*ToolSetBinding, error)
+
+	// GetToolSetBindingForConnection finds the current assignment for a parent pair.
+	GetToolSetBindingForConnection(ctx context.Context, toolSetId apid.ID, connectionId apid.ID) (*ToolSetBinding, error)
+
+	// DeleteToolSetBinding retires a no-longer-matching assignment using its epoch
+	// and current selector snapshot. Deleted-parent cleanup ignores selector revision.
+	DeleteToolSetBinding(ctx context.Context, id apid.ID, expectedEpoch uint64, expectedSelectorRevision uint64) error
+
 	/*
 	 *  Connections
 	 */

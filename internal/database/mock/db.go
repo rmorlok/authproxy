@@ -430,6 +430,21 @@ func (mr *MockDBMockRecorder) CreateToolSet(ctx, toolSet interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateToolSet", reflect.TypeOf((*MockDB)(nil).CreateToolSet), ctx, toolSet)
 }
 
+// CreateToolSetBinding mocks base method.
+func (m *MockDB) CreateToolSetBinding(ctx context.Context, toolSetId, connectionId apid.ID, expectedSelectorRevision uint64) (*database.ToolSetBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateToolSetBinding", ctx, toolSetId, connectionId, expectedSelectorRevision)
+	ret0, _ := ret[0].(*database.ToolSetBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateToolSetBinding indicates an expected call of CreateToolSetBinding.
+func (mr *MockDBMockRecorder) CreateToolSetBinding(ctx, toolSetId, connectionId, expectedSelectorRevision interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateToolSetBinding", reflect.TypeOf((*MockDB)(nil).CreateToolSetBinding), ctx, toolSetId, connectionId, expectedSelectorRevision)
+}
+
 // CreateToolSetGeneration mocks base method.
 func (m *MockDB) CreateToolSetGeneration(ctx context.Context, id apid.ID, definition encfield.EncryptedField) (*database.ToolSetGeneration, error) {
 	m.ctrl.T.Helper()
@@ -762,6 +777,20 @@ func (m *MockDB) DeleteToolSet(ctx context.Context, id apid.ID) error {
 func (mr *MockDBMockRecorder) DeleteToolSet(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteToolSet", reflect.TypeOf((*MockDB)(nil).DeleteToolSet), ctx, id)
+}
+
+// DeleteToolSetBinding mocks base method.
+func (m *MockDB) DeleteToolSetBinding(ctx context.Context, id apid.ID, expectedEpoch, expectedSelectorRevision uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteToolSetBinding", ctx, id, expectedEpoch, expectedSelectorRevision)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteToolSetBinding indicates an expected call of DeleteToolSetBinding.
+func (mr *MockDBMockRecorder) DeleteToolSetBinding(ctx, id, expectedEpoch, expectedSelectorRevision interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteToolSetBinding", reflect.TypeOf((*MockDB)(nil).DeleteToolSetBinding), ctx, id, expectedEpoch, expectedSelectorRevision)
 }
 
 // DeleteUnusedKey mocks base method.
@@ -1116,6 +1145,36 @@ func (m *MockDB) GetToolSet(ctx context.Context, id apid.ID) (*database.ToolSet,
 func (mr *MockDBMockRecorder) GetToolSet(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSet", reflect.TypeOf((*MockDB)(nil).GetToolSet), ctx, id)
+}
+
+// GetToolSetBinding mocks base method.
+func (m *MockDB) GetToolSetBinding(ctx context.Context, id apid.ID) (*database.ToolSetBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolSetBinding", ctx, id)
+	ret0, _ := ret[0].(*database.ToolSetBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolSetBinding indicates an expected call of GetToolSetBinding.
+func (mr *MockDBMockRecorder) GetToolSetBinding(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSetBinding", reflect.TypeOf((*MockDB)(nil).GetToolSetBinding), ctx, id)
+}
+
+// GetToolSetBindingForConnection mocks base method.
+func (m *MockDB) GetToolSetBindingForConnection(ctx context.Context, toolSetId, connectionId apid.ID) (*database.ToolSetBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolSetBindingForConnection", ctx, toolSetId, connectionId)
+	ret0, _ := ret[0].(*database.ToolSetBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolSetBindingForConnection indicates an expected call of GetToolSetBindingForConnection.
+func (mr *MockDBMockRecorder) GetToolSetBindingForConnection(ctx, toolSetId, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolSetBindingForConnection", reflect.TypeOf((*MockDB)(nil).GetToolSetBindingForConnection), ctx, toolSetId, connectionId)
 }
 
 // GetToolSetByName mocks base method.
