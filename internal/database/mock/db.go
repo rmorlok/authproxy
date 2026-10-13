@@ -416,6 +416,21 @@ func (mr *MockDBMockRecorder) CreateRateLimit(ctx, rl interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRateLimit", reflect.TypeOf((*MockDB)(nil).CreateRateLimit), ctx, rl)
 }
 
+// CreateStandaloneTool mocks base method.
+func (m *MockDB) CreateStandaloneTool(ctx context.Context, tool *database.Tool, definition encfield.EncryptedField, digest string) (*database.ToolRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateStandaloneTool", ctx, tool, definition, digest)
+	ret0, _ := ret[0].(*database.ToolRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateStandaloneTool indicates an expected call of CreateStandaloneTool.
+func (mr *MockDBMockRecorder) CreateStandaloneTool(ctx, tool, definition, digest interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateStandaloneTool", reflect.TypeOf((*MockDB)(nil).CreateStandaloneTool), ctx, tool, definition, digest)
+}
+
 // CreateToolSet mocks base method.
 func (m *MockDB) CreateToolSet(ctx context.Context, toolSet *database.ToolSet) error {
 	m.ctrl.T.Helper()
@@ -765,6 +780,20 @@ func (mr *MockDBMockRecorder) DeleteRateLimitLabels(ctx, id, keys interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimitLabels", reflect.TypeOf((*MockDB)(nil).DeleteRateLimitLabels), ctx, id, keys)
 }
 
+// DeleteStandaloneTool mocks base method.
+func (m *MockDB) DeleteStandaloneTool(ctx context.Context, id apid.ID, expectedRevision uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteStandaloneTool", ctx, id, expectedRevision)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteStandaloneTool indicates an expected call of DeleteStandaloneTool.
+func (mr *MockDBMockRecorder) DeleteStandaloneTool(ctx, id, expectedRevision interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStandaloneTool", reflect.TypeOf((*MockDB)(nil).DeleteStandaloneTool), ctx, id, expectedRevision)
+}
+
 // DeleteToolSet mocks base method.
 func (m *MockDB) DeleteToolSet(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
@@ -1027,6 +1056,21 @@ func (mr *MockDBMockRecorder) GetCurrentDataEncryptionKeyForKey(ctx, keyId inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentDataEncryptionKeyForKey", reflect.TypeOf((*MockDB)(nil).GetCurrentDataEncryptionKeyForKey), ctx, keyId)
 }
 
+// GetCurrentToolRevision mocks base method.
+func (m *MockDB) GetCurrentToolRevision(ctx context.Context, id apid.ID) (*database.ToolRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentToolRevision", ctx, id)
+	ret0, _ := ret[0].(*database.ToolRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentToolRevision indicates an expected call of GetCurrentToolRevision.
+func (mr *MockDBMockRecorder) GetCurrentToolRevision(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentToolRevision", reflect.TypeOf((*MockDB)(nil).GetCurrentToolRevision), ctx, id)
+}
+
 // GetDataEncryptionKey mocks base method.
 func (m *MockDB) GetDataEncryptionKey(ctx context.Context, id apid.ID) (*database.DataEncryptionKey, error) {
 	m.ctrl.T.Helper()
@@ -1130,6 +1174,36 @@ func (m *MockDB) GetRecentProbeOutcomes(ctx context.Context, connectionId apid.I
 func (mr *MockDBMockRecorder) GetRecentProbeOutcomes(ctx, connectionId, probeId, limit interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecentProbeOutcomes", reflect.TypeOf((*MockDB)(nil).GetRecentProbeOutcomes), ctx, connectionId, probeId, limit)
+}
+
+// GetTool mocks base method.
+func (m *MockDB) GetTool(ctx context.Context, id apid.ID) (*database.Tool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTool", ctx, id)
+	ret0, _ := ret[0].(*database.Tool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTool indicates an expected call of GetTool.
+func (mr *MockDBMockRecorder) GetTool(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTool", reflect.TypeOf((*MockDB)(nil).GetTool), ctx, id)
+}
+
+// GetToolRevision mocks base method.
+func (m *MockDB) GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*database.ToolRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolRevision", ctx, id, revision)
+	ret0, _ := ret[0].(*database.ToolRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolRevision indicates an expected call of GetToolRevision.
+func (mr *MockDBMockRecorder) GetToolRevision(ctx, id, revision interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolRevision", reflect.TypeOf((*MockDB)(nil).GetToolRevision), ctx, id, revision)
 }
 
 // GetToolSet mocks base method.
@@ -2407,6 +2481,21 @@ func (m *MockDB) UpdateRateLimitName(ctx context.Context, id apid.ID, name commo
 func (mr *MockDBMockRecorder) UpdateRateLimitName(ctx, id, name interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitName", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitName), ctx, id, name)
+}
+
+// UpdateStandaloneTool mocks base method.
+func (m *MockDB) UpdateStandaloneTool(ctx context.Context, tool *database.Tool, expectedRevision uint64, definition encfield.EncryptedField, digest string) (*database.ToolRevision, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateStandaloneTool", ctx, tool, expectedRevision, definition, digest)
+	ret0, _ := ret[0].(*database.ToolRevision)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateStandaloneTool indicates an expected call of UpdateStandaloneTool.
+func (mr *MockDBMockRecorder) UpdateStandaloneTool(ctx, tool, expectedRevision, definition, digest interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateStandaloneTool", reflect.TypeOf((*MockDB)(nil).UpdateStandaloneTool), ctx, tool, expectedRevision, definition, digest)
 }
 
 // UpdateToolSetConnectionSelector mocks base method.
