@@ -176,6 +176,28 @@ type DB interface {
 	DeleteToolSetBinding(ctx context.Context, id apid.ID, expectedEpoch uint64, expectedSelectorRevision uint64) error
 
 	/*
+	 *  Standalone Tool identity and revision storage
+	 */
+
+	// CreateStandaloneTool atomically stores an identity and its first active definition.
+	CreateStandaloneTool(ctx context.Context, tool *Tool, definition encfield.EncryptedField, digest string) (*ToolRevision, error)
+
+	// GetTool reads a live identity, including those whose connection was deleted.
+	GetTool(ctx context.Context, id apid.ID) (*Tool, error)
+
+	// UpdateStandaloneTool appends a revision and switches the pointer only if the observed revision is current.
+	UpdateStandaloneTool(ctx context.Context, tool *Tool, expectedRevision uint64, definition encfield.EncryptedField, digest string) (*ToolRevision, error)
+
+	// DeleteStandaloneTool removes the observed identity while retaining its revision history.
+	DeleteStandaloneTool(ctx context.Context, id apid.ID, expectedRevision uint64) error
+
+	// GetCurrentToolRevision reads the active definition and connection in one consistent SQL snapshot.
+	GetCurrentToolRevision(ctx context.Context, id apid.ID) (*ToolRevision, error)
+
+	// GetToolRevision inspects retained history; it does not select a definition for invocation.
+	GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*ToolRevision, error)
+
+	/*
 	 *  Connections
 	 */
 

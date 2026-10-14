@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	namespaceschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // ToolSetBindingsTable stores the lifetime of a ToolSet-to-connection assignment.
@@ -307,10 +308,8 @@ func (s *service) getToolSetBinding(
 	requireLiveParents bool,
 ) (*ToolSetBinding, error) {
 	var result ToolSetBinding
-	columns := result.cols()
-	for i := range columns {
-		columns[i] = "b." + columns[i]
-	}
+
+	columns := util.PrependStringToAll("b.", result.cols())
 	query := s.sq.
 		Select(columns...).
 		From(ToolSetBindingsTable + " b").
