@@ -51,6 +51,13 @@ type proxyRefreshRig struct {
 
 func newProxyRefreshRig(t *testing.T, name string) *proxyRefreshRig {
 	t.Helper()
+	return newProxyRefreshRigWithOptions(t, name, nil)
+}
+
+// newProxyRefreshRigWithOptions is newProxyRefreshRig with a hook to adjust
+// the connector options (e.g. refresh timeout) before the connector is built.
+func newProxyRefreshRigWithOptions(t *testing.T, name string, configure func(*helpers.OAuth2ConnectorOptions)) *proxyRefreshRig {
+	t.Helper()
 	provider := helpers.NewOAuth2TestProvider(t)
 	provider.SetRefreshRotation(true)
 
@@ -60,11 +67,15 @@ func newProxyRefreshRig(t *testing.T, name string) *proxyRefreshRig {
 	userEmail := name + "-" + suffix + "@example.com"
 
 	connectorID := apid.New(apid.PrefixConnector)
-	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
+	connectorOpts := helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
 		Scopes:       []string{"read"},
-	})
+	}
+	if configure != nil {
+		configure(&connectorOpts)
+	}
+	connector := helpers.NewOAuth2Connector(connectorID, name, provider, connectorOpts)
 
 	logCapture := helpers.NewLogCapture()
 	env := helpers.Setup(t, helpers.SetupOptions{

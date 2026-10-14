@@ -85,6 +85,7 @@ export default defineConfig({
             'operations/migrations',
             'operations/app-metrics',
             'operations/rate-limits',
+            'operations/oauth2-token-refresh',
             'operations/background-tasks',
             'operations/connector-lifecycle',
             'operations/connector-generation-migrations',
