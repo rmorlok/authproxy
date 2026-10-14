@@ -85,7 +85,7 @@ Standard `db.client.connections.*` and per-command histograms emitted by the red
 ### OAuth2 lifecycle
 
 - `authproxy.oauth2.refresh.attempts.total{result}` — counter.
-- `authproxy.oauth2.refresh.failures.total{reason}` — counter. `reason` uses the same enumeration as the structured failure events (`invalid_grant`, `provider_5xx`, `network_error`, `no_refresh_token`, `malformed_response`, `internal_error`, …).
+- `authproxy.oauth2.refresh.failures.total{reason}` — counter. `reason` uses the same enumeration as the structured failure events (`invalid_grant`, `invalid_grant_after_ambiguous_attempt`, `provider_5xx`, `network_error`, `no_refresh_token`, `malformed_response`, `internal_error`, …). `invalid_grant_after_ambiguous_attempt` means the provider rejected the refresh token after an earlier attempt for the same token may have reached it without AuthProxy seeing the answer (a dropped connection, read timeout or 5xx). With one-time-use refresh tokens, that usually means the lost attempt consumed the token, which points to network or provider trouble rather than revoked consent.
 - `authproxy.oauth2.revocations.total{revocation_kind, result}` — counter. `kind` is `refresh_token` / `access_token`.
 - `authproxy.oauth2.token_exchange.attempts.total{result}` — counter.
 - `authproxy.oauth2.token_exchange.failures.total{reason}` — counter.

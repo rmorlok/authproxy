@@ -53,6 +53,11 @@ type rotatingTokenProvider struct {
 	// failFirstWith, when non-zero, is the status returned to the very
 	// first request (without consuming the refresh token).
 	failFirstWith int
+	// consumeThenFailFirstWith, when non-zero, makes the very first request
+	// redeem the refresh token (rotating it) but answer with this status,
+	// simulating a gateway error or lost response after the provider did
+	// the work.
+	consumeThenFailFirstWith int
 	// extraResponse is merged into every successful response body; used to
 	// add provider-specific fields such as refresh_token_expires_in.
 	extraResponse map[string]any
@@ -87,6 +92,10 @@ func (p *rotatingTokenProvider) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	p.issued++
 	p.current = fmt.Sprintf("rt-%d", p.issued)
+	if n == 1 && p.consumeThenFailFirstWith != 0 {
+		w.WriteHeader(p.consumeThenFailFirstWith)
+		return
+	}
 	body := map[string]any{
 		"access_token":  fmt.Sprintf("at-%d", p.issued),
 		"refresh_token": p.current,
@@ -346,7 +355,7 @@ func TestPostRefreshWithRetry_AttemptTimeout(t *testing.T) {
 
 	o := newRefreshRetryTestConn(t)
 	start := time.Now()
-	resp, attempts, err := o.postRefreshWithRetry(
+	resp, attempts, _, err := o.postRefreshWithRetry(
 		context.Background(),
 		gentleman.New(),
 		srv.URL,
@@ -594,4 +603,12 @@ func TestRefreshAccessToken_PersistFailureIsInternalError(t *testing.T) {
 	require.Len(t, records, 1)
 	assert.Equal(t, string(tokenRefreshInternalError), records[0]["category"])
 	assert.Empty(t, hr.connection.recordedTransitions(), "transient failure must not change health")
+}
+
+// newHTTPTestServer starts an httptest server closed at test cleanup.
+func newHTTPTestServer(t *testing.T, h http.Handler) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv
 }

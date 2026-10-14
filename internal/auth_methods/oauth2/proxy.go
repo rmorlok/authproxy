@@ -249,18 +249,30 @@ func (o *oAuth2Connection) refreshAccessTokenLocked(
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 
-	refreshResp, attempts, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values, authHeader, o.auth.Token.GetRefreshTimeout())
+	refreshResp, attempts, sawAmbiguous, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values, authHeader, o.auth.Token.GetRefreshTimeout())
 	if err != nil {
 		// Transport-layer failure — provider never produced a status code.
 		// Transient by classification; does not flip unhealthy.
+		if sawAmbiguous {
+			o.recordAmbiguousRefresh(ctx, token.Id)
+		}
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNetworkError, 0, "", attempts, err)
 	}
 
 	if refreshResp.StatusCode != 200 {
 		category, providerErr := classifyTokenRefreshStatus(refreshResp.StatusCode, refreshResp.Bytes())
+		if category == tokenRefreshInvalidGrant && (sawAmbiguous || o.hadAmbiguousRefresh(ctx, token.Id)) {
+			// Most likely our own earlier attempt consumed this refresh token
+			// and its response was lost, rather than the user revoking access.
+			category = tokenRefreshInvalidGrantAfterAmbiguousAttempt
+		} else if sawAmbiguous {
+			o.recordAmbiguousRefresh(ctx, token.Id)
+		}
 		err := fmt.Errorf("refresh token request failed with status %d", refreshResp.StatusCode)
 		return nil, o.classifyAndRecordRefreshFailure(ctx, category, refreshResp.StatusCode, providerErr, attempts, err)
 	}
+	// A definitive success supersedes any earlier ambiguous attempt.
+	defer o.clearAmbiguousRefresh(ctx)
 
 	newToken, err := o.createDbTokenFromResponseWithOptions(ctx, refreshResp, token, persistOptions)
 	if err != nil {
@@ -386,7 +398,10 @@ func bufferResponseBody(resp *gentleman.Response) error {
 // (transport errors and 5xx responses). Returns the final response (or
 // last network error) along with the number of attempts actually made;
 // callers attach that to the failure event so "exhausted budget" is
-// visibly distinct from a single non-retryable failure.
+// visibly distinct from a single non-retryable failure. The bool result
+// reports whether any attempt was ambiguous — it may have been processed by
+// the provider without us seeing the answer — so the caller can recognize
+// an invalid_grant caused by our own retry of a consumed refresh token.
 //
 // 4xx responses are never retried — the provider has classified the
 // refresh token itself as invalid/expired/revoked, and resubmitting it
@@ -409,7 +424,11 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 	values url.Values,
 	authHeader string,
 	attemptTimeout time.Duration,
-) (*gentleman.Response, int, error) {
+) (*gentleman.Response, int, bool, error) {
+	// sawAmbiguous is set if any attempt may have reached the provider
+	// without a definitive answer (see isAmbiguousRefreshOutcome). Attempts
+	// run sequentially, so no synchronization is needed.
+	sawAmbiguous := false
 	res, err := retry.Do(ctx, retry.Options[*gentleman.Response]{
 		MaxAttempts: tokenRefreshMaxAttempts,
 		Backoff:     &retry.LinearBackOff{Step: tokenRefreshBackoffStep},
@@ -450,11 +469,16 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 
 		resp, err := req.Send()
 		if err != nil {
+			sawAmbiguous = sawAmbiguous || isAmbiguousTransportError(err)
 			return resp, err
 		}
 		if err := bufferResponseBody(resp); err != nil {
+			// The status line arrived but the body did not: the provider
+			// may well have processed the request.
+			sawAmbiguous = true
 			return nil, err
 		}
+		sawAmbiguous = sawAmbiguous || isAmbiguousRefreshOutcome(resp.StatusCode, nil)
 		return resp, nil
 	})
 
@@ -462,7 +486,7 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 	// response. Callers (and the unit tests) key on err first; a 5xx
 	// response left dangling on a ctx-cancelled return is just noise.
 	if err != nil {
-		return nil, res.Attempts, err
+		return nil, res.Attempts, sawAmbiguous, err
 	}
-	return res.Value, res.Attempts, nil
+	return res.Value, res.Attempts, sawAmbiguous, nil
 }
