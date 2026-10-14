@@ -23,6 +23,13 @@ type AuthApplication struct {
 	Headers map[string]string
 	// QueryParams to set on the outgoing request URL.
 	QueryParams map[string]string
+	// CredentialVersion is an opaque identifier for the stored credential
+	// this application was built from (for OAuth2, the token row id). The
+	// orchestrator hands the application that the upstream rejected back
+	// to RecoverFrom401, which uses this to tell whether the credential has
+	// already been replaced by a concurrent recovery. Empty when the auth
+	// method does not version its credentials.
+	CredentialVersion string
 }
 
 // Authenticator is the auth-method-shaped contract used by the proxy
@@ -43,11 +50,15 @@ type Authenticator interface {
 	Resolve(ctx context.Context) (AuthApplication, error)
 
 	// RecoverFrom401 attempts to obtain a new credential after the
-	// upstream returned 401. For OAuth2 this is a forced refresh; for
-	// auth methods with no recovery mechanism (api_key, no_auth) it
-	// returns ErrCannotRecover and the orchestrator surfaces the
-	// upstream 401 unchanged.
-	RecoverFrom401(ctx context.Context) error
+	// upstream returned 401 for a request built from rejected (the
+	// AuthApplication returned by the Resolve call for that attempt). For
+	// OAuth2 this is a refresh, skipped when rejected's credential has
+	// already been replaced so that many concurrent 401s on the same
+	// token cause one refresh rather than one per request. Auth methods
+	// with no recovery mechanism (api_key, no_auth) return
+	// ErrCannotRecover and the orchestrator surfaces the upstream 401
+	// unchanged.
+	RecoverFrom401(ctx context.Context, rejected AuthApplication) error
 
 	// Refresh attempts to refresh stored credentials outside of a
 	// request-retry path. Auth methods that cannot or do not need to

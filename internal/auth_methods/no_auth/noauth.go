@@ -24,7 +24,7 @@ func (n *noAuthAuthenticator) Resolve(ctx context.Context) (auth_methods.AuthApp
 	return auth_methods.AuthApplication{}, nil
 }
 
-func (n *noAuthAuthenticator) RecoverFrom401(ctx context.Context) error {
+func (n *noAuthAuthenticator) RecoverFrom401(ctx context.Context, _ auth_methods.AuthApplication) error {
 	return auth_methods.ErrCannotRecover
 }
 

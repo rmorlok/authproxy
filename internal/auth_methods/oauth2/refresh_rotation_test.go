@@ -16,6 +16,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -407,4 +408,101 @@ func TestRefreshAccessToken_ClosesProviderBodyOnce(t *testing.T) {
 		require.NoError(t, hr.newConn().Refresh(context.Background()))
 	})
 	assert.Equal(t, "rt-1", hr.storedRefreshToken())
+}
+
+// seedUnexpiredToken replaces the connection's token with one whose access
+// token is still valid (refresh token "rt-0", matching the provider), so
+// Resolve returns it without refreshing. Returns the new token row id.
+func (hr *rotationHarness) seedUnexpiredToken() apid.ID {
+	hr.t.Helper()
+	ctx := context.Background()
+	encRefresh, err := hr.encrypt.EncryptStringForEntity(ctx, hr.connection, "rt-0")
+	require.NoError(hr.t, err)
+	encAccess, err := hr.encrypt.EncryptStringForEntity(ctx, hr.connection, "at-0")
+	require.NoError(hr.t, err)
+	token, err := hr.db.InsertOAuth2Token(ctx, hr.connection.GetId(), nil, encRefresh, encAccess,
+		util.ToPtr(time.Now().Add(time.Hour)), "", "", nil)
+	require.NoError(hr.t, err)
+	return token.Id
+}
+
+// TestResolve_StampsCredentialVersionWithTokenId checks the contract that
+// lets the proxy identify which credential an upstream rejected.
+func TestResolve_StampsCredentialVersionWithTokenId(t *testing.T) {
+	hr := newRotationHarness(t, &rotatingTokenProvider{}, time.Second)
+	tokenId := hr.seedUnexpiredToken()
+
+	app, err := hr.newConn().Resolve(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, tokenId.String(), app.CredentialVersion)
+	assert.Equal(t, "Bearer at-0", app.Headers["Authorization"])
+}
+
+// TestRecoverFrom401_ConcurrentRejectionsRefreshOnce: many in-flight
+// requests built from the same access token all get 401 at once. Only the
+// first recovery may redeem the refresh token; the rest must notice the
+// rejected token was already replaced and return without a provider call.
+// Previously each recovery forced a refresh, rotating the refresh token once
+// per failed request.
+func TestRecoverFrom401_ConcurrentRejectionsRefreshOnce(t *testing.T) {
+	provider := &rotatingTokenProvider{delay: 50 * time.Millisecond}
+	hr := newRotationHarness(t, provider, time.Second)
+	hr.seedUnexpiredToken()
+
+	rejected, err := hr.newConn().Resolve(context.Background())
+	require.NoError(t, err)
+
+	const requests = 5
+	var wg sync.WaitGroup
+	errs := make([]error, requests)
+	for i := 0; i < requests; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs[i] = hr.newConn().RecoverFrom401(context.Background(), rejected)
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		assert.NoError(t, err, "recovery %d", i)
+	}
+	assert.Equal(t, int32(1), provider.requests.Load(), "one refresh for one rejected token")
+	assert.Zero(t, provider.rejections.Load())
+
+	// The retried request resolves the replacement token.
+	app, err := hr.newConn().Resolve(context.Background())
+	require.NoError(t, err)
+	assert.NotEqual(t, rejected.CredentialVersion, app.CredentialVersion)
+	assert.Equal(t, "Bearer at-1", app.Headers["Authorization"])
+}
+
+// TestRecoverFrom401_RefreshesWhenRejectedTokenIsCurrent: a 401 on the
+// current token (e.g. revoked access token that has not reached its expiry)
+// still forces a refresh even though the access token looks unexpired.
+func TestRecoverFrom401_RefreshesWhenRejectedTokenIsCurrent(t *testing.T) {
+	provider := &rotatingTokenProvider{}
+	hr := newRotationHarness(t, provider, time.Second)
+	hr.seedUnexpiredToken()
+
+	rejected, err := hr.newConn().Resolve(context.Background())
+	require.NoError(t, err)
+	require.NoError(t, hr.newConn().RecoverFrom401(context.Background(), rejected))
+
+	assert.Equal(t, int32(1), provider.requests.Load())
+	assert.Equal(t, "rt-1", hr.storedRefreshToken())
+}
+
+// TestRecoverFrom401_EmptyCredentialVersionAlwaysRefreshes keeps the
+// pre-versioning behavior for callers that cannot identify the credential.
+func TestRecoverFrom401_EmptyCredentialVersionAlwaysRefreshes(t *testing.T) {
+	provider := &rotatingTokenProvider{}
+	hr := newRotationHarness(t, provider, time.Second)
+	hr.seedUnexpiredToken()
+
+	require.NoError(t, hr.newConn().RecoverFrom401(context.Background(), auth_methods.AuthApplication{}))
+	require.NoError(t, hr.newConn().RecoverFrom401(context.Background(), auth_methods.AuthApplication{}))
+
+	assert.Equal(t, int32(2), provider.requests.Load())
+	assert.Equal(t, "rt-2", hr.storedRefreshToken())
 }

@@ -3,6 +3,7 @@ package proxy
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -25,16 +26,21 @@ import (
 // fakeAuth is a hand-written Authenticator that records call sequencing
 // without pulling in mockgen for this single fixture. RecoverFrom401 is
 // allowed exactly maxRecover times before returning ErrCannotRecover.
+// Each Resolve stamps the application with CredentialVersion "v<n>" so
+// tests can check which attempt's credential was handed to RecoverFrom401.
 type fakeAuth struct {
 	headers     map[string]string
 	maxRecover  int
 	resolveN    int32
 	recoverN    int32
 	failResolve error
+
+	mu       sync.Mutex
+	rejected []string
 }
 
 func (a *fakeAuth) Resolve(ctx context.Context) (auth_methods.AuthApplication, error) {
-	atomic.AddInt32(&a.resolveN, 1)
+	n := atomic.AddInt32(&a.resolveN, 1)
 	if a.failResolve != nil {
 		return auth_methods.AuthApplication{}, a.failResolve
 	}
@@ -42,15 +48,26 @@ func (a *fakeAuth) Resolve(ctx context.Context) (auth_methods.AuthApplication, e
 	for k, v := range a.headers {
 		hs[k] = v
 	}
-	return auth_methods.AuthApplication{Headers: hs}, nil
+	return auth_methods.AuthApplication{Headers: hs, CredentialVersion: fmt.Sprintf("v%d", n)}, nil
 }
 
-func (a *fakeAuth) RecoverFrom401(ctx context.Context) error {
+func (a *fakeAuth) RecoverFrom401(ctx context.Context, rejected auth_methods.AuthApplication) error {
+	a.mu.Lock()
+	a.rejected = append(a.rejected, rejected.CredentialVersion)
+	a.mu.Unlock()
 	if atomic.LoadInt32(&a.recoverN) >= int32(a.maxRecover) {
 		return auth_methods.ErrCannotRecover
 	}
 	atomic.AddInt32(&a.recoverN, 1)
 	return nil
+}
+
+// rejectedVersions returns the CredentialVersion of every application
+// passed to RecoverFrom401, in call order.
+func (a *fakeAuth) rejectedVersions() []string {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return append([]string(nil), a.rejected...)
 }
 
 func (a *fakeAuth) Refresh(ctx context.Context) error { return nil }
@@ -187,8 +204,40 @@ func TestProxyRequestRaw_401TriggersRecoverAndRetry(t *testing.T) {
 	assert.Equal(t, int32(2), atomic.LoadInt32(&calls), "expected exactly one retry after 401")
 	assert.Equal(t, int32(1), atomic.LoadInt32(&auth.recoverN), "RecoverFrom401 must be called exactly once")
 	assert.Equal(t, int32(2), atomic.LoadInt32(&auth.resolveN), "Resolve must be called once per attempt")
+	assert.Equal(t, []string{"v1"}, auth.rejectedVersions(),
+		"RecoverFrom401 must receive the credential the upstream rejected")
 	assert.Equal(t, http.StatusOK, rec.status())
 	assert.Equal(t, "ok", rec.snapshot())
+}
+
+// TestProxyRequest_401PassesRejectedCredentialToRecover — the wrapped
+// (buffered) path must also hand the first attempt's AuthApplication to
+// RecoverFrom401, so OAuth2 can skip refreshing a token that a concurrent
+// request already replaced.
+func TestProxyRequest_401PassesRejectedCredentialToRecover(t *testing.T) {
+	var calls int32
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	auth := &fakeAuth{
+		headers:    map[string]string{"Authorization": "Bearer t"},
+		maxRecover: 1,
+	}
+	p, srv := newRawTestProxy(t, upstream, auth)
+
+	resp, err := p.ProxyRequest(context.Background(), httpf.RequestTypeProxy, &iface.ProxyRequest{
+		URL:    srv.URL + "/z",
+		Method: http.MethodGet,
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, int32(2), atomic.LoadInt32(&calls))
+	assert.Equal(t, []string{"v1"}, auth.rejectedVersions())
 }
 
 // TestProxyRequestRaw_401SurfacedWhenInboundBodyWasConsumed — when the

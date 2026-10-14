@@ -12,5 +12,5 @@ func TestAPIKeyAuthenticatorRefreshNoop(t *testing.T) {
 	auth := &apiKeyConnection{}
 
 	require.NoError(t, auth.Refresh(context.Background()))
-	require.ErrorIs(t, auth.RecoverFrom401(context.Background()), auth_methods.ErrCannotRecover)
+	require.ErrorIs(t, auth.RecoverFrom401(context.Background(), auth_methods.AuthApplication{}), auth_methods.ErrCannotRecover)
 }

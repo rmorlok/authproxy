@@ -12,5 +12,5 @@ func TestNoAuthAuthenticatorRefreshNoop(t *testing.T) {
 	auth := NewAuthenticator()
 
 	require.NoError(t, auth.Refresh(context.Background()))
-	require.ErrorIs(t, auth.RecoverFrom401(context.Background()), auth_methods.ErrCannotRecover)
+	require.ErrorIs(t, auth.RecoverFrom401(context.Background(), auth_methods.AuthApplication{}), auth_methods.ErrCannotRecover)
 }
