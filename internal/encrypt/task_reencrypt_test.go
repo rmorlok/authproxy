@@ -289,7 +289,7 @@ func TestHandleReencryptAll(t *testing.T) {
 
 		accessEF := env.encryptWithV1(t, []byte("access-token"))
 		refreshEF := env.encryptWithV1(t, []byte("refresh-token"))
-		_, err := env.db.InsertOAuth2Token(env.ctx, connId, nil, refreshEF, accessEF, nil, "scope1", "scope1", nil)
+		_, err := env.db.InsertOAuth2Token(env.ctx, connId, nil, refreshEF, accessEF, nil, database.OAuth2RefreshTokenExpiry{}, "scope1", "scope1", nil)
 		require.NoError(t, err)
 
 		env.setNamespaceTarget(t, "root", v2DEKID)
@@ -432,7 +432,7 @@ func TestHandleReencryptAll(t *testing.T) {
 		// Both fields encrypted with v1
 		accessEF := env.encryptWithV1(t, []byte("access"))
 		refreshEF := env.encryptWithV1(t, []byte("refresh"))
-		_, err := env.db.InsertOAuth2Token(env.ctx, connId, nil, refreshEF, accessEF, nil, "", "", nil)
+		_, err := env.db.InsertOAuth2Token(env.ctx, connId, nil, refreshEF, accessEF, nil, database.OAuth2RefreshTokenExpiry{}, "", "", nil)
 		require.NoError(t, err)
 
 		env.setNamespaceTarget(t, "root", v2DEKID)

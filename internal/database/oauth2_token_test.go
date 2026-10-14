@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -152,6 +153,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -187,6 +189,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -211,6 +214,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -230,6 +234,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -264,6 +269,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -283,6 +289,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -318,6 +325,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1",
 			"scope1",
 			&actorId,
@@ -345,6 +353,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -359,6 +368,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1",
 			"scope1",
 			nil,
@@ -398,6 +408,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -411,6 +422,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken2"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1 scope2",
 			"scope1 scope2",
 			nil,
@@ -425,6 +437,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedRefreshToken3"},
 			encfield.EncryptedField{ID: "dek_test", Data: "encryptedAccessToken3"},
 			nil,
+			OAuth2RefreshTokenExpiry{},
 			"scope1",
 			"scope1",
 			nil,
@@ -625,6 +638,47 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				expectedTokens: 0,
 			},
 			{
+				name: "refresh token due for proactive refresh",
+				tokens: []*OAuth2Token{
+					{
+						// Access token far from expiry (or no expiry at all),
+						// but the refresh token's refresh-at has passed.
+						ConnectionId:          readyConnection1.Id,
+						AccessTokenExpiresAt:  util.ToPtr(now.Add(30 * 24 * time.Hour)),
+						RefreshTokenExpiresAt: util.ToPtr(now.Add(12 * time.Hour)),
+						RefreshTokenRefreshAt: util.ToPtr(now.Add(-time.Minute)),
+					},
+					{
+						ConnectionId:          readyConnection2.Id,
+						RefreshTokenExpiresAt: util.ToPtr(now.Add(12 * time.Hour)),
+						RefreshTokenRefreshAt: util.ToPtr(now.Add(-time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 2,
+			},
+			{
+				name: "refresh token not yet due or without refresh-at",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionId:          readyConnection1.Id,
+						AccessTokenExpiresAt:  util.ToPtr(now.Add(30 * 24 * time.Hour)),
+						RefreshTokenExpiresAt: util.ToPtr(now.Add(48 * time.Hour)),
+						RefreshTokenRefreshAt: util.ToPtr(now.Add(24 * time.Hour)),
+					},
+					{
+						// Known expiry but a refresh cannot extend it.
+						ConnectionId:          readyConnection2.Id,
+						AccessTokenExpiresAt:  util.ToPtr(now.Add(30 * 24 * time.Hour)),
+						RefreshTokenExpiresAt: util.ToPtr(now.Add(12 * time.Hour)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 0,
+			},
+			{
 				name:           "multiple pages of tokens",
 				tokens:         tokens150AllExpiring,
 				duration:       time.Hour,
@@ -678,6 +732,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 						encfield.EncryptedField{ID: "dek_test", Data: "refreshToken"},
 						encfield.EncryptedField{ID: "dek_test", Data: "accessToken"},
 						token.AccessTokenExpiresAt,
+						OAuth2RefreshTokenExpiry{ExpiresAt: token.RefreshTokenExpiresAt, RefreshAt: token.RefreshTokenRefreshAt},
 						"scope1 scope2",
 						"scope1 scope2",
 						nil,
@@ -703,4 +758,36 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestOAuth2Tokens_RefreshTokenExpiryRoundTrip checks the refresh-token
+// expiry columns are written and read back on both providers.
+func TestOAuth2Tokens_RefreshTokenExpiryRoundTrip(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	ctx := context.Background()
+	connId := apid.New(apid.PrefixConnection)
+	expiresAt := time.Date(2027, time.April, 14, 12, 0, 0, 0, time.UTC)
+	refreshAt := expiresAt.Add(-24 * time.Hour)
+
+	inserted, err := db.InsertOAuth2Token(
+		ctx,
+		connId,
+		nil,
+		encfield.EncryptedField{ID: "dek_test", Data: "refreshToken"},
+		encfield.EncryptedField{ID: "dek_test", Data: "accessToken"},
+		nil,
+		OAuth2RefreshTokenExpiry{ExpiresAt: &expiresAt, RefreshAt: &refreshAt},
+		"",
+		"",
+		nil,
+	)
+	require.NoError(t, err)
+
+	got, err := db.GetOAuth2Token(ctx, connId)
+	require.NoError(t, err)
+	require.Equal(t, inserted.Id, got.Id)
+	require.NotNil(t, got.RefreshTokenExpiresAt)
+	require.NotNil(t, got.RefreshTokenRefreshAt)
+	require.True(t, expiresAt.Equal(*got.RefreshTokenExpiresAt))
+	require.True(t, refreshAt.Equal(*got.RefreshTokenRefreshAt))
 }

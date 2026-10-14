@@ -25,7 +25,18 @@ type AuthOauth2Token struct {
 	// RefreshTimeBeforeExpiry is the time prior to token expiry to refresh the tokens. The granularity of this setting
 	// is limited by the global cron schedule for running refresh. If not specified the global value or default is used.
 	RefreshTimeBeforeExpiry *common.HumanDuration `json:"refreshTimeBeforeExpiry,omitempty" yaml:"refreshTimeBeforeExpiry,omitempty"`
+
+	// RefreshTimeBeforeRefreshTokenExpiry is how long before the refresh token itself expires to proactively refresh,
+	// for providers that report refresh-token lifetimes (refresh_token_expires_in and similar token-response
+	// fields). Refreshing obtains a new or renewed refresh token so the connection does not lapse while idle. The
+	// lead time is capped at half the refresh token's remaining lifetime. Default is 24h. Has no effect when
+	// RefreshInBackground is false.
+	RefreshTimeBeforeRefreshTokenExpiry *common.HumanDuration `json:"refreshTimeBeforeRefreshTokenExpiry,omitempty" yaml:"refreshTimeBeforeRefreshTokenExpiry,omitempty"`
 }
+
+// DefaultRefreshTimeBeforeRefreshTokenExpiry is the default for
+// AuthOauth2Token.RefreshTimeBeforeRefreshTokenExpiry.
+const DefaultRefreshTimeBeforeRefreshTokenExpiry = 24 * time.Hour
 
 func (a *AuthOauth2Token) GetRefreshTimeout() time.Duration {
 	if a == nil || a.RefreshTimeout == nil {
@@ -48,4 +59,14 @@ func (a *AuthOauth2Token) GetRefreshTimeBeforeExpiryOrDefault(fallback time.Dura
 	}
 
 	return a.RefreshTimeBeforeExpiry.Duration
+}
+
+// GetRefreshTimeBeforeRefreshTokenExpiryOrDefault returns the configured lead
+// time for proactively refreshing before the refresh token expires, or
+// DefaultRefreshTimeBeforeRefreshTokenExpiry.
+func (a *AuthOauth2Token) GetRefreshTimeBeforeRefreshTokenExpiryOrDefault() time.Duration {
+	if a == nil || a.RefreshTimeBeforeRefreshTokenExpiry == nil {
+		return DefaultRefreshTimeBeforeRefreshTokenExpiry
+	}
+	return a.RefreshTimeBeforeRefreshTokenExpiry.Duration
 }

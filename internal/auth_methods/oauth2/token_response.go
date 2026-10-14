@@ -22,6 +22,12 @@ type tokenResponse struct {
 	ExpiresIn    *int   `json:"expires_in"`
 	RefreshToken string `json:"refresh_token"`
 	Scope        string `json:"scope"`
+
+	// Non-standard refresh-token lifetime fields; see refresh_token_expiry.go
+	// for which providers and drafts use each.
+	RefreshTokenExpiresIn  expiresInSeconds `json:"refresh_token_expires_in"`
+	XRefreshTokenExpiresIn expiresInSeconds `json:"x_refresh_token_expires_in"`
+	RefreshTokenTimeout    expiresInSeconds `json:"refresh_token_timeout"`
 }
 
 type tokenPersistOptions struct {
@@ -114,10 +120,12 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 		scopes = jsonResp.Scope
 	}
 
+	now := apctx.GetClock(ctx).Now()
 	var expiresAt *time.Time
 	if jsonResp.ExpiresIn != nil {
-		expiresAt = util.ToPtr(apctx.GetClock(ctx).Now().Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
+		expiresAt = util.ToPtr(now.Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
 	}
+	refreshTokenExpiry := o.refreshTokenExpiry(now, &jsonResp, opts, persistRefreshToken, refreshFrom)
 
 	var refreshFromId *apid.ID
 	if refreshFrom != nil {
@@ -178,6 +186,7 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 			encryptedRefreshToken,
 			encryptedAccessToken,
 			expiresAt,
+			refreshTokenExpiry,
 			scopes,
 			requestedScopes,
 			createdByActorId,
