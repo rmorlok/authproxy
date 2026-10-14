@@ -265,12 +265,16 @@ func (s *service) getTool(
 	id apid.ID,
 ) (*Tool, error) {
 	var result Tool
-	columns := util.PrependStringToAll("t.", result.cols())
 
+	columns := util.PrependStringToAll("t.", result.cols())
 	err := s.sq.Select(columns...).
 		From(ToolsTable + " t").
 		Join(NamespacesTable + " n ON n.path = t.namespace").
-		Where(sq.Eq{"t.id": id, "t.deleted_at": nil, "n.deleted_at": nil}).
+		Where(sq.Eq{
+			"t.id":         id,
+			"t.deleted_at": nil,
+			"n.deleted_at": nil,
+		}).
 		RunWith(runner).
 		QueryRowContext(ctx).
 		Scan(result.fields()...)
@@ -280,6 +284,7 @@ func (s *service) getTool(
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
@@ -308,59 +313,81 @@ func (s *service) UpdateStandaloneTool(
 	if tool == nil {
 		return nil, errors.New("tool is required")
 	}
+
 	if err := validateToolRevision(expectedRevision); err != nil {
 		return nil, err
 	}
+
 	if expectedRevision == math.MaxInt64 {
 		return nil, ErrToolRevisionConflict
 	}
+
 	candidate := *tool
 	candidate.ActiveRevision = expectedRevision + 1
 	if err := candidate.Validate(); err != nil {
 		return nil, err
 	}
+
 	revision := newToolRevision(ctx, &candidate, definition, digest)
 	if err := revision.Validate(); err != nil {
 		return nil, err
 	}
+
 	// Capture only the lock target outside the transaction. It is rechecked
 	// after locking; a concurrent retarget cannot leave a parent unprotected.
 	observed, err := s.GetTool(ctx, candidate.Id)
 	if err != nil {
 		return nil, err
 	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	if err := s.lockToolConnections(ctx, tx, observed.ConnectionId, candidate.ConnectionId); err != nil {
+
+	if err := s.lockToolConnections(
+		ctx,
+		tx,
+		observed.ConnectionId,
+		candidate.ConnectionId,
+	); err != nil {
 		return nil, err
 	}
 	_, err = s.sq.Update(ToolsTable).
 		Set("id", candidate.Id).
-		Where(sq.Eq{"id": candidate.Id, "deleted_at": nil}).
+		Where(sq.Eq{
+			"id":         candidate.Id,
+			"deleted_at": nil,
+		}).
 		RunWith(tx).
 		ExecContext(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	current, err := s.getTool(ctx, tx, candidate.Id)
 	if err != nil {
 		return nil, err
 	}
-	if current.ActiveRevision != expectedRevision || current.ConnectionId != observed.ConnectionId {
+
+	if current.ActiveRevision != expectedRevision ||
+		current.ConnectionId != observed.ConnectionId {
 		return nil, ErrToolRevisionConflict
 	}
+
 	if current.Namespace != candidate.Namespace {
 		return nil, errors.New("tool namespace cannot change")
 	}
+
 	if err := s.checkToolConnection(ctx, tx, &candidate); err != nil {
 		return nil, err
 	}
+
 	if err := s.insertToolRevision(ctx, tx, revision); err != nil {
 		return nil, err
 	}
+
 	candidate.CreatedAt = current.CreatedAt
 	candidate.UpdatedAt = revision.CreatedAt
 	candidate.DeletedAt = nil
@@ -369,12 +396,17 @@ func (s *service) UpdateStandaloneTool(
 		Set("connection_id", candidate.ConnectionId).
 		Set("active_revision", candidate.ActiveRevision).
 		Set("updated_at", candidate.UpdatedAt).
-		Where(sq.Eq{"id": candidate.Id, "active_revision": expectedRevision, "deleted_at": nil}).
+		Where(sq.Eq{
+			"id":              candidate.Id,
+			"active_revision": expectedRevision,
+			"deleted_at":      nil,
+		}).
 		RunWith(tx).
 		ExecContext(ctx)
 	if err != nil {
 		return nil, wrapDatabaseMutationError("failed to replace tool", err)
 	}
+
 	count, err := result.RowsAffected()
 	if err != nil {
 		return nil, err
@@ -385,39 +417,54 @@ func (s *service) UpdateStandaloneTool(
 	if err := tx.Commit(); err != nil {
 		return nil, wrapDatabaseMutationError("failed to commit tool replacement", err)
 	}
+
 	*tool = candidate
+
 	return revision, nil
 }
 
 // DeleteStandaloneTool soft-deletes exactly the observed live revision, releasing
 // its name while retaining the identity and revision history. Deleted connections
 // do not block cleanup. A removed ID is never reused by the create operation.
-func (s *service) DeleteStandaloneTool(ctx context.Context, id apid.ID, expectedRevision uint64) error {
+func (s *service) DeleteStandaloneTool(
+	ctx context.Context,
+	id apid.ID,
+	expectedRevision uint64,
+) error {
 	if err := validateToolID(id); err != nil {
 		return err
 	}
+
 	if err := validateToolRevision(expectedRevision); err != nil {
 		return err
 	}
+
 	now := apctx.GetClock(ctx).Now()
 	result, err := s.sq.Update(ToolsTable).
 		Set("deleted_at", now).
 		Set("updated_at", now).
-		Where(sq.Eq{"id": id, "active_revision": expectedRevision, "deleted_at": nil}).
+		Where(sq.Eq{
+			"id":              id,
+			"active_revision": expectedRevision,
+			"deleted_at":      nil,
+		}).
 		RunWith(s.db).
 		ExecContext(ctx)
 	if err != nil {
 		return err
 	}
+
 	count, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
+
 	if count == 0 {
 		if _, err := s.GetTool(ctx, id); err != nil {
 			return err
 		}
 		return ErrToolRevisionConflict
 	}
+
 	return nil
 }

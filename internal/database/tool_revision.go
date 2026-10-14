@@ -100,24 +100,32 @@ func (r *ToolRevision) Validate() error {
 	if r == nil {
 		return errors.New("tool revision is required")
 	}
+
 	if err := validateToolID(r.ToolId); err != nil {
 		return err
 	}
+
 	if err := validateToolRevision(r.Revision); err != nil {
 		return err
 	}
+
 	if err := validateToolConnectionID(r.ConnectionId); err != nil {
 		return err
 	}
+
 	if r.EncryptedDefinition.IsZero() {
 		return errors.New("encrypted tool definition is required")
 	}
-	if len(r.DefinitionDigest) != 64 || strings.ToLower(r.DefinitionDigest) != r.DefinitionDigest {
+
+	if len(r.DefinitionDigest) != 64 ||
+		strings.ToLower(r.DefinitionDigest) != r.DefinitionDigest {
 		return errors.New("tool definition digest must be lowercase SHA-256 hex")
 	}
+
 	if _, err := hex.DecodeString(r.DefinitionDigest); err != nil {
 		return errors.New("tool definition digest must be lowercase SHA-256 hex")
 	}
+
 	return nil
 }
 
@@ -130,7 +138,12 @@ func validateToolRevision(revision uint64) error {
 }
 
 // newToolRevision captures the candidate's active identity and injected clock.
-func newToolRevision(ctx context.Context, tool *Tool, definition encfield.EncryptedField, digest string) *ToolRevision {
+func newToolRevision(
+	ctx context.Context,
+	tool *Tool,
+	definition encfield.EncryptedField,
+	digest string,
+) *ToolRevision {
 	now := apctx.GetClock(ctx).Now()
 	return &ToolRevision{
 		ToolId:              tool.Id,
@@ -145,7 +158,11 @@ func newToolRevision(ctx context.Context, tool *Tool, definition encfield.Encryp
 
 // insertToolRevision appends a snapshot inside the pointer owner's transaction.
 // An existing composite identity, including a tombstone, cannot be overwritten.
-func (s *service) insertToolRevision(ctx context.Context, tx *sql.Tx, revision *ToolRevision) error {
+func (s *service) insertToolRevision(
+	ctx context.Context,
+	tx *sql.Tx,
+	revision *ToolRevision,
+) error {
 	_, err := s.sq.Insert(ToolRevisionsTable).
 		Columns(revision.cols()...).
 		Values(revision.values()...).
@@ -154,12 +171,18 @@ func (s *service) insertToolRevision(ctx context.Context, tx *sql.Tx, revision *
 	if err != nil {
 		return wrapDatabaseMutationError("failed to append tool revision", err)
 	}
+
 	return nil
 }
 
 // getToolRevision reads either a historical definition or the active definition
 // in one SQL snapshot. Only active reads require a live current connection.
-func (s *service) getToolRevision(ctx context.Context, id apid.ID, revision uint64, current bool) (*ToolRevision, error) {
+func (s *service) getToolRevision(
+	ctx context.Context,
+	id apid.ID,
+	revision uint64,
+	current bool,
+) (*ToolRevision, error) {
 	var result ToolRevision
 
 	columns := util.PrependStringToAll("r.", result.cols())
@@ -174,6 +197,7 @@ func (s *service) getToolRevision(ctx context.Context, id apid.ID, revision uint
 			"r.deleted_at": nil,
 			"n.deleted_at": nil,
 		})
+
 	if current {
 		query = query.Where("r.revision = t.active_revision").
 			Join(ConnectionsTable + " c ON c.id = t.connection_id AND c.id = r.connection_id").
@@ -198,7 +222,10 @@ func (s *service) getToolRevision(ctx context.Context, id apid.ID, revision uint
 // GetCurrentToolRevision returns the active encrypted definition and its captured
 // connection through a single joined read. This is a storage snapshot, not an
 // authorization decision or execution-readiness check.
-func (s *service) GetCurrentToolRevision(ctx context.Context, id apid.ID) (*ToolRevision, error) {
+func (s *service) GetCurrentToolRevision(
+	ctx context.Context,
+	id apid.ID,
+) (*ToolRevision, error) {
 	if err := validateToolID(id); err != nil {
 		return nil, err
 	}
@@ -208,12 +235,18 @@ func (s *service) GetCurrentToolRevision(ctx context.Context, id apid.ID) (*Tool
 // GetToolRevision reads retained history for inspection under a live Tool and
 // namespace. The captured connection need not still exist. Historical revisions
 // are not independently invokable; admission must select the current revision.
-func (s *service) GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*ToolRevision, error) {
+func (s *service) GetToolRevision(
+	ctx context.Context,
+	id apid.ID,
+	revision uint64,
+) (*ToolRevision, error) {
 	if err := validateToolID(id); err != nil {
 		return nil, err
 	}
+
 	if err := validateToolRevision(revision); err != nil {
 		return nil, err
 	}
+
 	return s.getToolRevision(ctx, id, revision, false)
 }

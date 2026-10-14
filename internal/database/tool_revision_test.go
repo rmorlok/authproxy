@@ -22,6 +22,7 @@ const toolDefinitionDigestForTest = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649
 // definition compilation and upstream execution are outside storage tests.
 func standaloneToolConnectionForTest(t *testing.T, ctx context.Context, db DB, namespace string) *Connection {
 	t.Helper()
+
 	connection := &Connection{
 		Id:                  apid.New(apid.PrefixConnection),
 		Namespace:           namespace,
@@ -29,7 +30,9 @@ func standaloneToolConnectionForTest(t *testing.T, ctx context.Context, db DB, n
 		ConnectorId:         apid.New(apid.PrefixConnector),
 		ConnectorGeneration: 1,
 	}
+
 	require.NoError(t, db.CreateConnection(ctx, connection))
+
 	return connection
 }
 
@@ -40,17 +43,20 @@ func standaloneToolForTest(t *testing.T) (context.Context, DB, *Tool, *ToolRevis
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := apctx.WithFixedClock(context.Background(), time.Date(2026, 10, 17, 12, 0, 0, 0, time.UTC))
 	require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: "root.owner"}))
+
 	connection := standaloneToolConnectionForTest(t, ctx, db, "root.owner")
 	tool := &Tool{
 		Id:           apid.New(apid.PrefixTool),
 		Namespace:    connection.Namespace,
 		ConnectionId: connection.Id,
 	}
+
 	revision, err := db.CreateStandaloneTool(ctx, tool, encfield.EncryptedField{
 		ID:   apid.New(apid.PrefixDataEncryptionKey),
 		Data: "ZGVmaW5pdGlvbg==",
 	}, toolDefinitionDigestForTest)
 	require.NoError(t, err)
+
 	return ctx, db, tool, revision
 }
 
@@ -60,6 +66,7 @@ func countToolRevisionsForTest(t *testing.T, ctx context.Context, db DB, id apid
 	t.Helper()
 	s := db.(*service)
 	var count int
+
 	err := s.sq.Select("COUNT(*)").
 		From(ToolRevisionsTable).
 		Where(sq.Eq{"tool_id": id}).
@@ -67,6 +74,7 @@ func countToolRevisionsForTest(t *testing.T, ctx context.Context, db DB, id apid
 		QueryRowContext(ctx).
 		Scan(&count)
 	require.NoError(t, err)
+
 	return count
 }
 
@@ -92,7 +100,14 @@ func TestStandaloneToolRevisionLifecycle(t *testing.T) {
 	definition := first.EncryptedDefinition
 	definition.Data = "bmV3LWRlZmluaXRpb24="
 	tool.Name = "renamed"
-	second, err := db.UpdateStandaloneTool(apctx.WithFixedClock(ctx, updatedAt), tool, 1, definition, strings.Repeat("b", 64))
+
+	second, err := db.UpdateStandaloneTool(
+		apctx.WithFixedClock(ctx, updatedAt),
+		tool,
+		1, // expected revision
+		definition,
+		strings.Repeat("b", 64),
+	)
 	require.NoError(t, err)
 	require.Equal(t, uint64(2), tool.ActiveRevision)
 	require.Equal(t, uint64(2), second.Revision)
@@ -100,11 +115,13 @@ func TestStandaloneToolRevisionLifecycle(t *testing.T) {
 	require.True(t, updatedAt.Equal(tool.UpdatedAt))
 	require.True(t, updatedAt.Equal(second.CreatedAt))
 	require.True(t, updatedAt.Equal(*second.EncryptedAt))
+
 	current, err := db.GetCurrentToolRevision(ctx, tool.Id)
 	require.NoError(t, err)
 	require.Equal(t, second.Revision, current.Revision)
 	require.Equal(t, definition, current.EncryptedDefinition)
 	require.Equal(t, second.DefinitionDigest, current.DefinitionDigest)
+
 	previous, err := db.GetToolRevision(ctx, tool.Id, 1)
 	require.NoError(t, err)
 	require.Equal(t, first.EncryptedDefinition, previous.EncryptedDefinition)
@@ -140,10 +157,12 @@ func TestStandaloneToolRevisionRollback(t *testing.T) {
 	candidate := *tool
 	candidate.Name = other.Name
 	before := candidate
+
 	_, err = db.UpdateStandaloneTool(ctx, &candidate, 1, first.EncryptedDefinition, first.DefinitionDigest)
 	require.ErrorIs(t, err, ErrDuplicate)
 	require.Equal(t, before, candidate)
 	require.Equal(t, 1, countToolRevisionsForTest(t, ctx, db, tool.Id))
+
 	stored, err := db.GetTool(ctx, tool.Id)
 	require.NoError(t, err)
 	require.Equal(t, tool.Name, stored.Name)
@@ -154,6 +173,7 @@ func TestStandaloneToolRevisionRollback(t *testing.T) {
 	candidate.ActiveRevision = 99
 	candidate.DeletedAt = &candidate.CreatedAt
 	before = candidate
+
 	_, err = db.CreateStandaloneTool(ctx, &candidate, first.EncryptedDefinition, first.DefinitionDigest)
 	require.ErrorIs(t, err, ErrDuplicate)
 	require.Equal(t, before, candidate)
@@ -170,15 +190,21 @@ func TestStandaloneToolRevisionRollback(t *testing.T) {
 // its purge, while purging the current connection removes its Tool and history.
 func TestStandaloneToolRetargetHistory(t *testing.T) {
 	ctx, db, tool, first := standaloneToolForTest(t)
+
 	originalConnection := tool.ConnectionId
+
 	other := standaloneToolConnectionForTest(t, ctx, db, tool.Namespace)
+
 	tool.ConnectionId = other.Id
+
 	second, err := db.UpdateStandaloneTool(ctx, tool, 1, first.EncryptedDefinition, first.DefinitionDigest)
 	require.NoError(t, err)
 	require.Equal(t, other.Id, second.ConnectionId)
 	require.NoError(t, db.DeleteConnection(ctx, originalConnection))
+
 	_, err = db.PurgeSoftDeletedRecords(ctx, apctx.GetClock(ctx).Now().Add(time.Second))
 	require.NoError(t, err)
+
 	s := db.(*service)
 	var oldConnections int
 	err = s.sq.Select("COUNT(*)").
@@ -189,25 +215,33 @@ func TestStandaloneToolRetargetHistory(t *testing.T) {
 		Scan(&oldConnections)
 	require.NoError(t, err)
 	require.Zero(t, oldConnections, "history survives physical removal of its former connection")
+
 	history, err := db.GetToolRevision(ctx, tool.Id, 1)
 	require.NoError(t, err)
 	require.Equal(t, originalConnection, history.ConnectionId)
+
 	current, err := db.GetCurrentToolRevision(ctx, tool.Id)
 	require.NoError(t, err)
 	require.Equal(t, other.Id, current.ConnectionId)
 	require.Equal(t, uint64(2), current.Revision)
 
 	require.NoError(t, db.DeleteConnection(ctx, other.Id))
+
 	_, err = db.GetCurrentToolRevision(ctx, tool.Id)
 	require.ErrorIs(t, err, ErrNotFound)
+
 	_, err = db.GetTool(ctx, tool.Id)
 	require.NoError(t, err, "management identity remains visible for cleanup")
+
 	_, err = db.GetToolRevision(ctx, tool.Id, 2)
 	require.NoError(t, err, "history is inspectable but cannot supply an execution snapshot")
+
 	_, err = db.PurgeSoftDeletedRecords(ctx, apctx.GetClock(ctx).Now().Add(time.Second))
 	require.NoError(t, err)
+
 	_, err = db.GetTool(ctx, tool.Id)
 	require.ErrorIs(t, err, ErrNotFound)
+
 	var remainingTools int
 	err = s.sq.Select("COUNT(*)").
 		From(ToolsTable).
@@ -228,16 +262,22 @@ func TestStandaloneToolDeletion(t *testing.T) {
 	require.NoError(t, err)
 	require.ErrorIs(t, db.DeleteStandaloneTool(ctx, tool.Id, 1), ErrToolRevisionConflict)
 	require.NoError(t, db.DeleteConnection(ctx, tool.ConnectionId))
+
 	deletedAt := tool.UpdatedAt.Add(time.Hour)
+
 	require.NoError(t, db.DeleteStandaloneTool(apctx.WithFixedClock(ctx, deletedAt), tool.Id, 2))
+
 	_, err = db.GetTool(ctx, tool.Id)
 	require.ErrorIs(t, err, ErrNotFound)
+
 	_, err = db.GetCurrentToolRevision(ctx, tool.Id)
 	require.ErrorIs(t, err, ErrNotFound)
+
 	_, err = db.GetToolRevision(ctx, tool.Id, 1)
 	require.ErrorIs(t, err, ErrNotFound)
 	require.ErrorIs(t, db.DeleteStandaloneTool(ctx, tool.Id, 2), ErrNotFound)
 	require.Equal(t, 2, countToolRevisionsForTest(t, ctx, db, tool.Id))
+
 	s := db.(*service)
 	var tombstone Tool
 	err = s.sq.Select(tombstone.cols()...).
@@ -256,11 +296,13 @@ func TestStandaloneToolDeletion(t *testing.T) {
 	replacement := *tool
 	replacement.Id = apid.New(apid.PrefixTool)
 	replacement.ConnectionId = connection.Id
+
 	_, err = db.CreateStandaloneTool(ctx, &replacement, first.EncryptedDefinition, first.DefinitionDigest)
 	require.NoError(t, err)
 	require.Equal(t, uint64(1), replacement.ActiveRevision)
 	tool.ConnectionId = connection.Id
 	tool.Name = "unused-name"
+
 	_, err = db.CreateStandaloneTool(ctx, tool, first.EncryptedDefinition, first.DefinitionDigest)
 	require.ErrorIs(t, err, ErrDuplicate)
 }
