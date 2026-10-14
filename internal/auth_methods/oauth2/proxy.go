@@ -1,9 +1,11 @@
 package oauth2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"time"
@@ -291,6 +293,31 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 	return token, nil
 }
 
+// bufferResponseBody reads the whole response body into memory while the
+// caller's per-attempt deadline is still live, closes the network body, and
+// swaps in an in-memory body that later Bytes()/JSON() calls read from. A body
+// that fails to arrive in time is reported as a transport error.
+//
+// It deliberately does not use gentleman's Response.Bytes() for this:
+// Bytes() closes the body and a later JSON() closes it again, and response
+// bodies wrapped by the request-metrics layer are not safe to close twice.
+// The in-memory replacement tolerates any number of Close calls.
+func bufferResponseBody(resp *gentleman.Response) error {
+	if resp.RawResponse == nil || resp.RawResponse.Body == nil {
+		return nil
+	}
+	body, readErr := io.ReadAll(resp.RawResponse.Body)
+	closeErr := resp.RawResponse.Body.Close()
+	if readErr != nil {
+		return readErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	resp.RawResponse.Body = io.NopCloser(bytes.NewReader(body))
+	return nil
+}
+
 // postRefreshWithRetry POSTs a refresh-token grant to the provider's token
 // endpoint with a small bounded retry budget for transient failures
 // (transport errors and 5xx responses). Returns the final response (or
@@ -362,12 +389,8 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 		if err != nil {
 			return resp, err
 		}
-		// Buffer the body while the per-attempt deadline is still live;
-		// gentleman serves later Bytes()/JSON() calls from this buffer. A
-		// body that fails to arrive in time is a transport failure.
-		resp.Bytes()
-		if resp.Error != nil {
-			return nil, resp.Error
+		if err := bufferResponseBody(resp); err != nil {
+			return nil, err
 		}
 		return resp, nil
 	})

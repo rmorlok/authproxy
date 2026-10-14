@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -25,6 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gentleman "gopkg.in/h2non/gentleman.v2"
+	"gopkg.in/h2non/gentleman.v2/plugins/transport"
 )
 
 // rotatingTokenProvider is a fake OAuth2 token endpoint that enforces
@@ -141,6 +143,9 @@ type rotationHarness struct {
 	server     *httptest.Server
 	connection *healthRecordingConnection
 	auth       *cschema.AuthOAuth2
+	// newClient builds the HTTP client used for token-endpoint calls.
+	// Defaults to a plain gentleman client; tests may swap it.
+	newClient func() *gentleman.Client
 }
 
 // newRotationHarness builds the harness and seeds the connection with an
@@ -157,12 +162,14 @@ func newRotationHarness(t *testing.T, provider *rotatingTokenProvider, refreshTi
 	server := httptest.NewServer(provider)
 	t.Cleanup(server.Close)
 
+	hr := &rotationHarness{newClient: gentleman.New}
+
 	// A real (non-mocking) gentleman client so requests reach the httptest
 	// server over the network.
 	h := mockH.NewMockF(ctrl)
 	h.EXPECT().ForRequestType(gomock.Any()).Return(h).AnyTimes()
 	h.EXPECT().ForConnection(gomock.Any()).Return(h).AnyTimes()
-	h.EXPECT().New().DoAndReturn(func() *gentleman.Client { return gentleman.New() }).AnyTimes()
+	h.EXPECT().New().DoAndReturn(func() *gentleman.Client { return hr.newClient() }).AnyTimes()
 
 	conn := &healthRecordingConnection{Connection: &mockCore.Connection{
 		Id:          apid.New(apid.PrefixConnection),
@@ -170,7 +177,8 @@ func newRotationHarness(t *testing.T, provider *rotatingTokenProvider, refreshTi
 		HealthState: database.ConnectionHealthStateHealthy,
 	}}
 
-	hr := &rotationHarness{
+	*hr = rotationHarness{
+		newClient:  hr.newClient,
 		t:          t,
 		db:         db,
 		r:          r,
@@ -354,4 +362,49 @@ func TestPostRefreshWithRetry_AttemptTimeout(t *testing.T) {
 func TestRefreshLockWaitBudget(t *testing.T) {
 	// 3 attempts + 1 slack = 4 × 30s, plus 200ms + 400ms of backoff.
 	assert.Equal(t, 120*time.Second+600*time.Millisecond, refreshLockWaitBudget(30*time.Second))
+}
+
+// closeOnceBody is a response body that panics if closed twice, like the
+// request-metrics body wrapper used in production.
+type closeOnceBody struct {
+	io.ReadCloser
+	closed bool
+}
+
+// Close panics on the second call.
+func (b *closeOnceBody) Close() error {
+	if b.closed {
+		panic("response body closed twice")
+	}
+	b.closed = true
+	return b.ReadCloser.Close()
+}
+
+// closeOnceTransport wraps every response body in a closeOnceBody.
+type closeOnceTransport struct{}
+
+// RoundTrip implements http.RoundTripper.
+func (closeOnceTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultTransport.RoundTrip(r)
+	if resp != nil && resp.Body != nil {
+		resp.Body = &closeOnceBody{ReadCloser: resp.Body}
+	}
+	return resp, err
+}
+
+// TestRefreshAccessToken_ClosesProviderBodyOnce: buffering the token
+// response (to apply the per-attempt deadline) must not leave the body to be
+// closed again when it is parsed. Production bodies are wrapped by the
+// request-metrics layer, which panics on a double close.
+func TestRefreshAccessToken_ClosesProviderBodyOnce(t *testing.T) {
+	provider := &rotatingTokenProvider{}
+	hr := newRotationHarness(t, provider, time.Second)
+	hr.newClient = func() *gentleman.Client {
+		return gentleman.New().Use(transport.Set(closeOnceTransport{}))
+	}
+
+	require.NotPanics(t, func() {
+		require.NoError(t, hr.newConn().Refresh(context.Background()))
+	})
+	assert.Equal(t, "rt-1", hr.storedRefreshToken())
 }
