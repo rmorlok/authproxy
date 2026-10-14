@@ -613,3 +613,60 @@ func newHTTPTestServer(t *testing.T, h http.Handler) *httptest.Server {
 	t.Cleanup(srv.Close)
 	return srv
 }
+
+// TestRefreshAccessToken_WaitersPickUpNewTokenPromptly: many requests block
+// behind one in-flight refresh. They must all return shortly after the holder
+// persists the new token, rather than draining through the lock one backoff
+// interval at a time (which took roughly a second per waiter).
+func TestRefreshAccessToken_WaitersPickUpNewTokenPromptly(t *testing.T) {
+	const providerDelay = 300 * time.Millisecond
+	provider := &rotatingTokenProvider{delay: providerDelay}
+	hr := newRotationHarness(t, provider, time.Second)
+
+	const waiters = 10
+	var wg sync.WaitGroup
+	errs := make([]error, waiters)
+	start := time.Now()
+	for i := 0; i < waiters; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			_, errs[i] = hr.newConn().getValidToken(context.Background())
+		}(i)
+	}
+	wg.Wait()
+	elapsed := time.Since(start)
+
+	for i, err := range errs {
+		assert.NoError(t, err, "waiter %d", i)
+	}
+	assert.Equal(t, int32(1), provider.requests.Load())
+	assert.Less(t, elapsed, providerDelay+time.Second,
+		"waiters must not serialize through the lock after the refresh completes")
+}
+
+// TestRefreshAccessToken_ConcurrentForcedRefreshesBothRun: refreshModeAlways
+// (background task, explicit Refresh) has no "already done" condition, so a
+// second forced refresh waits for the first and then refreshes again using
+// the rotated token.
+func TestRefreshAccessToken_ConcurrentForcedRefreshesBothRun(t *testing.T) {
+	provider := &rotatingTokenProvider{delay: 100 * time.Millisecond}
+	hr := newRotationHarness(t, provider, time.Second)
+
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range errs {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			errs[i] = hr.newConn().Refresh(context.Background())
+		}(i)
+	}
+	wg.Wait()
+
+	require.NoError(t, errs[0])
+	require.NoError(t, errs[1])
+	assert.Equal(t, int32(2), provider.requests.Load())
+	assert.Zero(t, provider.rejections.Load())
+	assert.Equal(t, "rt-2", hr.storedRefreshToken())
+}
