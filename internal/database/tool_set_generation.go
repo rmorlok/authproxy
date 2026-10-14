@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // ToolSetGenerationsTable stores generation-owned definitions and release state.
@@ -265,11 +266,7 @@ func (s *service) getToolSetGeneration(
 ) (*ToolSetGeneration, error) {
 	var result ToolSetGeneration
 
-	columns := result.cols()
-	for i := range columns {
-		columns[i] = "g." + columns[i]
-	}
-
+	columns := util.PrependStringToAll("g.", result.cols())
 	err := s.sq.
 		Select(columns...).
 		From(ToolSetGenerationsTable + " g").

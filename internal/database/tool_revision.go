@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // ToolRevisionsTable retains immutable executable definitions for each Tool.
@@ -160,15 +161,19 @@ func (s *service) insertToolRevision(ctx context.Context, tx *sql.Tx, revision *
 // in one SQL snapshot. Only active reads require a live current connection.
 func (s *service) getToolRevision(ctx context.Context, id apid.ID, revision uint64, current bool) (*ToolRevision, error) {
 	var result ToolRevision
-	columns := result.cols()
-	for i := range columns {
-		columns[i] = "r." + columns[i]
-	}
-	query := s.sq.Select(columns...).
+
+	columns := util.PrependStringToAll("r.", result.cols())
+	query := s.sq.
+		Select(columns...).
 		From(ToolRevisionsTable + " r").
 		Join(ToolsTable + " t ON t.id = r.tool_id").
 		Join(NamespacesTable + " n ON n.path = t.namespace").
-		Where(sq.Eq{"t.id": id, "t.deleted_at": nil, "r.deleted_at": nil, "n.deleted_at": nil})
+		Where(sq.Eq{
+			"t.id":         id,
+			"t.deleted_at": nil,
+			"r.deleted_at": nil,
+			"n.deleted_at": nil,
+		})
 	if current {
 		query = query.Where("r.revision = t.active_revision").
 			Join(ConnectionsTable + " c ON c.id = t.connection_id AND c.id = r.connection_id").
@@ -176,6 +181,7 @@ func (s *service) getToolRevision(ctx context.Context, id apid.ID, revision uint
 	} else {
 		query = query.Where(sq.Eq{"r.revision": revision})
 	}
+
 	err := query.RunWith(s.db).
 		QueryRowContext(ctx).
 		Scan(result.fields()...)
@@ -185,6 +191,7 @@ func (s *service) getToolRevision(ctx context.Context, id apid.ID, revision uint
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 

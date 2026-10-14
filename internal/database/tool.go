@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // ToolsTable holds Tool identities and their current definition pointers.
@@ -88,18 +89,23 @@ func (t *Tool) Validate() error {
 	if t == nil {
 		return errors.New("tool is required")
 	}
+
 	if err := validateToolID(t.Id); err != nil {
 		return err
 	}
+
 	if err := namespace.ValidatePath(t.Namespace); err != nil {
 		return fmt.Errorf("invalid tool namespace: %w", err)
 	}
+
 	if err := t.Name.Validate(); err != nil {
 		return fmt.Errorf("invalid tool name: %w", err)
 	}
+
 	if err := validateToolConnectionID(t.ConnectionId); err != nil {
 		return err
 	}
+
 	return validateToolRevision(t.ActiveRevision)
 }
 
@@ -123,7 +129,11 @@ func validateToolConnectionID(id apid.ID) error {
 // Lock all captured parents in ID order before the Tool, matching the cascade
 // direction used by purge. Neutral writes also avoid SQLite snapshot upgrades.
 // Deleted connections are locked too so a Tool can be retargeted for recovery.
-func (s *service) lockToolConnections(ctx context.Context, tx *sql.Tx, ids ...apid.ID) error {
+func (s *service) lockToolConnections(
+	ctx context.Context,
+	tx *sql.Tx,
+	ids ...apid.ID,
+) error {
 	slices.Sort(ids)
 	for _, id := range slices.Compact(ids) {
 		result, err := s.sq.Update(ConnectionsTable).
@@ -134,6 +144,7 @@ func (s *service) lockToolConnections(ctx context.Context, tx *sql.Tx, ids ...ap
 		if err != nil {
 			return err
 		}
+
 		count, err := result.RowsAffected()
 		if err != nil {
 			return err
@@ -142,18 +153,27 @@ func (s *service) lockToolConnections(ctx context.Context, tx *sql.Tx, ids ...ap
 			return ErrNotFound
 		}
 	}
+
 	return nil
 }
 
 // checkToolConnection verifies the locked destination and its namespace are live
 // and that the Tool stays within that exact namespace. It reads no credentials
 // or connection configuration. Setup/health does not prevent storing definitions.
-func (s *service) checkToolConnection(ctx context.Context, tx *sql.Tx, tool *Tool) error {
+func (s *service) checkToolConnection(
+	ctx context.Context,
+	tx *sql.Tx,
+	tool *Tool,
+) error {
 	var ns string
 	err := s.sq.Select("c.namespace").
 		From(ConnectionsTable + " c").
 		Join(NamespacesTable + " n ON n.path = c.namespace").
-		Where(sq.Eq{"c.id": tool.ConnectionId, "c.deleted_at": nil, "n.deleted_at": nil}).
+		Where(sq.Eq{
+			"c.id":         tool.ConnectionId,
+			"c.deleted_at": nil,
+			"n.deleted_at": nil,
+		}).
 		RunWith(tx).
 		QueryRowContext(ctx).
 		Scan(&ns)
@@ -163,9 +183,11 @@ func (s *service) checkToolConnection(ctx context.Context, tx *sql.Tx, tool *Too
 	if err != nil {
 		return err
 	}
+
 	if ns != tool.Namespace {
 		return errors.New("tool and connection must have the same namespace")
 	}
+
 	return nil
 }
 
@@ -183,6 +205,7 @@ func (s *service) CreateStandaloneTool(
 	if tool == nil {
 		return nil, errors.New("tool is required")
 	}
+
 	candidate := *tool
 	if candidate.Name == "" {
 		candidate.Name = common.ResourceName(candidate.Id.String())
@@ -191,9 +214,11 @@ func (s *service) CreateStandaloneTool(
 	candidate.CreatedAt = apctx.GetClock(ctx).Now()
 	candidate.UpdatedAt = candidate.CreatedAt
 	candidate.DeletedAt = nil
+
 	if err := candidate.Validate(); err != nil {
 		return nil, err
 	}
+
 	revision := newToolRevision(ctx, &candidate, definition, digest)
 	if err := revision.Validate(); err != nil {
 		return nil, err
@@ -204,12 +229,14 @@ func (s *service) CreateStandaloneTool(
 		return nil, err
 	}
 	defer tx.Rollback()
+
 	if err := s.lockToolConnections(ctx, tx, candidate.ConnectionId); err != nil {
 		return nil, err
 	}
 	if err := s.checkToolConnection(ctx, tx, &candidate); err != nil {
 		return nil, err
 	}
+
 	_, err = s.sq.Insert(ToolsTable).
 		Columns(candidate.cols()...).
 		Values(candidate.values()...).
@@ -224,18 +251,22 @@ func (s *service) CreateStandaloneTool(
 	if err := tx.Commit(); err != nil {
 		return nil, wrapDatabaseMutationError("failed to commit tool creation", err)
 	}
+
 	*tool = candidate
+
 	return revision, nil
 }
 
 // getTool reads a live identity in a live namespace. Connection liveness is
 // intentionally not required for management inspection, retargeting, or cleanup.
-func (s *service) getTool(ctx context.Context, runner sq.BaseRunner, id apid.ID) (*Tool, error) {
+func (s *service) getTool(
+	ctx context.Context,
+	runner sq.BaseRunner,
+	id apid.ID,
+) (*Tool, error) {
 	var result Tool
-	columns := result.cols()
-	for i := range columns {
-		columns[i] = "t." + columns[i]
-	}
+	columns := util.PrependStringToAll("t.", result.cols())
+
 	err := s.sq.Select(columns...).
 		From(ToolsTable + " t").
 		Join(NamespacesTable + " n ON n.path = t.namespace").

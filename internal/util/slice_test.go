@@ -43,3 +43,33 @@ func TestCountTrue(t *testing.T) {
 		require.Equal(t, tc.exp, CountTrue(tc.items))
 	}
 }
+
+func TestPrependStringToAll(t *testing.T) {
+	cases := []struct {
+		items []string
+		exp   []string
+	}{
+		{nil, nil},
+		{[]string{}, []string{}},
+		{[]string{"x"}, []string{"ax"}},
+		{[]string{"x", "y"}, []string{"ax", "ay"}},
+	}
+	for _, tc := range cases {
+		require.ElementsMatch(t, tc.exp, PrependStringToAll("a", tc.items))
+	}
+}
+
+func TestAppendStringToAll(t *testing.T) {
+	cases := []struct {
+		items []string
+		exp   []string
+	}{
+		{nil, nil},
+		{[]string{}, []string{}},
+		{[]string{"x"}, []string{"xa"}},
+		{[]string{"x", "y"}, []string{"xa", "ya"}},
+	}
+	for _, tc := range cases {
+		require.ElementsMatch(t, tc.exp, AppendStringToAll("a", tc.items))
+	}
+}
