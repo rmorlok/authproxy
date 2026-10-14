@@ -3,6 +3,7 @@ package oauth2
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -505,4 +507,91 @@ func TestRecoverFrom401_EmptyCredentialVersionAlwaysRefreshes(t *testing.T) {
 
 	assert.Equal(t, int32(2), provider.requests.Load())
 	assert.Equal(t, "rt-2", hr.storedRefreshToken())
+}
+
+// flakyInsertDB fails the first failInserts calls to InsertOAuth2Token,
+// running onFail first (e.g. to cancel the caller's context), then delegates.
+type flakyInsertDB struct {
+	database.DB
+	failInserts int
+	onFail      func()
+
+	mu    sync.Mutex
+	calls int
+}
+
+// InsertOAuth2Token implements the failure injection described on the type.
+func (d *flakyInsertDB) InsertOAuth2Token(
+	ctx context.Context,
+	connectionId apid.ID,
+	refreshedFrom *apid.ID,
+	encryptedRefreshToken encfield.EncryptedField,
+	encryptedAccessToken encfield.EncryptedField,
+	accessTokenExpiresAt *time.Time,
+	scopes string,
+	requestedScopes string,
+	createdByActorId *apid.ID,
+) (*database.OAuth2Token, error) {
+	d.mu.Lock()
+	d.calls++
+	fail := d.calls <= d.failInserts
+	d.mu.Unlock()
+	if fail {
+		if d.onFail != nil {
+			d.onFail()
+		}
+		return nil, errors.New("injected insert failure")
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return d.DB.InsertOAuth2Token(ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken,
+		accessTokenExpiresAt, scopes, requestedScopes, createdByActorId)
+}
+
+// TestRefreshAccessToken_PersistsRotatedTokenDespiteTransientFailureAndCancel:
+// once the provider has rotated the refresh token, the old one is dead, so
+// the new one must be stored even if the first write fails and the caller
+// gives up (context cancelled) in the meantime. Previously either event lost
+// the rotated token and the next refresh failed with invalid_grant.
+func TestRefreshAccessToken_PersistsRotatedTokenDespiteTransientFailureAndCancel(t *testing.T) {
+	provider := &rotatingTokenProvider{}
+	hr := newRotationHarness(t, provider, time.Second)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	flaky := &flakyInsertDB{DB: hr.db, failInserts: 1, onFail: cancel}
+
+	o := hr.newConn()
+	o.db = flaky
+	_, err := o.refreshAccessToken(ctx, nil, refreshModeAlways)
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, flaky.calls, "the failed write is retried once")
+	assert.Equal(t, "rt-1", hr.storedRefreshToken(), "the rotated refresh token must be persisted")
+
+	// The next refresh redeems the persisted token successfully.
+	require.NoError(t, hr.newConn().Refresh(context.Background()))
+	assert.Zero(t, provider.rejections.Load())
+}
+
+// TestRefreshAccessToken_PersistFailureIsInternalError: when every write
+// fails, the failure is proxy-side (internal_error, transient) rather than
+// blamed on the provider as malformed_response, which would also flip the
+// connection unhealthy.
+func TestRefreshAccessToken_PersistFailureIsInternalError(t *testing.T) {
+	provider := &rotatingTokenProvider{}
+	hr := newRotationHarness(t, provider, time.Second)
+
+	o := hr.newConn()
+	logger, read := bufLogger(t)
+	o.logger = logger
+	o.db = &flakyInsertDB{DB: hr.db, failInserts: tokenPersistMaxAttempts}
+	_, err := o.refreshAccessToken(context.Background(), nil, refreshModeAlways)
+	require.Error(t, err)
+
+	records := onlyTokenRefreshFailure(read())
+	require.Len(t, records, 1)
+	assert.Equal(t, string(tokenRefreshInternalError), records[0]["category"])
+	assert.Empty(t, hr.connection.recordedTransitions(), "transient failure must not change health")
 }

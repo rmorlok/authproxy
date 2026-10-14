@@ -264,7 +264,13 @@ func (o *oAuth2Connection) refreshAccessTokenLocked(
 
 	newToken, err := o.createDbTokenFromResponseWithOptions(ctx, refreshResp, token, persistOptions)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshMalformedResponse, refreshResp.StatusCode, "", attempts,
+		// Only an unusable response is the provider's fault (permanent);
+		// a failure to store a good response is ours and transient.
+		category := tokenRefreshInternalError
+		if errors.Is(err, errMalformedTokenResponse) {
+			category = tokenRefreshMalformedResponse
+		}
+		return nil, o.classifyAndRecordRefreshFailure(ctx, category, refreshResp.StatusCode, "", attempts,
 			fmt.Errorf("failed to refresh token: %w", err))
 	}
 
