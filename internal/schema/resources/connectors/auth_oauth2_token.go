@@ -11,7 +11,10 @@ type AuthOauth2Token struct {
 	QueryOverrides map[string]string `json:"queryOverrides,omitempty" yaml:"queryOverrides,omitempty"`
 	FormOverrides  map[string]string `json:"formOverrides,omitempty" yaml:"formOverrides,omitempty"`
 
-	// RefreshTimeout is how long to time out the HTTP request to refresh a token. Default is 30s if not specified.
+	// RefreshTimeout is how long each HTTP request to the token endpoint may take when refreshing a token, including
+	// reading the response. Default is 30s if not specified. It also sets the lease on the per-connection refresh
+	// lock; the lease is renewed while a refresh is in flight, so it only bounds how quickly the lock is reclaimed
+	// from a crashed holder.
 	RefreshTimeout *common.HumanDuration `json:"refreshTimeout,omitempty" yaml:"refreshTimeout,omitempty"`
 
 	// RefreshInBackground controls if the system should proactively refresh tokens in the background. Default
