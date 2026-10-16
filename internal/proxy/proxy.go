@@ -508,7 +508,11 @@ func splitCommaTrim(s string) []string {
 //
 // The applied AuthApplication is returned alongside the response so a 401
 // can be handed back to RecoverFrom401 identifying the rejected credential.
-func (p *proxy) send(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*gentleman.Response, auth_methods.AuthApplication, error) {
+func (p *proxy) send(
+	ctx context.Context,
+	reqType httpf.RequestType,
+	req *iface.ProxyRequest,
+) (*gentleman.Response, auth_methods.AuthApplication, error) {
 	app, err := p.auth.Resolve(ctx)
 	if err != nil {
 		return nil, auth_methods.AuthApplication{}, err
