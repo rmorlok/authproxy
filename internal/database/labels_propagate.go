@@ -587,7 +587,10 @@ func (s *service) recomputeToolSetLabelsTx(ctx context.Context, id apid.ID) (boo
 // labels after a rename, retarget, or metadata edit. Parent label changes remain
 // eventually consistent. Only labels and updated_at change; definitions, active
 // revisions, and annotations are untouched. A deleted Tool/namespace is skipped.
-func (s *service) recomputeToolLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
+func (s *service) recomputeToolLabelsTx(
+	ctx context.Context,
+	id apid.ID,
+) (bool, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return false, err
@@ -600,6 +603,7 @@ func (s *service) recomputeToolLabelsTx(ctx context.Context, id apid.ID) (bool, 
 		}
 		return false, err
 	}
+
 	tool, err := s.getTool(ctx, tx, id)
 	if errors.Is(err, ErrNotFound) {
 		return false, nil
@@ -607,21 +611,38 @@ func (s *service) recomputeToolLabelsTx(ctx context.Context, id apid.ID) (bool, 
 	if err != nil {
 		return false, err
 	}
+
 	previous := tool.Labels
-	if err := s.populateToolLabels(ctx, tx, tool, false); err != nil {
+	if err := s.populateToolLabels(
+		ctx,
+		tx,
+		tool,
+		false, // requireLiveConnection
+	); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return false, nil
 		}
 		return false, err
 	}
-	corrected, err := s.writeRecomputedLabels(ctx, tx, ToolsTable,
-		sq.Eq{"id": id, "deleted_at": nil}, previous, tool.Labels)
+
+	corrected, err := s.writeRecomputedLabels(
+		ctx,
+		tx,
+		ToolsTable,
+		sq.Eq{
+			"id":         id,
+			"deleted_at": nil,
+		},
+		previous,
+		tool.Labels,
+	)
 	if err != nil {
 		return false, err
 	}
 	if err := tx.Commit(); err != nil {
 		return false, err
 	}
+	
 	return corrected, nil
 }
 
