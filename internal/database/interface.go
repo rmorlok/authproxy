@@ -185,6 +185,14 @@ type DB interface {
 	// GetTool reads a live identity, including those whose connection was deleted.
 	GetTool(ctx context.Context, id apid.ID) (*Tool, error)
 
+	// ListToolCandidates scans bounded current metadata for later authorization;
+	// its internal pages and cursors must not be exposed as discovery results.
+	ListToolCandidates(ctx context.Context, query ToolCandidateQuery) (ToolCandidatePage, error)
+
+	// ListToolCandidatesFromCursor resumes a candidate scan with its saved filters
+	// and limit. Callers must still authorize each returned candidate.
+	ListToolCandidatesFromCursor(ctx context.Context, cursor string) (ToolCandidatePage, error)
+
 	// UpdateStandaloneTool appends a revision and switches the pointer only if the observed revision is current.
 	UpdateStandaloneTool(ctx context.Context, tool *Tool, expectedRevision uint64, definition encfield.EncryptedField, digest string) (*ToolRevision, error)
 
