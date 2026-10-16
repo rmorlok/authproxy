@@ -269,15 +269,23 @@ func (s *service) refreshToolsInNamespace(ctx context.Context, nsPath string) er
 
 // refreshToolsForConnection repairs descendants of one refreshed connection.
 // Re-reading each Tool under its write lock makes concurrent retargeting safe.
-func (s *service) refreshToolsForConnection(ctx context.Context, connectionID apid.ID) error {
-	rows, err := s.sq.Select("id").
+func (s *service) refreshToolsForConnection(
+	ctx context.Context,
+	connectionID apid.ID,
+) error {
+	rows, err := s.sq.
+		Select("id").
 		From(ToolsTable).
-		Where(sq.Eq{"connection_id": connectionID, "deleted_at": nil}).
+		Where(sq.Eq{
+			"connection_id": connectionID,
+			"deleted_at":    nil,
+		}).
 		RunWith(s.db).
 		QueryContext(ctx)
 	if err != nil {
 		return err
 	}
+
 	var ids []apid.ID
 	for rows.Next() {
 		var id apid.ID
@@ -287,9 +295,11 @@ func (s *service) refreshToolsForConnection(ctx context.Context, connectionID ap
 		}
 		ids = append(ids, id)
 	}
+
 	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
 		return err
 	}
+
 	for _, id := range ids {
 		if _, err := s.recomputeToolLabelsTx(ctx, id); err != nil {
 			return err
