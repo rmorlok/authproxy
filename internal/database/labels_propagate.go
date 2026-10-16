@@ -642,7 +642,7 @@ func (s *service) recomputeToolLabelsTx(
 	if err := tx.Commit(); err != nil {
 		return false, err
 	}
-	
+
 	return corrected, nil
 }
 

@@ -197,7 +197,12 @@ func (s *service) populateToolLabels(
 	var ns string
 	var connectionName common.ResourceName
 	var connectionLabels, namespaceLabels Labels
-	query := s.sq.Select("c.namespace", "c.name", "c.labels", "n.labels").
+	query := s.sq.Select(
+		"c.namespace",
+		"c.name",
+		"c.labels",
+		"n.labels",
+	).
 		From(ConnectionsTable + " c").
 		Join(NamespacesTable + " n ON n.path = c.namespace").
 		Where(sq.Eq{
@@ -231,11 +236,22 @@ func (s *service) populateToolLabels(
 			delete(connectionLabels, key)
 		}
 	}
-	connectionLabels = InjectSelfImplicitLabels(tool.ConnectionId, connectionName, ns, connectionLabels)
+	connectionLabels = InjectSelfImplicitLabels(
+		tool.ConnectionId,
+		connectionName,
+		ns,
+		connectionLabels,
+	)
 	tool.Labels = ApplyParentCarryForward(
 		userLabels,
-		ParentCarryForward{Rt: NamespaceLabelToken, Labels: namespaceLabels},
-		ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnection), Labels: connectionLabels},
+		ParentCarryForward{
+			Rt:     NamespaceLabelToken,
+			Labels: namespaceLabels,
+		},
+		ParentCarryForward{
+			Rt:     ApidPrefixToLabelToken(apid.PrefixConnection),
+			Labels: connectionLabels,
+		},
 	)
 	// Parent identities must describe the actual binding even if the namespace's
 	// own stored identity projection has not yet been reconciled.
@@ -251,12 +267,19 @@ func (s *service) populateToolLabels(
 // lock: a neutral UPDATE followed by a label UPDATE would force foreign-key
 // rechecks against parents and could reverse authoring's connection-to-Tool lock
 // order. SQLite needs an initial write to avoid upgrading a read snapshot.
-func (s *service) lockToolForWrite(ctx context.Context, tx *sql.Tx, id apid.ID) error {
+func (s *service) lockToolForWrite(
+	ctx context.Context,
+	tx *sql.Tx,
+	id apid.ID,
+) error {
 	if s.cfg.GetProvider() == config.DatabaseProviderPostgres {
 		var lockedID apid.ID
 		err := s.sq.Select("id").
 			From(ToolsTable).
-			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			Where(sq.Eq{
+				"id":         id,
+				"deleted_at": nil,
+			}).
 			Suffix("FOR UPDATE").
 			RunWith(tx).
 			QueryRowContext(ctx).
@@ -264,24 +287,31 @@ func (s *service) lockToolForWrite(ctx context.Context, tx *sql.Tx, id apid.ID) 
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
+
 		return err
 	}
 
 	result, err := s.sq.Update(ToolsTable).
 		Set("id", id).
-		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		Where(sq.Eq{
+			"id":         id,
+			"deleted_at": nil,
+		}).
 		RunWith(tx).
 		ExecContext(ctx)
 	if err != nil {
 		return err
 	}
+
 	count, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
+
 	if count == 0 {
 		return ErrNotFound
 	}
+	
 	return nil
 }
 
