@@ -31,9 +31,9 @@ var ErrToolRevisionConflict = errors.New("tool revision changed")
 // Tool is the identity of a standalone operation bound to one connection in its
 // namespace. A replacement changes its active revision atomically, while prior
 // definitions remain immutable and inspectable. Labels include authored values
-// and derived parent/self projections. Generated ownership and searchable
-// definition fields must be integrated before exposing managed inventories or
-// discovery APIs.
+// and derived parent/self projections. Description and Verbs project the active
+// definition for future discovery queries. Generated ownership and authorized
+// queries must be integrated before exposing managed inventories or discovery.
 type Tool struct {
 	Id             apid.ID
 	Namespace      string
@@ -49,6 +49,17 @@ type Tool struct {
 	Labels Labels
 	// Annotations belong to the Tool; parent annotations are never inherited.
 	Annotations Annotations
+
+	// Description is the active definition's public descriptive text. The trusted
+	// preparer supplies it from the same plaintext it encrypts; this layer cannot
+	// verify that correspondence. Never put resolved configuration or credentials
+	// into this projection. Legacy rows may be empty until a definition update.
+	Description string
+	// Verbs are exact permission aliases, stored in sorted order. They support
+	// candidate filtering, not authorization by themselves. Legacy nil values
+	// mean unprepared, never unrestricted access. Historical aliases remain in
+	// the encrypted revision; this list always describes ActiveRevision.
+	Verbs []string
 }
 
 // cols lists identity columns in migration order, matching fields and values.
@@ -64,6 +75,8 @@ func (t *Tool) cols() []string {
 		"deleted_at",
 		"labels",
 		"annotations",
+		"description",
+		"verbs",
 	}
 }
 
@@ -80,6 +93,8 @@ func (t *Tool) fields() []any {
 		&t.DeletedAt,
 		&t.Labels,
 		&t.Annotations,
+		&t.Description,
+		(*toolVerbsDB)(&t.Verbs),
 	}
 }
 
@@ -96,11 +111,15 @@ func (t *Tool) values() []any {
 		t.DeletedAt,
 		t.Labels,
 		t.Annotations,
+		t.Description,
+		toolVerbsDB(t.Verbs),
 	}
 }
 
-// Validate checks identity shape and the representable active revision. Parent
-// liveness and connection namespace equality require transactional checks.
+// Validate checks identity, metadata, definition projections, and the active
+// revision. Legacy rows with missing projections remain readable but must have
+// them supplied before a definition write. Parent liveness and connection
+// namespace equality require transactional checks.
 func (t *Tool) Validate() error {
 	if t == nil {
 		return errors.New("tool is required")
@@ -128,6 +147,9 @@ func (t *Tool) Validate() error {
 
 	if err := t.Annotations.Validate(); err != nil {
 		return fmt.Errorf("invalid tool annotations: %w", err)
+	}
+	if err := validateToolDefinitionProjection(t.Description, t.Verbs); err != nil {
+		return err
 	}
 
 	return validateToolRevision(t.ActiveRevision)
@@ -311,7 +333,7 @@ func (s *service) lockToolForWrite(
 	if count == 0 {
 		return ErrNotFound
 	}
-	
+
 	return nil
 }
 
@@ -321,6 +343,8 @@ func (s *service) lockToolForWrite(
 // Only a successful commit changes the caller's record. Existing IDs, including
 // tombstones, are never revived; duplicate live namespace/name pairs conflict.
 // Metadata maps are detached and system labels are derived from the parents.
+// Description and Verbs must come from the same prepared plaintext definition;
+// verbs are copied and sorted without changing the caller's input slice.
 func (s *service) CreateStandaloneTool(
 	ctx context.Context,
 	tool *Tool,
@@ -334,6 +358,8 @@ func (s *service) CreateStandaloneTool(
 	candidate := *tool
 	candidate.Labels = tool.Labels.Copy()
 	candidate.Annotations = tool.Annotations.Copy()
+	candidate.Verbs = slices.Clone(tool.Verbs)
+	slices.Sort(candidate.Verbs)
 	if candidate.Name == "" {
 		candidate.Name = common.ResourceName(candidate.Id.String())
 	}
@@ -432,6 +458,8 @@ func (s *service) GetTool(ctx context.Context, id apid.ID) (*Tool, error) {
 // preserve history and leave the caller's record unchanged.
 // Labels and annotations are full replacements; system labels are re-derived
 // so retargeting cannot retain projections from the previous connection.
+// Description and Verbs fully replace the active projection in that same
+// transaction and must describe the caller's prepared encrypted definition.
 func (s *service) UpdateStandaloneTool(
 	ctx context.Context,
 	tool *Tool,
@@ -454,6 +482,8 @@ func (s *service) UpdateStandaloneTool(
 	candidate := *tool
 	candidate.Labels = tool.Labels.Copy()
 	candidate.Annotations = tool.Annotations.Copy()
+	candidate.Verbs = slices.Clone(tool.Verbs)
+	slices.Sort(candidate.Verbs)
 	candidate.ActiveRevision = expectedRevision + 1
 	if err := candidate.Validate(); err != nil {
 		return nil, err
@@ -519,6 +549,8 @@ func (s *service) UpdateStandaloneTool(
 		Set("connection_id", candidate.ConnectionId).
 		Set("labels", candidate.Labels).
 		Set("annotations", candidate.Annotations).
+		Set("description", candidate.Description).
+		Set("verbs", toolVerbsDB(candidate.Verbs)).
 		Set("active_revision", candidate.ActiveRevision).
 		Set("updated_at", candidate.UpdatedAt).
 		Where(sq.Eq{
