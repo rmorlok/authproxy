@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // MaxToolCandidateLimit bounds one internal scan, independently of a public
@@ -22,18 +23,24 @@ const MaxToolCandidateLimit = 100
 // except that namespace matchers and verb aliases each match any member.
 type ToolCandidateQuery struct {
 	// NamespaceMatchers is an explicit scan scope. Nil or empty matches nothing.
-	NamespaceMatchers []string
+	NamespaceMatchers []string `json:"namespaceMatchers"`
 	// LabelSelector matches Tool labels, including inherited connection identity.
-	LabelSelector string
+	LabelSelector string `json:"labelSelector"`
 	// AnyVerbs matches exact literal aliases, never permission wildcard patterns.
 	// Nil omits this prefilter; a nonnil empty slice matches nothing. The caller
 	// must still check actor/JWT permission intersection for the same Tool alias.
-	AnyVerbs []string
-	// AfterID is an exclusive internal scan position. It is not an authorized
-	// continuation token and must not be accepted directly from an agent.
-	AfterID apid.ID
+	// Preserve nil versus empty when serializing a continuation cursor.
+	AnyVerbs []string `json:"anyVerbs"`
 	// Limit must be between one and MaxToolCandidateLimit; there is no default.
-	Limit int
+	Limit int `json:"limit"`
+}
+
+// toolCandidateCursor preserves the original query and exclusive scan position
+// inside the shared encrypted cursor format. Embedding the query keeps cursor
+// filters in sync with the initial request without exposing the position to callers.
+type toolCandidateCursor struct {
+	ToolCandidateQuery
+	AfterID apid.ID `json:"afterId"`
 }
 
 // ToolCandidate contains current metadata needed for later authorization and
@@ -57,14 +64,14 @@ type ToolCandidate struct {
 // ToolCandidatePage is a bounded internal batch, not an authorized result page.
 // Callers must keep scanning after rejected candidates, filter permissions before
 // visible ranking/counts/pagination, and bind public cursors to principal, JWT
-// scope, and query. Calls do not share a snapshot: later inserts before AfterID
+// scope, and query. Calls do not share a snapshot: inserts before the scan position
 // are not revisited, and invocation must recheck the current Tool and parents.
 type ToolCandidatePage struct {
 	Items []ToolCandidate
-	// NextAfterID is the last returned ID when a further matching row exists;
-	// it is empty at the end. Positions use the producing database's ID collation.
-	// Keep filters unchanged when resuming a traversal.
-	NextAfterID apid.ID
+	// Cursor resumes through ListToolCandidatesFromCursor with the same filters
+	// and limit. It is empty at the end. The opaque cursor preserves a position
+	// in the producing database's ID order; it does not confer authorization.
+	Cursor string
 }
 
 // validate checks all supplied filters, including when an empty scope would
@@ -72,11 +79,6 @@ type ToolCandidatePage struct {
 func (q ToolCandidateQuery) validate() (LabelSelector, error) {
 	if q.Limit < 1 || q.Limit > MaxToolCandidateLimit {
 		return nil, fmt.Errorf("tool candidate limit must be between 1 and %d", MaxToolCandidateLimit)
-	}
-	if !q.AfterID.IsNil() {
-		if err := validateToolID(q.AfterID); err != nil {
-			return nil, err
-		}
 	}
 	for _, matcher := range q.NamespaceMatchers {
 		if err := namespace.ValidateMatcher(matcher); err != nil {
@@ -91,12 +93,35 @@ func (q ToolCandidateQuery) validate() (LabelSelector, error) {
 	return ParseLabelSelector(q.LabelSelector)
 }
 
-// ListToolCandidates reads one ID-ordered batch using only current metadata.
+// ListToolCandidates starts an ID-ordered traversal using only current metadata.
 // Tools, their namespaces, connections, and active revisions must be live and
 // agree on the binding. Missing legacy projections are excluded until prepared.
 // Connection setup, authentication, and probe state do not filter this scan:
 // later policy determines readiness and whether unavailable descriptors appear.
 func (s *service) ListToolCandidates(ctx context.Context, params ToolCandidateQuery) (ToolCandidatePage, error) {
+	return s.listToolCandidates(ctx, params, apid.Nil)
+}
+
+// ListToolCandidatesFromCursor resumes a candidate traversal with its saved
+// filters, limit, and position. Invalid cursors return an error without querying
+// candidates. The cursor protects scan state but does not authorize its results.
+func (s *service) ListToolCandidatesFromCursor(ctx context.Context, cursor string) (ToolCandidatePage, error) {
+	parsed, err := pagination.ParseCursor[toolCandidateCursor](ctx, s.cursorEncryptor, cursor)
+	if err != nil {
+		return ToolCandidatePage{}, err
+	}
+	// Every continuation follows a returned Tool. Requiring its ID also rejects
+	// unrelated list cursors that lack this traversal's position.
+	if err := validateToolID(parsed.AfterID); err != nil {
+		return ToolCandidatePage{}, err
+	}
+	return s.listToolCandidates(ctx, parsed.ToolCandidateQuery, parsed.AfterID)
+}
+
+// listToolCandidates validates the query and reads a bounded batch after the
+// supplied position. A lookahead row produces a cursor containing the original
+// query and last returned ID, so callers do not need to retain either themselves.
+func (s *service) listToolCandidates(ctx context.Context, params ToolCandidateQuery, afterID apid.ID) (ToolCandidatePage, error) {
 	selector, err := params.validate()
 	if err != nil {
 		return ToolCandidatePage{}, err
@@ -135,8 +160,8 @@ func (s *service) ListToolCandidates(ctx context.Context, params ToolCandidateQu
 		scopes = append(scopes, condition)
 	}
 	q = selector.ApplyToSqlBuilderWithProvider(q.Where(scopes), "t.labels", s.cfg.GetProvider())
-	if !params.AfterID.IsNil() {
-		q = q.Where(sq.Gt{"t.id": params.AfterID})
+	if !afterID.IsNil() {
+		q = q.Where(sq.Gt{"t.id": afterID})
 	}
 
 	iterator := "json_each(t.verbs) AS tool_verb"
@@ -171,7 +196,13 @@ func (s *service) ListToolCandidates(ctx context.Context, params ToolCandidateQu
 	}
 	if len(page.Items) > params.Limit {
 		page.Items = page.Items[:params.Limit]
-		page.NextAfterID = page.Items[len(page.Items)-1].Id
+		page.Cursor, err = pagination.MakeCursor(ctx, s.cursorEncryptor, toolCandidateCursor{
+			ToolCandidateQuery: params,
+			AfterID:            page.Items[len(page.Items)-1].Id,
+		})
+		if err != nil {
+			return ToolCandidatePage{}, err
+		}
 	}
 	return page, nil
 }

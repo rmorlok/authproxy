@@ -2,13 +2,16 @@ package database
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"testing"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,7 +55,7 @@ func toolCandidateIDsForTest(page ToolCandidatePage) []apid.ID {
 }
 
 // TestToolCandidatesPagination applies every filter before page boundaries and
-// preserves an ID cursor when previously returned rows are renamed or deleted.
+// preserves an opaque continuation when previously returned rows change.
 func TestToolCandidatesPagination(t *testing.T) {
 	ctx, db, base, definition := standaloneToolForTest(t)
 	require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: "root.outside"}))
@@ -61,7 +64,7 @@ func TestToolCandidatesPagination(t *testing.T) {
 	// Numeric suffixes have the same ordering under both providers' collations.
 	// Interleave each kind of nonmatch before valid rows to expose filters that
 	// accidentally run after the query's limit.
-	for index := range 8 {
+	for index := range 12 {
 		tool := &Tool{
 			Id:           apid.ID(fmt.Sprintf("tol_%016d", index)),
 			Namespace:    base.Namespace,
@@ -72,9 +75,9 @@ func TestToolCandidatesPagination(t *testing.T) {
 		}
 		if index == 0 || index == 4 || index == 6 {
 			tool.Labels["eligible"] = "no"
-		} else if index == 1 {
+		} else if index == 1 || index == 8 {
 			tool.Namespace, tool.ConnectionId = other.Namespace, other.Id
-		} else if index == 2 {
+		} else if index == 2 || index == 10 {
 			tool.Verbs = []string{"write"}
 		}
 		_, err := db.CreateStandaloneTool(ctx, tool, definition.EncryptedDefinition, definition.DefinitionDigest)
@@ -85,34 +88,37 @@ func TestToolCandidatesPagination(t *testing.T) {
 	first, err := db.ListToolCandidates(ctx, query)
 	require.NoError(t, err)
 	require.Equal(t, []apid.ID{candidates[3].Id, candidates[5].Id}, toolCandidateIDsForTest(first))
-	require.Equal(t, candidates[5].Id, first.NextAfterID)
+	require.NotEmpty(t, first.Cursor)
+	second, err := db.ListToolCandidatesFromCursor(ctx, first.Cursor)
+	require.NoError(t, err)
+	require.Equal(t, []apid.ID{candidates[7].Id, candidates[9].Id}, toolCandidateIDsForTest(second))
+	require.NotEmpty(t, second.Cursor)
+	last, err := db.ListToolCandidatesFromCursor(ctx, second.Cursor)
+	require.NoError(t, err)
+	require.Equal(t, []apid.ID{candidates[11].Id}, toolCandidateIDsForTest(last))
+	require.Empty(t, last.Cursor)
 	allQuery := query
 	allQuery.Limit = MaxToolCandidateLimit
 	all, err := db.ListToolCandidates(ctx, allQuery)
 	require.NoError(t, err)
-	require.Equal(t, []apid.ID{candidates[3].Id, candidates[5].Id, candidates[7].Id}, toolCandidateIDsForTest(all))
-	require.True(t, all.NextAfterID.IsNil())
-	query.AfterID = candidates[3].Id
-	exact, err := db.ListToolCandidates(ctx, query)
-	require.NoError(t, err)
-	require.Equal(t, []apid.ID{candidates[5].Id, candidates[7].Id}, toolCandidateIDsForTest(exact))
-	require.True(t, exact.NextAfterID.IsNil(), "a full final page has no continuation")
+	traversed := append(toolCandidateIDsForTest(first), toolCandidateIDsForTest(second)...)
+	traversed = append(traversed, toolCandidateIDsForTest(last)...)
+	require.Equal(t, toolCandidateIDsForTest(all), traversed)
+	require.Empty(t, all.Cursor)
 
 	candidates[3].Name = "renamed-before-cursor"
 	_, err = db.UpdateStandaloneTool(ctx, candidates[3], 1, definition.EncryptedDefinition, definition.DefinitionDigest)
 	require.NoError(t, err)
 	require.NoError(t, db.DeleteStandaloneTool(ctx, candidates[5].Id, 1))
-	query.AfterID = first.NextAfterID
-	last, err := db.ListToolCandidates(ctx, query)
+	require.NoError(t, db.DeleteStandaloneTool(ctx, candidates[11].Id, 1))
+	exact, err := db.ListToolCandidatesFromCursor(ctx, first.Cursor)
 	require.NoError(t, err)
-	require.Equal(t, []apid.ID{candidates[7].Id}, toolCandidateIDsForTest(last))
-	require.True(t, last.NextAfterID.IsNil())
-	require.Equal(t, toolCandidateIDsForTest(all), append(toolCandidateIDsForTest(first), toolCandidateIDsForTest(last)...))
-	query.AfterID = candidates[7].Id
-	empty, err := db.ListToolCandidates(ctx, query)
+	require.Equal(t, []apid.ID{candidates[7].Id, candidates[9].Id}, toolCandidateIDsForTest(exact))
+	require.Empty(t, exact.Cursor, "a full final page has no continuation")
+	empty, err := db.ListToolCandidatesFromCursor(ctx, second.Cursor)
 	require.NoError(t, err)
 	require.Empty(t, empty.Items)
-	require.True(t, empty.NextAfterID.IsNil())
+	require.Empty(t, empty.Cursor)
 }
 
 // TestToolCandidatesNamespaceAndLabels combines exact and descendant scopes
@@ -139,7 +145,7 @@ func TestToolCandidatesNamespaceAndLabels(t *testing.T) {
 		page, err := db.ListToolCandidates(ctx, ToolCandidateQuery{NamespaceMatchers: test.matchers, Limit: 10})
 		require.NoError(t, err)
 		require.ElementsMatch(t, test.want, toolCandidateIDsForTest(page))
-		require.True(t, page.NextAfterID.IsNil())
+		require.Empty(t, page.Cursor)
 	}
 	for _, selector := range []string{
 		"apxy/cxn/-/id=" + base.ConnectionId.String(),
@@ -148,7 +154,7 @@ func TestToolCandidatesNamespaceAndLabels(t *testing.T) {
 		page, err := db.ListToolCandidates(ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, LabelSelector: selector, Limit: 1})
 		require.NoError(t, err)
 		require.Equal(t, []apid.ID{base.Id}, toolCandidateIDsForTest(page))
-		require.True(t, page.NextAfterID.IsNil())
+		require.Empty(t, page.Cursor)
 	}
 }
 
@@ -171,9 +177,16 @@ func TestToolCandidatesExactVerbs(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []apid.ID{tool.Id}, toolCandidateIDsForTest(page))
 	query.AnyVerbs = nil
+	query.Limit = 1
 	page, err = db.ListToolCandidates(ctx, query)
 	require.NoError(t, err)
-	require.ElementsMatch(t, []apid.ID{tool.Id, decoy.Id}, toolCandidateIDsForTest(page))
+	require.Len(t, page.Items, 1)
+	require.NotEmpty(t, page.Cursor)
+	next, err := db.ListToolCandidatesFromCursor(ctx, page.Cursor)
+	require.NoError(t, err)
+	require.Empty(t, next.Cursor)
+	require.ElementsMatch(t, []apid.ID{tool.Id, decoy.Id}, append(toolCandidateIDsForTest(page), toolCandidateIDsForTest(next)...))
+	query.Limit = 10
 	query.AnyVerbs = []string{}
 	page, err = db.ListToolCandidates(ctx, query)
 	require.NoError(t, err)
@@ -239,7 +252,7 @@ func TestToolCandidatesLiveness(t *testing.T) {
 		page, err := db.ListToolCandidates(ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 1})
 		require.NoError(t, err)
 		require.Equal(t, []apid.ID{base.Id}, toolCandidateIDsForTest(page), state)
-		require.True(t, page.NextAfterID.IsNil(), state)
+		require.Empty(t, page.Cursor, state)
 	}
 }
 
@@ -293,8 +306,6 @@ func TestToolCandidatesValidation(t *testing.T) {
 		{"negative limit", func(q *ToolCandidateQuery) { q.Limit = -1 }},
 		{"large limit", func(q *ToolCandidateQuery) { q.Limit = MaxToolCandidateLimit + 1 }},
 		{"matcher", func(q *ToolCandidateQuery) { q.NamespaceMatchers = []string{"root.**", "invalid**"} }},
-		{"cursor type", func(q *ToolCandidateQuery) { q.AfterID = apid.New(apid.PrefixConnection) }},
-		{"cursor syntax", func(q *ToolCandidateQuery) { q.AfterID = apid.ID("invalid") }},
 		{"selector", func(q *ToolCandidateQuery) { q.LabelSelector = "key in (" }},
 		{"blank verb", func(q *ToolCandidateQuery) { q.AnyVerbs = []string{"read", " \t"} }},
 		{"padded verb", func(q *ToolCandidateQuery) { q.AnyVerbs = []string{"read "} }},
@@ -318,4 +329,84 @@ func TestToolCandidatesValidation(t *testing.T) {
 	cancel()
 	_, err := db.ListToolCandidates(canceled, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 1})
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// TestToolCandidatesCursorErrors rejects damaged or invalid continuation state
+// and does not expose partial pages when their continuation cannot be encrypted.
+func TestToolCandidatesCursorErrors(t *testing.T) {
+	ctx, db, base, definition := standaloneToolForTest(t)
+	createToolCandidateForTest(t, ctx, db, base, definition, nil, base.Verbs, nil)
+	query := ToolCandidateQuery{NamespaceMatchers: []string{base.Namespace}, Limit: 1}
+	first, err := db.ListToolCandidates(ctx, query)
+	require.NoError(t, err)
+	require.NotEmpty(t, first.Cursor)
+
+	// Alter ciphertext without breaking its outer encoding so authentication,
+	// rather than only inline-string parsing, must reject the token.
+	tampered, err := encfield.ParseInlineString(first.Cursor)
+	require.NoError(t, err)
+	ciphertext, err := base64.StdEncoding.DecodeString(tampered.Data)
+	require.NoError(t, err)
+	ciphertext[len(ciphertext)-1] ^= 1
+	tampered.Data = base64.StdEncoding.EncodeToString(ciphertext)
+	for _, cursor := range []string{"", "invalid", base.Id.String(), tampered.ToInlineString()} {
+		page, err := db.ListToolCandidatesFromCursor(ctx, cursor)
+		require.Error(t, err)
+		require.Empty(t, page.Items)
+		require.Empty(t, page.Cursor)
+	}
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = db.ListToolCandidatesFromCursor(canceled, first.Cursor)
+	require.ErrorIs(t, err, context.Canceled)
+
+	// Restored payloads still require validation even though the token passed
+	// decryption, for example after a producer bug or future format change.
+	s := db.(*service)
+	payload, err := pagination.ParseCursor[toolCandidateCursor](ctx, s.cursorEncryptor, first.Cursor)
+	require.NoError(t, err)
+	for _, test := range []struct {
+		name string
+		edit func(*toolCandidateCursor)
+	}{
+		{"missing position", func(c *toolCandidateCursor) { c.AfterID = apid.Nil }},
+		{"wrong position type", func(c *toolCandidateCursor) { c.AfterID = base.ConnectionId }},
+		{"invalid position", func(c *toolCandidateCursor) { c.AfterID = apid.ID("invalid") }},
+		{"zero limit", func(c *toolCandidateCursor) { c.Limit = 0 }},
+		{"large limit", func(c *toolCandidateCursor) { c.Limit = MaxToolCandidateLimit + 1 }},
+		{"matcher", func(c *toolCandidateCursor) { c.NamespaceMatchers = []string{"invalid**"} }},
+		{"selector", func(c *toolCandidateCursor) { c.LabelSelector = "key in (" }},
+		{"blank verb", func(c *toolCandidateCursor) { c.AnyVerbs = []string{" "} }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			invalid := *payload
+			test.edit(&invalid)
+			cursor, err := pagination.MakeCursor(ctx, s.cursorEncryptor, invalid)
+			require.NoError(t, err)
+			page, err := db.ListToolCandidatesFromCursor(ctx, cursor)
+			require.Error(t, err)
+			require.Empty(t, page.Items)
+			require.Empty(t, page.Cursor)
+		})
+	}
+	// Empty aliases must survive encoding as an empty set, never become the nil
+	// value that would omit the alias restriction entirely.
+	payload.AnyVerbs = []string{}
+	cursor, err := pagination.MakeCursor(ctx, s.cursorEncryptor, payload)
+	require.NoError(t, err)
+	page, err := db.ListToolCandidatesFromCursor(ctx, cursor)
+	require.NoError(t, err)
+	require.Empty(t, page.Items)
+	require.Empty(t, page.Cursor)
+
+	db.SetCursorEncryptor(pagination.NewDefaultCursorEncryptor(nil))
+	page, err = db.ListToolCandidates(ctx, query)
+	require.Error(t, err, "an invalid AES key must fail continuation creation")
+	require.Empty(t, page.Items)
+	require.Empty(t, page.Cursor)
+	query.Limit = MaxToolCandidateLimit
+	page, err = db.ListToolCandidates(ctx, query)
+	require.NoError(t, err, "a final page does not need cursor encryption")
+	require.Len(t, page.Items, 2)
+	require.Empty(t, page.Cursor)
 }
