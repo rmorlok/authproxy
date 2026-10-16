@@ -1589,6 +1589,21 @@ func (mr *MockDBMockRecorder) ListRateLimitsFromCursor(ctx, cursor interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRateLimitsFromCursor", reflect.TypeOf((*MockDB)(nil).ListRateLimitsFromCursor), ctx, cursor)
 }
 
+// ListToolCandidates mocks base method.
+func (m *MockDB) ListToolCandidates(ctx context.Context, query database.ToolCandidateQuery) (database.ToolCandidatePage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolCandidates", ctx, query)
+	ret0, _ := ret[0].(database.ToolCandidatePage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListToolCandidates indicates an expected call of ListToolCandidates.
+func (mr *MockDBMockRecorder) ListToolCandidates(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolCandidates", reflect.TypeOf((*MockDB)(nil).ListToolCandidates), ctx, query)
+}
+
 // MarkNotificationViewed mocks base method.
 func (m *MockDB) MarkNotificationViewed(ctx context.Context, notificationID, actorID apid.ID) error {
 	m.ctrl.T.Helper()
