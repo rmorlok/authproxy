@@ -104,6 +104,7 @@ func (q ToolCandidateQuery) validate() (LabelSelector, error) {
 // agree on the binding. Missing legacy projections are excluded until prepared.
 // Connection setup, authentication, and probe state do not filter this scan:
 // later policy determines readiness and whether unavailable descriptors appear.
+// Generated Tools remain excluded until installed-binding checks are available.
 func (s *service) ListToolCandidates(
 	ctx context.Context,
 	params ToolCandidateQuery,
@@ -178,6 +179,7 @@ func (s *service) listToolCandidates(
 			"n.deleted_at": nil,
 			"c.deleted_at": nil,
 			"r.deleted_at": nil,
+			"t.binding_id": nil,
 		}).
 		Where(sq.NotEq{"t.description": ""}).
 		OrderBy("t.id ASC").
@@ -271,6 +273,6 @@ func (s *service) listToolCandidates(
 			return ToolCandidatePage{}, err
 		}
 	}
-	
+
 	return page, nil
 }

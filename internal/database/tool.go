@@ -28,12 +28,16 @@ const ToolsTable = "tools"
 // Callers must reload and validate their candidate before retrying.
 var ErrToolRevisionConflict = errors.New("tool revision changed")
 
-// Tool is the identity of a standalone operation bound to one connection in its
-// namespace. A replacement changes its active revision atomically, while prior
-// definitions remain immutable and inspectable. Labels include authored values
-// and derived parent/self projections. Description and Verbs project the active
-// definition for future discovery queries. Generated ownership and authorized
-// queries must be integrated before exposing managed inventories or discovery.
+// ErrToolManaged means a standalone write attempted to create, change, or remove
+// controller-owned state. Generated Tools must be changed through their ToolSet.
+var ErrToolManaged = errors.New("tool is managed by a toolset")
+
+// Tool is an operation identity bound to one connection in its namespace. A
+// replacement changes its active revision atomically, while prior definitions
+// remain immutable and inspectable. Labels include authored values and derived
+// parent/self projections. Description and Verbs project the active definition.
+// Generated ownership is retained for future atomic inventory installation;
+// generated rows are not yet eligible for current-definition or candidate reads.
 type Tool struct {
 	Id             apid.ID
 	Namespace      string
@@ -60,6 +64,14 @@ type Tool struct {
 	// mean unprepared, never unrestricted access. Historical aliases remain in
 	// the encrypted revision; this list always describes ActiveRevision.
 	Verbs []string
+
+	// BindingId identifies the controller assignment that owns this Tool; nil
+	// means standalone. A binding's removal/recreation creates a new identity.
+	BindingId apid.ID
+	// SourceKey is the exact source identity within a binding, independent of
+	// display name. It is empty only for standalone Tools. The pair stays unique
+	// across tombstones so a later inventory can restore the original Tool ID.
+	SourceKey string
 }
 
 // cols lists identity columns in migration order, matching fields and values.
@@ -77,6 +89,8 @@ func (t *Tool) cols() []string {
 		"annotations",
 		"description",
 		"verbs",
+		"binding_id",
+		"source_key",
 	}
 }
 
@@ -95,6 +109,8 @@ func (t *Tool) fields() []any {
 		&t.Annotations,
 		&t.Description,
 		(*toolVerbsDB)(&t.Verbs),
+		&t.BindingId,
+		&t.SourceKey,
 	}
 }
 
@@ -113,6 +129,8 @@ func (t *Tool) values() []any {
 		t.Annotations,
 		t.Description,
 		toolVerbsDB(t.Verbs),
+		t.BindingId,
+		t.SourceKey,
 	}
 }
 
@@ -141,6 +159,19 @@ func (t *Tool) Validate() error {
 		return err
 	}
 
+	if t.BindingId.IsNil() {
+		if t.SourceKey != "" {
+			return errors.New("standalone tool cannot have a source key")
+		}
+	} else {
+		if err := validateToolSetBindingID(t.BindingId); err != nil {
+			return err
+		}
+		if strings.TrimSpace(t.SourceKey) == "" {
+			return errors.New("generated tool source key is required")
+		}
+	}
+
 	if err := t.Labels.Validate(); err != nil {
 		return fmt.Errorf("invalid tool labels: %w", err)
 	}
@@ -153,6 +184,16 @@ func (t *Tool) Validate() error {
 	}
 
 	return validateToolRevision(t.ActiveRevision)
+}
+
+// requireStandalone rejects any supplied or persisted ownership, including an
+// incomplete pair. Callers must check the stored row as well as input so clearing
+// ownership on an update cannot bypass the controller's authority.
+func (t *Tool) requireStandalone() error {
+	if !t.BindingId.IsNil() || t.SourceKey != "" {
+		return fmt.Errorf("%w: binding %s", ErrToolManaged, t.BindingId)
+	}
+	return nil
 }
 
 // validateToolID rejects absent IDs and IDs of other resource kinds.
@@ -345,6 +386,8 @@ func (s *service) lockToolForWrite(
 // Metadata maps are detached and system labels are derived from the parents.
 // Description and Verbs must come from the same prepared plaintext definition;
 // verbs are copied and sorted without changing the caller's input slice.
+// Supplying controller ownership is rejected; generated identities will be
+// installed only by an atomic binding inventory operation.
 func (s *service) CreateStandaloneTool(
 	ctx context.Context,
 	tool *Tool,
@@ -353,6 +396,9 @@ func (s *service) CreateStandaloneTool(
 ) (*ToolRevision, error) {
 	if tool == nil {
 		return nil, errors.New("tool is required")
+	}
+	if err := tool.requireStandalone(); err != nil {
+		return nil, err
 	}
 
 	candidate := *tool
@@ -460,6 +506,8 @@ func (s *service) GetTool(ctx context.Context, id apid.ID) (*Tool, error) {
 // so retargeting cannot retain projections from the previous connection.
 // Description and Verbs fully replace the active projection in that same
 // transaction and must describe the caller's prepared encrypted definition.
+// Both supplied and stored ownership are checked so an update cannot detach or
+// replace a generated Tool by presenting it as standalone.
 func (s *service) UpdateStandaloneTool(
 	ctx context.Context,
 	tool *Tool,
@@ -469,6 +517,9 @@ func (s *service) UpdateStandaloneTool(
 ) (*ToolRevision, error) {
 	if tool == nil {
 		return nil, errors.New("tool is required")
+	}
+	if err := tool.requireStandalone(); err != nil {
+		return nil, err
 	}
 
 	if err := validateToolRevision(expectedRevision); err != nil {
@@ -523,6 +574,9 @@ func (s *service) UpdateStandaloneTool(
 	if err != nil {
 		return nil, err
 	}
+	if err := current.requireStandalone(); err != nil {
+		return nil, err
+	}
 
 	if current.ActiveRevision != expectedRevision ||
 		current.ConnectionId != observed.ConnectionId {
@@ -557,6 +611,7 @@ func (s *service) UpdateStandaloneTool(
 			"id":              candidate.Id,
 			"active_revision": expectedRevision,
 			"deleted_at":      nil,
+			"binding_id":      nil,
 		}).
 		RunWith(tx).
 		ExecContext(ctx)
@@ -583,6 +638,7 @@ func (s *service) UpdateStandaloneTool(
 // DeleteStandaloneTool soft-deletes exactly the observed live revision, releasing
 // its name while retaining the identity and revision history. Deleted connections
 // do not block cleanup. A removed ID is never reused by the create operation.
+// Controller-owned identities cannot be individually deleted by this method.
 func (s *service) DeleteStandaloneTool(
 	ctx context.Context,
 	id apid.ID,
@@ -604,6 +660,7 @@ func (s *service) DeleteStandaloneTool(
 			"id":              id,
 			"active_revision": expectedRevision,
 			"deleted_at":      nil,
+			"binding_id":      nil,
 		}).
 		RunWith(s.db).
 		ExecContext(ctx)
@@ -617,7 +674,11 @@ func (s *service) DeleteStandaloneTool(
 	}
 
 	if count == 0 {
-		if _, err := s.GetTool(ctx, id); err != nil {
+		current, err := s.GetTool(ctx, id)
+		if err != nil {
+			return err
+		}
+		if err := current.requireStandalone(); err != nil {
 			return err
 		}
 		return ErrToolRevisionConflict

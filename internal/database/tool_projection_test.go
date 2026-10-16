@@ -244,7 +244,7 @@ func TestToolProjectionMigration(t *testing.T) {
 	history, err := db.GetToolRevision(ctx, tool.Id, 1)
 	require.NoError(t, err)
 	require.Equal(t, definition.EncryptedDefinition, history.EncryptedDefinition)
-	migrateDatabaseToVersion(t, s, 22)
+	migrateDatabaseToVersion(t, s, 23)
 	legacy, err := db.GetTool(ctx, tool.Id)
 	require.NoError(t, err)
 	require.Empty(t, legacy.Description)

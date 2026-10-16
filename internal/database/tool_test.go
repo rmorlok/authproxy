@@ -552,7 +552,7 @@ func TestToolMetadataMigrationReversibility(t *testing.T) {
 	require.Equal(t, definition.EncryptedDefinition, revision.EncryptedDefinition)
 	require.Equal(t, definition.DefinitionDigest, revision.DefinitionDigest)
 
-	migrateDatabaseToVersion(t, s, 22)
+	migrateDatabaseToVersion(t, s, 23)
 	stored, err := db.GetTool(ctx, tool.Id)
 	require.NoError(t, err)
 	require.Nil(t, stored.Labels)
