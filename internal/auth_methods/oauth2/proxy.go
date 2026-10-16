@@ -105,28 +105,46 @@ func (o *oAuth2Connection) connectionLabelsForTelemetry() map[string]string {
 // refresh is cancelled so the in-flight work stops rather than outliving the
 // lock. Failures inside the locked section classify themselves; failures to
 // acquire the lock are classified here as internal errors (transient).
-func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
+func (o *oAuth2Connection) refreshAccessTokenInner(
+	ctx context.Context,
+	token *database.OAuth2Token,
+	mode refreshMode,
+) (*database.OAuth2Token, error) {
 	var (
 		result  *database.OAuth2Token
 		lockErr error
 		ran     bool
 	)
-	lockErr = apredis.RunWithMutex(ctx, o.tokenMutex(), o.auth.Token.GetRefreshTimeout(), func(lockedCtx context.Context) error {
-		ran = true
-		var err error
-		result, err = o.refreshAccessTokenLocked(lockedCtx, token, mode)
-		return err
-	})
+	lockErr = apredis.RunWithMutex(
+		ctx,
+		o.tokenMutex(),
+		o.auth.Token.GetRefreshTimeout(),
+		func(lockedCtx context.Context) error {
+			ran = true
+			var err error
+			result, err = o.refreshAccessTokenLocked(lockedCtx, token, mode)
+			return err
+		},
+	)
 
 	switch {
 	case !ran:
 		// Never acquired the lock; nothing was sent to the provider.
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, lockErr)
+		return nil, o.classifyAndRecordRefreshFailure(
+			ctx,
+			tokenRefreshInternalError,
+			0,  // providerStatusCode
+			"", // providerErr
+			0,  // attempts
+			lockErr,
+		)
 	case result != nil:
 		// The refresh succeeded and the new token is persisted. A lease or
 		// unlock error after that point does not invalidate the result.
 		if lockErr != nil {
-			o.logger.WarnContext(ctx, "oauth token refresh succeeded but releasing the token mutex failed",
+			o.logger.WarnContext(
+				ctx,
+				"oauth token refresh succeeded but releasing the token mutex failed",
 				"error", lockErr,
 			)
 		}
@@ -143,22 +161,37 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 //
 // observed is the token the caller based its decision to refresh on; only
 // its Id is consulted, and only in refreshModeUnlessReplaced.
-func (o *oAuth2Connection) refreshAccessTokenLocked(ctx context.Context, observed *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
+func (o *oAuth2Connection) refreshAccessTokenLocked(
+	ctx context.Context,
+	observed *database.OAuth2Token,
+	mode refreshMode,
+) (*database.OAuth2Token, error) {
 	// Get the latest token to make sure we still need to refresh
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
+		return nil, o.classifyAndRecordRefreshFailure(
+			ctx,
+			tokenRefreshInternalError,
+			0,  // providerStatus
+			"", // providerErr
+			0,  // attempts
+			err,
+		)
 	}
 
 	if mode == refreshModeOnlyExpired && !token.IsAccessTokenExpired(ctx) {
 		return token, nil
 	}
 
-	if mode == refreshModeUnlessReplaced && observed != nil && token.Id != observed.Id {
+	if mode == refreshModeUnlessReplaced &&
+		observed != nil &&
+		token.Id != observed.Id {
 		// A concurrent refresher already replaced the rejected token. With
 		// rotating refresh tokens, refreshing again would burn another
 		// rotation for no benefit.
-		o.logger.DebugContext(ctx, "skipping oauth token refresh; rejected token was already replaced",
+		o.logger.DebugContext(
+			ctx,
+			"skipping oauth token refresh; rejected token was already replaced",
 			"rejected_token_id", observed.Id,
 			"current_token_id", token.Id,
 		)

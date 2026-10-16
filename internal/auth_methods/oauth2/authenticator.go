@@ -77,7 +77,7 @@ func (o *oAuth2Connection) RecoverFrom401(
 	rejectedToken := &database.OAuth2Token{
 		Id: apid.ID(rejected.CredentialVersion),
 	}
-	
+
 	_, err := o.refreshAccessToken(
 		ctx,
 		rejectedToken,
