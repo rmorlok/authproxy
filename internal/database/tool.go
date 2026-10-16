@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -14,6 +15,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -27,9 +30,10 @@ var ErrToolRevisionConflict = errors.New("tool revision changed")
 
 // Tool is the identity of a standalone operation bound to one connection in its
 // namespace. A replacement changes its active revision atomically, while prior
-// definitions remain immutable and inspectable. This initial storage model does
-// not yet include metadata/search projections or generated Tool ownership; those
-// must be integrated before exposing management or managed-inventory operations.
+// definitions remain immutable and inspectable. Labels include authored values
+// and derived parent/self projections. Generated ownership and searchable
+// definition fields must be integrated before exposing managed inventories or
+// discovery APIs.
 type Tool struct {
 	Id             apid.ID
 	Namespace      string
@@ -39,6 +43,12 @@ type Tool struct {
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	DeletedAt      *time.Time
+
+	// Labels contains user labels plus derived apxy/ labels. Standalone writes
+	// regenerate the system portion instead of trusting supplied projections.
+	Labels Labels
+	// Annotations belong to the Tool; parent annotations are never inherited.
+	Annotations Annotations
 }
 
 // cols lists identity columns in migration order, matching fields and values.
@@ -52,6 +62,8 @@ func (t *Tool) cols() []string {
 		"created_at",
 		"updated_at",
 		"deleted_at",
+		"labels",
+		"annotations",
 	}
 }
 
@@ -66,6 +78,8 @@ func (t *Tool) fields() []any {
 		&t.CreatedAt,
 		&t.UpdatedAt,
 		&t.DeletedAt,
+		&t.Labels,
+		&t.Annotations,
 	}
 }
 
@@ -80,6 +94,8 @@ func (t *Tool) values() []any {
 		t.CreatedAt,
 		t.UpdatedAt,
 		t.DeletedAt,
+		t.Labels,
+		t.Annotations,
 	}
 }
 
@@ -104,6 +120,14 @@ func (t *Tool) Validate() error {
 
 	if err := validateToolConnectionID(t.ConnectionId); err != nil {
 		return err
+	}
+
+	if err := t.Labels.Validate(); err != nil {
+		return fmt.Errorf("invalid tool labels: %w", err)
+	}
+
+	if err := t.Annotations.Validate(); err != nil {
+		return fmt.Errorf("invalid tool annotations: %w", err)
 	}
 
 	return validateToolRevision(t.ActiveRevision)
@@ -157,26 +181,41 @@ func (s *service) lockToolConnections(
 	return nil
 }
 
-// checkToolConnection verifies the locked destination and its namespace are live
-// and that the Tool stays within that exact namespace. It reads no credentials
-// or connection configuration. Setup/health does not prevent storing definitions.
-func (s *service) checkToolConnection(
+// populateToolLabels checks the exact connection namespace and derives labels
+// from parent metadata and the Tool's authored labels. Identity labels come from
+// actual columns, so supplied or stale projections cannot shadow the binding.
+// Authoring requires a live connection; reconciliation also projects deleted
+// connections while their Tools remain visible for management. Neither path
+// reads credentials, configuration, or parent annotations. Parent reads do not
+// take write locks; the caller must protect the Tool from concurrent changes.
+func (s *service) populateToolLabels(
 	ctx context.Context,
 	tx *sql.Tx,
 	tool *Tool,
+	requireLiveConnection bool,
 ) error {
 	var ns string
-	err := s.sq.Select("c.namespace").
+	var connectionName common.ResourceName
+	var connectionLabels, namespaceLabels Labels
+	query := s.sq.Select(
+		"c.namespace",
+		"c.name",
+		"c.labels",
+		"n.labels",
+	).
 		From(ConnectionsTable + " c").
 		Join(NamespacesTable + " n ON n.path = c.namespace").
 		Where(sq.Eq{
 			"c.id":         tool.ConnectionId,
-			"c.deleted_at": nil,
 			"n.deleted_at": nil,
-		}).
+		})
+	if requireLiveConnection {
+		query = query.Where(sq.Eq{"c.deleted_at": nil})
+	}
+	err := query.
 		RunWith(tx).
 		QueryRowContext(ctx).
-		Scan(&ns)
+		Scan(&ns, &connectionName, &connectionLabels, &namespaceLabels)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -188,6 +227,91 @@ func (s *service) checkToolConnection(
 		return errors.New("tool and connection must have the same namespace")
 	}
 
+	userLabels, _ := SplitUserAndApxyLabels(tool.Labels)
+	// The namespace is read directly, so discard its cached projection on the
+	// connection. Otherwise removed labels could survive forever on Tools whose
+	// soft-deleted connection no longer participates in parent reconciliation.
+	for key := range connectionLabels {
+		if strings.HasPrefix(key, meta.SystemLabelPrefix+NamespaceLabelToken+"/") {
+			delete(connectionLabels, key)
+		}
+	}
+	connectionLabels = InjectSelfImplicitLabels(
+		tool.ConnectionId,
+		connectionName,
+		ns,
+		connectionLabels,
+	)
+	tool.Labels = ApplyParentCarryForward(
+		userLabels,
+		ParentCarryForward{
+			Rt:     NamespaceLabelToken,
+			Labels: namespaceLabels,
+		},
+		ParentCarryForward{
+			Rt:     ApidPrefixToLabelToken(apid.PrefixConnection),
+			Labels: connectionLabels,
+		},
+	)
+	// Parent identities must describe the actual binding even if the namespace's
+	// own stored identity projection has not yet been reconciled.
+	tool.Labels = InjectNamespaceSelfImplicitLabels(ns, tool.Labels)
+	tool.Labels = InjectSelfImplicitLabels(tool.Id, tool.Name, tool.Namespace, tool.Labels)
+
+	return nil
+}
+
+// lockToolForWrite protects a live Tool before reading its current binding and
+// metadata. Authoring takes connection locks first. Label reconciliation takes
+// only this lock and reads parents without locking them. PostgreSQL uses a row
+// lock: a neutral UPDATE followed by a label UPDATE would force foreign-key
+// rechecks against parents and could reverse authoring's connection-to-Tool lock
+// order. SQLite needs an initial write to avoid upgrading a read snapshot.
+func (s *service) lockToolForWrite(
+	ctx context.Context,
+	tx *sql.Tx,
+	id apid.ID,
+) error {
+	if s.cfg.GetProvider() == config.DatabaseProviderPostgres {
+		var lockedID apid.ID
+		err := s.sq.Select("id").
+			From(ToolsTable).
+			Where(sq.Eq{
+				"id":         id,
+				"deleted_at": nil,
+			}).
+			Suffix("FOR UPDATE").
+			RunWith(tx).
+			QueryRowContext(ctx).
+			Scan(&lockedID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		}
+
+		return err
+	}
+
+	result, err := s.sq.Update(ToolsTable).
+		Set("id", id).
+		Where(sq.Eq{
+			"id":         id,
+			"deleted_at": nil,
+		}).
+		RunWith(tx).
+		ExecContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return ErrNotFound
+	}
+	
 	return nil
 }
 
@@ -196,6 +320,7 @@ func (s *service) checkToolConnection(
 // this layer does not decrypt or compile it. Names default to the allocated ID.
 // Only a successful commit changes the caller's record. Existing IDs, including
 // tombstones, are never revived; duplicate live namespace/name pairs conflict.
+// Metadata maps are detached and system labels are derived from the parents.
 func (s *service) CreateStandaloneTool(
 	ctx context.Context,
 	tool *Tool,
@@ -207,6 +332,8 @@ func (s *service) CreateStandaloneTool(
 	}
 
 	candidate := *tool
+	candidate.Labels = tool.Labels.Copy()
+	candidate.Annotations = tool.Annotations.Copy()
 	if candidate.Name == "" {
 		candidate.Name = common.ResourceName(candidate.Id.String())
 	}
@@ -233,7 +360,7 @@ func (s *service) CreateStandaloneTool(
 	if err := s.lockToolConnections(ctx, tx, candidate.ConnectionId); err != nil {
 		return nil, err
 	}
-	if err := s.checkToolConnection(ctx, tx, &candidate); err != nil {
+	if err := s.populateToolLabels(ctx, tx, &candidate, true); err != nil {
 		return nil, err
 	}
 
@@ -299,10 +426,12 @@ func (s *service) GetTool(ctx context.Context, id apid.ID) (*Tool, error) {
 }
 
 // UpdateStandaloneTool appends an immutable revision and atomically replaces the
-// name, connection, and active pointer. The namespace cannot change. Every
-// accepted update advances the revision, even for identical content. Definitions
+// name, connection, metadata, and active pointer. The namespace cannot change.
+// Every accepted update advances the revision, even for identical content. Definitions
 // must already be validated and compiled by the caller. Failed or stale writes
 // preserve history and leave the caller's record unchanged.
+// Labels and annotations are full replacements; system labels are re-derived
+// so retargeting cannot retain projections from the previous connection.
 func (s *service) UpdateStandaloneTool(
 	ctx context.Context,
 	tool *Tool,
@@ -323,6 +452,8 @@ func (s *service) UpdateStandaloneTool(
 	}
 
 	candidate := *tool
+	candidate.Labels = tool.Labels.Copy()
+	candidate.Annotations = tool.Annotations.Copy()
 	candidate.ActiveRevision = expectedRevision + 1
 	if err := candidate.Validate(); err != nil {
 		return nil, err
@@ -354,15 +485,7 @@ func (s *service) UpdateStandaloneTool(
 	); err != nil {
 		return nil, err
 	}
-	_, err = s.sq.Update(ToolsTable).
-		Set("id", candidate.Id).
-		Where(sq.Eq{
-			"id":         candidate.Id,
-			"deleted_at": nil,
-		}).
-		RunWith(tx).
-		ExecContext(ctx)
-	if err != nil {
+	if err := s.lockToolForWrite(ctx, tx, candidate.Id); err != nil {
 		return nil, err
 	}
 
@@ -380,7 +503,7 @@ func (s *service) UpdateStandaloneTool(
 		return nil, errors.New("tool namespace cannot change")
 	}
 
-	if err := s.checkToolConnection(ctx, tx, &candidate); err != nil {
+	if err := s.populateToolLabels(ctx, tx, &candidate, true); err != nil {
 		return nil, err
 	}
 
@@ -394,6 +517,8 @@ func (s *service) UpdateStandaloneTool(
 	result, err := s.sq.Update(ToolsTable).
 		Set("name", candidate.Name).
 		Set("connection_id", candidate.ConnectionId).
+		Set("labels", candidate.Labels).
+		Set("annotations", candidate.Annotations).
 		Set("active_revision", candidate.ActiveRevision).
 		Set("updated_at", candidate.UpdatedAt).
 		Where(sq.Eq{

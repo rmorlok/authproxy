@@ -59,6 +59,9 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 	if err := s.refreshToolSetsInNamespace(ctx, nsPath); err != nil {
 		return err
 	}
+	if err := s.refreshToolsInNamespace(ctx, nsPath); err != nil {
+		return err
+	}
 
 	childPaths, err := s.directChildNamespacePaths(ctx, nsPath)
 	if err != nil {
@@ -107,6 +110,10 @@ func (s *service) RefreshConnectionsForConnector(ctx context.Context, id apid.ID
 	rows.Close()
 	for _, connID := range ids {
 		if _, err := s.recomputeConnectionLabelsTx(ctx, connID); err != nil {
+			return err
+		}
+		// Tool projections can drift even when the connection is already correct.
+		if err := s.refreshToolsForConnection(ctx, connID); err != nil {
 			return err
 		}
 	}
@@ -239,6 +246,62 @@ func (s *service) refreshToolSetsInNamespace(ctx context.Context, nsPath string)
 	}
 	for _, id := range ids {
 		if _, err := s.recomputeToolSetLabelsTx(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// refreshToolsInNamespace repairs Tools after their namespace's connections have
+// been refreshed. Each Tool is re-read and updated in its own short transaction.
+func (s *service) refreshToolsInNamespace(ctx context.Context, nsPath string) error {
+	ids, err := s.scanIdsByNamespace(ToolsTable, nsPath)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := s.recomputeToolLabelsTx(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// refreshToolsForConnection repairs descendants of one refreshed connection.
+// Re-reading each Tool under its write lock makes concurrent retargeting safe.
+func (s *service) refreshToolsForConnection(
+	ctx context.Context,
+	connectionID apid.ID,
+) error {
+	rows, err := s.sq.
+		Select("id").
+		From(ToolsTable).
+		Where(sq.Eq{
+			"connection_id": connectionID,
+			"deleted_at":    nil,
+		}).
+		RunWith(s.db).
+		QueryContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	var ids []apid.ID
+	for rows.Next() {
+		var id apid.ID
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return err
+	}
+
+	for _, id := range ids {
+		if _, err := s.recomputeToolLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -519,6 +582,70 @@ func (s *service) recomputeToolSetLabelsTx(ctx context.Context, id apid.ID) (boo
 	return corrected, nil
 }
 
+// recomputeToolLabelsTx rebuilds projections from the Tool's current binding and
+// authored labels. Locking before reading prevents a sweep from restoring stale
+// labels after a rename, retarget, or metadata edit. Parent label changes remain
+// eventually consistent. Only labels and updated_at change; definitions, active
+// revisions, and annotations are untouched. A deleted Tool/namespace is skipped.
+func (s *service) recomputeToolLabelsTx(
+	ctx context.Context,
+	id apid.ID,
+) (bool, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+
+	if err := s.lockToolForWrite(ctx, tx, id); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	tool, err := s.getTool(ctx, tx, id)
+	if errors.Is(err, ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+
+	previous := tool.Labels
+	if err := s.populateToolLabels(
+		ctx,
+		tx,
+		tool,
+		false, // requireLiveConnection
+	); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	corrected, err := s.writeRecomputedLabels(
+		ctx,
+		tx,
+		ToolsTable,
+		sq.Eq{
+			"id":         id,
+			"deleted_at": nil,
+		},
+		previous,
+		tool.Labels,
+	)
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+
+	return corrected, nil
+}
+
 // recomputeNamespaceLabelsTx opens a short transaction and re-derives a
 // namespace's full labels from its immediate parent and its own user labels.
 // Returns true if drift was detected and corrected.
@@ -605,8 +732,8 @@ func labelsEqual(a, b Labels) bool {
 
 // ReconcileCarryForwardLabels walks every labelled resource type in
 // batches and re-derives the materialized apxy/ portion of each row. Each
-// row's update runs in its own short transaction; rows whose computed
-// labels match the stored labels are not rewritten. Returns the total
+// row's update runs in its own short transaction; matching labels and modification
+// timestamps remain unchanged. Returns the total
 // number of rows corrected across all resource types.
 //
 // batchSize controls the page size for each list query. limiter, when
@@ -635,6 +762,7 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 		{name: "keys", walk: s.reconcileEncryptionKeys},
 		{name: "rate_limits", walk: s.reconcileRateLimits},
 		{name: "tool_sets", walk: s.reconcileToolSets},
+		{name: "tools", walk: s.reconcileTools},
 	}
 
 	for _, step := range steps {
@@ -778,20 +906,41 @@ func (s *service) reconcileRateLimits(ctx context.Context, batchSize int32, limi
 	return corrected, err
 }
 
-// reconcileToolSets walks live IDs in bounded, ascending pages. Reading IDs
-// instead of sorting by updated_at keeps label writes from shifting the cursor.
-// The caller supplies a positive batchSize; rate limiting applies to each row.
+// reconcileToolSets repairs logical ToolSet projections in bounded ID pages.
 func (s *service) reconcileToolSets(
 	ctx context.Context,
 	batchSize int32,
 	limiter *rate.Limiter,
+) (int64, error) {
+	return s.reconcileLabelsByID(ctx, ToolSetsTable, batchSize, limiter, s.recomputeToolSetLabelsTx)
+}
+
+// reconcileTools repairs Tool projections after parent resources. It also
+// initializes labels on rows created before metadata storage was introduced.
+func (s *service) reconcileTools(
+	ctx context.Context,
+	batchSize int32,
+	limiter *rate.Limiter,
+) (int64, error) {
+	return s.reconcileLabelsByID(ctx, ToolsTable, batchSize, limiter, s.recomputeToolLabelsTx)
+}
+
+// reconcileLabelsByID walks live IDs in bounded ascending pages. Reading IDs
+// instead of sorting by updated_at keeps writes from shifting the cursor. The
+// caller supplies a known table and positive batchSize; limiting applies per row.
+func (s *service) reconcileLabelsByID(
+	ctx context.Context,
+	table string,
+	batchSize int32,
+	limiter *rate.Limiter,
+	recompute func(context.Context, apid.ID) (bool, error),
 ) (int64, error) {
 	var corrected int64
 	var lastID apid.ID
 	for {
 		query := s.sq.
 			Select("id").
-			From(ToolSetsTable).
+			From(table).
 			Where(sq.Eq{"deleted_at": nil}).
 			OrderBy("id").
 			Limit(uint64(batchSize))
@@ -829,14 +978,14 @@ func (s *service) reconcileToolSets(
 				}
 			}
 
-			wasCorrected, err := s.recomputeToolSetLabelsTx(ctx, id)
+			wasCorrected, err := recompute(ctx, id)
 			if err != nil {
 				return corrected, err
 			}
 
 			if wasCorrected {
 				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "tool_set", "id", id)
+				s.logger.Info("reconciled drifted carry-forward labels", "type", table, "id", id)
 			}
 		}
 

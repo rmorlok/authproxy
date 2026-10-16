@@ -618,7 +618,7 @@ func TestStandaloneToolMigrationReversibility(t *testing.T) {
 	migrateDatabaseToVersion(t, db.(*service), 19)
 	_, err := db.GetConnection(ctx, tool.ConnectionId)
 	require.NoError(t, err)
-	migrateDatabaseToVersion(t, db.(*service), 20)
+	migrateDatabaseToVersion(t, db.(*service), 21)
 	_, err = db.GetTool(ctx, tool.Id)
 	require.ErrorIs(t, err, ErrNotFound)
 	_, err = db.CreateStandaloneTool(ctx, tool, first.EncryptedDefinition, first.DefinitionDigest)
