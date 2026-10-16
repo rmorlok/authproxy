@@ -25,7 +25,7 @@ type replayAuth struct {
 }
 
 // RecoverFrom401 counts recovery attempts and optionally fails or cancels one.
-func (a *replayAuth) RecoverFrom401(ctx context.Context) error {
+func (a *replayAuth) RecoverFrom401(ctx context.Context, _ auth_methods.AuthApplication) error {
 	atomic.AddInt32(&a.recoverN, 1)
 	if a.recoverFn != nil {
 		return a.recoverFn(ctx)

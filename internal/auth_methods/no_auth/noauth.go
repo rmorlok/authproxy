@@ -20,11 +20,16 @@ func NewAuthenticator() auth_methods.Authenticator {
 	return &noAuthAuthenticator{}
 }
 
-func (n *noAuthAuthenticator) Resolve(ctx context.Context) (auth_methods.AuthApplication, error) {
+func (n *noAuthAuthenticator) Resolve(
+	_ context.Context,
+) (auth_methods.AuthApplication, error) {
 	return auth_methods.AuthApplication{}, nil
 }
 
-func (n *noAuthAuthenticator) RecoverFrom401(ctx context.Context) error {
+func (n *noAuthAuthenticator) RecoverFrom401(
+	_ context.Context,
+	_ auth_methods.AuthApplication,
+) error {
 	return auth_methods.ErrCannotRecover
 }
 

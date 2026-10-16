@@ -36,17 +36,17 @@ func (m *MockAuthenticator) EXPECT() *MockAuthenticatorMockRecorder {
 }
 
 // RecoverFrom401 mocks base method.
-func (m *MockAuthenticator) RecoverFrom401(ctx context.Context) error {
+func (m *MockAuthenticator) RecoverFrom401(ctx context.Context, rejected auth_methods.AuthApplication) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RecoverFrom401", ctx)
+	ret := m.ctrl.Call(m, "RecoverFrom401", ctx, rejected)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // RecoverFrom401 indicates an expected call of RecoverFrom401.
-func (mr *MockAuthenticatorMockRecorder) RecoverFrom401(ctx interface{}) *gomock.Call {
+func (mr *MockAuthenticatorMockRecorder) RecoverFrom401(ctx, rejected interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverFrom401", reflect.TypeOf((*MockAuthenticator)(nil).RecoverFrom401), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecoverFrom401", reflect.TypeOf((*MockAuthenticator)(nil).RecoverFrom401), ctx, rejected)
 }
 
 // Refresh mocks base method.

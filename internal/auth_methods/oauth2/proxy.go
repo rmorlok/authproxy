@@ -42,11 +42,21 @@ const (
 // must re-authenticate) without parsing error strings.
 var errNoRefreshToken = errors.New("token does not have refresh token")
 
+// refreshMode decides, once the token mutex is held and the current token
+// has been re-read, whether a refresh is still needed.
 type refreshMode int
 
 const (
+	// refreshModeOnlyExpired refreshes only if the current access token
+	// has expired (lazy refresh on use).
 	refreshModeOnlyExpired refreshMode = iota
+	// refreshModeAlways refreshes unconditionally (background refresh,
+	// explicit Refresh calls).
 	refreshModeAlways
+	// refreshModeUnlessReplaced refreshes only if the current token row is
+	// still the one passed to refreshAccessToken — i.e. nobody else has
+	// refreshed since the caller observed that token being rejected.
+	refreshModeUnlessReplaced
 )
 
 func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
@@ -95,28 +105,46 @@ func (o *oAuth2Connection) connectionLabelsForTelemetry() map[string]string {
 // refresh is cancelled so the in-flight work stops rather than outliving the
 // lock. Failures inside the locked section classify themselves; failures to
 // acquire the lock are classified here as internal errors (transient).
-func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
+func (o *oAuth2Connection) refreshAccessTokenInner(
+	ctx context.Context,
+	token *database.OAuth2Token,
+	mode refreshMode,
+) (*database.OAuth2Token, error) {
 	var (
 		result  *database.OAuth2Token
 		lockErr error
 		ran     bool
 	)
-	lockErr = apredis.RunWithMutex(ctx, o.tokenMutex(), o.auth.Token.GetRefreshTimeout(), func(lockedCtx context.Context) error {
-		ran = true
-		var err error
-		result, err = o.refreshAccessTokenLocked(lockedCtx, mode)
-		return err
-	})
+	lockErr = apredis.RunWithMutex(
+		ctx,
+		o.tokenMutex(),
+		o.auth.Token.GetRefreshTimeout(),
+		func(lockedCtx context.Context) error {
+			ran = true
+			var err error
+			result, err = o.refreshAccessTokenLocked(lockedCtx, token, mode)
+			return err
+		},
+	)
 
 	switch {
 	case !ran:
 		// Never acquired the lock; nothing was sent to the provider.
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, lockErr)
+		return nil, o.classifyAndRecordRefreshFailure(
+			ctx,
+			tokenRefreshInternalError,
+			0,  // providerStatusCode
+			"", // providerErr
+			0,  // attempts
+			lockErr,
+		)
 	case result != nil:
 		// The refresh succeeded and the new token is persisted. A lease or
 		// unlock error after that point does not invalidate the result.
 		if lockErr != nil {
-			o.logger.WarnContext(ctx, "oauth token refresh succeeded but releasing the token mutex failed",
+			o.logger.WarnContext(
+				ctx,
+				"oauth token refresh succeeded but releasing the token mutex failed",
 				"error", lockErr,
 			)
 		}
@@ -130,14 +158,43 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 // token mutex. It re-reads the current token (another holder may already
 // have refreshed it), posts the grant, and persists the response. Every
 // failure path is classified and recorded via classifyAndRecordRefreshFailure.
-func (o *oAuth2Connection) refreshAccessTokenLocked(ctx context.Context, mode refreshMode) (*database.OAuth2Token, error) {
+//
+// observed is the token the caller based its decision to refresh on; only
+// its Id is consulted, and only in refreshModeUnlessReplaced.
+func (o *oAuth2Connection) refreshAccessTokenLocked(
+	ctx context.Context,
+	observed *database.OAuth2Token,
+	mode refreshMode,
+) (*database.OAuth2Token, error) {
 	// Get the latest token to make sure we still need to refresh
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
+		return nil, o.classifyAndRecordRefreshFailure(
+			ctx,
+			tokenRefreshInternalError,
+			0,  // providerStatus
+			"", // providerErr
+			0,  // attempts
+			err,
+		)
 	}
 
 	if mode == refreshModeOnlyExpired && !token.IsAccessTokenExpired(ctx) {
+		return token, nil
+	}
+
+	if mode == refreshModeUnlessReplaced &&
+		observed != nil &&
+		token.Id != observed.Id {
+		// A concurrent refresher already replaced the rejected token. With
+		// rotating refresh tokens, refreshing again would burn another
+		// rotation for no benefit.
+		o.logger.DebugContext(
+			ctx,
+			"skipping oauth token refresh; rejected token was already replaced",
+			"rejected_token_id", observed.Id,
+			"current_token_id", token.Id,
+		)
 		return token, nil
 	}
 

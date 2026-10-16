@@ -42,7 +42,7 @@ func (a *migrationRefreshTestAuthenticator) Resolve(context.Context) (auth_metho
 	return auth_methods.AuthApplication{}, nil
 }
 
-func (a *migrationRefreshTestAuthenticator) RecoverFrom401(context.Context) error {
+func (a *migrationRefreshTestAuthenticator) RecoverFrom401(context.Context, auth_methods.AuthApplication) error {
 	a.recoverCalls++
 	return auth_methods.ErrCannotRecover
 }

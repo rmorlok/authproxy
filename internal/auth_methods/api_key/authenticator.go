@@ -31,7 +31,10 @@ func (a *apiKeyConnection) Resolve(ctx context.Context) (auth_methods.AuthApplic
 // RecoverFrom401 returns ErrCannotRecover — there is no automated path
 // to obtain a replacement api key. The orchestrator surfaces the
 // upstream 401 unchanged.
-func (a *apiKeyConnection) RecoverFrom401(ctx context.Context) error {
+func (a *apiKeyConnection) RecoverFrom401(
+	ctx context.Context,
+	_ auth_methods.AuthApplication,
+) error {
 	return auth_methods.ErrCannotRecover
 }
 

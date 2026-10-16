@@ -99,16 +99,16 @@ func (p *proxy) maybeAccelerateProbes(ctx context.Context, reqType httpf.Request
 // retry path, and the recovery failure was already classified inside
 // the authenticator.
 func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
-	resp, err := p.send(ctx, reqType, req)
+	resp, app, err := p.send(ctx, reqType, req)
 	if err != nil {
 		return nil, err
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		recoverErr := p.auth.RecoverFrom401(ctx)
+		recoverErr := p.auth.RecoverFrom401(ctx, app)
 		if recoverErr == nil {
 			p.logUpstreamRetryAttempted(ctx, reqType, resp.StatusCode)
-			retried, retryErr := p.send(ctx, reqType, req)
+			retried, _, retryErr := p.send(ctx, reqType, req)
 			if retryErr == nil {
 				resp = retried
 			}
@@ -154,7 +154,7 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 		ForLabels(req.Labels).
 		NewHTTPClient()
 
-	resp, err := p.sendRaw(ctx, client, req.Outbound)
+	resp, app, err := p.sendRaw(ctx, client, req.Outbound)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 			_ = resp.Body.Close()
 			return nil, err
 		}
-		recoverErr := p.auth.RecoverFrom401(ctx)
+		recoverErr := p.auth.RecoverFrom401(ctx, app)
 		if err := ctx.Err(); err != nil {
 			_ = resp.Body.Close()
 			return nil, err
@@ -181,7 +181,7 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 				return nil, err
 			}
 			p.logUpstreamRetryAttempted(ctx, reqType, resp.StatusCode)
-			resp, err = p.sendRaw(ctx, client, retry)
+			resp, _, err = p.sendRaw(ctx, client, retry)
 			if err != nil {
 				return nil, err
 			}
@@ -316,25 +316,26 @@ func closeRawRequestBody(outbound *http.Request) {
 // so credential application never mutates the caller's request or carries
 // previous credentials into a retry. The body is not cloned and is owned by
 // this method until handed to the HTTP client; cancellation or credential
-// resolution errors before that handoff close the unsent body.
+// resolution errors before that handoff close the unsent body. The applied
+// AuthApplication is returned so a 401 can identify the rejected credential.
 func (p *proxy) sendRaw(
 	ctx context.Context,
 	client *http.Client,
 	outbound *http.Request,
-) (*http.Response, error) {
+) (*http.Response, auth_methods.AuthApplication, error) {
 	outbound = outbound.Clone(ctx)
 	if err := ctx.Err(); err != nil {
 		closeRawRequestBody(outbound)
-		return nil, err
+		return nil, auth_methods.AuthApplication{}, err
 	}
 	app, err := p.auth.Resolve(ctx)
 	if contextErr := ctx.Err(); contextErr != nil {
 		closeRawRequestBody(outbound)
-		return nil, contextErr
+		return nil, auth_methods.AuthApplication{}, contextErr
 	}
 	if err != nil {
 		closeRawRequestBody(outbound)
-		return nil, err
+		return nil, auth_methods.AuthApplication{}, err
 	}
 	if outbound.Header == nil {
 		outbound.Header = make(http.Header)
@@ -354,7 +355,8 @@ func (p *proxy) sendRaw(
 		outbound.URL.RawQuery = q.Encode()
 	}
 
-	return client.Do(outbound)
+	resp, err := client.Do(outbound)
+	return resp, app, err
 }
 
 // streamResponse copies the upstream response back to the caller with
@@ -503,10 +505,17 @@ func splitCommaTrim(s string) []string {
 // Order is deliberate: caller-supplied headers go on first (via
 // ProxyRequest.Apply), then the authenticator's headers via SetHeader
 // so the credential always wins. Same for query params.
-func (p *proxy) send(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*gentleman.Response, error) {
+//
+// The applied AuthApplication is returned alongside the response so a 401
+// can be handed back to RecoverFrom401 identifying the rejected credential.
+func (p *proxy) send(
+	ctx context.Context,
+	reqType httpf.RequestType,
+	req *iface.ProxyRequest,
+) (*gentleman.Response, auth_methods.AuthApplication, error) {
 	app, err := p.auth.Resolve(ctx)
 	if err != nil {
-		return nil, err
+		return nil, auth_methods.AuthApplication{}, err
 	}
 
 	r := p.httpf.
@@ -525,5 +534,6 @@ func (p *proxy) send(ctx context.Context, reqType httpf.RequestType, req *iface.
 	for k, v := range app.QueryParams {
 		r.SetQuery(k, v)
 	}
-	return r.Do()
+	resp, err := r.Do()
+	return resp, app, err
 }
