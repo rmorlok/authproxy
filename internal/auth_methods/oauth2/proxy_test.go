@@ -289,6 +289,7 @@ func TestPostRefreshWithRetry_SuccessFirstAttempt(t *testing.T) {
 		srv.URL,
 		url.Values{"grant_type": {"refresh_token"}, "refresh_token": {"rt"}},
 		"",
+		0,
 	)
 
 	require.NoError(t, err)
@@ -322,6 +323,7 @@ func TestPostRefreshWithRetry_4xxNotRetried(t *testing.T) {
 				srv.URL,
 				url.Values{"grant_type": {"refresh_token"}},
 				"",
+				0,
 			)
 
 			require.NoError(t, err, "transport-layer call succeeded — 4xx is not a transport error")
@@ -348,6 +350,7 @@ func TestPostRefreshWithRetry_5xxThenSuccess(t *testing.T) {
 		srv.URL,
 		url.Values{},
 		"",
+		0,
 	)
 	elapsed := time.Since(start)
 
@@ -376,6 +379,7 @@ func TestPostRefreshWithRetry_5xxExhausted(t *testing.T) {
 		srv.URL,
 		url.Values{},
 		"",
+		0,
 	)
 
 	require.NoError(t, err, "5xx is an HTTP-level failure, not a transport error")
@@ -402,6 +406,7 @@ func TestPostRefreshWithRetry_TransportErrorRetried(t *testing.T) {
 		closedURL,
 		url.Values{},
 		"",
+		0,
 	)
 
 	require.Error(t, err, "transport failure must surface as an error")
@@ -435,6 +440,7 @@ func TestPostRefreshWithRetry_ContextCancelledBeforeRetry(t *testing.T) {
 		srv.URL,
 		url.Values{},
 		"",
+		0,
 	)
 
 	require.ErrorIs(t, err, context.Canceled)

@@ -1,14 +1,17 @@
 package oauth2
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -80,16 +83,56 @@ func (o *oAuth2Connection) connectionLabelsForTelemetry() map[string]string {
 	return o.connection.GetLabels()
 }
 
+// refreshAccessTokenInner runs the refresh while holding the per-connection
+// token mutex. The mutex lease is renewed for the full duration of the
+// refresh (apredis.RunWithMutex), so a slow token endpoint or a refresh that
+// spends its retry budget cannot let the lease lapse and admit a second
+// refresher. That matters most for providers that rotate refresh tokens: a
+// second refresher would read the same, already-consumed refresh token and
+// get invalid_grant, flipping a perfectly good connection unhealthy.
+//
+// If the lease is lost anyway (Redis unavailable), the context passed to the
+// refresh is cancelled so the in-flight work stops rather than outliving the
+// lock. Failures inside the locked section classify themselves; failures to
+// acquire the lock are classified here as internal errors (transient).
 func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
-	m := o.tokenMutex()
-	err := m.Lock(ctx)
-	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
-	}
-	defer m.Unlock(ctx)
+	var (
+		result  *database.OAuth2Token
+		lockErr error
+		ran     bool
+	)
+	lockErr = apredis.RunWithMutex(ctx, o.tokenMutex(), o.auth.Token.GetRefreshTimeout(), func(lockedCtx context.Context) error {
+		ran = true
+		var err error
+		result, err = o.refreshAccessTokenLocked(lockedCtx, mode)
+		return err
+	})
 
+	switch {
+	case !ran:
+		// Never acquired the lock; nothing was sent to the provider.
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, lockErr)
+	case result != nil:
+		// The refresh succeeded and the new token is persisted. A lease or
+		// unlock error after that point does not invalidate the result.
+		if lockErr != nil {
+			o.logger.WarnContext(ctx, "oauth token refresh succeeded but releasing the token mutex failed",
+				"error", lockErr,
+			)
+		}
+		return result, nil
+	default:
+		return nil, lockErr
+	}
+}
+
+// refreshAccessTokenLocked performs the refresh assuming the caller holds the
+// token mutex. It re-reads the current token (another holder may already
+// have refreshed it), posts the grant, and persists the response. Every
+// failure path is classified and recorded via classifyAndRecordRefreshFailure.
+func (o *oAuth2Connection) refreshAccessTokenLocked(ctx context.Context, mode refreshMode) (*database.OAuth2Token, error) {
 	// Get the latest token to make sure we still need to refresh
-	token, err = o.db.GetOAuth2Token(ctx, o.connection.GetId())
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
@@ -149,7 +192,7 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 
-	refreshResp, attempts, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values, authHeader)
+	refreshResp, attempts, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values, authHeader, o.auth.Token.GetRefreshTimeout())
 	if err != nil {
 		// Transport-layer failure — provider never produced a status code.
 		// Transient by classification; does not flip unhealthy.
@@ -250,6 +293,31 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 	return token, nil
 }
 
+// bufferResponseBody reads the whole response body into memory while the
+// caller's per-attempt deadline is still live, closes the network body, and
+// swaps in an in-memory body that later Bytes()/JSON() calls read from. A body
+// that fails to arrive in time is reported as a transport error.
+//
+// It deliberately does not use gentleman's Response.Bytes() for this:
+// Bytes() closes the body and a later JSON() closes it again, and response
+// bodies wrapped by the request-metrics layer are not safe to close twice.
+// The in-memory replacement tolerates any number of Close calls.
+func bufferResponseBody(resp *gentleman.Response) error {
+	if resp.RawResponse == nil || resp.RawResponse.Body == nil {
+		return nil
+	}
+	body, readErr := io.ReadAll(resp.RawResponse.Body)
+	closeErr := resp.RawResponse.Body.Close()
+	if readErr != nil {
+		return readErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	resp.RawResponse.Body = io.NopCloser(bytes.NewReader(body))
+	return nil
+}
+
 // postRefreshWithRetry POSTs a refresh-token grant to the provider's token
 // endpoint with a small bounded retry budget for transient failures
 // (transport errors and 5xx responses). Returns the final response (or
@@ -265,12 +333,19 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 //
 // gentleman requests are single-use (Send panics on the second call), so
 // each iteration rebuilds the request from scratch.
+//
+// attemptTimeout bounds each individual POST, including reading the response
+// body (the connector's token.refreshTimeout). Zero or negative disables the
+// per-attempt deadline and leaves only ctx in charge. The body is buffered
+// inside the attempt so the deadline can be released before the caller
+// parses it.
 func (o *oAuth2Connection) postRefreshWithRetry(
 	ctx context.Context,
 	client *gentleman.Client,
 	tokenEndpoint string,
 	values url.Values,
 	authHeader string,
+	attemptTimeout time.Duration,
 ) (*gentleman.Response, int, error) {
 	res, err := retry.Do(ctx, retry.Options[*gentleman.Response]{
 		MaxAttempts: tokenRefreshMaxAttempts,
@@ -291,6 +366,12 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 			o.logger.WarnContext(ctx, "oauth token refresh transient failure; retrying", args...)
 		},
 	}, func(ctx context.Context) (*gentleman.Response, error) {
+		if attemptTimeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(ctx, attemptTimeout)
+			defer cancel()
+		}
+
 		req := client.
 			UseContext(ctx).
 			Request().
@@ -304,7 +385,14 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 			req = req.AddHeader("Authorization", authHeader)
 		}
 
-		return req.Send()
+		resp, err := req.Send()
+		if err != nil {
+			return resp, err
+		}
+		if err := bufferResponseBody(resp); err != nil {
+			return nil, err
+		}
+		return resp, nil
 	})
 
 	// Mirror the original contract: a returned error always implies a nil
