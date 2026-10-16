@@ -16,7 +16,9 @@ import (
 // ProxyRequest: token + decrypt. The retry-once-after-refresh wrapper
 // lives in internal/proxy and calls RecoverFrom401 followed by another
 // Resolve when the upstream rejects the request.
-func (o *oAuth2Connection) Resolve(ctx context.Context) (auth_methods.AuthApplication, error) {
+func (o *oAuth2Connection) Resolve(
+	ctx context.Context,
+) (auth_methods.AuthApplication, error) {
 	token, err := o.getValidToken(ctx)
 	if err != nil {
 		return auth_methods.AuthApplication{}, err
@@ -64,13 +66,24 @@ func (o *oAuth2Connection) Refresh(ctx context.Context) error {
 // so the customer's app sees the same auth failure it would have without
 // this retry path. The refresh failure was already classified and (if
 // permanent) flipped the connection unhealthy by refreshAccessToken.
-func (o *oAuth2Connection) RecoverFrom401(ctx context.Context, rejected auth_methods.AuthApplication) error {
+func (o *oAuth2Connection) RecoverFrom401(
+	ctx context.Context,
+	rejected auth_methods.AuthApplication,
+) error {
 	if rejected.CredentialVersion == "" {
 		return o.Refresh(ctx)
 	}
 
-	rejectedToken := &database.OAuth2Token{Id: apid.ID(rejected.CredentialVersion)}
-	_, err := o.refreshAccessToken(ctx, rejectedToken, refreshModeUnlessReplaced)
+	rejectedToken := &database.OAuth2Token{
+		Id: apid.ID(rejected.CredentialVersion),
+	}
+	
+	_, err := o.refreshAccessToken(
+		ctx,
+		rejectedToken,
+		refreshModeUnlessReplaced,
+	)
+
 	return err
 }
 
