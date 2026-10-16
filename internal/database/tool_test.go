@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ func copyToolMetadataForTest(tool *Tool) Tool {
 	copy := *tool
 	copy.Labels = tool.Labels.Copy()
 	copy.Annotations = tool.Annotations.Copy()
+	copy.Verbs = slices.Clone(tool.Verbs)
 	return copy
 }
 
@@ -52,6 +54,8 @@ func TestToolMetadataLifecycle(t *testing.T) {
 		Namespace:    base.Namespace,
 		Name:         "lookup",
 		ConnectionId: base.ConnectionId,
+		Description:  base.Description,
+		Verbs:        base.Verbs,
 		Labels:       labels,
 		Annotations:  annotations,
 	}
@@ -548,7 +552,7 @@ func TestToolMetadataMigrationReversibility(t *testing.T) {
 	require.Equal(t, definition.EncryptedDefinition, revision.EncryptedDefinition)
 	require.Equal(t, definition.DefinitionDigest, revision.DefinitionDigest)
 
-	migrateDatabaseToVersion(t, s, 21)
+	migrateDatabaseToVersion(t, s, 22)
 	stored, err := db.GetTool(ctx, tool.Id)
 	require.NoError(t, err)
 	require.Nil(t, stored.Labels)

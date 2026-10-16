@@ -49,6 +49,8 @@ func standaloneToolForTest(t *testing.T) (context.Context, DB, *Tool, *ToolRevis
 		Id:           apid.New(apid.PrefixTool),
 		Namespace:    connection.Namespace,
 		ConnectionId: connection.Id,
+		Description:  "Read an example resource.",
+		Verbs:        []string{"example:read"},
 	}
 
 	revision, err := db.CreateStandaloneTool(ctx, tool, encfield.EncryptedField{
@@ -150,6 +152,8 @@ func TestStandaloneToolRevisionRollback(t *testing.T) {
 		Namespace:    tool.Namespace,
 		Name:         "occupied",
 		ConnectionId: tool.ConnectionId,
+		Description:  tool.Description,
+		Verbs:        tool.Verbs,
 	}
 	_, err := db.CreateStandaloneTool(ctx, other, first.EncryptedDefinition, first.DefinitionDigest)
 	require.NoError(t, err)
@@ -618,7 +622,7 @@ func TestStandaloneToolMigrationReversibility(t *testing.T) {
 	migrateDatabaseToVersion(t, db.(*service), 19)
 	_, err := db.GetConnection(ctx, tool.ConnectionId)
 	require.NoError(t, err)
-	migrateDatabaseToVersion(t, db.(*service), 21)
+	migrateDatabaseToVersion(t, db.(*service), 22)
 	_, err = db.GetTool(ctx, tool.Id)
 	require.ErrorIs(t, err, ErrNotFound)
 	_, err = db.CreateStandaloneTool(ctx, tool, first.EncryptedDefinition, first.DefinitionDigest)
