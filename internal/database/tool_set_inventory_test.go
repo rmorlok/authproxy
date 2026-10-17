@@ -32,33 +32,60 @@ type toolSetInventoryFixture struct {
 // keeping definition compilation and encryption outside these storage tests.
 func explicitInventoryForTest(t *testing.T, count int) *toolSetInventoryFixture {
 	t.Helper()
+
 	ctx, db, toolSet, connection := toolSetBindingParentsForTest(t)
 	require.NoError(t, db.SetConnectionState(ctx, connection.Id, ConnectionStateConfigured))
-	definition := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "ZGVmaW5pdGlvbg=="}
+
+	definition := encfield.EncryptedField{
+		ID:   apid.New(apid.PrefixDataEncryptionKey),
+		Data: "ZGVmaW5pdGlvbg==",
+	}
 	generation, err := db.CreateToolSetGeneration(ctx, toolSet.Id, definition)
 	require.NoError(t, err)
+
 	_, err = db.PublishToolSetGeneration(ctx, toolSet.Id, generation.Generation, generation.Revision)
 	require.NoError(t, err)
+
 	binding, err := db.CreateToolSetBinding(ctx, toolSet.Id, connection.Id, toolSet.SelectorRevision)
 	require.NoError(t, err)
 	require.Nil(t, binding.AppliedGeneration)
 	require.Zero(t, binding.InventoryRevision)
+
 	request := ToolSetInventoryInstall{
-		BindingId: binding.Id, ExpectedEpoch: binding.Epoch,
-		ExpectedSelectorRevision: toolSet.SelectorRevision, Generation: generation.Generation,
+		BindingId:                binding.Id,
+		ExpectedEpoch:            binding.Epoch,
+		ExpectedSelectorRevision: toolSet.SelectorRevision,
+		Generation:               generation.Generation,
 	}
+
 	for index := range count {
 		request.Tools = append(request.Tools, PreparedToolSetTool{
 			Tool: Tool{
-				Id: apid.New(apid.PrefixTool), Namespace: connection.Namespace,
-				ConnectionId: connection.Id, BindingId: binding.Id, SourceKey: fmt.Sprintf("operation-%d", index),
-				Description: "An explicitly prepared operation", Verbs: []string{"write", "read"},
-				Labels: Labels{"local": "value", "apxy/cxn/-/id": "forged"}, Annotations: Annotations{"note": "own"},
+				Id:           apid.New(apid.PrefixTool),
+				Namespace:    connection.Namespace,
+				ConnectionId: connection.Id,
+				BindingId:    binding.Id,
+				SourceKey:    fmt.Sprintf("operation-%d", index),
+				Description:  "An explicitly prepared operation",
+				Verbs:        []string{"write", "read"},
+				Labels: Labels{
+					"local":         "value",
+					"apxy/cxn/-/id": "forged",
+				},
+				Annotations: Annotations{"note": "own"},
 			},
-			EncryptedDefinition: definition, DefinitionDigest: toolDefinitionDigestForTest,
+			EncryptedDefinition: definition,
+			DefinitionDigest:    toolDefinitionDigestForTest,
 		})
 	}
-	return &toolSetInventoryFixture{ctx, db, toolSet, connection, binding, request}
+	return &toolSetInventoryFixture{
+		ctx,
+		db,
+		toolSet,
+		connection,
+		binding,
+		request,
+	}
 }
 
 // copyInventoryForTest detaches nested slices and maps so unchanged-input
@@ -87,6 +114,7 @@ func readInventoryBindingForTest(t *testing.T, fixture *toolSetInventoryFixture)
 // binding transition without modifying preparation data or activating execution.
 func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	f := explicitInventoryForTest(t, 2)
+
 	old := apctx.GetClock(f.ctx).Now().Add(-time.Hour)
 	f.request.Tools[0].Tool.ActiveRevision = 99
 	f.request.Tools[0].Tool.CreatedAt, f.request.Tools[0].Tool.UpdatedAt = old, old
@@ -94,6 +122,7 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	f.request.Tools[0].Tool.SourceKey = " GET /v1/{id}?a='b'%_\t"
 	before := copyInventoryForTest(f.request)
 	installedAt := apctx.GetClock(f.ctx).Now().Add(time.Hour)
+
 	installed, err := f.db.InstallExplicitToolSetInventory(apctx.WithFixedClock(f.ctx, installedAt), f.request)
 	require.NoError(t, err)
 	require.Equal(t, before, f.request)
@@ -104,6 +133,7 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, f.request.Generation, *installed.AppliedGeneration)
 	require.True(t, installedAt.Equal(installed.UpdatedAt))
 	require.True(t, f.binding.CreatedAt.Equal(installed.CreatedAt))
+
 	for _, prepared := range f.request.Tools {
 		stored, err := f.db.GetTool(f.ctx, prepared.Tool.Id)
 		require.NoError(t, err)
@@ -128,9 +158,11 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 		_, err = f.db.GetCurrentToolRevision(f.ctx, stored.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 	}
+
 	page, err := f.db.ListToolCandidates(f.ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 10})
 	require.NoError(t, err)
 	require.Empty(t, page.Items)
+
 	f.request.Tools[0].Tool.Labels["local"] = "changed"
 	f.request.Tools[0].Tool.Annotations["note"] = "changed"
 	f.request.Tools[0].Tool.Verbs[0] = "changed"
@@ -139,10 +171,13 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, "value", stored.Labels["local"])
 	require.Equal(t, "own", stored.Annotations["note"])
 	require.Equal(t, []string{"read", "write"}, stored.Verbs)
+
 	second, err := f.db.CreateToolSetGeneration(f.ctx, f.toolSet.Id, before.Tools[0].EncryptedDefinition)
 	require.NoError(t, err)
+
 	_, err = f.db.PublishToolSetGeneration(f.ctx, f.toolSet.Id, second.Generation, second.Revision)
 	require.NoError(t, err)
+
 	unchanged := readInventoryBindingForTest(t, f)
 	require.Equal(t, installed.Epoch, unchanged.Epoch)
 	require.Equal(t, installed.AppliedGeneration, unchanged.AppliedGeneration, "publication does not roll existing inventories forward")
@@ -160,8 +195,10 @@ func TestExplicitToolSetInventoryEmpty(t *testing.T) {
 		require.Equal(t, before, f.request)
 		require.Equal(t, uint64(1), installed.InventoryRevision)
 		require.Equal(t, uint64(1), *installed.AppliedGeneration)
+
 		_, err = f.db.InstallExplicitToolSetInventory(f.ctx, f.request)
 		require.ErrorIs(t, err, ErrToolSetBindingEpochConflict)
+
 		f.request.ExpectedEpoch = installed.Epoch
 		_, err = f.db.InstallExplicitToolSetInventory(f.ctx, f.request)
 		require.ErrorIs(t, err, ErrToolSetBindingInventoryConflict)

@@ -352,6 +352,6 @@ func (s *service) InstallExplicitToolSetInventory(
 	if err := tx.Commit(); err != nil {
 		return nil, wrapDatabaseMutationError("failed to commit toolset inventory", err)
 	}
-	
+
 	return &result, nil
 }
