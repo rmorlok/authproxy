@@ -27,36 +27,72 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 		responseBody   string
 		responseError  error
 		wantErr        string
-		setupMocks     func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE)
+		// wantMalformed: the error must wrap errMalformedTokenResponse
+		// (provider's fault) rather than be a retried persistence failure.
+		wantMalformed bool
+		setupMocks    func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE)
 	}{
 		{
 			name:         "valid response",
 			responseBody: `{"access_token": "valid_access_token", "refresh_token": "valid_refresh_token", "scope": "read write", "expires_in": 3600}`,
 			wantErr:      "",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, nil)
-				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_refresh_token").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_refresh_token"}, nil)
-				mdb.EXPECT().InsertOAuth2Token(gomock.Any(), gomock.Any(), nil, encfield.EncryptedField{ID: "dek_test", Data: "encrypted_refresh_token"}, encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, gomock.Any(), "read write", "read write", gomock.Any()).Return(&database.OAuth2Token{}, nil)
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").
+					Return(encfield.EncryptedField{
+						ID:   "dek_test",
+						Data: "encrypted_access_token",
+					}, nil)
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_refresh_token").
+					Return(encfield.EncryptedField{
+						ID:   "dek_test",
+						Data: "encrypted_refresh_token",
+					}, nil)
+				mdb.EXPECT().
+					InsertOAuth2Token(
+						gomock.Any(),
+						gomock.Any(),
+						nil, // refreshFrom
+						encfield.EncryptedField{
+							ID:   "dek_test",
+							Data: "encrypted_refresh_token",
+						},
+						encfield.EncryptedField{
+							ID:   "dek_test",
+							Data: "encrypted_access_token",
+						},
+						gomock.Any(),
+						"read write",
+						"read write",
+						gomock.Any(),
+					).
+					Return(&database.OAuth2Token{}, nil)
 			},
 		},
 		{
-			name:         "error deserializing response",
-			responseBody: `invalid_json`,
-			wantErr:      "failed to parse token response",
-			setupMocks:   func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {},
+			name:          "error deserializing response",
+			responseBody:  `invalid_json`,
+			wantErr:       "failed to parse token response",
+			wantMalformed: true,
+			setupMocks:    func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {},
 		},
 		{
-			name:         "missing access token",
-			responseBody: `{"refresh_token": "valid_refresh_token"}`,
-			wantErr:      "no access token in response",
-			setupMocks:   func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {},
+			name:          "missing access token",
+			responseBody:  `{"refresh_token": "valid_refresh_token"}`,
+			wantErr:       "no access token in response",
+			wantMalformed: true,
+			setupMocks:    func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {},
 		},
 		{
 			name:         "encryption failure for access token",
 			responseBody: `{"access_token": "valid_access_token"}`,
 			wantErr:      "failed to encrypt access token",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{}, errors.New("encryption failed"))
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").
+					Return(encfield.EncryptedField{}, errors.New("encryption failed")).
+					Times(tokenPersistMaxAttempts)
 			},
 		},
 		{
@@ -64,8 +100,14 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			responseBody: `{"access_token": "valid_access_token", "refresh_token": "valid_refresh_token"}`,
 			wantErr:      "failed to encrypt refresh token",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, nil)
-				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_refresh_token").Return(encfield.EncryptedField{}, errors.New("encryption failed"))
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").
+					Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, nil).
+					Times(tokenPersistMaxAttempts)
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_refresh_token").
+					Return(encfield.EncryptedField{}, errors.New("encryption failed")).
+					Times(tokenPersistMaxAttempts)
 			},
 		},
 		{
@@ -73,8 +115,83 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			responseBody: `{"access_token": "valid_access_token"}`,
 			wantErr:      "failed to insert oauth2 token",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, nil)
-				mdb.EXPECT().InsertOAuth2Token(gomock.Any(), gomock.Any(), nil, encfield.EncryptedField{}, encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("insert failed"))
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").
+					Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, nil).
+					Times(tokenPersistMaxAttempts)
+				mdb.EXPECT().
+					InsertOAuth2Token(
+						gomock.Any(),
+						gomock.Any(),
+						nil, // refreshFrom
+						encfield.EncryptedField{},
+						encfield.EncryptedField{
+							ID:   "dek_test",
+							Data: "encrypted_access_token",
+						},
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+						gomock.Any(),
+					).
+					Return(nil, errors.New("insert failed")).
+					Times(tokenPersistMaxAttempts)
+			},
+		},
+		{
+			// A transient DB failure must not lose a token the provider
+			// already issued: the write is retried and succeeds.
+			name:         "transient database insert failure is retried",
+			responseBody: `{"access_token": "valid_access_token", "refresh_token": "rotated_refresh_token"}`,
+			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").
+					Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"}, nil).
+					Times(2)
+				mencrypt.EXPECT().
+					EncryptStringForEntity(gomock.Any(), gomock.Any(), "rotated_refresh_token").
+					Return(encfield.EncryptedField{ID: "dek_test", Data: "encrypted_refresh_token"}, nil).
+					Times(2)
+				gomock.InOrder(
+					mdb.EXPECT().
+						InsertOAuth2Token(
+							gomock.Any(),
+							gomock.Any(),
+							nil, // refreshFrom
+							encfield.EncryptedField{
+								ID:   "dek_test",
+								Data: "encrypted_refresh_token",
+							},
+							encfield.EncryptedField{
+								ID:   "dek_test",
+								Data: "encrypted_access_token",
+							},
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Any(),
+						).
+						Return(nil, errors.New("database is locked")),
+					mdb.EXPECT().
+						InsertOAuth2Token(
+							gomock.Any(),
+							gomock.Any(),
+							nil, // refreshFrom
+							encfield.EncryptedField{
+								ID:   "dek_test",
+								Data: "encrypted_refresh_token",
+							},
+							encfield.EncryptedField{
+								ID:   "dek_test",
+								Data: "encrypted_access_token",
+							},
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Any(),
+							gomock.Any(),
+						).
+						Return(&database.OAuth2Token{}, nil),
+				)
 			},
 		},
 	}
@@ -125,6 +242,10 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			} else if tt.wantErr != "" && (err == nil || !strings.Contains(err.Error(), tt.wantErr)) {
 				t.Errorf("expected error: %v, got: %v", tt.wantErr, err)
+			}
+			if err != nil {
+				assert.Equal(t, tt.wantMalformed, errors.Is(err, errMalformedTokenResponse),
+					"malformed classification for %q", err)
 			}
 		})
 	}

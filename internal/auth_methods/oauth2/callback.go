@@ -216,7 +216,7 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 	_, err = o.createDbTokenFromResponse(ctx, resp, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create db token from response: %w", err)
-		o.emitAndRecordExchangeFailure(ctx, tokenExchangeMalformedResponse, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, persistFailureExchangeCategory(err), o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
@@ -317,7 +317,7 @@ func (o *oAuth2Connection) exchangeClientCredentialsInner(ctx context.Context) e
 	_, err = o.createDbTokenFromResponseWithOptions(ctx, resp, nil, tokenPersistOptions{PersistRefreshToken: false})
 	if err != nil {
 		err = fmt.Errorf("failed to create db token from response: %w", err)
-		o.emitAndRecordExchangeFailure(ctx, tokenExchangeMalformedResponse, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, persistFailureExchangeCategory(err), o.tokenExchangeAttrsFromConn(err))
 		return err
 	}
 
@@ -405,4 +405,15 @@ func (o *oAuth2Connection) appendSetupPendingToReturnUrl(raw string) string {
 	q.Set("connectionId", string(o.connection.GetId()))
 	returnUrl.RawQuery = q.Encode()
 	return returnUrl.String()
+}
+
+// persistFailureExchangeCategory classifies an error from
+// createDbTokenFromResponseWithOptions on the token-exchange path: an
+// unusable provider response is malformed_response; a failure to encrypt or
+// store a good response is internal_error.
+func persistFailureExchangeCategory(err error) tokenExchangeCategory {
+	if errors.Is(err, errMalformedTokenResponse) {
+		return tokenExchangeMalformedResponse
+	}
+	return tokenExchangeInternalError
 }
