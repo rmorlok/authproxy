@@ -16,7 +16,7 @@ A connection's token is refreshed in three situations:
 |---|---|
 | **Expired on use** | A proxied request finds the stored access token expired, refreshes it, then sends the request. |
 | **Upstream 401** | The provider rejects a request with 401. AuthProxy refreshes once and replays the request. If the refresh fails, the original 401 is returned. |
-| **Background task** | Every 10 minutes (`oauth.refreshTokensCronSchedule`), AuthProxy refreshes tokens whose access token expires within `oauth.refreshTokensTimeBeforeExpiry` (default 10 minutes), and tokens whose refresh token is about to expire (see [Refresh-token expiry](#refresh-token-expiry)). Disable it with `oauth.refreshTokensInBackground: false`. |
+| **Background task** | Every 10 minutes (`oauth.refreshTokensCronSchedule`), AuthProxy refreshes tokens whose access token expires within the connector's `refreshTimeBeforeExpiry` (falling back to `oauth.refreshTokensTimeBeforeExpiry`, default 10 minutes), and tokens whose refresh token is about to expire (see [Refresh-token expiry](#refresh-token-expiry)). Disable it globally with `oauth.refreshTokensInBackground: false`, or for one connector with `token.refreshInBackground: false`. |
 
 The grant used is `refresh_token`, or `client_credentials` for connectors with
 `grantType: client_credentials`. Client-credentials connectors simply request a
@@ -97,14 +97,16 @@ spec:
   request, including reading the response. It also sets the lease on the
   per-connection refresh lock. The lease is renewed while a refresh runs, so
   it only controls how quickly a crashed process's lock is reclaimed.
-- `refreshInBackground` (default `true`): when `false`, AuthProxy doesn't
-  schedule early refreshes before this connector's refresh tokens expire.
-  Background refresh of expiring *access* tokens is currently controlled only
-  by the global `oauth.refreshTokensInBackground`.
-- `refreshTimeBeforeExpiry` sets how long before the access token expires to
-  refresh in the background. The background task scans with the largest value
-  across all connectors (or the global `oauth.refreshTokensTimeBeforeExpiry`,
-  if that is larger), so the effective window is shared.
+- `refreshInBackground` (default `true`): when `false`, the background task
+  doesn't refresh this connector's tokens ahead of time, neither before access
+  tokens expire nor before refresh tokens expire. Tokens are still refreshed
+  when they're found expired on use or after an upstream 401. The global
+  `oauth.refreshTokensInBackground` must also be enabled for background
+  refresh to run at all.
+- `refreshTimeBeforeExpiry` sets how long before the access token expires the
+  background task refreshes this connector's tokens. If unset, the global
+  `oauth.refreshTokensTimeBeforeExpiry` (default `10m`) applies. Each
+  connection uses the value from its own connector generation.
 - `refreshTimeBeforeRefreshTokenExpiry` (default `24h`) sets how long before a
   reported refresh-token expiry to refresh. It is capped at half the refresh
   token's remaining lifetime.
