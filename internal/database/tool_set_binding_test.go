@@ -463,7 +463,7 @@ func TestToolSetBindingMigrationReversibility(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.GetConnection(ctx, connection.Id)
 	require.NoError(t, err)
-	migrateDatabaseToVersion(t, db.(*service), 19)
+	migrateDatabaseToVersion(t, db.(*service), 24)
 	_, err = db.GetToolSetBinding(ctx, binding.Id)
 	require.ErrorIs(t, err, ErrNotFound)
 	_, err = db.CreateToolSetBinding(ctx, toolSet.Id, connection.Id, 1)

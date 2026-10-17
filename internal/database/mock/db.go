@@ -1356,6 +1356,21 @@ func (mr *MockDBMockRecorder) InsertProbeOutcome(ctx, connectionId, probeId, out
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertProbeOutcome", reflect.TypeOf((*MockDB)(nil).InsertProbeOutcome), ctx, connectionId, probeId, outcome, errorMessage)
 }
 
+// InstallExplicitToolSetInventory mocks base method.
+func (m *MockDB) InstallExplicitToolSetInventory(ctx context.Context, install database.ToolSetInventoryInstall) (*database.ToolSetBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InstallExplicitToolSetInventory", ctx, install)
+	ret0, _ := ret[0].(*database.ToolSetBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InstallExplicitToolSetInventory indicates an expected call of InstallExplicitToolSetInventory.
+func (mr *MockDBMockRecorder) InstallExplicitToolSetInventory(ctx, install interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InstallExplicitToolSetInventory", reflect.TypeOf((*MockDB)(nil).InstallExplicitToolSetInventory), ctx, install)
+}
+
 // ListActorsBuilder mocks base method.
 func (m *MockDB) ListActorsBuilder() database.ListActorsBuilder {
 	m.ctrl.T.Helper()

@@ -324,7 +324,7 @@ func TestGeneratedToolMigration(t *testing.T) {
 	require.Equal(t, base.Name, name)
 	require.Equal(t, base.ActiveRevision, revision)
 
-	migrateDatabaseToVersion(t, s, 23)
+	migrateDatabaseToVersion(t, s, 24)
 	stored, err := db.GetTool(ctx, base.Id)
 	require.NoError(t, err)
 	require.Equal(t, before, stored)
