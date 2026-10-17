@@ -307,7 +307,12 @@ func (s *service) commitExplicitToolSetInventory(
 		return nil, ErrToolSetInventoryGenerationConflict
 	}
 
-	if err := resolveToolSetInventoryIdentities(params, tools, revisions, existing); err != nil {
+	if err := resolveToolSetInventoryIdentities(
+		params,
+		tools,
+		revisions,
+		existing,
+	); err != nil {
 		return nil, err
 	}
 
