@@ -58,7 +58,14 @@ func (o *oAuth2Connection) createDbTokenFromResponse(
 	resp *gentleman.Response,
 	refreshFrom *database.OAuth2Token,
 ) (*database.OAuth2Token, error) {
-	return o.createDbTokenFromResponseWithOptions(ctx, resp, refreshFrom, tokenPersistOptions{PersistRefreshToken: true})
+	return o.createDbTokenFromResponseWithOptions(
+		ctx,
+		resp,
+		refreshFrom,
+		tokenPersistOptions{
+			PersistRefreshToken: true,
+		},
+	)
 }
 
 // createDbTokenFromResponseWithOptions parses a token-endpoint response and
@@ -96,7 +103,9 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 	requestedScopes := JoinScopes(effectiveScopes)
 
 	persistRefreshToken := jsonResp.RefreshToken != "" && opts.PersistRefreshToken
-	if jsonResp.RefreshToken != "" && !opts.PersistRefreshToken && o.logger != nil {
+	if jsonResp.RefreshToken != "" &&
+		!opts.PersistRefreshToken &&
+		o.logger != nil {
 		o.logger.WarnContext(ctx, "oauth token response included refresh_token for client_credentials grant; discarding")
 	}
 
@@ -126,8 +135,12 @@ func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
 		createdByActorId = &actorId
 	}
 
-	persistCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tokenPersistTimeout)
+	persistCtx, cancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		tokenPersistTimeout,
+	)
 	defer cancel()
+	
 	res, err := retry.Do(persistCtx, retry.Options[*database.OAuth2Token]{
 		MaxAttempts: tokenPersistMaxAttempts,
 		Backoff:     &retry.LinearBackOff{Step: tokenPersistBackoffStep},
