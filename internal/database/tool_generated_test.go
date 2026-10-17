@@ -342,7 +342,7 @@ func TestGeneratedToolMigration(t *testing.T) {
 		_, err := db.GetTool(ctx, tool.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 	}
-	
+
 	_, err = db.GetToolSetBinding(ctx, binding.Id)
 	require.NoError(t, err, "the downgrade removes inventory, not membership")
 }

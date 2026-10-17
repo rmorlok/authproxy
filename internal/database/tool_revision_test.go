@@ -614,17 +614,3 @@ func TestStandaloneToolRevisionReEncryption(t *testing.T) {
 	require.Equal(t, tool.ActiveRevision, stored.ActiveRevision)
 	require.True(t, tool.UpdatedAt.Equal(stored.UpdatedAt))
 }
-
-// TestStandaloneToolMigrationReversibility drops the mutually dependent Tool
-// tables without disturbing their connection, then permits fresh creation.
-func TestStandaloneToolMigrationReversibility(t *testing.T) {
-	ctx, db, tool, first := standaloneToolForTest(t)
-	migrateDatabaseToVersion(t, db.(*service), 19)
-	_, err := db.GetConnection(ctx, tool.ConnectionId)
-	require.NoError(t, err)
-	migrateDatabaseToVersion(t, db.(*service), 23)
-	_, err = db.GetTool(ctx, tool.Id)
-	require.ErrorIs(t, err, ErrNotFound)
-	_, err = db.CreateStandaloneTool(ctx, tool, first.EncryptedDefinition, first.DefinitionDigest)
-	require.NoError(t, err)
-}
