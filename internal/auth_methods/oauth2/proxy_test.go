@@ -29,6 +29,7 @@ func TestClassifyAndRecordRefreshFailure_PermanentFlipsUnhealthy(t *testing.T) {
 	permanent := []tokenRefreshCategory{
 		tokenRefreshNoRefreshToken,
 		tokenRefreshInvalidGrant,
+		tokenRefreshInvalidGrantAfterAmbiguousAttempt,
 		tokenRefreshInvalidClient,
 		tokenRefreshProvider4xxOther,
 		tokenRefreshMalformedResponse,
@@ -283,7 +284,7 @@ func TestPostRefreshWithRetry_SuccessFirstAttempt(t *testing.T) {
 	})
 	o := newRefreshRetryTestConn(t)
 
-	resp, attempts, err := o.postRefreshWithRetry(
+	resp, attempts, _, err := o.postRefreshWithRetry(
 		context.Background(),
 		gentleman.New(),
 		srv.URL,
@@ -317,7 +318,7 @@ func TestPostRefreshWithRetry_4xxNotRetried(t *testing.T) {
 			})
 			o := newRefreshRetryTestConn(t)
 
-			resp, attempts, err := o.postRefreshWithRetry(
+			resp, attempts, _, err := o.postRefreshWithRetry(
 				context.Background(),
 				gentleman.New(),
 				srv.URL,
@@ -344,7 +345,7 @@ func TestPostRefreshWithRetry_5xxThenSuccess(t *testing.T) {
 	o := newRefreshRetryTestConn(t)
 
 	start := time.Now()
-	resp, attempts, err := o.postRefreshWithRetry(
+	resp, attempts, _, err := o.postRefreshWithRetry(
 		context.Background(),
 		gentleman.New(),
 		srv.URL,
@@ -373,7 +374,7 @@ func TestPostRefreshWithRetry_5xxExhausted(t *testing.T) {
 	})
 	o := newRefreshRetryTestConn(t)
 
-	resp, attempts, err := o.postRefreshWithRetry(
+	resp, attempts, _, err := o.postRefreshWithRetry(
 		context.Background(),
 		gentleman.New(),
 		srv.URL,
@@ -400,7 +401,7 @@ func TestPostRefreshWithRetry_TransportErrorRetried(t *testing.T) {
 	srv.Close()
 	o := newRefreshRetryTestConn(t)
 
-	resp, attempts, err := o.postRefreshWithRetry(
+	resp, attempts, _, err := o.postRefreshWithRetry(
 		context.Background(),
 		gentleman.New(),
 		closedURL,
@@ -434,7 +435,7 @@ func TestPostRefreshWithRetry_ContextCancelledBeforeRetry(t *testing.T) {
 		cancel()
 	}()
 
-	resp, attempts, err := o.postRefreshWithRetry(
+	resp, attempts, _, err := o.postRefreshWithRetry(
 		ctx,
 		gentleman.New(),
 		srv.URL,

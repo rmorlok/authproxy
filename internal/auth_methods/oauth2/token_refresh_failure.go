@@ -34,6 +34,15 @@ const (
 	// been used (rotation enforcement). Permanent — the user must
 	// re-authenticate.
 	tokenRefreshInvalidGrant tokenRefreshCategory = "invalid_grant"
+	// tokenRefreshInvalidGrantAfterAmbiguousAttempt — invalid_grant
+	// following an attempt (earlier in the same refresh, or a recent
+	// refresh of the same token) that may have reached the provider without
+	// AuthProxy seeing the answer: a dropped connection, a read timeout, or
+	// a 5xx. The likely cause is that our own lost attempt consumed a
+	// one-time-use refresh token, so this points at network or provider
+	// trouble rather than revoked consent. Permanent — the refresh token is
+	// unusable either way and the user must re-authenticate.
+	tokenRefreshInvalidGrantAfterAmbiguousAttempt tokenRefreshCategory = "invalid_grant_after_ambiguous_attempt"
 	// tokenRefreshInvalidClient — provider returned `error=invalid_client`.
 	// Misconfigured client_id or client_secret. Permanent from a runtime
 	// perspective — refreshes will keep failing until the config is fixed,
@@ -65,6 +74,7 @@ func (c tokenRefreshCategory) IsPermanent() bool {
 	switch c {
 	case tokenRefreshNoRefreshToken,
 		tokenRefreshInvalidGrant,
+		tokenRefreshInvalidGrantAfterAmbiguousAttempt,
 		tokenRefreshInvalidClient,
 		tokenRefreshProvider4xxOther,
 		tokenRefreshMalformedResponse:
