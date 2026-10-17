@@ -97,13 +97,18 @@ func (o *oAuth2Connection) ambiguousRefreshMarkerKey() string {
 // recordAmbiguousRefresh notes that a refresh redeeming tokenId ended without
 // a definitive answer. Best effort: a Redis failure only loses diagnostic
 // precision, so it is logged and otherwise ignored.
-func (o *oAuth2Connection) recordAmbiguousRefresh(ctx context.Context, tokenId apid.ID) {
+func (o *oAuth2Connection) recordAmbiguousRefresh(
+	ctx context.Context,
+	tokenId apid.ID,
+) {
 	if o.r == nil {
 		return
 	}
 	ctx, cancel := detachedMarkerCtx(ctx)
 	defer cancel()
-	if err := o.r.Set(ctx, o.ambiguousRefreshMarkerKey(), tokenId.String(), ambiguousRefreshMarkerTTL).Err(); err != nil {
+	
+	if err := o.r.
+		Set(ctx, o.ambiguousRefreshMarkerKey(), tokenId.String(), ambiguousRefreshMarkerTTL).Err(); err != nil {
 		o.logger.WarnContext(ctx, "failed to record ambiguous oauth token refresh", "error", err)
 	}
 }
@@ -111,19 +116,27 @@ func (o *oAuth2Connection) recordAmbiguousRefresh(ctx context.Context, tokenId a
 // hadAmbiguousRefresh reports whether a previous refresh that redeemed
 // tokenId ended ambiguously (and the marker has not expired). Lookup errors
 // are treated as "no".
-func (o *oAuth2Connection) hadAmbiguousRefresh(ctx context.Context, tokenId apid.ID) bool {
+func (o *oAuth2Connection) hadAmbiguousRefresh(
+	ctx context.Context,
+	tokenId apid.ID,
+) bool {
 	if o.r == nil {
 		return false
 	}
 	ctx, cancel := detachedMarkerCtx(ctx)
 	defer cancel()
-	val, err := o.r.Get(ctx, o.ambiguousRefreshMarkerKey()).Result()
+
+	val, err := o.r.
+		Get(ctx, o.ambiguousRefreshMarkerKey()).
+		Result()
 	if err != nil {
 		if !errors.Is(err, redis.Nil) {
 			o.logger.WarnContext(ctx, "failed to read ambiguous oauth token refresh marker", "error", err)
 		}
+
 		return false
 	}
+
 	return val == tokenId.String()
 }
 
@@ -135,6 +148,7 @@ func (o *oAuth2Connection) clearAmbiguousRefresh(ctx context.Context) {
 	}
 	ctx, cancel := detachedMarkerCtx(ctx)
 	defer cancel()
+
 	if err := o.r.Del(ctx, o.ambiguousRefreshMarkerKey()).Err(); err != nil {
 		o.logger.WarnContext(ctx, "failed to clear ambiguous oauth token refresh marker", "error", err)
 	}

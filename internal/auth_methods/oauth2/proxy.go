@@ -249,28 +249,45 @@ func (o *oAuth2Connection) refreshAccessTokenLocked(
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 
-	refreshResp, attempts, sawAmbiguous, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values, authHeader, o.auth.Token.GetRefreshTimeout())
+	refreshResp, attempts, sawAmbiguous, err := o.postRefreshWithRetry(
+		ctx,
+		client,
+		tokenEndpoint,
+		values,
+		authHeader,
+		o.auth.Token.GetRefreshTimeout(),
+	)
 	if err != nil {
 		// Transport-layer failure — provider never produced a status code.
 		// Transient by classification; does not flip unhealthy.
 		if sawAmbiguous {
 			o.recordAmbiguousRefresh(ctx, token.Id)
 		}
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNetworkError, 0, "", attempts, err)
+
+		return nil, o.classifyAndRecordRefreshFailure(
+			ctx,
+			tokenRefreshNetworkError,
+			0,  // providerStatusCode
+			"", // providerErr
+			attempts,
+			err)
 	}
 
 	if refreshResp.StatusCode != 200 {
 		category, providerErr := classifyTokenRefreshStatus(refreshResp.StatusCode, refreshResp.Bytes())
-		if category == tokenRefreshInvalidGrant && (sawAmbiguous || o.hadAmbiguousRefresh(ctx, token.Id)) {
+		if category == tokenRefreshInvalidGrant &&
+			(sawAmbiguous || o.hadAmbiguousRefresh(ctx, token.Id)) {
 			// Most likely our own earlier attempt consumed this refresh token
 			// and its response was lost, rather than the user revoking access.
 			category = tokenRefreshInvalidGrantAfterAmbiguousAttempt
 		} else if sawAmbiguous {
 			o.recordAmbiguousRefresh(ctx, token.Id)
 		}
+
 		err := fmt.Errorf("refresh token request failed with status %d", refreshResp.StatusCode)
 		return nil, o.classifyAndRecordRefreshFailure(ctx, category, refreshResp.StatusCode, providerErr, attempts, err)
 	}
+
 	// A definitive success supersedes any earlier ambiguous attempt.
 	defer o.clearAmbiguousRefresh(ctx)
 
