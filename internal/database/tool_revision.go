@@ -122,7 +122,8 @@ func (r *ToolRevision) Validate() error {
 		return err
 	}
 
-	if r.SourceGeneration != nil && (*r.SourceGeneration == 0 || *r.SourceGeneration > math.MaxInt64) {
+	if r.SourceGeneration != nil &&
+		(*r.SourceGeneration == 0 || *r.SourceGeneration > math.MaxInt64) {
 		return errors.New("tool source generation must be a positive signed 64-bit integer")
 	}
 
