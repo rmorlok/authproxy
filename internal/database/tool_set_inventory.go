@@ -20,22 +20,25 @@ import (
 
 var (
 	// ErrToolSetBindingInventoryConflict prevents first installation from being
-	// used to replace an installed inventory or reuse retained identities.
-	ErrToolSetBindingInventoryConflict = errors.New("toolset binding already has an inventory")
+	// used to replace an installed inventory or reuse retained identities, and
+	// rejects installed inventory counters that cannot advance.
+	ErrToolSetBindingInventoryConflict = errors.New("toolset binding inventory state conflicts")
 
-	// ErrToolSetInventoryGenerationConflict requires preparation against the
-	// current primary; publication of a new primary invalidates pending work.
-	ErrToolSetInventoryGenerationConflict = errors.New("toolset inventory generation is no longer primary")
+	// ErrToolSetInventoryGenerationConflict means the target is no longer
+	// eligible: first installation requires primary, replacement primary/active.
+	ErrToolSetInventoryGenerationConflict = errors.New("toolset inventory generation is no longer eligible")
 
-	// ErrToolSetInventoryConnectionNotReady leaves unconfigured or disconnected
-	// assignments pending rather than installing their first inventory.
+	// ErrToolSetInventoryConnectionNotReady preserves the prior inventory while
+	// the connection is unconfigured or disconnected.
 	ErrToolSetInventoryConnectionNotReady = errors.New("toolset inventory connection is not configured")
 )
 
 // PreparedToolSetTool pairs a generated identity and its discovery metadata with
 // a compiled, encrypted explicit-template definition. The trusted caller supplies
-// a fresh ID, exact source key, name, namespace, connection, and binding identity.
-// This layer derives parent labels, revision one, timestamps, and provenance.
+// a provisional fresh ID, exact source key, name, namespace, connection, and
+// binding identity. Replacement resolves retained IDs by source key; an omitted
+// name retains the existing name. This layer derives parent labels, revision
+// numbers, timestamps, and provenance.
 // Compilation and encryption must finish before calling the database; definitions
 // must retain symbolic configuration references, not resolved connection values.
 type PreparedToolSetTool struct {
@@ -44,10 +47,10 @@ type PreparedToolSetTool struct {
 	DefinitionDigest    string
 }
 
-// ToolSetInventoryInstall captures one complete first inventory prepared from
-// a published explicit ToolSet generation. Both nil and empty Tools install an
-// empty inventory. This operation does not support replacement or remote catalogs:
-// those need identity restoration and connection-context fencing, respectively.
+// ToolSetInventoryInstall captures a complete inventory prepared from a
+// published explicit ToolSet generation, for first installation or replacement.
+// Both nil and empty Tools install an empty inventory. Remote catalogs require
+// connection-context fencing and are not supported by these explicit operations.
 type ToolSetInventoryInstall struct {
 	BindingId                apid.ID
 	ExpectedEpoch            uint64
@@ -80,7 +83,7 @@ func (p ToolSetInventoryInstall) prepare(
 
 	tools := make([]Tool, 0, len(p.Tools))
 	revisions := make([]*ToolRevision, 0, len(p.Tools))
-	ids, keys, names := map[apid.ID]bool{}, map[string]bool{}, map[common.ResourceName]bool{}
+	keys := map[string]bool{}
 
 	for _, entry := range p.Tools {
 		candidate := entry.Tool
@@ -107,12 +110,10 @@ func (p ToolSetInventoryInstall) prepare(
 			return nil, nil, err
 		}
 
-		if ids[candidate.Id] ||
-			keys[candidate.SourceKey] ||
-			names[candidate.Name] {
-			return nil, nil, errors.New("tool inventory contains duplicate ids, source keys, or names")
+		if keys[candidate.SourceKey] {
+			return nil, nil, errors.New("tool inventory contains duplicate source keys")
 		}
-		ids[candidate.Id], keys[candidate.SourceKey], names[candidate.Name] = true, true, true
+		keys[candidate.SourceKey] = true
 
 		revision := newToolRevision(
 			ctx,
@@ -135,7 +136,7 @@ func (p ToolSetInventoryInstall) prepare(
 
 // toolSetInventoryNamespace checks readiness and both namespace parents after
 // locking the ToolSet and Connection. PostgreSQL share locks keep namespace soft
-// deletion from racing this first install; SQLite's initial parent writes already
+// deletion from racing this inventory write; SQLite's initial parent writes already
 // serialize writers. This runs even for empty inventories. It reads no credentials
 // or configuration and does not assert that a remote catalog context is current.
 func (s *service) toolSetInventoryNamespace(
@@ -191,6 +192,17 @@ func (s *service) InstallExplicitToolSetInventory(
 	ctx context.Context,
 	params ToolSetInventoryInstall,
 ) (*ToolSetBinding, error) {
+	return s.commitExplicitToolSetInventory(ctx, params, 0)
+}
+
+// commitExplicitToolSetInventory shares parent locking, readiness, preparation,
+// and atomic publication between first installation and explicit replacement.
+// expectedGeneration is zero only for the pending-to-installed transition.
+func (s *service) commitExplicitToolSetInventory(
+	ctx context.Context,
+	params ToolSetInventoryInstall,
+	expectedGeneration uint64,
+) (*ToolSetBinding, error) {
 	tools, revisions, err := params.prepare(ctx)
 	if err != nil {
 		return nil, err
@@ -244,8 +256,17 @@ func (s *service) InstallExplicitToolSetInventory(
 		return nil, ErrToolSetBindingEpochConflict
 	}
 
-	if binding.AppliedGeneration != nil || binding.InventoryRevision != 0 {
-		return nil, ErrToolSetBindingInventoryConflict
+	if expectedGeneration == 0 {
+		if binding.AppliedGeneration != nil || binding.InventoryRevision != 0 {
+			return nil, ErrToolSetBindingInventoryConflict
+		}
+	} else {
+		if binding.AppliedGeneration == nil || *binding.AppliedGeneration != expectedGeneration {
+			return nil, ErrToolSetBindingGenerationConflict
+		}
+		if binding.InventoryRevision == 0 || binding.InventoryRevision >= math.MaxInt64 {
+			return nil, ErrToolSetBindingInventoryConflict
+		}
 	}
 
 	namespace, err := s.toolSetInventoryNamespace(ctx, tx, binding)
@@ -253,24 +274,14 @@ func (s *service) InstallExplicitToolSetInventory(
 		return nil, err
 	}
 
-	// A pending binding with retained rows must not be mistaken for a fresh
-	// assignment. Restoration/replacement will use a separate operation.
-	var existing apid.ID
-	err = s.sq.
-		Select("id").
-		From(ToolsTable).
-		Where(sq.Eq{
-			"binding_id": binding.Id,
-		}).
-		Limit(1).
-		RunWith(tx).
-		QueryRowContext(ctx).
-		Scan(&existing)
-	if err == nil {
-		return nil, ErrToolSetBindingInventoryConflict
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
+	// Include tombstones so a returning source key recovers its original ID and
+	// revision sequence. A pending binding may not reuse any retained inventory.
+	existing, err := s.lockToolSetInventory(ctx, tx, binding.Id)
+	if err != nil {
 		return nil, err
+	}
+	if expectedGeneration == 0 && len(existing) != 0 {
+		return nil, ErrToolSetBindingInventoryConflict
 	}
 
 	var state toolsetschema.ToolSetReleaseState
@@ -291,8 +302,13 @@ func (s *service) InstallExplicitToolSetInventory(
 	if err != nil {
 		return nil, err
 	}
-	if state != toolsetschema.ToolSetReleaseStatePrimary {
+	if state != toolsetschema.ToolSetReleaseStatePrimary &&
+		(expectedGeneration == 0 || state != toolsetschema.ToolSetReleaseStateActive) {
 		return nil, ErrToolSetInventoryGenerationConflict
+	}
+
+	if err := resolveToolSetInventoryIdentities(params, tools, revisions, existing); err != nil {
+		return nil, err
 	}
 
 	// Validate every parent assignment and derive metadata before inserting any
@@ -308,18 +324,26 @@ func (s *service) InstallExplicitToolSetInventory(
 		}
 	}
 
-	for i := range tools {
+	if expectedGeneration != 0 {
+		// Release all owned names before restoring the new complete inventory,
+		// permitting swaps and reuse of removed names in the same transaction.
+		// Already-retired rows keep their original removal timestamp and history.
+		now := apctx.GetClock(ctx).Now()
 		_, err = s.sq.
-			Insert(ToolsTable).
-			Columns(tools[i].cols()...).
-			Values(tools[i].values()...).
+			Update(ToolsTable).
+			Set("deleted_at", now).
+			Set("updated_at", now).
+			Where(sq.Eq{"binding_id": binding.Id, "deleted_at": nil}).
 			RunWith(tx).
 			ExecContext(ctx)
 		if err != nil {
-			return nil, wrapDatabaseMutationError("failed to install tool identity", err)
+			return nil, wrapDatabaseMutationError("failed to retire prior tool inventory", err)
 		}
+	}
 
-		if err := s.insertToolRevision(ctx, tx, revisions[i]); err != nil {
+	for i := range tools {
+		previous, retained := existing[tools[i].SourceKey]
+		if err := s.writeToolSetInventoryEntry(ctx, tx, &tools[i], revisions[i], previous, retained); err != nil {
 			return nil, err
 		}
 	}
@@ -328,14 +352,14 @@ func (s *service) InstallExplicitToolSetInventory(
 	err = s.sq.
 		Update(ToolSetBindingsTable).
 		Set("applied_generation", params.Generation).
-		Set("inventory_revision", 1).
+		Set("inventory_revision", sq.Expr("inventory_revision + 1")).
 		Set("epoch", sq.Expr("epoch + 1")).
 		Set("updated_at", apctx.GetClock(ctx).Now()).
 		Where(sq.Eq{
 			"id":                 binding.Id,
 			"epoch":              params.ExpectedEpoch,
-			"applied_generation": nil,
-			"inventory_revision": 0,
+			"applied_generation": binding.AppliedGeneration,
+			"inventory_revision": binding.InventoryRevision,
 			"deleted_at":         nil,
 		}).
 		Suffix("RETURNING " + strings.Join(result.cols(), ", ")).
