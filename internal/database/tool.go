@@ -36,7 +36,7 @@ var ErrToolManaged = errors.New("tool is managed by a toolset")
 // replacement changes its active revision atomically, while prior definitions
 // remain immutable and inspectable. Labels include authored values and derived
 // parent/self projections. Description and Verbs project the active definition.
-// Generated ownership is retained for future atomic inventory installation;
+// Generated inventories are installed atomically through their binding;
 // generated rows are not yet eligible for current-definition or candidate reads.
 type Tool struct {
 	Id             apid.ID
@@ -386,7 +386,7 @@ func (s *service) lockToolForWrite(
 // Metadata maps are detached and system labels are derived from the parents.
 // Description and Verbs must come from the same prepared plaintext definition;
 // verbs are copied and sorted without changing the caller's input slice.
-// Supplying controller ownership is rejected; generated identities will be
+// Supplying controller ownership is rejected; generated identities are
 // installed only by an atomic binding inventory operation.
 func (s *service) CreateStandaloneTool(
 	ctx context.Context,

@@ -171,6 +171,10 @@ type DB interface {
 	// GetToolSetBindingForConnection finds the current assignment for a parent pair.
 	GetToolSetBindingForConnection(ctx context.Context, toolSetId apid.ID, connectionId apid.ID) (*ToolSetBinding, error)
 
+	// InstallExplicitToolSetInventory atomically pins a pending binding to its
+	// prepared primary generation and installs its complete first Tool inventory.
+	InstallExplicitToolSetInventory(ctx context.Context, install ToolSetInventoryInstall) (*ToolSetBinding, error)
+
 	// DeleteToolSetBinding retires a no-longer-matching assignment using its epoch
 	// and current selector snapshot. Deleted-parent cleanup ignores selector revision.
 	DeleteToolSetBinding(ctx context.Context, id apid.ID, expectedEpoch uint64, expectedSelectorRevision uint64) error

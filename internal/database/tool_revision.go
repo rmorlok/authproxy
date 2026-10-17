@@ -25,7 +25,8 @@ const ToolRevisionsTable = "tool_revisions"
 // ConnectionId is historical identity, so purging a former connection after a
 // retarget must not delete this revision. Revisions are never updated in place,
 // except that key rotation may replace ciphertext without changing the digest.
-// Source provenance and retention policies will be added with imported Tools.
+// Generated revisions also capture their source generation; catalog provenance
+// and retention policies will be added with imported Tools.
 type ToolRevision struct {
 	ToolId              apid.ID
 	Revision            uint64
@@ -38,6 +39,11 @@ type ToolRevision struct {
 	CreatedAt        time.Time
 	EncryptedAt      *time.Time
 	DeletedAt        *time.Time
+
+	// SourceGeneration is nil for standalone Tools and identifies the published
+	// generation used to prepare a generated revision. The Tool's immutable
+	// binding supplies its source ToolSet; later installations do not rewrite it.
+	SourceGeneration *uint64
 }
 
 func init() {
@@ -63,6 +69,7 @@ func (r *ToolRevision) cols() []string {
 		"created_at",
 		"encrypted_at",
 		"deleted_at",
+		"source_generation",
 	}
 }
 
@@ -77,6 +84,7 @@ func (r *ToolRevision) fields() []any {
 		&r.CreatedAt,
 		&r.EncryptedAt,
 		&r.DeletedAt,
+		&r.SourceGeneration,
 	}
 }
 
@@ -91,6 +99,7 @@ func (r *ToolRevision) values() []any {
 		r.CreatedAt,
 		r.EncryptedAt,
 		r.DeletedAt,
+		r.SourceGeneration,
 	}
 }
 
@@ -111,6 +120,11 @@ func (r *ToolRevision) Validate() error {
 
 	if err := validateToolConnectionID(r.ConnectionId); err != nil {
 		return err
+	}
+
+	if r.SourceGeneration != nil &&
+		(*r.SourceGeneration == 0 || *r.SourceGeneration > math.MaxInt64) {
+		return errors.New("tool source generation must be a positive signed 64-bit integer")
 	}
 
 	if r.EncryptedDefinition.IsZero() {

@@ -30,20 +30,27 @@ var (
 // ToolSetBinding is an internal assignment identity, initially pending inventory
 // installation. It is not a public resource or an execution grant. Removing and
 // recreating the same pair allocates a new ID; a removed ID is never revived.
-// Applied generations and inventory pointers must be added together with atomic
-// inventory operations, not independently changed by these membership methods.
+// Applied generation and inventory revision change together with the complete
+// generated inventory, never independently through membership operations.
 type ToolSetBinding struct {
 	Id           apid.ID
 	ToolSetId    apid.ID
 	ConnectionId apid.ID
 
-	// Epoch starts at one and advances on removal. Future inventory commits must
-	// advance it too, alongside selector and connection-context preconditions.
+	// Epoch starts at one and advances on inventory installation and removal.
+	// Future inventory and context changes must advance it too.
 	// It protects one assignment's lifetime, not the lifetime of the parent pair.
 	Epoch     uint64
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
+
+	// AppliedGeneration is nil until the first complete inventory is installed.
+	// Removed bindings retain their last installed generation for inspection.
+	AppliedGeneration *uint64
+	// InventoryRevision is zero while pending and advances with complete
+	// inventories. It differs from Epoch, which also advances on removal.
+	InventoryRevision uint64
 }
 
 // cols lists binding columns in migration order, matching fields and values.
@@ -56,6 +63,8 @@ func (b *ToolSetBinding) cols() []string {
 		"created_at",
 		"updated_at",
 		"deleted_at",
+		"applied_generation",
+		"inventory_revision",
 	}
 }
 
@@ -69,6 +78,8 @@ func (b *ToolSetBinding) fields() []any {
 		&b.CreatedAt,
 		&b.UpdatedAt,
 		&b.DeletedAt,
+		&b.AppliedGeneration,
+		&b.InventoryRevision,
 	}
 }
 
@@ -82,10 +93,13 @@ func (b *ToolSetBinding) values() []any {
 		b.CreatedAt,
 		b.UpdatedAt,
 		b.DeletedAt,
+		b.AppliedGeneration,
+		b.InventoryRevision,
 	}
 }
 
-// Validate checks typed identities and a positive epoch in the shared SQL range.
+// Validate checks typed identities, counters in the shared SQL range, and the
+// paired pending/installed state of the applied generation and inventory.
 // Current parent liveness and membership require transactional database checks.
 func (b *ToolSetBinding) Validate() error {
 	if b == nil {
@@ -102,6 +116,19 @@ func (b *ToolSetBinding) Validate() error {
 
 	if b.Epoch == 0 || b.Epoch > math.MaxInt64 {
 		return errors.New("toolset binding epoch must be a positive signed 64-bit integer")
+	}
+
+	if b.AppliedGeneration == nil {
+		if b.InventoryRevision != 0 {
+			return errors.New("pending toolset binding must have inventory revision zero")
+		}
+	} else {
+		if *b.AppliedGeneration == 0 || *b.AppliedGeneration > math.MaxInt64 {
+			return errors.New("applied toolset generation must be a positive signed 64-bit integer")
+		}
+		if b.InventoryRevision == 0 || b.InventoryRevision > math.MaxInt64 {
+			return errors.New("installed toolset inventory revision must be a positive signed 64-bit integer")
+		}
 	}
 
 	return nil
@@ -365,8 +392,10 @@ func (s *service) GetToolSetBindingForConnection(
 // longer matches the expected current selector, or a parent has been deleted.
 // Deleted-parent cleanup ignores expectedSelectorRevision (including zero).
 // Epoch is always checked and incremented atomically; an old identity can never
-// remove a later assignment for the same pair. This handles pending membership,
-// not an installed inventory or execution-readiness decision.
+// remove a later assignment for the same pair. Live generated Tools are retired
+// in the same transaction, releasing their names while retaining source-key
+// tombstones and revision history. Installed generation/revision markers remain
+// as inspection history; removal does not publish a replacement inventory.
 func (s *service) DeleteToolSetBinding(
 	ctx context.Context,
 	id apid.ID,
@@ -436,6 +465,17 @@ func (s *service) DeleteToolSetBinding(
 
 	if count == 0 {
 		return ErrToolSetBindingEpochConflict
+	}
+
+	_, err = s.sq.
+		Update(ToolsTable).
+		Set("deleted_at", now).
+		Set("updated_at", now).
+		Where(sq.Eq{"binding_id": id, "deleted_at": nil}).
+		RunWith(tx).
+		ExecContext(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to retire toolset binding inventory: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
