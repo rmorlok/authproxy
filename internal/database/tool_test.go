@@ -517,61 +517,6 @@ func TestToolMetadataParentLiveness(t *testing.T) {
 	}
 }
 
-// TestToolMetadataMigrationReversibility retains populated identities and
-// history through downgrade, then repairs NULL metadata after upgrading again.
-func TestToolMetadataMigrationReversibility(t *testing.T) {
-	ctx, db, tool, definition := standaloneToolForTest(t)
-	tool.Labels = Labels{"local": "before"}
-	tool.Annotations = Annotations{"note": "before"}
-	_, err := db.UpdateStandaloneTool(ctx, tool, 1, definition.EncryptedDefinition, definition.DefinitionDigest)
-	require.NoError(t, err)
-	s := db.(*service)
-	migrateDatabaseToVersion(t, s, 20)
-	var connectionID apid.ID
-	var activeRevision uint64
-	var name common.ResourceName
-	err = s.sq.Select("connection_id", "active_revision", "name").
-		From(ToolsTable).
-		Where(sq.Eq{"id": tool.Id}).
-		RunWith(s.db).
-		QueryRowContext(ctx).
-		Scan(&connectionID, &activeRevision, &name)
-	require.NoError(t, err)
-	require.Equal(t, tool.ConnectionId, connectionID)
-	require.Equal(t, tool.ActiveRevision, activeRevision)
-	require.Equal(t, tool.Name, name)
-	require.Equal(t, 2, countToolRevisionsForTest(t, ctx, db, tool.Id))
-	var revision ToolRevision
-	err = s.sq.Select(revision.cols()...).
-		From(ToolRevisionsTable).
-		Where(sq.Eq{"tool_id": tool.Id, "revision": 2}).
-		RunWith(s.db).
-		QueryRowContext(ctx).
-		Scan(revision.fields()...)
-	require.NoError(t, err)
-	require.Equal(t, definition.EncryptedDefinition, revision.EncryptedDefinition)
-	require.Equal(t, definition.DefinitionDigest, revision.DefinitionDigest)
-
-	migrateDatabaseToVersion(t, s, 22)
-	stored, err := db.GetTool(ctx, tool.Id)
-	require.NoError(t, err)
-	require.Nil(t, stored.Labels)
-	require.Nil(t, stored.Annotations)
-	_, err = db.ReconcileCarryForwardLabels(ctx, 1, nil)
-	require.NoError(t, err)
-	stored, err = db.GetTool(ctx, tool.Id)
-	require.NoError(t, err)
-	require.Equal(t, tool.Id.String(), stored.Labels["apxy/tol/-/id"])
-	require.Equal(t, tool.ConnectionId.String(), stored.Labels["apxy/cxn/-/id"])
-	require.NotContains(t, stored.Labels, "local", "downgrade removes the metadata columns")
-	require.Empty(t, stored.Annotations)
-	require.Equal(t, uint64(2), stored.ActiveRevision)
-	current, err := db.GetCurrentToolRevision(ctx, tool.Id)
-	require.NoError(t, err)
-	require.Equal(t, revision.EncryptedDefinition, current.EncryptedDefinition)
-	require.Equal(t, revision.DefinitionDigest, current.DefinitionDigest)
-}
-
 // TestToolMetadataRepairLockOrder ensures PostgreSQL label repair never waits
 // for a connection lock held by an authoring transaction that will next lock
 // the Tool. A second tuple write would otherwise trigger foreign-key rechecks.

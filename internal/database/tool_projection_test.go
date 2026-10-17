@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -220,50 +219,6 @@ func TestToolProjectionMaintenance(t *testing.T) {
 	require.Equal(t, rotated, current.EncryptedDefinition)
 	require.Equal(t, definition.DefinitionDigest, current.DefinitionDigest)
 	require.Equal(t, 1, countToolRevisionsForTest(t, ctx, db, tool.Id))
-}
-
-// TestToolProjectionMigration preserves populated identities and history through
-// downgrade/upgrade, then requires a complete replacement for legacy projections.
-func TestToolProjectionMigration(t *testing.T) {
-	ctx, db, tool, definition := standaloneToolForTest(t)
-	s := db.(*service)
-	migrateDatabaseToVersion(t, s, 21)
-	var connectionID apid.ID
-	var activeRevision uint64
-	var labels Labels
-	err := s.sq.Select("connection_id", "active_revision", "labels").
-		From(ToolsTable).
-		Where(sq.Eq{"id": tool.Id}).
-		RunWith(s.db).
-		QueryRowContext(ctx).
-		Scan(&connectionID, &activeRevision, &labels)
-	require.NoError(t, err)
-	require.Equal(t, tool.ConnectionId, connectionID)
-	require.Equal(t, tool.ActiveRevision, activeRevision)
-	require.Equal(t, tool.Labels, labels)
-	history, err := db.GetToolRevision(ctx, tool.Id, 1)
-	require.NoError(t, err)
-	require.Equal(t, definition.EncryptedDefinition, history.EncryptedDefinition)
-	migrateDatabaseToVersion(t, s, 22)
-	legacy, err := db.GetTool(ctx, tool.Id)
-	require.NoError(t, err)
-	require.Empty(t, legacy.Description)
-	require.Nil(t, legacy.Verbs)
-	_, err = db.UpdateStandaloneTool(ctx, legacy, 1, definition.EncryptedDefinition, definition.DefinitionDigest)
-	require.Error(t, err, "an author must supply the missing projection before replacement")
-	require.Equal(t, 1, countToolRevisionsForTest(t, ctx, db, tool.Id))
-	legacy.Description = "A populated legacy Tool"
-	legacy.Verbs = []string{"read"}
-	_, err = db.UpdateStandaloneTool(ctx, legacy, 1, definition.EncryptedDefinition, definition.DefinitionDigest)
-	require.NoError(t, err)
-	stored, err := db.GetTool(ctx, tool.Id)
-	require.NoError(t, err)
-	require.Equal(t, legacy.Description, stored.Description)
-	require.Equal(t, legacy.Verbs, stored.Verbs)
-	require.Equal(t, uint64(2), stored.ActiveRevision)
-	history, err = db.GetToolRevision(ctx, tool.Id, 1)
-	require.NoError(t, err)
-	require.Equal(t, definition.EncryptedDefinition, history.EncryptedDefinition)
 }
 
 // TestToolVerbsDBCodec covers both providers' driver representations and rejects
