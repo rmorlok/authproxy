@@ -22,10 +22,13 @@ func toolOwnershipBindingForTest(
 	name common.ResourceName,
 ) *ToolSetBinding {
 	t.Helper()
+
 	toolSet := toolSetForDatabaseTest(tool.Namespace, name)
 	require.NoError(t, db.CreateToolSet(ctx, toolSet))
+
 	binding, err := db.CreateToolSetBinding(ctx, toolSet.Id, tool.ConnectionId, 1)
 	require.NoError(t, err)
+
 	return binding
 }
 
@@ -43,11 +46,19 @@ func generatedToolForTest(
 	t.Helper()
 	tool := createToolCandidateForTest(t, ctx, db, base, definition, nil, base.Verbs, base.Labels)
 	s := db.(*service)
-	_, err := s.sq.Update(ToolsTable).Set("binding_id", binding.Id).Set("source_key", key).
-		Where(sq.Eq{"id": tool.Id}).RunWith(s.db).ExecContext(ctx)
+
+	_, err := s.sq.
+		Update(ToolsTable).
+		Set("binding_id", binding.Id).
+		Set("source_key", key).
+		Where(sq.Eq{"id": tool.Id}).
+		RunWith(s.db).
+		ExecContext(ctx)
 	require.NoError(t, err)
+
 	tool, err = db.GetTool(ctx, tool.Id)
 	require.NoError(t, err)
+
 	return tool
 }
 
@@ -97,21 +108,36 @@ func TestGeneratedToolStandaloneGuards(t *testing.T) {
 			candidate.BindingId, candidate.SourceKey = apid.Nil, ""
 		}
 		before := copyToolMetadataForTest(&candidate)
-		_, err := db.UpdateStandaloneTool(ctx, &candidate, 1, definition.EncryptedDefinition, definition.DefinitionDigest)
+		_, err := db.UpdateStandaloneTool(
+			ctx,
+			&candidate,
+			1,
+			definition.EncryptedDefinition,
+			definition.DefinitionDigest,
+		)
 		require.ErrorIs(t, err, ErrToolManaged)
 		require.Equal(t, before, candidate)
 	}
+
 	candidate := copyToolMetadataForTest(base)
 	candidate.BindingId, candidate.SourceKey = binding.Id, "new-operation"
 	before := copyToolMetadataForTest(&candidate)
-	_, err := db.UpdateStandaloneTool(ctx, &candidate, 1, definition.EncryptedDefinition, definition.DefinitionDigest)
+	_, err := db.UpdateStandaloneTool(
+		ctx,
+		&candidate,
+		1,
+		definition.EncryptedDefinition,
+		definition.DefinitionDigest,
+	)
 	require.ErrorIs(t, err, ErrToolManaged)
 	require.Equal(t, before, candidate)
+
 	candidate.Id, candidate.Name = apid.New(apid.PrefixTool), "new-tool"
 	before = copyToolMetadataForTest(&candidate)
 	_, err = db.CreateStandaloneTool(ctx, &candidate, definition.EncryptedDefinition, definition.DefinitionDigest)
 	require.ErrorIs(t, err, ErrToolManaged)
 	require.Equal(t, before, candidate)
+
 	_, err = db.GetTool(ctx, candidate.Id)
 	require.ErrorIs(t, err, ErrNotFound)
 	require.Zero(t, countToolRevisionsForTest(t, ctx, db, candidate.Id))
@@ -120,9 +146,11 @@ func TestGeneratedToolStandaloneGuards(t *testing.T) {
 	stored, err := db.GetTool(ctx, generated.Id)
 	require.NoError(t, err)
 	require.Equal(t, generated, stored)
+
 	unchanged, err := db.GetTool(ctx, base.Id)
 	require.NoError(t, err)
 	require.Equal(t, base, unchanged)
+
 	for _, tool := range []*Tool{generated, base} {
 		require.Equal(t, 1, countToolRevisionsForTest(t, ctx, db, tool.Id))
 		history, err := db.GetToolRevision(ctx, tool.Id, 1)
@@ -130,8 +158,10 @@ func TestGeneratedToolStandaloneGuards(t *testing.T) {
 		require.Equal(t, definition.EncryptedDefinition, history.EncryptedDefinition)
 		require.Equal(t, definition.DefinitionDigest, history.DefinitionDigest)
 	}
+
 	_, err = db.GetCurrentToolRevision(ctx, generated.Id)
 	require.ErrorIs(t, err, ErrNotFound, "ownership alone must not activate execution")
+
 	page, err := db.ListToolCandidates(ctx, ToolCandidateQuery{NamespaceMatchers: []string{base.Namespace}, Limit: 10})
 	require.NoError(t, err)
 	require.Equal(t, []apid.ID{base.Id}, toolCandidateIDsForTest(page))
@@ -143,20 +173,35 @@ func TestGeneratedToolStandaloneGuards(t *testing.T) {
 func TestGeneratedToolSourceIdentity(t *testing.T) {
 	ctx, db, base, definition := standaloneToolForTest(t)
 	binding := toolOwnershipBindingForTest(t, ctx, db, base, "tools")
-	for _, key := range []string{"lookup", "Lookup", " lookup ", "GET /v1/{id}?a='b'%_\t"} {
+
+	for _, key := range []string{
+		"lookup",
+		"Lookup",
+		" lookup ",
+		"GET /v1/{id}?a='b'%_\t",
+	} {
 		tool := generatedToolForTest(t, ctx, db, base, definition, binding, key)
 		require.Equal(t, binding.Id, tool.BindingId)
 		require.Equal(t, key, tool.SourceKey)
 	}
+
 	otherBinding := toolOwnershipBindingForTest(t, ctx, db, base, "other-tools")
 	other := generatedToolForTest(t, ctx, db, base, definition, otherBinding, "lookup")
 	s := db.(*service)
-	_, err := s.sq.Update(ToolsTable).Set("deleted_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"binding_id": binding.Id, "source_key": "lookup"}).RunWith(s.db).ExecContext(ctx)
+	_, err := s.sq.
+		Update(ToolsTable).
+		Set("deleted_at", apctx.GetClock(ctx).Now()).
+		Where(sq.Eq{
+			"binding_id": binding.Id,
+			"source_key": "lookup",
+		}).
+		RunWith(s.db).
+		ExecContext(ctx)
 	require.NoError(t, err)
 	_, err = s.sq.Update(ToolsTable).Set("binding_id", binding.Id).
 		Where(sq.Eq{"id": other.Id}).RunWith(s.db).ExecContext(ctx)
 	require.Error(t, err, "retired source keys cannot allocate a different Tool identity")
+
 	stored, err := db.GetTool(ctx, other.Id)
 	require.NoError(t, err)
 	require.Equal(t, otherBinding.Id, stored.BindingId)
@@ -195,7 +240,11 @@ func TestGeneratedToolParentPurge(t *testing.T) {
 			generated := generatedToolForTest(t, ctx, db, base, definition, binding, "lookup")
 			s := db.(*service)
 			if parent == "binding" {
-				_, err := s.sq.Delete(ToolSetBindingsTable).Where(sq.Eq{"id": binding.Id}).RunWith(s.db).ExecContext(ctx)
+				_, err := s.sq.
+					Delete(ToolSetBindingsTable).
+					Where(sq.Eq{"id": binding.Id}).
+					RunWith(s.db).
+					ExecContext(ctx)
 				require.NoError(t, err)
 				_, err = db.GetTool(ctx, base.Id)
 				require.NoError(t, err, "removing a binding must preserve standalone siblings")
@@ -209,8 +258,13 @@ func TestGeneratedToolParentPurge(t *testing.T) {
 			require.ErrorIs(t, err, ErrNotFound)
 			require.Zero(t, countToolRevisionsForTest(t, ctx, db, generated.Id))
 			var bindings int
-			err = s.sq.Select("COUNT(*)").From(ToolSetBindingsTable).Where(sq.Eq{"id": binding.Id}).
-				RunWith(s.db).QueryRowContext(ctx).Scan(&bindings)
+			err = s.sq.
+				Select("COUNT(*)").
+				From(ToolSetBindingsTable).
+				Where(sq.Eq{"id": binding.Id}).
+				RunWith(s.db).
+				QueryRowContext(ctx).
+				Scan(&bindings)
 			require.NoError(t, err)
 			require.Zero(t, bindings)
 			_, err = db.GetToolSet(ctx, binding.ToolSetId)
@@ -230,24 +284,42 @@ func TestGeneratedToolMigration(t *testing.T) {
 	generated := generatedToolForTest(t, ctx, db, base, definition, binding, "lookup")
 	retired := generatedToolForTest(t, ctx, db, base, definition, binding, "retired")
 	s := db.(*service)
-	_, err = s.sq.Update(ToolsTable).Set("deleted_at", apctx.GetClock(ctx).Now()).
-		Where(sq.Eq{"id": retired.Id}).RunWith(s.db).ExecContext(ctx)
+
+	_, err = s.sq.
+		Update(ToolsTable).
+		Set("deleted_at", apctx.GetClock(ctx).Now()).
+		Where(sq.Eq{"id": retired.Id}).
+		RunWith(s.db).
+		ExecContext(ctx)
 	require.NoError(t, err)
+
 	before, err := db.GetTool(ctx, base.Id)
 	require.NoError(t, err)
 	migrateDatabaseToVersion(t, s, 22)
 	var remaining int
-	err = s.sq.Select("COUNT(*)").From(ToolsTable).RunWith(s.db).QueryRowContext(ctx).Scan(&remaining)
+	err = s.sq.
+		Select("COUNT(*)").
+		From(ToolsTable).
+		RunWith(s.db).
+		QueryRowContext(ctx).
+		Scan(&remaining)
 	require.NoError(t, err)
 	require.Equal(t, 1, remaining)
+
 	for _, tool := range []*Tool{generated, retired} {
 		require.Zero(t, countToolRevisionsForTest(t, ctx, db, tool.Id))
 	}
 	require.Equal(t, 2, countToolRevisionsForTest(t, ctx, db, base.Id))
+
 	var name common.ResourceName
 	var revision uint64
-	err = s.sq.Select("name", "active_revision").From(ToolsTable).Where(sq.Eq{"id": base.Id}).
-		RunWith(s.db).QueryRowContext(ctx).Scan(&name, &revision)
+	err = s.sq.
+		Select("name", "active_revision").
+		From(ToolsTable).
+		Where(sq.Eq{"id": base.Id}).
+		RunWith(s.db).
+		QueryRowContext(ctx).
+		Scan(&name, &revision)
 	require.NoError(t, err)
 	require.Equal(t, base.Name, name)
 	require.Equal(t, base.ActiveRevision, revision)
@@ -256,17 +328,21 @@ func TestGeneratedToolMigration(t *testing.T) {
 	stored, err := db.GetTool(ctx, base.Id)
 	require.NoError(t, err)
 	require.Equal(t, before, stored)
+
 	current, err := db.GetCurrentToolRevision(ctx, base.Id)
 	require.NoError(t, err)
 	require.Equal(t, definition.EncryptedDefinition, current.EncryptedDefinition)
 	require.Equal(t, definition.DefinitionDigest, current.DefinitionDigest)
+
 	history, err := db.GetToolRevision(ctx, base.Id, 1)
 	require.NoError(t, err)
 	require.Equal(t, definition.EncryptedDefinition, history.EncryptedDefinition)
+
 	for _, tool := range []*Tool{generated, retired} {
 		_, err := db.GetTool(ctx, tool.Id)
 		require.ErrorIs(t, err, ErrNotFound)
 	}
+	
 	_, err = db.GetToolSetBinding(ctx, binding.Id)
 	require.NoError(t, err, "the downgrade removes inventory, not membership")
 }
