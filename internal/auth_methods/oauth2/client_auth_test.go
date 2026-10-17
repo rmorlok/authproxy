@@ -224,7 +224,7 @@ func callbackConnFor(t *testing.T, ctrl *gomock.Controller, method sconfig.Token
 
 	encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "a").
 		Return(encfield.EncryptedField{ID: "dek_test", Data: "enc-a"}, nil)
-	db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&database.OAuth2Token{Id: tokenId}, nil)
 
 	return o, connectionId

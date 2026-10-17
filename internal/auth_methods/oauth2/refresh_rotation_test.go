@@ -217,7 +217,7 @@ func newRotationHarness(t *testing.T, provider *rotatingTokenProvider, refreshTi
 	encAccess, err := hr.encrypt.EncryptStringForEntity(ctx, conn, "at-0")
 	require.NoError(t, err)
 	_, err = db.InsertOAuth2Token(ctx, conn.GetId(), nil, encRefresh, encAccess,
-		util.ToPtr(time.Now().Add(-time.Minute)), "", "", nil)
+		util.ToPtr(time.Now().Add(-time.Minute)), database.OAuth2RefreshTokenExpiry{}, "", "", nil)
 	require.NoError(t, err)
 
 	return hr
@@ -432,7 +432,7 @@ func (hr *rotationHarness) seedUnexpiredToken() apid.ID {
 	encAccess, err := hr.encrypt.EncryptStringForEntity(ctx, hr.connection, "at-0")
 	require.NoError(hr.t, err)
 	token, err := hr.db.InsertOAuth2Token(ctx, hr.connection.GetId(), nil, encRefresh, encAccess,
-		util.ToPtr(time.Now().Add(time.Hour)), "", "", nil)
+		util.ToPtr(time.Now().Add(time.Hour)), database.OAuth2RefreshTokenExpiry{}, "", "", nil)
 	require.NoError(hr.t, err)
 	return token.Id
 }
@@ -537,6 +537,7 @@ func (d *flakyInsertDB) InsertOAuth2Token(
 	encryptedRefreshToken encfield.EncryptedField,
 	encryptedAccessToken encfield.EncryptedField,
 	accessTokenExpiresAt *time.Time,
+	refreshTokenExpiry database.OAuth2RefreshTokenExpiry,
 	scopes string,
 	requestedScopes string,
 	createdByActorId *apid.ID,
@@ -555,7 +556,7 @@ func (d *flakyInsertDB) InsertOAuth2Token(
 		return nil, err
 	}
 	return d.DB.InsertOAuth2Token(ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken,
-		accessTokenExpiresAt, scopes, requestedScopes, createdByActorId)
+		accessTokenExpiresAt, refreshTokenExpiry, scopes, requestedScopes, createdByActorId)
 }
 
 // TestRefreshAccessToken_PersistsRotatedTokenDespiteTransientFailureAndCancel:
