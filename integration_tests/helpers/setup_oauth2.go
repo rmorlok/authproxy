@@ -91,6 +91,11 @@ type OAuth2ConnectorOptions struct {
 	// PKCE is disabled (the default, current behavior).
 	PKCE *connectors.AuthOauth2PKCE
 
+	// RefreshTimeout, when non-zero, sets token.refreshTimeout: the
+	// per-attempt deadline on token-endpoint calls and the lease on the
+	// per-connection refresh lock.
+	RefreshTimeout time.Duration
+
 	// Probes are appended to the connector definition verbatim. Tests that
 	// exercise probe-driven health configure these (e.g. a proxy_http probe
 	// pointing at provider.ResourceURL("/echo")).
@@ -129,6 +134,9 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 		Token: connectors.AuthOauth2Token{
 			Endpoint: tokenEndpoint,
 		},
+	}
+	if opts.RefreshTimeout > 0 {
+		auth.Token.RefreshTimeout = &common.HumanDuration{Duration: opts.RefreshTimeout}
 	}
 	if opts.TokenEndpointAuthMethod != "" {
 		auth.TokenEndpointAuthMethod = connectors.NewTokenEndpointAuthMethod(opts.TokenEndpointAuthMethod)
