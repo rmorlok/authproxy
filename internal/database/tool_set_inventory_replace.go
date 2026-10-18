@@ -59,7 +59,9 @@ func (s *service) lockToolSetInventory(
 		query = query.Suffix("FOR UPDATE")
 	}
 
-	rows, err := query.RunWith(tx).QueryContext(ctx)
+	rows, err := query.
+		RunWith(tx).
+		QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,18 +97,22 @@ func resolveToolSetInventoryIdentities(
 			if previous.ActiveRevision >= math.MaxInt64 {
 				return ErrToolRevisionConflict
 			}
+
 			tool.Id = previous.Id
 			tool.CreatedAt = previous.CreatedAt
 			tool.ActiveRevision = previous.ActiveRevision + 1
 			if params.Tools[i].Tool.Name == "" {
 				tool.Name = previous.Name
 			}
+
 			revisions[i].ToolId = tool.Id
 			revisions[i].Revision = tool.ActiveRevision
 		}
+
 		if ids[tool.Id] || names[tool.Name] {
 			return errors.New("tool inventory contains duplicate resolved ids or names")
 		}
+
 		ids[tool.Id], names[tool.Name] = true, true
 	}
 
