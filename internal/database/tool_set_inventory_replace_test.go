@@ -18,11 +18,14 @@ import (
 // writable epoch while retaining the original preparation data for replacements.
 func installedInventoryForTest(t *testing.T, count int) *toolSetInventoryFixture {
 	t.Helper()
+
 	f := explicitInventoryForTest(t, count)
 	installed, err := f.db.InstallExplicitToolSetInventory(f.ctx, f.request)
 	require.NoError(t, err)
+
 	f.binding = installed
 	f.request.ExpectedEpoch = installed.Epoch
+
 	return f
 }
 
@@ -30,10 +33,17 @@ func installedInventoryForTest(t *testing.T, count int) *toolSetInventoryFixture
 // returns a new primary without automatically changing any installed binding.
 func publishReplacementGenerationForTest(t *testing.T, f *toolSetInventoryFixture) uint64 {
 	t.Helper()
-	generation, err := f.db.CreateToolSetGeneration(f.ctx, f.toolSet.Id, f.request.Tools[0].EncryptedDefinition)
+
+	generation, err := f.db.CreateToolSetGeneration(
+		f.ctx,
+		f.toolSet.Id,
+		f.request.Tools[0].EncryptedDefinition,
+	)
 	require.NoError(t, err)
+
 	_, err = f.db.PublishToolSetGeneration(f.ctx, f.toolSet.Id, generation.Generation, generation.Revision)
 	require.NoError(t, err)
+
 	return generation.Generation
 }
 
@@ -41,8 +51,10 @@ func publishReplacementGenerationForTest(t *testing.T, f *toolSetInventoryFixtur
 // while retaining exact source identity, complete history, and caller ownership.
 func TestReplaceExplicitToolSetInventoryLifecycle(t *testing.T) {
 	f := installedInventoryForTest(t, 3)
+
 	original := copyInventoryForTest(f.request)
 	first := readToolRowForTest(t, f.ctx, f.db, original.Tools[0].Tool.Id)
+
 	request := copyInventoryForTest(original)
 	request.Generation = publishReplacementGenerationForTest(t, f)
 	publishReplacementGenerationForTest(t, f) // The prepared target is now active, still eligible.
@@ -56,6 +68,7 @@ func TestReplaceExplicitToolSetInventoryLifecycle(t *testing.T) {
 	request.Tools[0].DefinitionDigest = strings.Repeat("a", 64)
 	request.Tools[1].Tool.Id, request.Tools[1].Tool.Name = apid.New(apid.PrefixTool), "new-source"
 	request.Tools[1].Tool.SourceKey = "Operation-0" // Distinct from operation-0.
+
 	before := copyInventoryForTest(request)
 	changedAt := apctx.GetClock(f.ctx).Now().Add(time.Hour)
 	migrated, err := f.db.ReplaceExplicitToolSetInventory(apctx.WithFixedClock(f.ctx, changedAt), request, 1)
@@ -65,6 +78,7 @@ func TestReplaceExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, uint64(2), migrated.InventoryRevision)
 	require.Equal(t, request.Generation, *migrated.AppliedGeneration)
 	require.True(t, changedAt.Equal(migrated.UpdatedAt))
+
 	stored, err := f.db.GetTool(f.ctx, first.Id)
 	require.NoError(t, err)
 	require.Equal(t, common.ResourceName("renamed"), stored.Name)
@@ -77,27 +91,34 @@ func TestReplaceExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, "yes", stored.Labels["updated"])
 	require.NotContains(t, stored.Labels, "local")
 	require.Equal(t, before.Tools[0].Tool.Annotations, stored.Annotations)
+
 	for _, entry := range original.Tools[1:] {
 		removed := readToolRowForTest(t, f.ctx, f.db, entry.Tool.Id)
 		require.NotNil(t, removed.DeletedAt)
 		require.True(t, changedAt.Equal(*removed.DeletedAt))
 		require.Equal(t, uint64(1), removed.ActiveRevision)
 	}
+
 	newTool, err := f.db.GetTool(f.ctx, request.Tools[1].Tool.Id)
 	require.NoError(t, err)
 	require.Equal(t, request.Tools[1].Tool.SourceKey, newTool.SourceKey)
 	require.Equal(t, request.Tools[1].Tool.Name, newTool.Name)
 	require.Equal(t, uint64(1), newTool.ActiveRevision)
-	request.Tools[0].Tool.Labels["updated"], request.Tools[0].Tool.Annotations["note"], request.Tools[0].Tool.Verbs[0] = "mutated", "mutated", "mutated"
+
+	request.Tools[0].Tool.Labels["updated"] = "mutated"
+	request.Tools[0].Tool.Annotations["note"] = "mutated"
+	request.Tools[0].Tool.Verbs[0] = "mutated"
 	unchanged, err := f.db.GetTool(f.ctx, first.Id)
 	require.NoError(t, err)
 	require.Equal(t, stored, unchanged)
 
 	rollback := copyInventoryForTest(original)
 	rollback.ExpectedEpoch = migrated.Epoch
+
 	for index := range rollback.Tools {
 		rollback.Tools[index].Tool.Id = apid.New(apid.PrefixTool)
 	}
+
 	beforeRollback := copyInventoryForTest(rollback)
 	rolledBack, err := f.db.ReplaceExplicitToolSetInventory(apctx.WithFixedClock(f.ctx, changedAt.Add(time.Hour)), rollback, request.Generation)
 	require.NoError(t, err, "the prior active generation remains a valid rollback target")
