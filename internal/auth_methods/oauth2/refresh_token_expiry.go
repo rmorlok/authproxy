@@ -92,15 +92,22 @@ func (r *tokenResponse) refreshTokenLifetime() (time.Duration, bool) {
 		shortest time.Duration
 		found    bool
 	)
-	for _, v := range []expiresInSeconds{r.RefreshTokenExpiresIn, r.XRefreshTokenExpiresIn, r.RefreshTokenTimeout} {
+	for _, v := range []expiresInSeconds{
+		r.RefreshTokenExpiresIn,
+		r.XRefreshTokenExpiresIn,
+		r.RefreshTokenTimeout,
+	} {
 		if !v.Present || v.Seconds <= 0 {
 			continue
 		}
+
 		d := time.Duration(v.Seconds) * time.Second
+
 		if !found || d < shortest {
 			shortest, found = d, true
 		}
 	}
+
 	return shortest, found
 }
 
@@ -136,14 +143,18 @@ func (o *oAuth2Connection) refreshTokenExpiry(
 	var expiresAt *time.Time
 	if lifetime, ok := resp.refreshTokenLifetime(); ok {
 		expiresAt = util.ToPtr(now.Add(lifetime))
-	} else if !persistingNewRefreshToken && refreshFrom != nil && refreshFrom.RefreshTokenExpiresAt != nil {
+	} else if !persistingNewRefreshToken && refreshFrom != nil &&
+		refreshFrom.RefreshTokenExpiresAt != nil {
 		expiresAt = util.ToPtr(*refreshFrom.RefreshTokenExpiresAt)
 	}
+
 	if expiresAt == nil {
 		return database.OAuth2RefreshTokenExpiry{}
 	}
 
-	result := database.OAuth2RefreshTokenExpiry{ExpiresAt: expiresAt}
+	result := database.OAuth2RefreshTokenExpiry{
+		ExpiresAt: expiresAt,
+	}
 
 	if !o.auth.Token.GetRefreshInBackgroundOrDefault() {
 		return result
@@ -163,6 +174,8 @@ func (o *oAuth2Connection) refreshTokenExpiry(
 	if half := remaining / 2; lead > half {
 		lead = half
 	}
+
 	result.RefreshAt = util.ToPtr(expiresAt.Add(-lead))
+
 	return result
 }
