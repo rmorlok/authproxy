@@ -22,12 +22,37 @@ func TestExpiresInSeconds_Unmarshal(t *testing.T) {
 		wantSeconds int64
 		wantErr     bool
 	}{
-		{name: "number", json: `15897600`, wantPresent: true, wantSeconds: 15897600},
-		{name: "float", json: `3600.0`, wantPresent: true, wantSeconds: 3600},
-		{name: "numeric string", json: `"8726400"`, wantPresent: true, wantSeconds: 8726400},
-		{name: "null", json: `null`},
-		{name: "empty string", json: `""`},
-		{name: "garbage", json: `"soon"`, wantErr: true},
+		{
+			name:        "number",
+			json:        `15897600`,
+			wantPresent: true,
+			wantSeconds: 15897600,
+		},
+		{
+			name:        "float",
+			json:        `3600.0`,
+			wantPresent: true,
+			wantSeconds: 3600,
+		},
+		{
+			name:        "numeric string",
+			json:        `"8726400"`,
+			wantPresent: true,
+			wantSeconds: 8726400,
+		},
+		{
+			name: "null",
+			json: `null`,
+		},
+		{
+			name: "empty string",
+			json: `""`,
+		},
+		{
+			name:    "garbage",
+			json:    `"soon"`,
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -205,6 +230,10 @@ func TestRefresh_PersistsRefreshTokenExpiry(t *testing.T) {
 	require.NotNil(t, token.RefreshTokenExpiresAt)
 	require.NotNil(t, token.RefreshTokenRefreshAt)
 	assert.WithinDuration(t, before.Add(15897600*time.Second), *token.RefreshTokenExpiresAt, 5*time.Second)
-	assert.WithinDuration(t, token.RefreshTokenExpiresAt.Add(-cschema.DefaultRefreshTimeBeforeRefreshTokenExpiry),
-		*token.RefreshTokenRefreshAt, time.Second)
+	assert.WithinDuration(
+		t,
+		token.RefreshTokenExpiresAt.Add(-cschema.DefaultRefreshTimeBeforeRefreshTokenExpiry),
+		*token.RefreshTokenRefreshAt,
+		time.Second,
+	)
 }
