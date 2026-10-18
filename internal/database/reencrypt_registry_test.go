@@ -139,7 +139,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		// Create token: access token matches, refresh token mismatches
 		accessToken := encfield.EncryptedField{ID: targetEKVId, Data: "YWNjZXNz"}
 		refreshToken := encfield.EncryptedField{ID: oldEKVId, Data: "cmVmcmVzaA=="}
-		token, err := db.InsertOAuth2Token(ctx, connId, nil, refreshToken, accessToken, nil, "scope1", "scope1", nil)
+		token, err := db.InsertOAuth2Token(ctx, connId, nil, refreshToken, accessToken, nil, OAuth2RefreshTokenExpiry{}, "scope1", "scope1", nil)
 		require.NoError(t, err)
 
 		var tokenTargets []ReEncryptionTarget
@@ -180,7 +180,7 @@ func TestReEncryptRegistry(t *testing.T) {
 
 		accessToken := encfield.EncryptedField{ID: oldEKVId, Data: "YWNjZXNz"}
 		refreshToken := encfield.EncryptedField{ID: oldEKVId, Data: "cmVmcmVzaA=="}
-		token, err := db.InsertOAuth2Token(ctx, connId, nil, refreshToken, accessToken, nil, "scope1", "scope1", nil)
+		token, err := db.InsertOAuth2Token(ctx, connId, nil, refreshToken, accessToken, nil, OAuth2RefreshTokenExpiry{}, "scope1", "scope1", nil)
 		require.NoError(t, err)
 
 		var tokenTargets []ReEncryptionTarget
@@ -227,7 +227,7 @@ func TestReEncryptRegistry(t *testing.T) {
 
 		accessToken := encfield.EncryptedField{ID: oldEKVId, Data: "YWNjZXNz"}
 		refreshToken := encfield.EncryptedField{ID: oldEKVId, Data: "cmVmcmVzaA=="}
-		token, err := db.InsertOAuth2Token(ctx, connId, nil, refreshToken, accessToken, nil, "", "", nil)
+		token, err := db.InsertOAuth2Token(ctx, connId, nil, refreshToken, accessToken, nil, OAuth2RefreshTokenExpiry{}, "", "", nil)
 		require.NoError(t, err)
 
 		var found bool

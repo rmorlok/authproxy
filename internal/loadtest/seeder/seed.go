@@ -338,6 +338,7 @@ func Seed(ctx context.Context, opts Options) (*Result, error) {
 			encryptedRefreshToken,
 			encryptedAccessToken,
 			&expiresAt,
+			database.OAuth2RefreshTokenExpiry{},
 			"loadtest.read",
 			"loadtest.read",
 			&actor.ActorID,

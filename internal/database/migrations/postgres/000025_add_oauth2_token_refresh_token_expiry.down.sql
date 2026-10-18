@@ -1,0 +1,3 @@
+drop index idx_oauth2_tokens_refresh_token_refresh_at;
+alter table oauth2_tokens drop column refresh_token_refresh_at;
+alter table oauth2_tokens drop column refresh_token_expires_at;

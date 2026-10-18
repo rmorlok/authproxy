@@ -63,6 +63,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 							Data: "encrypted_access_token",
 						},
 						gomock.Any(),
+						gomock.Any(), // refreshTokenExpiry
 						"read write",
 						"read write",
 						gomock.Any(),
@@ -130,6 +131,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 							Data: "encrypted_access_token",
 						},
 						gomock.Any(),
+						gomock.Any(), // refreshTokenExpiry
 						gomock.Any(),
 						gomock.Any(),
 						gomock.Any(),
@@ -167,6 +169,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 								Data: "encrypted_access_token",
 							},
 							gomock.Any(),
+							gomock.Any(), // refreshTokenExpiry
 							gomock.Any(),
 							gomock.Any(),
 							gomock.Any(),
@@ -186,6 +189,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 								Data: "encrypted_access_token",
 							},
 							gomock.Any(),
+							gomock.Any(), // refreshTokenExpiry
 							gomock.Any(),
 							gomock.Any(),
 							gomock.Any(),
@@ -268,6 +272,7 @@ func TestCreateDbTokenFromResponse_ClientCredentialsDiscardsRefreshToken(t *test
 			nil,
 			encfield.EncryptedField{},
 			encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access_token"},
+			gomock.Any(),
 			gomock.Any(),
 			"read",
 			"read",

@@ -254,6 +254,7 @@ type DB interface {
 		encryptedRefreshToken encfield.EncryptedField,
 		encryptedAccessToken encfield.EncryptedField,
 		accessTokenExpiresAt *time.Time,
+		refreshTokenExpiry OAuth2RefreshTokenExpiry,
 		scopes string,
 		requestedScopes string,
 		createdByActorId *apid.ID,
@@ -262,8 +263,9 @@ type DB interface {
 	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId apid.ID) error
 
 	// EnumerateOAuth2TokensExpiringWithin enumerates OAuth2 tokens that are expiring within a specified time interval
-	// of now. This includes tokens that are already expired. Deleted tokens are not considered, nor are tokens tied
-	// to a deleted connection.
+	// of now. This includes tokens that are already expired. It also includes tokens whose refresh token is due for
+	// a proactive refresh (refresh_token_refresh_at has passed) regardless of access-token expiry. Deleted tokens are
+	// not considered, nor are tokens tied to a deleted connection.
 	EnumerateOAuth2TokensExpiringWithin(
 		ctx context.Context,
 		duration time.Duration,

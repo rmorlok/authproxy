@@ -169,6 +169,12 @@ func (r *proxyRefreshRig) forceTokenExpiresAt(t *testing.T, connectionID string,
 		refreshToken,
 		existing.EncryptedAccessToken,
 		&expiresAt,
+		// Only the access-token expiry is forged; keep what is known about
+		// the refresh token's lifetime.
+		database.OAuth2RefreshTokenExpiry{
+			ExpiresAt: existing.RefreshTokenExpiresAt,
+			RefreshAt: existing.RefreshTokenRefreshAt,
+		},
 		existing.Scopes,
 		existing.RequestedScopes,
 		existing.CreatedByActorId,

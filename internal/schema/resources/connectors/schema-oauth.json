@@ -83,6 +83,9 @@
         "refreshTimeBeforeExpiry": {
           "$ref": "../../common/schema.json#/$defs/HumanDuration"
         },
+        "refreshTimeBeforeRefreshTokenExpiry": {
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
+        },
         "authInBody": {
           "type": "boolean"
         }

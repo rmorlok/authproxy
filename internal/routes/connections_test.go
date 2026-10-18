@@ -1476,6 +1476,7 @@ func TestConnections(t *testing.T) {
 				encfield.EncryptedField{ID: "dek_test", Data: "encrypted_refresh"},
 				encfield.EncryptedField{ID: "dek_test", Data: "encrypted_access"},
 				nil,
+				database.OAuth2RefreshTokenExpiry{},
 				"read write",
 				"read write admin",
 				nil,

@@ -34,6 +34,15 @@ const OAuth2TokensTable = "oauth2_tokens"
 
 const OAuth2AccessTokenExpiryBuffer = 30 * time.Second
 
+// OAuth2RefreshTokenExpiry carries what is known about a refresh token's
+// lifetime when inserting a token row. The zero value means "unknown".
+type OAuth2RefreshTokenExpiry struct {
+	// ExpiresAt is when the refresh token stops working.
+	ExpiresAt *time.Time
+	// RefreshAt is when to proactively refresh to keep the connection alive.
+	RefreshAt *time.Time
+}
+
 type OAuth2Token struct {
 	Id                    apid.ID
 	ConnectionId          apid.ID // Foreign key to Connection; not enforced by database
@@ -41,6 +50,15 @@ type OAuth2Token struct {
 	EncryptedRefreshToken encfield.EncryptedField
 	EncryptedAccessToken  encfield.EncryptedField
 	AccessTokenExpiresAt  *time.Time
+	// RefreshTokenExpiresAt is when the provider says the refresh token
+	// stops working, derived from refresh_token_expires_in and related
+	// token-response fields. Nil when the provider did not say.
+	RefreshTokenExpiresAt *time.Time
+	// RefreshTokenRefreshAt is when the background refresh task should
+	// proactively refresh this token so that a new (or renewed) refresh
+	// token is obtained before RefreshTokenExpiresAt. Nil when refreshing
+	// cannot extend the refresh token's life or background refresh is off.
+	RefreshTokenRefreshAt *time.Time
 	Scopes                string
 	RequestedScopes       string
 	CreatedByActorId      *apid.ID // Actor who initiated this token (carried forward on refresh)
@@ -57,6 +75,8 @@ func (t *OAuth2Token) cols() []string {
 		"encrypted_refresh_token",
 		"encrypted_access_token",
 		"access_token_expires_at",
+		"refresh_token_expires_at",
+		"refresh_token_refresh_at",
 		"scopes",
 		"requested_scopes",
 		"created_by_actor_id",
@@ -74,6 +94,8 @@ func (t *OAuth2Token) fields() []any {
 		&t.EncryptedRefreshToken,
 		&t.EncryptedAccessToken,
 		&t.AccessTokenExpiresAt,
+		&t.RefreshTokenExpiresAt,
+		&t.RefreshTokenRefreshAt,
 		&t.Scopes,
 		&t.RequestedScopes,
 		&t.CreatedByActorId,
@@ -91,6 +113,8 @@ func (t *OAuth2Token) values() []any {
 		t.EncryptedRefreshToken,
 		t.EncryptedAccessToken,
 		t.AccessTokenExpiresAt,
+		t.RefreshTokenExpiresAt,
+		t.RefreshTokenRefreshAt,
 		t.Scopes,
 		t.RequestedScopes,
 		t.CreatedByActorId,
@@ -239,6 +263,7 @@ func (s *service) InsertOAuth2Token(
 	encryptedRefreshToken encfield.EncryptedField,
 	encryptedAccessToken encfield.EncryptedField,
 	accessTokenExpiresAt *time.Time,
+	refreshTokenExpiry OAuth2RefreshTokenExpiry,
 	scopes string,
 	requestedScopes string,
 	createdByActorId *apid.ID,
@@ -281,6 +306,8 @@ func (s *service) InsertOAuth2Token(
 			EncryptedRefreshToken: encryptedRefreshToken,
 			EncryptedAccessToken:  encryptedAccessToken,
 			AccessTokenExpiresAt:  accessTokenExpiresAt,
+			RefreshTokenExpiresAt: refreshTokenExpiry.ExpiresAt,
+			RefreshTokenRefreshAt: refreshTokenExpiry.RefreshAt,
 			Scopes:                scopes,
 			RequestedScopes:       requestedScopes,
 			CreatedByActorId:      createdByActorId,
@@ -344,14 +371,20 @@ func (s *service) EnumerateOAuth2TokensExpiringWithin(
 					util.PrependAll("c.", util.ToPtr(Connection{}).cols())...,
 				)...,
 			).
-			From(OAuth2TokensTable+" AS t").
-			InnerJoin(ConnectionsTable+" AS c ON c.id = t.connection_id").
+			From(OAuth2TokensTable + " AS t").
+			InnerJoin(ConnectionsTable + " AS c ON c.id = t.connection_id").
 			Where(sq.Eq{
 				"t.deleted_at": nil,
 				"c.deleted_at": nil,
 				"c.state":      ConnectionStateConfigured,
 			}).
-			Where("t.access_token_expires_at <= ?", expirationThreshold).
+			// Either the access token is about to expire, or the refresh
+			// token is approaching its own expiry and is due for a
+			// proactive refresh to keep the connection alive.
+			Where(sq.Or{
+				sq.LtOrEq{"t.access_token_expires_at": expirationThreshold},
+				sq.LtOrEq{"t.refresh_token_refresh_at": now},
+			}).
 			OrderBy("t.created_at DESC").
 			Limit(pageSize + 1).
 			Offset(offset).
