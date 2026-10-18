@@ -1,5 +1,6 @@
 ---
 title: Configuration reference
+description: Where the server configuration schema lives, what each top-level block controls, and how connector manifests are applied.
 ---
 
 AuthProxy configuration is YAML validated against the canonical JSON Schema at
@@ -32,8 +33,11 @@ separate files or combine them in a multi-document YAML file. Server configurati
 contains service and infrastructure settings; connector manifests are separate
 inputs to apply.
 
-Give each new connector a `metadata.name` and `metadata.namespace`. Include
+Give each new connector a `metadata.name` and `metadata.namespace`, and set
+`spec.release.desiredState: primary` to publish it. Without that field, an
+applied connector is stored as a draft that cannot be connected. Include
 Namespace manifests in the same apply batch when those namespaces do not exist.
+[Define a connector](/integration/connectors/) explains the definition itself.
 See [resource manifests](/reference/resources/) for the manifest structure.
 
 Use `ap apply -f resources.yaml` after deployment. For local development, use
@@ -106,6 +110,5 @@ repository changes, run:
 ./scripts/preflight.sh
 ```
 
-Connector definitions have their own schema and authoring guides; continue
-with [connector setup flows](/integration/connector-setup-flow/) and
-[connector predicates](/integration/connector-predicates/).
+Connector definitions have their own schema and authoring guides; start with
+[Define a connector](/integration/connectors/).

@@ -1,18 +1,26 @@
 ---
-title: Marketplace integration
+title: Embed the Marketplace
+description: Send signed-in users to AuthProxy's ready-made UI for connecting, reconnecting, and disconnecting their accounts.
 ---
 
-The AuthProxy Marketplace is a ready-made React application where users browse
-connectors, establish OAuth or API-key connections, resume setup, reauthenticate
-unhealthy connections, and disconnect installations.
+The Marketplace is a ready-made web UI where your users browse the connectors
+you offer, connect their accounts, answer any setup questions, reconnect
+accounts whose credentials stopped working, and disconnect accounts they no
+longer want to use. You link to it from your product, for example from an
+**Integrations** settings page.
 
 ![Marketplace connection flow](../images/marketplace-connect.gif)
 
-The host application authenticates the user. The Marketplace does not need a
-second login screen; it exchanges a short-lived, one-time JWT from the host for
-an AuthProxy browser session.
+Users do not log in to the Marketplace separately. Your backend, which already
+knows who the user is, signs a short-lived, one-time JWT and redirects the
+browser to the Marketplace. The Marketplace exchanges that token for its own
+session cookie.
 
-## Deployment modes
+If you would rather build your own UI, everything the Marketplace does is
+available through the API. The [tutorial](/getting-started/first-connection/#4-create-a-connection)
+shows the calls for an API-key connector.
+
+## Where the Marketplace is served from
 
 | Mode | Configuration | Use when |
 |---|---|---|
@@ -109,26 +117,44 @@ sign an AuthProxy JWT for the Public service with a short expiration and nonce
 redirect to returnToUrl with authToken=<jwt>
 ```
 
-The signing key remains in the host backend. Register its public key or trusted
-signing configuration with AuthProxy. The actor identified by the token must
-already exist unless the trusted token includes the full actor claim for
-just-in-time provisioning; see [Host application
-integration](/integration/host-application/#provision-actors).
+Sign the token with the key whose public half is configured as
+`systemAuth.jwtSigningKey`. Set `aud` to `public`, set a short `exp`, and
+include a fresh `nonce` that starts with `non_`. The actor must already exist
+unless the token includes the full actor definition. [Authenticate requests to
+AuthProxy](/integration/authentication/#sign-a-token) has a complete example
+of a handoff token.
 
 ## Security requirements
 
 - Authenticate the host session before signing anything.
 - Allowlist complete Marketplace return destinations; do not implement an open
   redirect.
-- Use a short expiration and a nonce. AuthProxy accepts each nonce only once.
+- Use a short expiration and a fresh nonce. AuthProxy accepts each nonce only
+  once, but it only enforces this when the token contains a nonce.
 - Scope the JWT audience and permissions to the Public Marketplace flow.
 - Keep signing keys and provider credentials out of browser code.
 - Use HTTPS. The handoff token briefly appears in a query parameter and must not
   be reusable.
-- Keep `public.enable_proxy` disabled unless browser-to-provider proxying is an
+- Keep `public.enableProxy` disabled unless browser-to-provider proxying is an
   explicit requirement; it is disabled by default.
 - Do not use the demo identity picker as production authentication. It is only
   a stand-in host that demonstrates the JWT exchange.
+
+## Finding connections your users created
+
+When a user finishes connecting an account, they stay in the Marketplace.
+AuthProxy does not currently call back into your application, so your backend
+discovers new connections by listing them. Because each connection is created
+in a namespace you chose, listing that namespace finds them:
+
+```bash
+curl "https://authproxy-api.internal.example.com/api/v1/connections?namespace=root.tenants.acme_42.**" \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Filter further by connector or by label with a `labelSelector`, for example
+`labelSelector=apxy/cxr/-/name=google-contacts`. Store the IDs you find on
+your own records so later requests do not need to search.
 
 ## Local development
 
@@ -149,6 +175,6 @@ flow](/integration/connector-setup-flow/).
 
 ## Next steps
 
-- [Model host users and tenants](/integration/host-application/)
+- [Map users and tenants](/integration/host-application/)
 - [Author connector setup](/integration/connector-setup-flow/)
 - [Observe Marketplace requests](/operations/app-metrics/)

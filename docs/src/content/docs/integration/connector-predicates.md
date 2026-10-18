@@ -1,10 +1,14 @@
 ---
-title: Connector Predicates
+title: Connector predicates
+description: Turn OAuth scopes, probes, and setup steps on or off per connection with JavaScript conditions.
 ---
 
 Connector predicates let a connector definition enable or require parts of a connection dynamically. They are authored in YAML and evaluated server-side for the specific connection.
 
-Predicates currently support JavaScript only:
+Predicates currently support JavaScript only. This example matches
+connections whose setup answered `region: eu` and whose connector carries a
+`type: salesforce` label (connector labels are copied onto connections under
+the `apxy/cxr/` prefix):
 
 ```yaml
 if:
@@ -14,7 +18,7 @@ if:
 
 The JavaScript must evaluate to a boolean. Syntax errors, thrown errors, `null`, `undefined`, and non-boolean results fail the operation instead of guessing the connector author's intent.
 
-## Runtime Context
+## Runtime context
 
 Every connector predicate receives the same variables:
 
@@ -26,7 +30,7 @@ Every connector predicate receives the same variables:
 
 There is no `attributes` alias. Use `cfg`, `labels`, and `annotations` directly.
 
-## Connector JavaScript Library
+## Connector JavaScript library
 
 A connector can define top-level shared JavaScript with the `javascript` field. Use it for helper functions and constants that are reused by predicates and configure-step data-source transforms:
 
@@ -55,7 +59,7 @@ Connector-level JavaScript cannot declare the reserved runtime variables `cfg`, 
 
 The same connector-level helpers are available to setup-step predicates, OAuth scope predicates, probe predicates, and configure-step data-source transforms. Data-source transforms also receive `data`, which contains the proxied JSON response. See [Connector setup flow](/integration/connector-setup-flow/#data-sources) for transform examples.
 
-## Setup Steps
+## Setup steps
 
 Connector-authored setup-flow form and redirect steps support `if.javascript`. Clients only see eligible steps. See [Connector setup flow](/integration/connector-setup-flow/#conditional-steps) for setup-step examples and behavior.
 
@@ -147,7 +151,7 @@ Probe behavior:
 
 `apxy:verify` is inserted during setup only when at least one probe is enabled for the connection. If all probes are disabled, setup advances to the next eligible configure step or completes immediately when no configure step is left.
 
-## Generation Notes
+## Generation notes
 
 Adding, removing, or changing predicates or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector generation and migrate existing connections with the [connector generation migration workflow](/operations/connector-generation-migrations/).
 

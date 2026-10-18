@@ -1,82 +1,106 @@
 ---
 title: AuthProxy documentation
-description: Build and operate secure third-party API integrations without owning every authentication flow and credential lifecycle.
+description: AuthProxy is an open-source, self-hosted service that stores your users' third-party API credentials and attaches them to requests your application makes.
 template: splash
 hero:
-  title: Integrations without the authentication plumbing
-  tagline: AuthProxy gives your application one place to create, secure, use, and operate connections to third-party APIs.
+  title: Let your users connect their accounts. Skip writing the OAuth code.
+  tagline: AuthProxy is an open-source service you run next to your application. It handles the OAuth flows, API keys, and token refresh for the third-party APIs your product integrates with, then adds the right credentials to each request your application sends.
   actions:
-    - text: Try the live demo
-      link: /getting-started/demo/
+    - text: How AuthProxy works
+      link: /concepts/
       icon: right-arrow
       variant: primary
+    - text: Try the live demo
+      link: /getting-started/demo/
+      icon: external
+      variant: minimal
     - text: Run it locally
       link: /development/quick-start/
       icon: rocket
-      variant: minimal
-    - text: Browse Documentation
-      link: /concepts/
-      icon: open-book
       variant: minimal
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
 
-## One integration boundary
+## The problem it solves
+
+Suppose you build a CRM and your customers want to connect their Salesforce,
+Gmail, and Slack accounts. For each provider you need an OAuth client, a
+callback endpoint, encrypted token storage, refresh logic, a way to show a
+connection as broken when a token is revoked, and a settings page where users
+can connect and disconnect. That code is nearly the same for every provider,
+and it handles your customers' most sensitive credentials.
+
+AuthProxy is that code, packaged as a service:
+
+1. **You describe each provider once** in a YAML *connector*: its auth type,
+   OAuth endpoints and scopes, and any setup questions.
+2. **Your users connect their accounts** through AuthProxy's embeddable
+   Marketplace UI. AuthProxy runs the OAuth or API-key flow and stores the
+   result, encrypted, as a *connection*.
+3. **Your backend calls the provider through AuthProxy.** It sends the request
+   it wants to make along with a connection ID. AuthProxy adds the
+   credentials, refreshes expired tokens, forwards the request, logs it, and
+   returns the provider's response.
 
 ```mermaid
 flowchart LR
-    Host["Your application"] -->|Actor and namespace context| AP["AuthProxy"]
-    AP -->|OAuth, API key, or no-auth request| APIs["Third-party APIs"]
-    Admin["Your operators"] -->|Configure and monitor| AP
+    App["Your backend"] -->|"Provider request + connection ID"| AP["AuthProxy"]
+    AP -->|"Same request + credentials"| API["Salesforce, Gmail, ..."]
+    User["Your user"] -->|"Connect account"| MP["AuthProxy Marketplace"]
+    MP --> AP
 ```
 
-## Choose your path
+Your code still calls each provider's own API with its own URLs and payloads.
+AuthProxy does not translate them into a common schema, and it does not run
+workflows. Its job ends at authenticating and forwarding the request.
+
+## Where to start
 
 <CardGrid>
   <LinkCard
-    title="Add integrations"
+    title="How AuthProxy works"
+    href="/concepts/"
+    description="A ten-minute explanation of connectors, connections, and how a request flows through AuthProxy."
+  />
+  <LinkCard
+    title="Try the hosted demo"
+    href="/getting-started/demo/"
+    description="Connect fake accounts in the Marketplace and look around the Admin UI and Grafana. Nothing to install."
+  />
+  <LinkCard
+    title="Tutorial: your first connection"
+    href="/getting-started/first-connection/"
+    description="Run AuthProxy locally, define a connector, connect it, and watch AuthProxy add a credential to a request."
+  />
+  <LinkCard
+    title="Compare with other approaches"
+    href="/reference/related-projects/"
+    description="How AuthProxy differs from unified APIs, embedded iPaaS products, and credential vaults."
+  />
+</CardGrid>
+
+## Guides by role
+
+<CardGrid>
+  <LinkCard
+    title="Add AuthProxy to your product"
     href="/integration/"
-    description="Map host users and tenants, embed the Marketplace, and make proxied requests."
+    description="Map your users and tenants, authenticate your backend, embed the Marketplace, and define connectors."
   />
   <LinkCard
     title="Deploy and operate"
     href="/deployment/"
-    description="Install AuthProxy, configure its dependencies, and monitor production traffic."
+    description="Install with Helm, choose the backing stores, and monitor requests and background work."
   />
   <LinkCard
     title="Review security"
     href="/security/"
-    description="Evaluate trust boundaries, permissions, encrypted credentials, and logging risk."
+    description="Trust boundaries, the permission model, credential encryption, and a review checklist."
   />
   <LinkCard
-    title="Evaluate the architecture"
-    href="/concepts/"
-    description="Understand connectors, connections, actors, namespaces, and the build-versus-buy boundary."
-  />
-</CardGrid>
-
-## Start with a working system
-
-<CardGrid>
-  <LinkCard
-    title="Explore the hosted demo"
-    href="/getting-started/demo/"
-    description="Use fake accounts, connect an app, inspect the Admin UI, and explore Grafana."
-  />
-  <LinkCard
-    title="Run AuthProxy locally"
-    href="/development/quick-start/"
-    description="Clone the repository and start the full stack with Docker Compose."
-  />
-  <LinkCard
-    title="Make a proxied request"
-    href="/sdks/proxying/"
-    description="Send an authenticated request through a connection without handling its credentials."
-  />
-  <LinkCard
-    title="Install with Helm"
-    href="/deployment/helm/"
-    description="Deploy AuthProxy to Kubernetes and connect production dependencies."
+    title="Contribute"
+    href="/development/"
+    description="Run AuthProxy from source, learn the codebase, and run the tests."
   />
 </CardGrid>

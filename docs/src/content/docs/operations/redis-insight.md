@@ -1,5 +1,5 @@
 ---
-title: Viewing Redis Data
+title: Viewing Redis data
 ---
 
 If using Docker Compose, start RedisInsight with:

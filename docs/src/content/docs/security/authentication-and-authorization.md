@@ -1,5 +1,6 @@
 ---
-title: Authentication and Authorization
+title: Authentication and authorization
+description: How AuthProxy verifies callers, establishes browser sessions, and evaluates permissions.
 ---
 
 AuthProxy separates identity proof from access enforcement:
@@ -14,7 +15,7 @@ AuthProxy separates identity proof from access enforcement:
 AuthProxy is not a replacement for the host application's login, MFA, account
 recovery, or workforce/customer identity provider.
 
-## Map Host Identities to Actors
+## Map host identities to actors
 
 An actor represents a user or service principal. Its `spec.externalId` should be a
 stable, non-reassignable identifier from the host system. Avoid mutable values
@@ -32,17 +33,20 @@ AuthProxy resource namespace: root.tenants.org_123
 The host application owns this mapping. AuthProxy does not infer ownership from
 an email address, connection label, or other business metadata.
 
-## Authentication Paths
+## Authentication paths
 
 | Path | Typical use | Security properties |
 |---|---|---|
 | Bearer JWT in `Authorization` | Host backend, CLI, automation | Signature and claims validated on each request; audience must include the receiving service |
-| One-time JWT in `authToken` | Marketplace or Admin UI session handoff | Must include expiration and nonce; nonce is atomically marked used |
+| One-time JWT in `authToken` | Marketplace or Admin UI session handoff | Should include a nonce (prefixed `non_`), which then requires an expiration; each nonce is atomically marked used and rejected on reuse |
 | Browser session | Marketplace or Admin UI after handoff | Server-side state in Redis; encrypted session identifier in an `HttpOnly` cookie; XSRF token required for mutating session requests |
 | System-signed JWT | Internal AuthProxy handoffs and OAuth state | Minted and validated by AuthProxy services; protect internal signing material as production key material |
 
-Actor-signed tokens use an actor's private key and are verified with its
-configured public key. Private keys belong in the host backend, automation
+Host-signed tokens are verified with the public key in
+`systemAuth.jwtSigningKey`, which can sign for any actor. Actor-signed tokens
+use an actor's own private key and are verified with that actor's configured
+public key. [Authenticate requests to AuthProxy](/integration/authentication/)
+shows how to configure the host key and what claims to send. Private keys belong in the host backend, automation
 secret store, or developer keychain—not in a browser bundle, mobile client, URL,
 log, or source repository.
 
@@ -77,14 +81,15 @@ match `actor.metadata.namespace`. JWT actors cannot contain `metadata.id`,
 `metadata.generation`, `metadata.createdAt`, `metadata.updatedAt`, `status`, or
 `spec.signingKey`. AuthProxy also rejects unknown fields.
 
-## Browser Session Handoff
+## Browser session handoff
 
 The embedded Marketplace and Admin UI use a delegated session flow:
 
 1. The user authenticates with the host application.
 2. The host maps the user to an actor and decides what they may access.
 3. The host backend signs a short-lived JWT with the target AuthProxy service
-   in `aud`, an expiration, and a one-time nonce.
+   in `aud`, an expiration, and a one-time nonce. AuthProxy only enforces
+   one-time use when the nonce is present, so always include it.
 4. The host redirects to the AuthProxy UI with `authToken=<jwt>`.
 5. The UI calls `POST /api/v1/session/_initiate`; AuthProxy validates the token, marks
    the nonce used, and establishes a server-side session.
@@ -111,7 +116,7 @@ timeout. Protect Redis with network isolation, authentication, TLS where
 available, persistence/backup policy appropriate to the deployment, and a
 process for invalidating sessions during an incident or user offboarding.
 
-## Permission Model
+## Permission model
 
 A permission grants a verb on a resource type within a namespace and can
 optionally restrict specific resource ids:
@@ -150,7 +155,7 @@ Routes validate the namespace and, where relevant, the loaded resource id.
 List and aggregate routes constrain their database queries to effective
 namespace matchers rather than relying on a client-supplied filter.
 
-## Least-Privilege Tokens
+## Least-privilege tokens
 
 Use token restrictions when a user delegates a narrow operation to automation
 or an agent. An actor might be able to manage every connection in a tenant,
@@ -168,7 +173,7 @@ Also set a short expiration and only the service audiences the task needs.
 Token restrictions reduce blast radius; they do not replace actor
 deprovisioning or signing-key rotation.
 
-## Labels and Permission Templates
+## Labels and permission templates
 
 **Labels and annotations are metadata, not authorization.** They support
 mapping, selection, telemetry dimensions, and reporting. A resource label or
@@ -192,7 +197,7 @@ Prefer direct, explicit namespace grants when they are practical. See
 [Labels and Annotations](/concepts/labels-and-annotations/) for metadata
 semantics.
 
-## Service Exposure
+## Service exposure
 
 AuthProxy separates its HTTP surfaces so they can have different network
 policies:
@@ -216,7 +221,7 @@ Kustomize deployment commonly terminates TLS at ingress. In either case, ensure
 the configured external URLs, HTTPS state, cookie flags, and allowed origins
 describe the real topology.
 
-## Review Guidance
+## Review guidance
 
 Before adding an actor, route, or integration:
 

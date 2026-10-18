@@ -61,7 +61,7 @@ credential and request data.
 
 ---
 
-## Quick Comparison (High-Level)
+## Quick comparison (high-level)
 
 Licensing reviewed **2026-09-07**. “Commercial” indicates a paid product or SaaS
 offering; where a project also publishes code, the license and its scope are

@@ -1,5 +1,5 @@
 ---
-title: Rate Limits
+title: Rate limits
 ---
 
 AuthProxy has two complementary rate-limiting systems:

@@ -13,7 +13,7 @@ snapshot. It does not protect against compromise of the running AuthProxy
 process, its key-provider identity, or an authorized API that returns decrypted
 data.
 
-## What Is Encrypted
+## What is encrypted
 
 Sensitive fields protected by the encryption service include:
 
@@ -32,7 +32,7 @@ Resource ids, namespaces, labels, annotations, timestamps, request-event
 metadata, and key/DEK ids are not secret ciphertext fields. Do not put secrets
 in labels, annotations, resource names, paths, or correlation ids.
 
-## Encrypted Field Format
+## Encrypted field format
 
 Encrypted database fields use this self-describing JSON form:
 
@@ -48,7 +48,7 @@ AES-GCM detects modification of the encrypted payload. Authorization and
 database integrity are separate controls; ciphertext authentication does not
 replace permission checks or datastore access controls.
 
-## Key Hierarchy
+## Key hierarchy
 
 ```mermaid
 flowchart TD
@@ -102,7 +102,7 @@ Namespace key selection controls encryption, not authorization. A caller still
 needs permission to access the resource, and selecting a tenant key does not
 create an ACL.
 
-## Key Providers
+## Key providers
 
 AuthProxy supports two provider patterns:
 
@@ -159,7 +159,7 @@ and full re-encryption every 30 minutes. The internal
 [unified key-model design note](/development/design/key-model-migration/)
 contains the detailed data model, migration history, and implementation checks.
 
-## Operational Requirements
+## Operational requirements
 
 - Configure a durable `systemAuth.globalAesKey`; do not rely on an
   ephemeral startup key in production.

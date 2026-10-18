@@ -1,5 +1,5 @@
 ---
-title: Connector Generation Migrations
+title: Connector generation migrations
 description: Move live connections between connector generations with migration hooks, automatic analysis, rollback, and notifications.
 ---
 
@@ -81,7 +81,7 @@ receive:
 
 Hooks cannot call network, database, or host application APIs.
 
-## Hook Ordering
+## Hook ordering
 
 When migrating upward, AuthProxy runs each target-side `up` hook in order:
 
@@ -95,7 +95,7 @@ order:
 If any hook fails, the workflow fails without persisting partial hook output.
 Rollback is the same workflow pointed at an earlier connector generation.
 
-## Hook Output
+## Hook output
 
 Migration hooks return a JSON-like object. Every section is optional:
 
@@ -150,7 +150,7 @@ connector-owned and cannot be set by hooks.
 Connector-authored notifications are keyed per connection. A hook can unset a
 previous notice by returning the same `notifications.unset[].key`.
 
-## Automatic Analysis
+## Automatic analysis
 
 After hooks run, AuthProxy compares the source and target connector definitions
 and updates the migration candidate:

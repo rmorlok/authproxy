@@ -1,5 +1,5 @@
 ---
-title: Application Metrics
+title: Application metrics
 ---
 
 AuthProxy stores Admin UI-facing application metrics in the `appMetrics` store. This store includes request-event records, optional full request/response payloads, and periodic resource snapshots used for time-series dashboards.

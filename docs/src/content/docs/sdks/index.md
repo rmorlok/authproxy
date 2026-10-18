@@ -1,9 +1,12 @@
 ---
-title: SDKs and API Clients
-description: Choose an SDK or proxy request pattern for calling third-party APIs through AuthProxy.
+title: Call third-party APIs
+description: Choose how your application sends requests through AuthProxy, from plain HTTP to the JavaScript SDK and CLI.
 ---
 
-AuthProxy is HTTP-first. Any application that can make an HTTP request can manage resources and send requests through a connection. The repository also includes a JavaScript/TypeScript client and an `ap` command-line client.
+Once a user has connected an account, your application calls the provider by
+sending the request to AuthProxy instead. AuthProxy's API is plain HTTP and
+JSON, so any language works without an SDK. The repository also includes a
+JavaScript/TypeScript client and the `ap` command-line tool.
 
 ## Choose an interface
 
@@ -18,7 +21,10 @@ The JavaScript SDK currently provides the broadest typed client surface in this 
 
 ## Authentication
 
-Calls to AuthProxy require an AuthProxy session or JWT. This authenticates the caller to AuthProxy; it is not the credential for the third-party API.
+Every call to AuthProxy carries an AuthProxy JWT, or a session cookie in the
+browser. This proves who your application is acting for. It is not the
+provider's credential, and AuthProxy never forwards it. See [Authenticate
+requests to AuthProxy](/integration/authentication/) for how to create one.
 
 When an application proxies through a connection, it sends the connection ID and the upstream request. AuthProxy authorizes the caller, loads the connection's encrypted credentials, applies them to the upstream request, and manages refresh or rotation behavior for the connector's authentication method.
 

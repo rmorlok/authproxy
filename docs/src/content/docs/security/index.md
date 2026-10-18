@@ -1,5 +1,5 @@
 ---
-title: Security Overview
+title: Security overview
 description: Review AuthProxy trust boundaries, authorization, credential encryption, logging, and deployment controls.
 ---
 
@@ -13,7 +13,7 @@ This page describes AuthProxy's security boundaries and the controls a
 deployment must supply. It is not a compliance certification or a substitute
 for a threat model specific to your environment.
 
-## Security Model at a Glance
+## Security model at a glance
 
 - **The host application is the identity source.** It authenticates its users,
   maps them to AuthProxy actors and namespaces, and signs the short-lived JWTs
@@ -30,10 +30,10 @@ for a threat model specific to your environment.
   context. Optional full request/response capture is encrypted, but it also
   creates a high-sensitivity data set that operators must tightly control.
 
-Read [Authentication and Authorization](/security/authentication-and-authorization/)
+Read [Authentication and authorization](/security/authentication-and-authorization/)
 and [Encryption](/security/encryption/) for the implementation details.
 
-## Trust Boundaries
+## Trust boundaries
 
 ```mermaid
 flowchart LR
@@ -76,7 +76,7 @@ identity policy. In particular:
   operator-managed security boundaries even when the values AuthProxy writes
   to them are application-encrypted.
 
-## Shared Responsibility
+## Shared responsibility
 
 | Area | AuthProxy provides | Host application or operator provides |
 |---|---|---|
@@ -88,7 +88,7 @@ identity policy. In particular:
 | Storage | Encrypted sensitive fields and encrypted full-request blobs | Database/Redis/blob encryption at rest, TLS, access control, backups, retention and restore testing |
 | Audit and telemetry | Redacted request-event metadata and optional encrypted full capture | Who can query/export it, retention, downstream redaction, alerting and incident response |
 
-## Labels Are Not Authorization
+## Labels are not authorization
 
 Labels and annotations are metadata used for mapping, selection, attribution,
 and reporting. A label selector is a query filter, not an access-control check.
@@ -105,7 +105,7 @@ See [Labels and Annotations](/concepts/labels-and-annotations/) for metadata
 behavior and [Authentication and Authorization](/security/authentication-and-authorization/)
 for the permission model.
 
-## Data Exposure to Consider
+## Data exposure to consider
 
 Application-level encryption protects an offline store from revealing
 plaintext without the corresponding key material. It does not protect data
@@ -122,9 +122,9 @@ namespace-encrypted before blob storage, but an authorized viewer can still
 retrieve the plaintext. Minimize capture, size limits, retention, and viewer
 permissions. See [Application Metrics](/operations/app-metrics/).
 
-## Security Review Checklist
+## Security review checklist
 
-### Identity and Authorization
+### Identity and authorization
 
 - [ ] The host application is the authoritative identity source and uses
   stable, non-reassignable actor ids.
@@ -139,7 +139,7 @@ permissions. See [Application Metrics](/operations/app-metrics/).
 - [ ] Offboarding covers host access, AuthProxy actor permissions, signing
   keys, active sessions, and third-party credentials.
 
-### Network and Runtime
+### Network and runtime
 
 - [ ] Every public endpoint uses trusted TLS, and AuthProxy is configured to
   recognize HTTPS when TLS terminates at a proxy or ingress.
@@ -147,14 +147,14 @@ permissions. See [Application Metrics](/operations/app-metrics/).
   appropriate to the deployment's threat model.
 - [ ] The Admin API and core API are private unless a documented use case
   requires exposure.
-- [ ] `public.enable_proxy` remains disabled unless browser/session clients
+- [ ] `public.enableProxy` remains disabled unless browser/session clients
   require direct proxy calls.
 - [ ] CORS origins, cookie domains, and `SameSite` settings are limited to the
   application origins that need them.
 - [ ] Network policy limits datastore, key-provider, telemetry, and third-party
   egress to approved destinations.
 
-### Keys and Storage
+### Keys and storage
 
 - [ ] `systemAuth.globalAesKey` uses durable, recoverable production key
   material; fake encryption, inline values, and ephemeral random keys are not
@@ -168,7 +168,7 @@ permissions. See [Application Metrics](/operations/app-metrics/).
 - [ ] Database, Redis, object storage, telemetry, and backups have independent
   TLS, encryption-at-rest, access, retention, and restore controls.
 
-### Credentials and Audit Data
+### Credentials and audit data
 
 - [ ] Connector OAuth scopes and API-key permissions are the minimum needed.
 - [ ] Provider callback URLs are exact and production/test OAuth clients are

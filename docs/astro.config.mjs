@@ -15,7 +15,7 @@ export default defineConfig({
     starlight({
       title: 'AuthProxy',
       description:
-        'Create, secure, use, and operate third-party API connections from one integration platform.',
+        'AuthProxy is an open-source, self-hosted service that manages third-party API credentials for your application and adds them to the requests it sends.',
       customCss: ['./src/styles/custom.css'],
       lastUpdated: true,
       editLink: {
@@ -30,40 +30,40 @@ export default defineConfig({
       ],
       sidebar: [
         {
-          label: 'Get started',
+          label: 'Start here',
           items: [
             { label: 'Documentation home', link: '/' },
+            { label: 'How AuthProxy works', link: '/concepts/' },
             'getting-started/demo',
             'development/quick-start',
+            'getting-started/first-connection',
           ],
         },
         {
           label: 'Concepts',
           items: [
-            'concepts',
             'concepts/core-model',
             'concepts/labels-and-annotations',
           ],
         },
         {
-          label: 'Integrate',
+          label: 'Build an integration',
           items: [
             'integration',
             'integration/host-application',
+            'integration/authentication',
             'integration/marketplace',
+            'integration/connectors',
             'integration/connector-setup-flow',
             'integration/connector-predicates',
           ],
         },
         {
-          label: 'SDKs & API',
+          label: 'Call third-party APIs',
           items: [
             'sdks',
             'sdks/proxying',
             'sdks/javascript',
-            'development/cli',
-            'reference/resources',
-            'reference/api',
           ],
         },
         {
@@ -71,8 +71,8 @@ export default defineConfig({
           items: [
             'deployment',
             'deployment/helm',
-            'deployment/kustomize',
             'deployment/container-images',
+            'deployment/kustomize',
             'deployment/eks-runbook',
           ],
         },
@@ -80,15 +80,15 @@ export default defineConfig({
           label: 'Operate',
           items: [
             'operations',
-            'operations/load-testing',
-            'operations/telemetry',
-            'operations/migrations',
             'operations/app-metrics',
+            'operations/telemetry',
             'operations/rate-limits',
-            'operations/background-tasks',
             'operations/connector-lifecycle',
             'operations/connector-generation-migrations',
+            'operations/background-tasks',
+            'operations/migrations',
             'operations/blob-storage',
+            'operations/load-testing',
             'operations/redis-insight',
           ],
         },
@@ -102,7 +102,19 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Develop',
+          label: 'Reference',
+          items: [
+            'reference',
+            'reference/resources',
+            'reference/api',
+            'reference/configuration',
+            'development/cli',
+            'reference/related-projects',
+          ],
+        },
+        {
+          label: 'Contribute',
+          collapsed: true,
           items: [
             'development',
             'development/local-development',
@@ -119,15 +131,6 @@ export default defineConfig({
                 'development/design/oauth-provider-identity',
               ],
             },
-          ],
-        },
-        {
-          label: 'Reference',
-          collapsed: true,
-          items: [
-            'reference',
-            'reference/configuration',
-            'reference/related-projects',
           ],
         },
       ],

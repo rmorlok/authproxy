@@ -1,8 +1,14 @@
 ---
-title: Connector Setup Flow
+title: Connector setup flows
+description: Ask users for extra information before or after they authenticate, such as a region, tenant, or workspace.
 ---
 
-Connector setup flows let a connector collect configuration before and after credentials are established. The setup flow is authored in connector YAML and returned to clients one eligible step at a time.
+Some providers need more than a sign-in. You may need to know a customer's
+region or instance URL before starting OAuth, or let them choose which
+workspace to sync after it. A connector's `setupFlow` defines these extra
+steps. AuthProxy returns them to the Marketplace (or your own UI) one at a
+time and stores the answers on the connection, where predicates, probes, and
+your application can read them.
 
 ## Phases
 
@@ -24,7 +30,7 @@ Auth-method steps and AuthProxy pseudo-steps are inserted by the runtime. Connec
 - `apxy:verify` is inserted when verification is needed, which means at least one probe is enabled for the connection.
 - Connector-authored step ids must not start with `apxy:`.
 
-## Form Steps
+## Form steps
 
 Form steps are the default step type. They use JSON Schema for submitted data and optional JSONForms UI Schema for layout.
 
@@ -48,7 +54,7 @@ setupFlow:
 
 When a form step is submitted, AuthProxy validates the payload against the step's `jsonSchema` and merges only top-level fields declared in `properties` into the connection configuration.
 
-## Redirect Steps
+## Redirect steps
 
 Redirect steps send the user to an off-platform URL before continuing setup. Set `type: redirect` and provide `redirect.url`.
 
@@ -70,7 +76,7 @@ Redirect URLs support `{{cfg.field_name}}` mustache references plus two runtime 
 
 Redirect steps cannot define `jsonSchema`, `uiSchema`, or `dataSources`.
 
-## Conditional Steps
+## Conditional steps
 
 Connector-authored form and redirect steps can include an `if.javascript` condition. AuthProxy evaluates the condition server-side each time it resolves the current or next setup step. Clients only receive steps whose condition is true.
 
@@ -153,7 +159,7 @@ setupFlow:
                 - restricted
 ```
 
-## Runtime Behavior
+## Runtime behavior
 
 AuthProxy applies step conditions consistently across setup APIs:
 
@@ -165,7 +171,7 @@ AuthProxy applies step conditions consistently across setup APIs:
 
 If all connector-authored steps in a phase are ineligible, the runtime skips that phase. Auth-method and verification steps still run according to the connector's auth method and probe configuration.
 
-## Data Sources
+## Data sources
 
 Configure form steps can define `dataSources` for controls that need upstream options. AuthProxy calls the `proxyRequest` through the authenticated connection, exposes the JSON response as `data`, and evaluates `transform` JavaScript to produce options:
 
@@ -198,7 +204,7 @@ setupFlow:
 
 Transforms must return an array of objects with `value` and `label` fields. They run in the same connector JavaScript context as predicates, so top-level connector helpers can read `cfg`, `labels`, and `annotations`; transforms additionally receive `data`. See [Connector predicates](/integration/connector-predicates/#connector-javascript-library) for the shared JavaScript library contract.
 
-## Migration Notes
+## Migration notes
 
 Adding, removing, or changing `if.javascript`, data-source transforms, or connector-level JavaScript changes the connector definition. For published connectors, publish a new connector generation and migrate existing connections with the [connector generation migration workflow](/operations/connector-generation-migrations/).
 

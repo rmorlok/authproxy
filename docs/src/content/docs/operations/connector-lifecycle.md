@@ -1,5 +1,5 @@
 ---
-title: Connector Lifecycle Operations
+title: Connector lifecycle operations
 ---
 
 AuthProxy exposes connector-wide lifecycle operations for administrative cleanup:
@@ -17,7 +17,7 @@ Admin lists display the connector name, but lifecycle URLs continue to use the
 immutable connector ID. Renaming a connector does not change an in-flight task,
 workflow instance ID, or any connector-generation reference.
 
-## Choosing An Operation
+## Choosing an operation
 
 Use **disconnect all** when a logical connector should remain available, but
 every current connection across all of its generations should be disconnected
@@ -59,7 +59,7 @@ without a generation, because the operation covers every generation:
 
 The caller needs `connectors:disconnect_all` permission for disconnect-all and `connectors:archive` permission for archive, scoped to the connector namespace and id.
 
-## Task Polling
+## Task polling
 
 The response repeats the action target and spec and adds the secure task token
 under status:
@@ -99,7 +99,7 @@ Workflow-backed connector lifecycle tasks usually report these states:
 
 For compatibility with Asynq-backed tasks, the task schema also includes `pending`, `scheduled`, and `retry`. Treat those as in-progress states when building generic task polling clients.
 
-## Timeout And Forced Terminal Semantics
+## Timeout and forced terminal semantics
 
 Disconnect-all starts one child `core.connection.disconnect.v1` workflow for each relevant connection. Relevant connections are in `setup`, `configured`, `disabled`, or `disconnecting` state.
 
@@ -120,7 +120,7 @@ This prevents duplicate disconnect-all or archive workflows from running for the
 
 Archive invokes disconnect-all with the same connector-specific disconnect-all instance id. If a disconnect-all workflow for the connector is already active, starting archive for that connector will fail instead of creating a competing cleanup workflow.
 
-## Durable Workflow Names
+## Durable workflow names
 
 The connector lifecycle workflows and activities use durable names that are stored in workflow history:
 
@@ -135,7 +135,7 @@ core.connector.archive.finalize_versions.v1
 
 These names follow the versioning rules in [Workflow versioning](/development/workflows/). Breaking changes must add a new `vN` workflow or activity name and keep the old registration available for at least one deployment window so in-flight customer workflows can continue replaying after an upgrade.
 
-## Verification Matrix
+## Verification matrix
 
 The connector lifecycle integration tests cover the workflow-backed polling path and the final data effects:
 
