@@ -175,6 +175,10 @@ type DB interface {
 	// prepared primary generation and installs its complete first Tool inventory.
 	InstallExplicitToolSetInventory(ctx context.Context, install ToolSetInventoryInstall) (*ToolSetBinding, error)
 
+	// ReplaceExplicitToolSetInventory replaces an installed inventory at its
+	// captured epoch/generation, preserving identities for retained source keys.
+	ReplaceExplicitToolSetInventory(ctx context.Context, install ToolSetInventoryInstall, expectedGeneration uint64) (*ToolSetBinding, error)
+
 	// DeleteToolSetBinding retires a no-longer-matching assignment using its epoch
 	// and current selector snapshot. Deleted-parent cleanup ignores selector revision.
 	DeleteToolSetBinding(ctx context.Context, id apid.ID, expectedEpoch uint64, expectedSelectorRevision uint64) error

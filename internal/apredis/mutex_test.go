@@ -99,6 +99,8 @@ func TestMutexOptionRetryForDeadline(t *testing.T) {
 	})
 }
 
+// TestRunWithMutexRenewsAndReleases checks repeated renewal and final release,
+// synchronizing fake time with the renewal goroutine's timer resets.
 func TestRunWithMutexRenewsAndReleases(t *testing.T) {
 	fakeClock := clocktesting.NewFakeClock(time.Now())
 	ctx := apctx.WithClock(context.Background(), fakeClock)
@@ -118,10 +120,15 @@ func TestRunWithMutexRenewsAndReleases(t *testing.T) {
 	}()
 
 	<-operationStarted
-	fakeClock.Step(30 * time.Second)
-	require.Eventually(t, func() bool { return m.extendCallCount() == 1 }, time.Second, time.Millisecond)
-	fakeClock.Step(30 * time.Second)
-	require.Eventually(t, func() bool { return m.extendCallCount() == 2 }, time.Second, time.Millisecond)
+	for expected := 1; expected <= 2; expected++ {
+		fakeClock.Step(30 * time.Second)
+		// Extend records its call before the renewal timer is reset. Wait for
+		// both before stepping time again, or the next deadline can move ahead
+		// of that step and leave the test waiting for a tick it never sends.
+		require.Eventually(t, func() bool {
+			return m.extendCallCount() == expected && fakeClock.HasWaiters()
+		}, time.Second, time.Millisecond, "renewal must complete and rearm its timer")
+	}
 
 	finishOnce.Do(func() { close(finishOperation) })
 	require.NoError(t, <-result)

@@ -1944,6 +1944,21 @@ func (mr *MockDBMockRecorder) RefreshNamespaceLabelsCarryForward(ctx, nsPath int
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshNamespaceLabelsCarryForward", reflect.TypeOf((*MockDB)(nil).RefreshNamespaceLabelsCarryForward), ctx, nsPath)
 }
 
+// ReplaceExplicitToolSetInventory mocks base method.
+func (m *MockDB) ReplaceExplicitToolSetInventory(ctx context.Context, install database.ToolSetInventoryInstall, expectedGeneration uint64) (*database.ToolSetBinding, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReplaceExplicitToolSetInventory", ctx, install, expectedGeneration)
+	ret0, _ := ret[0].(*database.ToolSetBinding)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReplaceExplicitToolSetInventory indicates an expected call of ReplaceExplicitToolSetInventory.
+func (mr *MockDBMockRecorder) ReplaceExplicitToolSetInventory(ctx, install, expectedGeneration interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReplaceExplicitToolSetInventory", reflect.TypeOf((*MockDB)(nil).ReplaceExplicitToolSetInventory), ctx, install, expectedGeneration)
+}
+
 // ResolveActorReference mocks base method.
 func (m *MockDB) ResolveActorReference(ctx context.Context, reference meta.ObjectReference) (*database.Actor, error) {
 	m.ctrl.T.Helper()
