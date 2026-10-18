@@ -34,6 +34,11 @@ the same change.
 - Use inline comments to explain non-obvious decisions, constraints, and
   algorithms. Keep comments concise and substantive rather than restating
   individual statements.
+- When creating or changing tests, add short, usually one-line comments at
+  meaningful steps explaining the setup, actions, and expected outcomes. Readers
+  should be able to follow the scenario without reading the assertions directly.
+  Group related assertions under a shared comment, and explain each transition
+  in multi-step lifecycle or concurrency tests.
 - Update comments alongside behavior changes. Follow the language's doc-comment
   conventions, including starting Go doc comments with the declared name.
 
