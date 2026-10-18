@@ -111,8 +111,9 @@ func readInventoryBindingForTest(t *testing.T, fixture *toolSetInventoryFixture)
 }
 
 // TestExplicitToolSetInventoryLifecycle installs all rows and provenance in one
-// binding transition without modifying preparation data or activating execution.
+// binding transition and exposes coherent current reads without changing inputs.
 func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
+	// Supply stale counters and timestamps to verify installation owns them.
 	f := explicitInventoryForTest(t, 2)
 
 	old := apctx.GetClock(f.ctx).Now().Add(-time.Hour)
@@ -123,6 +124,7 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	before := copyInventoryForTest(f.request)
 	installedAt := apctx.GetClock(f.ctx).Now().Add(time.Hour)
 
+	// Publish the complete inventory and advance its binding in one transaction.
 	installed, err := f.db.InstallExplicitToolSetInventory(apctx.WithFixedClock(f.ctx, installedAt), f.request)
 	require.NoError(t, err)
 	require.Equal(t, before, f.request)
@@ -134,6 +136,7 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.True(t, installedAt.Equal(installed.UpdatedAt))
 	require.True(t, f.binding.CreatedAt.Equal(installed.CreatedAt))
 
+	// Each generated identity is now readable with its exact installed definition.
 	for _, prepared := range f.request.Tools {
 		stored, err := f.db.GetTool(f.ctx, prepared.Tool.Id)
 		require.NoError(t, err)
@@ -155,14 +158,18 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 		require.Equal(t, f.request.Generation, *revision.SourceGeneration)
 		require.Equal(t, prepared.EncryptedDefinition, revision.EncryptedDefinition)
 		require.Equal(t, prepared.DefinitionDigest, revision.DefinitionDigest)
-		_, err = f.db.GetCurrentToolRevision(f.ctx, stored.Id)
-		require.ErrorIs(t, err, ErrNotFound)
+		current, err := f.db.GetCurrentToolRevision(f.ctx, stored.Id)
+		require.NoError(t, err)
+		require.Equal(t, revision, current)
 	}
 
+	// The same installed set is available to metadata-only candidate scans.
 	page, err := f.db.ListToolCandidates(f.ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 10})
 	require.NoError(t, err)
-	require.Empty(t, page.Items)
+	require.ElementsMatch(t, []apid.ID{f.request.Tools[0].Tool.Id, f.request.Tools[1].Tool.Id}, toolCandidateIDsForTest(page))
+	require.Empty(t, page.Cursor)
 
+	// Caller-owned maps and aliases cannot change the committed projections.
 	f.request.Tools[0].Tool.Labels["local"] = "changed"
 	f.request.Tools[0].Tool.Annotations["note"] = "changed"
 	f.request.Tools[0].Tool.Verbs[0] = "changed"
@@ -172,6 +179,7 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, "own", stored.Annotations["note"])
 	require.Equal(t, []string{"read", "write"}, stored.Verbs)
 
+	// A new primary leaves the installed inventory pinned and readable.
 	second, err := f.db.CreateToolSetGeneration(f.ctx, f.toolSet.Id, before.Tools[0].EncryptedDefinition)
 	require.NoError(t, err)
 
@@ -181,6 +189,9 @@ func TestExplicitToolSetInventoryLifecycle(t *testing.T) {
 	unchanged := readInventoryBindingForTest(t, f)
 	require.Equal(t, installed.Epoch, unchanged.Epoch)
 	require.Equal(t, installed.AppliedGeneration, unchanged.AppliedGeneration, "publication does not roll existing inventories forward")
+	current, err := f.db.GetCurrentToolRevision(f.ctx, stored.Id)
+	require.NoError(t, err)
+	require.Equal(t, installed.AppliedGeneration, current.SourceGeneration)
 }
 
 // TestExplicitToolSetInventoryEmpty distinguishes a completed empty inventory
