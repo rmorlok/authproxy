@@ -1,10 +1,10 @@
 ---
-title: Development quick start
+title: Run AuthProxy locally
 description: Clone AuthProxy and start a complete local stack with Docker Compose.
 ---
 
-This is the shortest path from a fresh checkout to a running build of the
-current source.
+This is the shortest path from a fresh checkout to a running AuthProxy. It
+builds the current source and starts every service and dependency in Docker.
 
 ## Prerequisites
 
@@ -60,6 +60,8 @@ Remove all local AuthProxy containers and data volumes:
 
 ## Next steps
 
+- [Follow the tutorial](/getting-started/first-connection/) to create a
+  connection and proxy a request through this stack.
 - [Run services and UIs from source](/development/local-development/)
 - [Understand the codebase](/development/codebase/)
 - [Try the complete hosted demo](/getting-started/demo/)

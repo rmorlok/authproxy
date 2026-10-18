@@ -1,10 +1,11 @@
 ---
 title: JavaScript and TypeScript SDK
+description: Use the @authproxy/api client to manage resources and call AuthProxy from JavaScript or TypeScript.
 ---
 
 `@authproxy/api` is the repository's typed JavaScript/TypeScript client for AuthProxy. It uses Axios, exports ESM and TypeScript declarations, and is shared by the Marketplace and Admin UIs.
 
-The package currently lives at [`sdks/js/`](https://github.com/rmorlok/authproxy/tree/main/sdks/js/). Inside this monorepo, Yarn resolves it as the `@authproxy/api` workspace.
+The package lives at [`sdks/js/`](https://github.com/rmorlok/authproxy/tree/main/sdks/js/) and is not yet published to npm. Inside this monorepo, Yarn resolves it as the `@authproxy/api` workspace. To use it in another project, [build it](#use-the-package-in-this-repository) and depend on the built package by path, or call the HTTP API directly.
 
 ## Configure the client
 

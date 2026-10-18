@@ -1,52 +1,55 @@
 ---
-title: Host application integration
+title: Map users and tenants
+description: Decide how your users, tenants, and installed integrations correspond to AuthProxy actors, namespaces, and connections.
 ---
 
-The host application remains the source of truth for users, tenants, roles,
-and product installations. AuthProxy should receive stable identifiers and the
-minimum metadata needed to authorize and operate third-party connections.
+Your application remains the source of truth for users, tenants, roles, and
+which integrations are installed. AuthProxy needs only enough of that
+information to decide who may use which connection. This page explains how to
+choose that mapping.
 
-## Map host entities deliberately
+## The mapping at a glance
 
-| Host entity | AuthProxy representation | Guidance |
+| In your application | In AuthProxy | Advice |
 |---|---|---|
-| User or service principal | Actor `spec.externalId` | Use an immutable primary key, not email or display name. |
-| Tenant or organization | Namespace | Derive a stable, namespace-safe segment and never rename it when the tenant's display name changes. |
-| Team | Optional child namespace | Create it only when it is an authorization boundary. Otherwise use a label. |
-| Integration installation | Connection | Store the immutable `cxn_...` ID in the host. Supply a human-readable name for display and exact-name discovery. |
-| Searchable host metadata | Labels | Keep values short and non-sensitive; labels appear in request-event dimensions. |
-| Descriptive metadata | Annotations | Use for non-selectable values such as a host record URL or description. |
+| A user or service account | An actor, identified by its external ID | Use your immutable primary key, not an email or display name. |
+| A tenant or organization | A namespace, such as `root.tenants.acme_42` | Derive the segment from a stable ID. Do not use a name that can change. |
+| A team | A child namespace, or just a label | Use a namespace only if the team is an access boundary. |
+| An installed integration | A connection | Store the `cxn_...` ID in your database. |
+| Your own IDs and tags | Labels | Keep them short and non-sensitive. They appear in request logs. |
 
-An actor is located by `(namespace, externalId)`, so keep both stable. A user
-with host id `usr_7` in tenant `tnt_42` might map to:
+For example, user `usr_7` in tenant `acme_42` might become:
 
 ```text
-actor namespace: root.tenants.tnt_42
-externalId:     usr_7
-tenant namespace: root.tenants.tnt_42
+actor namespace:  root.tenants.acme_42
+external ID:      usr_7
 ```
 
-If the host id contains characters that cannot appear in a namespace segment,
-retain the original id as `externalId` and maintain a deterministic,
-namespace-safe key separately.
+Namespace segments may contain letters, digits, `_`, and `-`, and cannot start
+with `-`. If your tenant IDs contain other characters, derive a stable,
+namespace-safe key from them and use that consistently.
 
-## Choose a namespace model
+## Shared or private connections
 
-### Tenant-shared connections
+The most important decision is who shares a connection, because it decides
+which namespace each connection is created in.
+
+**Tenant-shared.** One authorization covers a whole customer, such as a
+company-wide Salesforce or Slack installation. Create the connection in the
+tenant namespace and give every actor in the tenant access to it:
 
 ```text
-root.tenants.tnt_42
+root.tenants.acme_42
 ├── actors: usr_7, usr_9
 └── connections: Salesforce, Slack
 ```
 
-Give each tenant actor access to the tenant subtree. Use this when one provider
-authorization represents the whole customer account.
-
-### Per-user connections
+**Per-user.** Each person connects their own account, such as Google Drive or
+a personal calendar. Create each connection in a namespace for that user, and
+give each actor access only to their own:
 
 ```text
-root.tenants.tnt_42
+root.tenants.acme_42
 └── users
     ├── usr_7
     │   └── connection: Google Drive
@@ -54,127 +57,102 @@ root.tenants.tnt_42
         └── connection: Google Drive
 ```
 
-Give an actor access only to its user subtree. Use this when the provider
-authorization represents an individual account.
+Most products use both, depending on the provider. A connector can live in a
+shared parent namespace, such as `root`, while its connections are created in
+tenant or user namespaces below it.
 
-Many products use both models. A connector can live at a parent namespace while
-each connection is created in the appropriate child namespace.
+Connections are not owned by actors. They belong to namespaces, and actors get
+access through permissions on those namespaces. When a user leaves, nothing
+happens to "their" connections automatically. Your application has to decide
+whether to disconnect them.
 
 ## Provision actors
 
-AuthProxy supports two provisioning patterns:
+An actor must exist before it can do anything. There are two ways to create
+actors.
 
-1. **Provision first.** Create or synchronize the actor through a trusted
-   management path. Browser handoff JWTs then identify it by `sub` and
-   `namespace`. A token that does not contain a full actor claim is rejected if
-   that actor does not already exist.
-2. **Just in time.** A trusted JWT may contain the complete actor claim.
-   AuthProxy upserts that actor during authentication. Use this only when the
-   host signing service is authoritative for actor permissions and metadata.
+**Ahead of time.** Your backend creates and updates actors through the API
+whenever users join, change role, or leave. Tokens then identify the actor by
+`sub` and `namespace` only. A token for an actor that does not exist is
+rejected. This keeps all permission changes in one place that you can audit.
 
-Provision-first is easier to audit. Just-in-time provisioning reduces sync work
-but makes the token issuer part of the actor-provisioning control plane.
+**On first use.** Your backend includes the complete actor definition in each
+token. AuthProxy creates or updates the actor when it sees the token. This
+saves you a sync job, but it means the code that signs tokens is also the
+code that decides permissions.
 
-An embedded actor uses the same `authproxy.net/v1alpha1` resource shape as the
-Actor API, with a deliberately restricted field set:
+The token format for both is described in [Authenticate requests to
+AuthProxy](/integration/authentication/).
 
-```yaml
-sub: usr_7
-namespace: root.tenants.tnt_42
-actor:
-  apiVersion: authproxy.net/v1alpha1
-  kind: Actor
-  metadata:
-    name: user-7
-    namespace: root.tenants.tnt_42
-    labels:
-      app.example.com/role: member
-  spec:
-    externalId: usr_7
-    permissions:
-      - namespace: root.tenants.tnt_42.**
-        resources: [connections]
-        verbs: [create, get, list, proxy]
-```
+Do not copy your whole user profile into the actor. It needs the stable ID,
+its namespace, its permissions, and perhaps a few labels.
 
-The JWT `sub` must equal `actor.spec.externalId`, and the top-level
-`namespace` must equal `actor.metadata.namespace`. Do not include
-`metadata.id`, `metadata.generation`, lifecycle timestamps, `status`, or
-`spec.signingKey` in a JWT actor. Those fields are database identity,
-server-observed state, or secret configuration—not identity assertions. The
-legacy flat actor claim is not accepted.
+## Grant the least access needed
 
-Do not copy an entire host user profile. AuthProxy generally needs the stable
-id, home namespace, permissions, and carefully selected labels or annotations.
-
-## Define least-privilege access
-
-For a tenant user who can browse connectors and use connections, keep connector
-and connection permissions separate:
+A typical tenant member who can browse connectors and manage their tenant's
+connections might have:
 
 ```json
 [
   {
-    "namespace": "root.tenants.tnt_42.**",
+    "namespace": "root.**",
     "resources": ["connectors"],
     "verbs": ["list", "get"]
   },
   {
-    "namespace": "root.tenants.tnt_42.**",
+    "namespace": "root.tenants.acme_42.**",
     "resources": ["connections"],
     "verbs": ["create", "list", "get", "update", "disconnect", "proxy"]
   }
 ]
 ```
 
-Treat this as a starting example, not a universal Marketplace role. Remove
-verbs the user experience does not need. Keep connector publication,
-force-state actions, actor management, and namespace administration on a
-separate operator identity. If connectors live in a shared parent namespace,
-grant their `list` and `get` permissions there while keeping connection
-permissions restricted to the tenant or user namespace.
+`root.tenants.acme_42.**` matches that namespace and everything below it.
+Connector and connection permissions are listed separately so that connectors
+can live in a shared namespace while connections stay restricted to the
+tenant.
 
-Request JWTs may narrow these permissions. AuthProxy verifies that every
-top-level token permission is a subset of the actor's base permissions and
-then intersects the two sets during authorization. A broader token is rejected
-instead of being silently trimmed.
+Remove any verbs your product does not need. Keep administrative actions,
+such as publishing connectors or managing actors and namespaces, on a
+separate operator identity rather than on end users.
 
-## Track host installations
+If many actors follow the same pattern, a permission can refer to the actor's
+own data, such as `root.tenants.{{labels.tenant_id}}.**`. AuthProxy fills in
+the value from the actor's labels when it checks the permission. If you use
+this, make sure users cannot set that label themselves. See [Authentication
+and authorization](/security/authentication-and-authorization/#labels-and-permission-templates).
 
-There are three common lookup patterns:
+## Keep track of installations
 
-- **Store the connection id.** Add `cxn_...` to the host installation row. This
-  is the most direct lookup for proxy requests.
-- **Assign a resource name.** Use a stable, human-readable value such as
-  `production-crm` in UI lists and reconciliation tools. Exact-name queries are
-  namespace-scoped; names can be changed and must not replace the stored ID.
-- **Apply a label.** Add a label such as
-  `app.example.com/installation-id=ins_123` and query with a label selector.
-  This is useful for reconciliation and audit searches.
+You will need to find a connection again, for example when a sync job runs.
+There are three ways to do this, and using all three is reasonable:
 
-Using all three gives fast direct access, readable operator output, and
-recoverable reconciliation. Never use a mutable AuthProxy name or a
-user-editable provider account name as the durable join key.
+- **Store the connection ID** on your own "installed integration" record.
+  This is the fastest lookup, and it is what the proxy endpoints take.
+- **Give the connection a name**, such as `production-crm`, when you create
+  it. Names are readable in the Admin UI and can be looked up within a
+  namespace. They can be renamed, so do not use them as your only reference.
+- **Add a label**, such as `acme.com/installation-id=ins_123`, and search with
+  a label selector. This is useful when reconciling your records against
+  AuthProxy.
 
-Labels improve discovery; namespace permissions still enforce access. See
-[Labels and annotations](/concepts/labels-and-annotations/) for selector,
-carry-forward, and request-snapshot behavior.
+Labels help you find things. They never grant access. See [Labels and
+annotations](/concepts/labels-and-annotations/).
 
-## Handle membership and deletion
+## When users and tenants change
 
-When tenant membership changes, update actor permissions before issuing another
-session or API token. On account deletion:
+When someone's role changes, update the actor's permissions before you issue
+their next token. When someone leaves:
 
-1. stop issuing tokens and remove the actor's access;
-2. disconnect connections that were private to that actor;
-3. preserve tenant-shared connections still used by other actors; and
-4. retain or purge request-event data according to the host's data policy.
-
-Because connections are namespace-owned rather than actor-owned, the host must
-make the shared-versus-private decision explicit.
+1. stop signing tokens for them and remove the actor's permissions;
+2. disconnect connections that were private to them;
+3. leave tenant-shared connections alone if other users still rely on them;
+   and
+4. keep or delete their request history according to your data policy.
 
 ## Next steps
 
-- [Implement Marketplace SSO](/integration/marketplace/)
-- [Review the core resource model](/concepts/core-model/)
-- [Make requests through a connection](/sdks/proxying/)
+- [Authenticate requests to AuthProxy](/integration/authentication/)
+- [Embed the Marketplace](/integration/marketplace/)
+- [The core resource model](/concepts/core-model/) has the exact rules for
+  namespaces, permissions, and names.

@@ -1,5 +1,5 @@
 ---
-title: Workflow Versioning
+title: Workflow versioning
 ---
 
 AuthProxy uses [go-workflows](https://cschleiden.github.io/go-workflows/) for durable background work that must survive process restarts, worker rollouts, and customer upgrades. Workflow code is replayed from persisted history, so compatibility is stricter than ordinary request handlers or Asynq tasks.
@@ -39,7 +39,7 @@ Rules:
 - Version workflows and activities independently. A workflow may stay at `v1` while calling a new `v2` activity only if replay of already-started workflow histories cannot observe that change.
 - Keep Go function names descriptive, but never rely on inferred function names for durable production workflows. Register with `registry.WithName(...)`.
 
-## When To Create A New Version
+## When to create a new version
 
 Create a new workflow name when a change can alter the sequence of commands emitted during replay for an existing in-flight workflow.
 
@@ -72,7 +72,7 @@ Safe changes usually include:
 
 When in doubt, create a new version. The cost of one extra registered implementation is much lower than a non-recoverable replay error on a customer's system.
 
-## Determinism And Side Effects
+## Determinism and side effects
 
 Workflow code describes orchestration. Activity code performs side effects.
 
@@ -93,7 +93,7 @@ Do not do this in workflows:
 
 Put those operations in activities instead. Activities receive `context.Context`, may perform I/O, and should be idempotent because go-workflows retries activities by default.
 
-## Upgrade Pattern
+## Upgrade pattern
 
 For a breaking workflow change:
 
@@ -124,7 +124,7 @@ Use separate queues only for exceptional cases, such as:
 
 If queues are used for versioning, the queue name must be treated as an operational routing control, not the durable version identifier. The workflow and activity names still need explicit `vN` suffixes.
 
-## Registration Checklist
+## Registration checklist
 
 Before merging a workflow change:
 
@@ -136,7 +136,7 @@ Before merging a workflow change:
 - Admin and task-monitoring surfaces can still resolve in-flight instances created before the change.
 - Documentation identifies when the old version can be retired.
 
-## Local Checks
+## Local checks
 
 Run workflow guardrails locally before merging workflow changes:
 

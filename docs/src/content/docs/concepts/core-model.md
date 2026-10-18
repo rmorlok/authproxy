@@ -1,14 +1,18 @@
 ---
 title: The core resource model
+description: The precise rules for namespaces, actors, permissions, connectors, connections, and resource names.
 ---
 
-AuthProxy separates third-party integration definitions, credential instances,
-and caller identity. This leads to the following core resources in the application:
+[How AuthProxy works](/concepts/) introduces AuthProxy's main ideas. This page
+gives the exact rules behind them: how namespaces nest, how permissions match,
+how connector generations are released, and how resources are named. It
+covers four resources:
 
-* Namespaces
-* Actors
-* Connectors
-* Connections
+- **Namespaces**: where every other resource lives, and what permissions are
+  granted on.
+- **Actors**: the users and services that call AuthProxy.
+- **Connectors**: definitions of how to connect to a provider.
+- **Connections**: one connected account and its credentials.
 
 ```mermaid
 flowchart LR
@@ -36,15 +40,19 @@ root.tenants.tnt_42
 root.tenants.tnt_42.users.usr_7
 ```
 
-Use namespaces for boundaries that must affect authorization or cryptographic
-isolation. Because AuthProxy does not have a direct conccept of resource
-ownership, namespaces can be used to implement whatever ownership model the host
-application wants. For example, `usr_7`'s connections could be created in
-`root.tenants.tnt_42.users.usr_7` as suggested above, and then the actor would
-be given permissions on those connections via ACL.
+Use namespaces for boundaries that must affect authorization or encryption.
+AuthProxy has no separate concept of a resource owner, so namespaces are how
+you express ownership. For example, `usr_7`'s private connections could be
+created in `root.tenants.tnt_42.users.usr_7`, and `usr_7`'s actor given
+permission on that namespace.
 
-It is possible to grant permissions on child namespaces via globs. A permission 
-on `root.tenants.tnt_42.**` can cover the tenant namespace and every descendant.
+A permission can cover a namespace and everything below it with `**`. A
+permission on `root.tenants.tnt_42.**` applies to `root.tenants.tnt_42` and
+every descendant.
+
+Each namespace can also be assigned its own encryption key, which its
+descendants inherit. This lets you isolate one tenant's stored credentials
+cryptographically from another's. See [Encryption](/security/encryption/).
 
 Connectors are namespace-scoped. A connection may be created in the connector's
 namespace or one of its children. This makes a connector defined at
@@ -60,22 +68,21 @@ The final segment is also returned as the namespace's `name`.
 
 ## Actors and permissions
 
-An **actor** represents a caller to an AuthProxy API: an end user, application service, 
-operator, or automation. Its host-facing identity is the pair:
+An **actor** is anything that calls AuthProxy: an end user, a backend service,
+an operator, or an automated job. It is identified by the pair:
 
 ```text
 (actor namespace, externalId)
 ```
 
-`externalId` is AuthProxy's way of dynamically connecting actors to the calling 
-entity in the host system. It should be the host application's immutable user 
-or service id. The same external id may exist in different actor
-namespaces. Actors can either by synced via the API or dynamically created based
-on the metadata defined in the JWT authenticating a request. This allows for
-dynamic bootstrapping of actors as needed from the host system.
+`externalId` is the ID your application uses for that user or service. It
+should never change or be reused. The same external ID can exist in different
+namespaces as different actors. Actors can be created ahead of time through
+the API, or created on first use from an actor definition carried in the JWT.
+See [Authenticate requests to AuthProxy](/integration/authentication/).
 
-Actors have permissions that combine a namespace matcher, resources, verbs, 
-and optional resource ids. For example:
+Each permission combines a namespace matcher, resource types, verbs, and
+optionally specific resource IDs. For example:
 
 ```json
 {
@@ -85,38 +92,32 @@ and optional resource ids. For example:
 }
 ```
 
-In the above example, the actor has the `create`, `list`, `get`, `proxy` verbs for
-connections in the `root.tenants.tnt_42` namespace or any child of that namespace.
+This permission lets the actor create, list, read, and proxy through
+connections in `root.tenants.tnt_42` or any namespace below it.
 
-In addition to having ACLs for a given actor, a given JWT can carry narrower 
-request-level permissions. Those restrictions are intersected with the actor's 
-stored permissions; a token cannot grant access the actor does not already 
-have. This type of restriction can be used for cases where you want to further restrict an
-actors permissions, for example as part of a JWT being leveraged on the actor's behalf.
+A JWT can also carry its own, narrower permissions. AuthProxy allows a request
+only if both the actor's permissions and the token's permissions allow it, so
+a token can never grant more than the actor has. This is useful when handing a
+token to a background job or an AI agent that should only do one thing.
 
-Permission namespace matchers can also use actor data such as
-`root.tenants.{{labels.tenant_key}}.**`. If a referenced value is missing or
-does not render a valid namespace segment, the permission does not match. This allows
-the host system to define standard templates for permissions rather than having to
-fully customize the permissions for each request.
+A permission's namespace can refer to the actor's own data, as in
+`root.tenants.{{labels.tenant_key}}.**`. The available values are
+`external_id`, `labels.<key>`, and `annotations.<key>`. This lets many actors
+share one permission template instead of each carrying its own copy. If a
+referenced value is missing, or does not form a valid namespace segment, the
+permission does not match.
 
 ## Connectors and generations
 
-A **connector** is the reusable definition for a third-party system. It can
-describe:
+A **connector** is the reusable definition for a third-party system: its
+authentication type and endpoints, OAuth scopes, setup forms and redirects,
+health probes, and rate-limit handling. [Define a
+connector](/integration/connectors/) explains how to write one.
 
-- OAuth2, API-key, or unauthenticated access
-- OAuth scopes and provider endpoints
-- forms and redirects used during setup
-- probes that verify connection health
-- request authentication placement and rate-limit behavior
-
-The connector ID, name, namespace, labels, and annotations belong to the
-logical connector and are shared by every generation. Renaming a connector
-therefore changes the name projected by all generations without rewriting
-their encrypted definitions. Each generation is a complete snapshot of the
-definition, selected by `metadata.generation`, and has one of four release
-states:
+A connector's ID, name, namespace, labels, and annotations are shared by all
+of its versions. Its definition is versioned: each published change creates a
+new **generation**, a complete, immutable snapshot identified by
+`metadata.generation`. Each generation is in one of four release states:
 
 | State | Meaning |
 |---|---|
@@ -147,10 +148,11 @@ A **connection** is one configured instance of a connector. It records:
 - an independent `healthy` or `unhealthy` signal
 - labels and annotations
 
-Lifecycle and health answer different questions. A connection can be
-`configured` but `unhealthy`, for example after a provider revokes its refresh
-token. The Marketplace can then guide the user through reauthentication without
-changing the connection's identity.
+Lifecycle and health answer different questions. Lifecycle says where the
+connection is in setup and teardown. Health says whether its credentials work
+right now. A connection can be `configured` but `unhealthy`, for example after
+the provider revokes its refresh token. The user can then reconnect it from
+the Marketplace, and it keeps the same ID.
 
 Connection lifecycle states are `setup`, `configured`, `disabled`,
 `disconnecting`, and `disconnected`.
@@ -223,9 +225,9 @@ Every durable resource has two identifiers with different purposes:
   Rename a resource with its ID-addressed `PATCH` endpoint. Renaming never
   changes its URL or references.
 
-Names are intended as a way to define an identifier for a specific resource
-up-front, so that the resource can be referenced by declarative configurations
-(e.g. YAML files that define the resources and are synced against the API).
+Names exist so that you can choose an identifier before a resource is
+created. This lets YAML files applied with `ap apply` refer to resources
+without knowing their generated IDs.
 
 For actors, connectors, connections, keys, and rate limits, a live name is
 unique for that resource type within one namespace. The same name can exist in

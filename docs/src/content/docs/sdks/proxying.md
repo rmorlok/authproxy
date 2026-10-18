@@ -1,5 +1,6 @@
 ---
-title: Proxying Requests
+title: Proxying requests
+description: Send requests through a connection with the wrapped JSON endpoint or the streaming raw endpoint.
 ---
 
 AuthProxy exposes two ways to send an HTTP request through a connection. Both authorize the caller with the `connections:proxy` permission, apply the connection's credentials, enforce matching rate limits, and record request-event and telemetry data.

@@ -1,5 +1,5 @@
 ---
-title: Viewing S3 Blob Storage Data
+title: Viewing S3 blob storage data
 ---
 
 The local Docker Compose stack uses SeaweedFS for S3-compatible storage of full

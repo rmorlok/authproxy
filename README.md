@@ -46,8 +46,8 @@ AuthProxy is useful when you want to:
 
 AuthProxy focuses on authentication, connection lifecycle, proxying, and
 governance. It is not a workflow builder or a replacement for the business
-logic in your application. See the [core concepts](http://docs.authproxy.net/concepts/)
-and [comparison with related projects](http://docs.authproxy.net/reference/related-projects/) for
+logic in your application. See the [how AuthProxy works](https://docs.authproxy.net/concepts/)
+and [comparison with related projects](https://docs.authproxy.net/reference/related-projects/) for
 more detail.
 
 ## Demos
@@ -139,9 +139,11 @@ you trust it. Stop the stack with:
 docker compose --profile server down
 ```
 
+To define a connector, create a connection, and send a request through it,
+follow the [first-connection tutorial](https://docs.authproxy.net/getting-started/first-connection/).
 For local UI sign-in, source-mode development, alternate data stores, tests,
-and observability, continue with the
-[development quick start](http://docs.authproxy.net/development/quick-start/).
+and observability, see the
+[development docs](https://docs.authproxy.net/development/local-development/).
 
 ## License
 

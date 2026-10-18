@@ -1,5 +1,5 @@
 ---
-title: Permission Resources and Verbs
+title: Permission resources and verbs
 description: Reference every resource type and verb available in AuthProxy permissions.
 ---
 
@@ -11,7 +11,7 @@ AuthProxy checks have an effect.
 `*` is valid in either `resources` or `verbs` and matches every value in that
 dimension. Prefer the explicit values below for least-privilege grants.
 
-## Resource and Verb Matrix
+## Resource and verb matrix
 
 | Resource type | Available verbs | Controls |
 |---|---|---|
@@ -27,7 +27,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `task_monitoring` | `get`, `list`, `manage` | Asynq queue, server, scheduler, and task inspection or mutation |
 | `workflow_monitoring` | `get`, `list`, `manage` | Workflow instance inspection, cancellation, and removal |
 
-## Specialized Verbs
+## Specialized verbs
 
 Most resources use the conventional `create`, `get`, `list`, `update`, and
 `delete` verbs. The specialized verbs mean:
@@ -50,6 +50,6 @@ disables response redaction after the caller passes that route's normal
 permission check, so grant it sparingly. The namespace dimension is not
 evaluated for `secrets:replay`, `task_monitoring`, or `workflow_monitoring`.
 
-See [Authentication and Authorization](/security/authentication-and-authorization/)
+See [Authentication and authorization](/security/authentication-and-authorization/)
 for namespace matching, resource ID restrictions, actor permissions, and JWT
 permission intersection.
