@@ -66,7 +66,8 @@ tenancy model.
 
 Keep reusable provider behavior in the connector:
 
-- OAuth endpoints, scopes, and token refresh
+- OAuth endpoints, scopes, and token refresh (see [OAuth2 token
+  refresh](/operations/oauth2-token-refresh/))
 - API-key placement
 - setup forms and provider redirects
 - health probes and connector-specific 429 handling
