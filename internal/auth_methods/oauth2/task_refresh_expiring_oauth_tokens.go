@@ -37,8 +37,15 @@ type connectorRefreshPolicy struct {
 // connector generation. A nil connector, or one whose auth is not OAuth2,
 // gets the global defaults: background refresh enabled with the global
 // window.
-func refreshPolicyForConnector(connector iface.Connector, globalWithin time.Duration) connectorRefreshPolicy {
-	policy := connectorRefreshPolicy{refreshInBackground: true, refreshWithin: globalWithin}
+func refreshPolicyForConnector(
+	connector iface.Connector,
+	globalWithin time.Duration,
+) connectorRefreshPolicy {
+	policy := connectorRefreshPolicy{
+		refreshInBackground: true,
+		refreshWithin:       globalWithin,
+	}
+
 	if connector == nil {
 		return policy
 	}
@@ -55,6 +62,7 @@ func refreshPolicyForConnector(connector iface.Connector, globalWithin time.Dura
 
 	policy.refreshInBackground = o2.Token.GetRefreshInBackgroundOrDefault()
 	policy.refreshWithin = o2.Token.GetRefreshTimeBeforeExpiryOrDefault(globalWithin)
+
 	return policy
 }
 
@@ -68,7 +76,11 @@ func refreshPolicyForConnector(connector iface.Connector, globalWithin time.Dura
 // time. The access-token criterion applies only when the connector allows
 // background refresh, using the connector's own window rather than the
 // widest window across all connectors that the scan was run with.
-func shouldRefreshInBackground(token *database.OAuth2Token, policy connectorRefreshPolicy, now time.Time) bool {
+func shouldRefreshInBackground(
+	token *database.OAuth2Token,
+	policy connectorRefreshPolicy,
+	now time.Time,
+) bool {
 	if token.RefreshTokenRefreshAt != nil && !token.RefreshTokenRefreshAt.After(now) {
 		return true
 	}
@@ -90,7 +102,10 @@ func shouldRefreshInBackground(token *database.OAuth2Token, policy connectorRefr
 // shouldRefreshInBackground). Connector definitions are cached per
 // (connector id, generation) for the run: the cache is seeded from the
 // window pre-scan and misses are fetched in one batch per page of tokens.
-func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq.Task) error {
+func (th *taskHandler) refreshExpiringOauth2Tokens(
+	ctx context.Context,
+	t *asynq.Task,
+) error {
 	logger := aplog.NewBuilder(th.logger).
 		WithTask(t).
 		WithCtx(ctx).
@@ -111,19 +126,23 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 
 	// The scan window must include overrides on stored generations, including
 	// active generations still used by existing connections.
-	err := th.core.ListConnectorGenerationsBuilder().ForStates([]database.ConnectorGenerationState{
-		database.ConnectorGenerationStatePrimary, database.ConnectorGenerationStateActive,
-	}).Enumerate(ctx, func(page pagination.PageResult[iface.Connector]) (pagination.KeepGoing, error) {
-		for _, connector := range page.Results {
-			policy := refreshPolicyForConnector(connector, globalWithin)
-			policies[iface.ConnectorGenerationId{Id: connector.GetId(), Generation: connector.GetGeneration()}] = policy
+	err := th.core.
+		ListConnectorGenerationsBuilder().
+		ForStates([]database.ConnectorGenerationState{
+			database.ConnectorGenerationStatePrimary,
+			database.ConnectorGenerationStateActive,
+		}).
+		Enumerate(ctx, func(page pagination.PageResult[iface.Connector]) (pagination.KeepGoing, error) {
+			for _, connector := range page.Results {
+				policy := refreshPolicyForConnector(connector, globalWithin)
+				policies[iface.ConnectorGenerationId{Id: connector.GetId(), Generation: connector.GetGeneration()}] = policy
 
-			if policy.refreshInBackground && policy.refreshWithin > refreshWithin {
-				refreshWithin = policy.refreshWithin
+				if policy.refreshInBackground && policy.refreshWithin > refreshWithin {
+					refreshWithin = policy.refreshWithin
+				}
 			}
-		}
-		return pagination.Continue, nil
-	})
+			return pagination.Continue, nil
+		})
 	if err != nil {
 		return err
 	}
@@ -135,14 +154,24 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		ctx,
 		refreshWithin,
 		func(tokensWithConnections []*database.OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
-			if err := th.loadMissingRefreshPolicies(ctx, logger, tokensWithConnections, policies, globalWithin); err != nil {
+			if err := th.loadMissingRefreshPolicies(
+				ctx,
+				logger,
+				tokensWithConnections,
+				policies,
+				globalWithin,
+			); err != nil {
 				return pagination.Stop, err
 			}
 
 			now := apctx.GetClock(ctx).Now()
 			for _, tokenWithConnection := range tokensWithConnections {
 				policy := policies[connectorGenerationIdForConnection(&tokenWithConnection.Connection)]
-				if !shouldRefreshInBackground(&tokenWithConnection.Token, policy, now) {
+				if !shouldRefreshInBackground(
+					&tokenWithConnection.Token,
+					policy,
+					now,
+				) {
 					skipped++
 					continue
 				}
@@ -156,6 +185,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 				if err != nil {
 					return pagination.Stop, err
 				}
+
 				logger.Debug(
 					"token refresh task enqueued for connection",
 					"connection_id", tokenWithConnection.Token.ConnectionId,
@@ -169,15 +199,24 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		},
 	)
 
-	logger.Info("completed queuing for expiring OAuth tokens", "queued", queuedForRefresh, "skipped", skipped)
+	logger.Info(
+		"completed queuing for expiring OAuth tokens",
+		"queued", queuedForRefresh,
+		"skipped", skipped,
+	)
 
 	return err
 }
 
 // connectorGenerationIdForConnection returns the connector generation a
 // connection is bound to.
-func connectorGenerationIdForConnection(c *database.Connection) iface.ConnectorGenerationId {
-	return iface.ConnectorGenerationId{Id: c.ConnectorId, Generation: c.ConnectorGeneration}
+func connectorGenerationIdForConnection(
+	c *database.Connection,
+) iface.ConnectorGenerationId {
+	return iface.ConnectorGenerationId{
+		Id:         c.ConnectorId,
+		Generation: c.ConnectorGeneration,
+	}
 }
 
 // loadMissingRefreshPolicies fills policies for any connector generation
@@ -194,6 +233,8 @@ func (th *taskHandler) loadMissingRefreshPolicies(
 ) error {
 	var missing []iface.ConnectorGenerationId
 	seen := make(map[iface.ConnectorGenerationId]struct{})
+
+	// Establish the connectro generations we need to load
 	for _, tokenWithConnection := range tokens {
 		id := connectorGenerationIdForConnection(&tokenWithConnection.Connection)
 		if _, ok := policies[id]; ok {
@@ -224,6 +265,7 @@ func (th *taskHandler) loadMissingRefreshPolicies(
 				"connector_generation", id.Generation,
 			)
 		}
+
 		policies[id] = refreshPolicyForConnector(connector, globalWithin)
 	}
 
