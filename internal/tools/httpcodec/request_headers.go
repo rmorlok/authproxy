@@ -82,10 +82,27 @@ func validRequestHeaderValue(value string) bool {
 	return utf8.ValidString(value) && httpguts.ValidHeaderFieldValue(value)
 }
 
-// requestContentType selects a compatible content type without allowing an
-// authored header to discard declared body parameters or replace MIME framing.
-// Raw and absent bodies may use any concrete authored type. Structured JSON may
-// use any json or +json subtype; all other encodings retain their declared base.
+// requestContentType selects the request's Content-Type while preserving the
+// body's declared parameters and encoder-owned multipart boundary.
+//
+// authored is the literal header during compilation or its rendered value during
+// invocation. It is empty when omitted. present records whether the header was
+// supplied, distinguishing omission from an explicitly empty, invalid header.
+//
+// generated is the body's declared or encoded media type, such as
+// "application/json" or "text/plain; charset=utf-8". Multipart compilation uses a
+// temporary boundary only to check compatibility; invocation supplies the actual
+// boundary matching the encoded body. Raw and absent bodies ignore generated.
+//
+// mode identifies the body encoding and selects its compatibility rules. Raw and
+// absent bodies accept any concrete authored type; structured JSON accepts json
+// or +json subtypes; text, form, and multipart retain their generated base type.
+//
+// Without an authored header, the result is generated, or empty for raw and
+// absent bodies. Otherwise it retains generated parameters and compatible
+// authored additions. Errors return an empty string for invalid media types or
+// modes, incompatible types or parameter values, an authored multipart boundary,
+// or a missing generated boundary.
 func requestContentType(
 	authored string,
 	present bool,

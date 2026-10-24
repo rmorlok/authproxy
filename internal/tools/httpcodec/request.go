@@ -19,12 +19,43 @@ import (
 // Method and header names are literal. Compilation captures all source data,
 // so independent invocations may reuse the program concurrently.
 type Request struct {
-	method   string
-	names    []string
+	// method is the literal HTTP method copied from the definition. For example,
+	// "PATCH" becomes http.Request.Method unchanged; it is never templated.
+	method string
+
+	// names contains the authored header names in lexical order. Each names[i]
+	// identifies the header whose value is at envelope position i+1. For example,
+	// ["X-Tenant"] pairs with the second envelope value to produce X-Tenant: acme.
+	// Names stay outside the template so a header named "$value" remains literal.
+	names []string
+
+	// envelope is the compiled program for a JSON string array: the URL first,
+	// then header values in names order. With names ["X-Tenant"], a source array
+	// ["https://{{cfg.host}}/items", "{{cfg.tenant}}"] might render to
+	// ["https://api.example.com/items", "acme"]. Render uses the first string as
+	// the destination and the remaining strings as header values. One program
+	// makes all these strings share the same rendering budget.
 	envelope *render.ValueTemplate
-	query    *Parameters
-	body     *Body
-	limits   render.Limits
+
+	// query is the compiled program for structured query fields, separate from
+	// any query already in the URL. For example, {"tag":{"$value":"params.tags"}} with
+	// params.tags = ["lead", "new"] renders to "tag=lead&tag=new", which Render
+	// appends after checking for keys also defined in the URL. An empty field
+	// map still has a program and produces an empty query string.
+	query *Parameters
+
+	// body is the compiled program for the selected body mode and its content type.
+	// For example, bodyJson: {"active":{"$value":"params.active"}} with
+	// params.active = false
+	// produces bytes {"active":false} and Content-Type application/json. A
+	// successfully compiled request always has a body program; an omitted body
+	// uses bodyAbsent and renders with Present=false.
+	body *Body
+
+	// limits holds the positive byte, depth, and step caps captured at compile
+	// time. Each program applies them independently; MaxBytes also caps the
+	// combined request source and final prepared request data.
+	limits render.Limits
 }
 
 // CompileRequest compiles the outbound fields of an HTTP Tool without accessing
