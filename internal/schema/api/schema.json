@@ -2284,6 +2284,20 @@
       "required": ["rateLimitRef", "mode"],
       "additionalProperties": false
     },
+    "RequestEventCaptureState": {
+      "type": "string",
+      "enum": ["loaded", "missing", "unavailable"]
+    },
+    "RequestEventStatus": {
+      "description": "Per-read observations about a request event. Present only on single-event reads.",
+      "type": "object",
+      "properties": {
+        "captureState": { "$ref": "#/$defs/RequestEventCaptureState" },
+        "message": { "type": "string" }
+      },
+      "required": ["captureState"],
+      "additionalProperties": false
+    },
     "RequestEventSpec": {
       "type": "object",
       "properties": {
@@ -2338,7 +2352,8 @@
                 }
               ]
             },
-            "spec": { "$ref": "#/$defs/RequestEventSpec" }
+            "spec": { "$ref": "#/$defs/RequestEventSpec" },
+            "status": { "$ref": "#/$defs/RequestEventStatus" }
           }
         }
       ],

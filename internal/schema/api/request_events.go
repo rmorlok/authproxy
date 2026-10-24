@@ -17,6 +17,39 @@ type RequestEventJson struct {
 	meta.TypeMeta `json:",inline" yaml:",inline"`
 	Metadata      meta.ObjectMeta      `json:"metadata" yaml:"metadata"`
 	Spec          RequestEventSpecJson `json:"spec" yaml:"spec"`
+	// Status describes how completely this read could load the event. It is
+	// only present on single-event reads, which load captured details from
+	// blob storage; list results omit it.
+	Status *RequestEventStatusJson `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// RequestEventCaptureState reports whether the captured details for a request
+// event could be loaded from blob storage on this read.
+type RequestEventCaptureState string
+
+const (
+	// RequestEventCaptureStateLoaded means captured details were loaded. Spec
+	// still omits Capture when the event was recorded without full capture.
+	RequestEventCaptureStateLoaded RequestEventCaptureState = "loaded"
+
+	// RequestEventCaptureStateMissing means no captured details exist in blob
+	// storage for this event (never written, expired, or deleted).
+	RequestEventCaptureStateMissing RequestEventCaptureState = "missing"
+
+	// RequestEventCaptureStateUnavailable means blob storage failed to return
+	// the captured details. The event's summary is still returned; retrying
+	// later may succeed. Server logs and traces carry the underlying error.
+	RequestEventCaptureStateUnavailable RequestEventCaptureState = "unavailable"
+)
+
+// RequestEventStatusJson carries per-read observations about a request event.
+// A degraded CaptureState never fails the read: Spec is always populated from
+// the searchable record so clients can still show the request summary.
+type RequestEventStatusJson struct {
+	CaptureState RequestEventCaptureState `json:"captureState" yaml:"captureState" swaggertype:"string" enums:"loaded,missing,unavailable" example:"loaded"`
+	// Message is a human-readable explanation when CaptureState is not
+	// loaded. It deliberately excludes internal error details.
+	Message string `json:"message,omitempty" yaml:"message,omitempty"`
 }
 
 type RequestEventSpecJson struct {

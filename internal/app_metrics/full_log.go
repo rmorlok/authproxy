@@ -109,7 +109,32 @@ type FullLog struct {
 	// It is not persisted in the encrypted blob. API conversion uses it to
 	// preserve typed resource attribution alongside captured protocol data.
 	Record *LogRecord `json:"-"`
+
+	// CaptureLoadState reports whether StorageService.GetFullLog could load
+	// the encrypted blob for this entry. It is set on read and never
+	// persisted. When it is anything other than CaptureLoadStateLoaded, only
+	// Record (and the summary fields copied from it) is populated.
+	CaptureLoadState CaptureLoadState `json:"-"`
 }
+
+// CaptureLoadState describes the outcome of loading a request's full-log blob
+// alongside its searchable record. Callers use it to return the record's
+// metadata even when blob storage cannot supply the captured details.
+type CaptureLoadState string
+
+const (
+	// CaptureLoadStateLoaded means the blob was read and decoded successfully.
+	CaptureLoadStateLoaded CaptureLoadState = "loaded"
+
+	// CaptureLoadStateMissing means blob storage reported that no blob exists
+	// for the request, e.g. because it was never written or was deleted.
+	CaptureLoadStateMissing CaptureLoadState = "missing"
+
+	// CaptureLoadStateUnavailable means the blob could not be loaded for
+	// another reason (blob storage unreachable or erroring, decryption or
+	// decoding failure). This indicates an operational problem.
+	CaptureLoadStateUnavailable CaptureLoadState = "unavailable"
+)
 
 func (e *FullLog) GetId() apid.ID {
 	return e.Id

@@ -523,7 +523,31 @@ func (r *RequestEventsRoutes) get(gctx *gin.Context) {
 	if record == nil {
 		record = entry.ToRecord()
 	}
-	apgin.APIJSON(gctx, http.StatusOK, requestEventToJSON(record, entry))
+	resource := requestEventToJSON(record, entry)
+	resource.Status = requestEventStatus(entry.CaptureLoadState)
+	apgin.APIJSON(gctx, http.StatusOK, resource)
+}
+
+// requestEventStatus maps the storage layer's blob load outcome to the API
+// status block for a single-event read. A degraded state still returns 200 so
+// clients can render the summary; the message tells them why captured details
+// are absent without exposing internal storage errors (those are logged and
+// traced by app_metrics.StorageService).
+func requestEventStatus(state app_metrics.CaptureLoadState) *sapi.RequestEventStatusJson {
+	switch state {
+	case app_metrics.CaptureLoadStateMissing:
+		return &sapi.RequestEventStatusJson{
+			CaptureState: sapi.RequestEventCaptureStateMissing,
+			Message:      "Captured request details are not stored for this event; only the summary is available.",
+		}
+	case app_metrics.CaptureLoadStateUnavailable:
+		return &sapi.RequestEventStatusJson{
+			CaptureState: sapi.RequestEventCaptureStateUnavailable,
+			Message:      "Captured request details could not be loaded from blob storage; only the summary is available. Try again later.",
+		}
+	default:
+		return &sapi.RequestEventStatusJson{CaptureState: sapi.RequestEventCaptureStateLoaded}
+	}
 }
 
 // @Summary		List request events entries

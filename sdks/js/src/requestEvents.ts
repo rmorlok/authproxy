@@ -89,10 +89,24 @@ export interface RequestEventSpec {
   requestCancelled?: boolean;
 }
 
+/**
+ * Whether a single-event read could load captured details from blob storage.
+ * `missing` and `unavailable` still return the event summary in `spec`.
+ */
+export type RequestEventCaptureState = 'loaded' | 'missing' | 'unavailable';
+
+/** Per-read observations; present only on single-event (get) responses. */
+export interface RequestEventStatus {
+  captureState: RequestEventCaptureState;
+  /** Human-readable explanation when `captureState` is not `loaded`. */
+  message?: string;
+}
+
 /** Immutable projection used by both list and get request-event endpoints. */
 export interface RequestEvent extends TypeMeta<typeof REQUEST_EVENT_KIND> {
   metadata: RequestEventMetadata;
   spec: RequestEventSpec;
+  status?: RequestEventStatus;
 }
 
 export type RequestEventList = ResourceList<RequestEvent> & {

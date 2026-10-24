@@ -108,6 +108,15 @@ type RequestEventJson struct {
 	Kind       string               `json:"kind" binding:"required" enums:"RequestEvent" example:"RequestEvent"`
 	Metadata   meta.ObjectMeta      `json:"metadata" binding:"required"`
 	Spec       RequestEventSpecJson `json:"spec" binding:"required"`
+	// Status is present only on single-event reads.
+	Status *RequestEventStatusJson `json:"status,omitempty"`
+}
+
+// RequestEventStatusJson documents per-read observations about a request
+// event, such as whether captured details could be loaded from blob storage.
+type RequestEventStatusJson struct {
+	CaptureState string `json:"captureState" binding:"required" enums:"loaded,missing,unavailable" example:"loaded"`
+	Message      string `json:"message,omitempty"`
 }
 
 type RequestEventListMetaJson struct {
