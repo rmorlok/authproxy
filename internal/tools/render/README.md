@@ -7,10 +7,10 @@ values such as the provider's API host and the tenant selected during setup.
 
 This package combines those values into strings and structured JSON for request
 construction. It copies invocation data, resolves template references, applies
-explicit encoding, and limits rendering work. The HTTP execution layer is
-responsible for authorization, input-schema validation, final URL/header/body
-validation, authentication, and sending the request. Integration with that layer
-is separate from this package's rendering API.
+explicit encoding, and limits rendering work. The [HTTP codec](../httpcodec/README.md)
+uses these programs to validate and assemble complete outbound requests.
+Authorization, input-schema validation, authentication, sending, and response
+handling remain responsibilities of the execution layer.
 
 ## Example: update a CRM contact
 
