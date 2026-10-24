@@ -700,26 +700,9 @@ func (r *sqlRecordRetriever) ListRateLimitResourceSamples(ctx context.Context, q
 }
 
 func (r *sqlRecordRetriever) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
-	return executeResourceMetricsQueries(ctx, queries,
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectionResourceSample, error) {
-			return fetchConnectionResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ActorResourceSample, error) {
-			return fetchActorResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorResourceSample, error) {
-			return fetchConnectorResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorGenerationResourceSample, error) {
-			return fetchConnectorGenerationResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*NamespaceResourceSample, error) {
-			return fetchNamespaceResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*RateLimitResourceSample, error) {
-			return fetchRateLimitResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
-		},
-	)
+	return executeResourceMetricsQueries(ctx, queries, func(ctx context.Context, query ResourceMetricsQuery) ([]resourceMetricAggregate, error) {
+		return fetchResourceMetricAggregates(ctx, r.db, r.placeholderFormat, r.provider, query)
+	})
 }
 
 func (r *clickhouseRecordRetriever) ListConnectionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectionResourceSample, error) {
@@ -747,26 +730,124 @@ func (r *clickhouseRecordRetriever) ListRateLimitResourceSamples(ctx context.Con
 }
 
 func (r *clickhouseRecordRetriever) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
-	return executeResourceMetricsQueries(ctx, queries,
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectionResourceSample, error) {
-			return fetchConnectionResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ActorResourceSample, error) {
-			return fetchActorResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorResourceSample, error) {
-			return fetchConnectorResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectorGenerationResourceSample, error) {
-			return fetchConnectorGenerationResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*NamespaceResourceSample, error) {
-			return fetchNamespaceResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
-		},
-		func(ctx context.Context, query ResourceMetricsQuery) ([]*RateLimitResourceSample, error) {
-			return fetchRateLimitResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
-		},
+	return executeResourceMetricsQueries(ctx, queries, func(ctx context.Context, query ResourceMetricsQuery) ([]resourceMetricAggregate, error) {
+		return fetchResourceMetricAggregates(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
+	})
+}
+
+// fetchResourceMetricAggregates runs a resource metrics query against a SQL provider (Postgres, SQLite, or
+// ClickHouse) and returns distinct-resource counts per time bucket and group.
+//
+// The inner SELECT DISTINCT reduces samples to one row per (bucket, group values, resource identity), and the outer
+// query counts those rows per (bucket, group values). That keeps the result bounded by buckets × groups no matter
+// how many resources are sampled, and it avoids COUNT(DISTINCT tuple), which SQLite does not support. A resource
+// whose group values change inside a bucket (e.g. a state transition) is counted in each group it was seen in.
+func fetchResourceMetricAggregates(
+	ctx context.Context,
+	db *sql.DB,
+	placeholderFormat sq.PlaceholderFormat,
+	provider config.DatabaseProvider,
+	query ResourceMetricsQuery,
+) ([]resourceMetricAggregate, error) {
+	spec, ok := resourceMetricSpecs[query.Metric]
+	if !ok {
+		return nil, fmt.Errorf("unsupported resource metric %q", query.Metric)
+	}
+
+	startMS := query.Start.UnixMilli()
+	stepMS := query.Step.Milliseconds()
+	// Integers are derived from validated time values and inlined so the expression is identical wherever it is
+	// used. Modulo keeps the result integer-valued on ClickHouse, whose "/" operator always produces a float.
+	bucketExpr := fmt.Sprintf("sampled_at_ms - ((sampled_at_ms - %d) %% %d)", startMS, stepMS)
+
+	groupColumns := make([]string, 0, len(query.GroupBy))
+	for _, groupBy := range query.GroupBy {
+		column, ok := spec.groupByColumns[groupBy]
+		if !ok {
+			return nil, fmt.Errorf("unsupported resource group_by dimension %q for metric %q", groupBy, query.Metric)
+		}
+		groupColumns = append(groupColumns, column)
+	}
+
+	// The inner projection lists each column once; a column can be both a group-by dimension and part of the
+	// resource identity (e.g. connector_generation), and ClickHouse rejects duplicate names in a subquery.
+	innerColumns := []string{bucketExpr + " AS bucket_start_ms"}
+	seen := map[string]bool{}
+	for _, column := range append(append([]string{}, groupColumns...), spec.identityColumns...) {
+		if !seen[column] {
+			seen[column] = true
+			innerColumns = append(innerColumns, column)
+		}
+	}
+
+	inner, err := applyResourceSampleQuery(
+		sq.Select(innerColumns...).
+			Distinct().
+			From(resourceSampleTableName(spec.table, provider)),
+		provider,
+		resourceMetricsSampleQuery(query),
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	outerGroup := append([]string{"bucket_start_ms"}, groupColumns...)
+	outer := sq.Select(append(append([]string{}, outerGroup...), sqlInt64Expr(provider, "COUNT(*)"))...).
+		FromSelect(inner, "distinct_samples").
+		GroupBy(outerGroup...).
+		PlaceholderFormat(placeholderFormat)
+
+	sqlQuery, args, err := outer.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build resource metrics query: %w", err)
+	}
+	rows, err := db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute resource metrics query: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]resourceMetricAggregate, 0)
+	for rows.Next() {
+		var row resourceMetricAggregate
+		// Group values are scanned generically because their column types differ by provider (e.g.
+		// connector_generation is BIGINT on Postgres and UInt64 on ClickHouse).
+		groupValues := make([]any, len(groupColumns))
+		dest := make([]any, 0, len(groupColumns)+2)
+		dest = append(dest, &row.BucketStartMS)
+		for i := range groupValues {
+			dest = append(dest, &groupValues[i])
+		}
+		dest = append(dest, &row.Count)
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("failed to scan resource metric row: %w", err)
+		}
+
+		row.Labels = make(map[string]string, len(query.GroupBy))
+		for i, groupBy := range query.GroupBy {
+			row.Labels[string(groupBy)] = resourceMetricLabelValue(groupValues[i])
+		}
+		out = append(out, row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate resource metric rows: %w", err)
+	}
+	return out, nil
+}
+
+// resourceMetricLabelValue renders a generically scanned group-by value as a label string. Drivers return text as
+// string or []byte and integers as signed or unsigned ints depending on the provider.
+func resourceMetricLabelValue(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return ""
+	case []byte:
+		return string(v)
+	case string:
+		return v
+	default:
+		return fmt.Sprint(v)
+	}
 }
 
 func fetchConnectionResourceSamples(
