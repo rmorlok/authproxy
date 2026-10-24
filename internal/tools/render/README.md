@@ -169,8 +169,8 @@ field; `{{query.params.text}}` encodes the root `params.text` field.
 Encoding views are resolved on demand, so both `json.params.object` and
 `json.params.object.child` work. Path encoding rejects empty values, `.` and `..`
 to avoid empty or traversing path segments. Use the query view only in manually
-authored query strings; the future structured-query encoder will apply its own
-encoding.
+authored query strings; the [structured query/form codec](../httpcodec/README.md)
+applies its own encoding.
 
 For a body authored as a raw string template, the `json` view supplies JSON
 quoting and preserves scalar types. With the contact data above, this template:
