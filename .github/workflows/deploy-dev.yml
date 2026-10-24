@@ -298,7 +298,7 @@ jobs:
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
           grep -Fq "provider: miniredis" "${manifest}"
           grep -Fq "provider: filesystem" "${manifest}"
-          if grep -Eq "name: dev-(postgresql|redis-master|minio)$" "${manifest}"; then
+          if grep -Eq "name: dev-(postgresql|redis-master|seaweedfs)$" "${manifest}"; then
             echo "Dev Kustomize render leaked backing service workloads" >&2
             exit 1
           fi

@@ -1,0 +1,121 @@
+# SeaweedFS provides the S3-compatible blob store for full request/response
+# logs in the persistent demo. `weed mini` runs the master, volume server,
+# filer, and S3 gateway in one process, which is enough for a single-replica
+# demo and matches the local Docker Compose and CI setups.
+#
+# SeaweedFS packs objects into fixed-size volume files instead of storing one
+# directory + metadata file per object, so millions of small request-log blobs
+# consume a handful of inodes rather than exhausting the filesystem's inode
+# table (the failure mode that took the previous MinIO deployment offline).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: object-storage
+spec:
+  replicas: 1
+  # The EBS-backed volume is ReadWriteOnce, so the old pod must release it
+  # before a replacement can mount it.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs
+      app.kubernetes.io/component: object-storage
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs
+        app.kubernetes.io/component: object-storage
+    spec:
+      containers:
+        - name: seaweedfs
+          # Same digest-pinned image as docker-compose.yml and CI.
+          image: docker.io/chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
+          imagePullPolicy: IfNotPresent
+          args:
+            - mini
+            - -dir=/data
+            # Identities and keys come from the Secret provisioned by the
+            # Deploy Demo workflow; the bucket requires authentication.
+            - -s3.config=/etc/seaweedfs/s3.json
+            # Created at startup if missing.
+            - -bucket=authproxy-request-logs
+            # Only the S3 gateway and filer are needed. The admin UI has no
+            # authentication by default, so keep it off.
+            - -s3.port.iceberg=0
+            - -s3.port.lance=0
+            - -webdav=false
+            - -admin.ui=false
+            - -master.telemetry=false
+            # The filer UI is reachable only through kubectl port-forward;
+            # don't offer one-click recursive deletes from it.
+            - -filer.ui.deleteDir=false
+          ports:
+            - name: s3
+              containerPort: 8333
+            - name: filer
+              containerPort: 8888
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: s3
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /readyz
+              port: s3
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: s3-config
+              mountPath: /etc/seaweedfs
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: seaweedfs-data
+        - name: s3-config
+          secret:
+            secretName: demo-seaweedfs-creds
+            items:
+              - key: s3.json
+                path: s3.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs
+  labels:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: object-storage
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: seaweedfs
+    app.kubernetes.io/component: object-storage
+  ports:
+    - name: s3
+      port: 8333
+      targetPort: s3
+    - name: filer
+      port: 8888
+      targetPort: filer
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: seaweedfs-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 10Gi

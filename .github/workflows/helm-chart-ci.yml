@@ -168,15 +168,20 @@ jobs:
           test "$(grep -c '^kind: PersistentVolumeClaim$' "${demo_manifest}")" -eq 3
           test "$(grep -c '^  storageClassName: gp3$' "${demo_manifest}")" -eq 3
           test "$(grep -c '^    type: Recreate$' "${demo_manifest}")" -eq 3
-          test "$(grep -c '^        fsGroup: 1001$' "${demo_manifest}")" -eq 3
-          test "$(grep -c '^        fsGroupChangePolicy: OnRootMismatch$' "${demo_manifest}")" -eq 3
-          for claim in demo-postgresql-data demo-redis-data demo-minio-data; do
+          test "$(grep -c '^        fsGroup: 1001$' "${demo_manifest}")" -eq 2
+          test "$(grep -c '^        fsGroupChangePolicy: OnRootMismatch$' "${demo_manifest}")" -eq 2
+          for claim in demo-postgresql-data demo-redis-data demo-seaweedfs-data; do
             grep -q "name: ${claim}" "${demo_manifest}"
             grep -q "claimName: ${claim}" "${demo_manifest}"
           done
           grep -q "mountPath: /bitnami/postgresql" "${demo_manifest}"
           grep -q "mountPath: /bitnami/redis/data" "${demo_manifest}"
-          grep -q "mountPath: /bitnami/minio/data" "${demo_manifest}"
+          grep -q "mountPath: /data" "${demo_manifest}"
+          grep -q "endpoint: http://demo-seaweedfs:8333" "${demo_manifest}"
+          if grep -q "minio" "${demo_manifest}"; then
+            echo "Kustomize demo render still references MinIO" >&2
+            exit 1
+          fi
 
           grep -q "name: dev-authproxy" "${dev_manifest}"
           grep -q "provider: miniredis" "${dev_manifest}"
@@ -187,7 +192,7 @@ jobs:
             exit 1
           fi
 
-          if grep -Eq "name: dev-(postgresql|redis-master|minio)$" "${dev_manifest}"; then
+          if grep -Eq "name: dev-(postgresql|redis-master|seaweedfs)$" "${dev_manifest}"; then
             echo "Kustomize dev render leaked backing service workloads" >&2
             exit 1
           fi

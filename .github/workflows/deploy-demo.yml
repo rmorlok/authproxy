@@ -14,8 +14,8 @@ name: Deploy Demo
 # Pre-requisites:
 #   - EKS cluster up and bootstrap chart installed.
 #   - `demo` namespace secrets exist: demo-jwt, demo-encryption,
-#     demo-demo-shell-key, demo-actors, demo-db, demo-redis-creds,
-#     and demo-minio-creds.
+#     demo-demo-shell-key, demo-actors, demo-db, and demo-redis-creds.
+#     The workflow generates and preserves demo-seaweedfs-creds itself.
 #   - Repo secret AWS_ROLE_ARN.
 #   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
 #   - Optional: repo variable DEMO_GRAFANA_ADMIN_USER and repo secret
@@ -177,7 +177,6 @@ jobs:
             "${RELEASE_NAME}-actors"
             "${RELEASE_NAME}-db"
             "${RELEASE_NAME}-redis-creds"
-            "${RELEASE_NAME}-minio-creds"
           )
 
           for secret in "${secrets[@]}"; do
@@ -302,6 +301,40 @@ jobs:
             --dry-run=client -o yaml \
             | kubectl apply -f -
 
+      - name: Provision SeaweedFS credentials
+        run: |
+          set -euo pipefail
+
+          # The demo SeaweedFS S3 gateway reads its identities from s3.json
+          # in this Secret, and AuthProxy reads the matching secret key from
+          # it. Generate them once and keep them across deploys so existing
+          # pods and stored blobs stay reachable.
+          secret="${RELEASE_NAME}-seaweedfs-creds"
+          if kubectl -n "${RELEASE_NS}" get secret "${secret}" >/dev/null 2>&1; then
+            echo "Reusing ${secret}"
+            exit 0
+          fi
+
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          # Hex keeps the key safe to embed in JSON and env vars unescaped.
+          secret_key="$(openssl rand -hex 32)"
+          jq -n --arg secretKey "${secret_key}" '{
+              identities: [{
+                name: "authproxy",
+                credentials: [{accessKey: "authproxy", secretKey: $secretKey}],
+                actions: ["Admin", "Read", "Write", "List", "Tagging"]
+              }]
+            }' > "${workdir}/s3.json"
+
+          kubectl -n "${RELEASE_NS}" create secret generic "${secret}" \
+            --from-literal=access-key=authproxy \
+            --from-literal=secret-key="${secret_key}" \
+            --from-file=s3.json="${workdir}/s3.json" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
       - name: Render Kustomize overlay
         id: render
         env:
@@ -338,9 +371,14 @@ jobs:
           grep -Fq "name: demo-otel-lgtm" "${manifest}"
           grep -Fq "endpoint: http://demo-otel-lgtm:4317" "${manifest}"
           grep -Fq "provider: s3" "${manifest}"
-          grep -Fq "endpoint: http://demo-minio:9000" "${manifest}"
+          grep -Fq "endpoint: http://demo-seaweedfs:8333" "${manifest}"
           grep -Fq "bucket: authproxy-request-logs" "${manifest}"
-          grep -Fq "name: MINIO_DEFAULT_BUCKETS" "${manifest}"
+          grep -Fq -- "- -bucket=authproxy-request-logs" "${manifest}"
+          grep -Fq "secretName: demo-seaweedfs-creds" "${manifest}"
+          if grep -Fq "minio" "${manifest}"; then
+            echo "Rendered demo manifest still references MinIO" >&2
+            exit 1
+          fi
           grep -Fq "uid: prometheus" "${manifest}"
           grep -Fq "uid: tempo" "${manifest}"
           grep -Fq "uid: loki" "${manifest}"
@@ -380,7 +418,7 @@ jobs:
           for d in \
             "${RELEASE_NAME}-postgresql" \
             "${RELEASE_NAME}-redis-master" \
-            "${RELEASE_NAME}-minio" \
+            "${RELEASE_NAME}-seaweedfs" \
             "${RELEASE_NAME}-otel-lgtm" \
           ; do
             echo "Waiting for $d..."
@@ -437,6 +475,25 @@ jobs:
             echo "Waiting for $d..."
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=10m
           done
+
+      - name: Remove legacy MinIO blob storage
+        run: |
+          set -euo pipefail
+
+          # The demo previously stored request-log blobs in MinIO. AuthProxy
+          # now writes to SeaweedFS and the old blobs are intentionally not
+          # migrated, so drop the MinIO workload, its EBS-backed volume, and
+          # its credentials once the new AuthProxy pods are healthy.
+          # kubectl apply does not prune, so these must be removed explicitly.
+          # Every delete is idempotent; later deploys find nothing to remove.
+          kubectl -n "${RELEASE_NS}" delete \
+            "deployment/${RELEASE_NAME}-minio" \
+            "service/${RELEASE_NAME}-minio" \
+            --ignore-not-found --wait=true --timeout=5m
+          kubectl -n "${RELEASE_NS}" delete \
+            "persistentvolumeclaim/${RELEASE_NAME}-minio-data" \
+            "secret/${RELEASE_NAME}-minio-creds" \
+            --ignore-not-found --wait=true --timeout=5m
 
       - name: Wait for Grafana rollout
         timeout-minutes: 10
@@ -584,7 +641,7 @@ jobs:
             "${RELEASE_NAME}-go-oauth2-server" \
             "${RELEASE_NAME}-postgresql" \
             "${RELEASE_NAME}-redis-master" \
-            "${RELEASE_NAME}-minio" \
+            "${RELEASE_NAME}-seaweedfs" \
             "${RELEASE_NAME}-grafana" \
             "${RELEASE_NAME}-otel-lgtm" \
           ; do
@@ -592,7 +649,7 @@ jobs:
             echo
           done
           echo "## Recent pod logs"
-          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm; do
+          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm seaweedfs; do
             kubectl -n "${RELEASE_NS}" logs \
               -l "app.kubernetes.io/name=${selector}" \
               --all-containers --tail=120

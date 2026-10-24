@@ -168,8 +168,10 @@ uses `ap apply` to reconcile the demo catalog before smoke tests run. The manual
    for the required secret names). The workflow assumes
    `demo-jwt`, `demo-encryption`, `demo-demo-shell-key`, and
    `demo-actors` already exist in the `demo` namespace. Persistent
-   backing-store Secrets (`demo-db`, `demo-redis-creds`, and
-   `demo-minio-creds`) are also preserved across Kustomize applies.
+   backing-store Secrets (`demo-db` and `demo-redis-creds`) are also
+   preserved across Kustomize applies. The workflow generates the
+   SeaweedFS blob-store credentials (`demo-seaweedfs-creds`) itself on
+   the first deploy and reuses them afterwards.
    The demo observability backend (`demo-otel-lgtm`) is created by the
    Kustomize overlay and receives AuthProxy OTLP telemetry for Prometheus,
    Tempo, and Loki.
@@ -248,11 +250,11 @@ applies `deploy/kustomize/authproxy-demo/overlays/dev`; the regular
 
 | Environment | Main DB | Session/task/rate-limit store | Blob storage | Backing workloads |
 |---|---|---|---|---|
-| `demo.authproxy.net` | Postgres | Redis | MinIO | AuthProxy, demo shell, go-oauth2-server, Postgres, Redis, MinIO, optional Grafana, and manual seed Jobs |
+| `demo.authproxy.net` | Postgres | Redis | SeaweedFS | AuthProxy, demo shell, go-oauth2-server, Postgres, Redis, SeaweedFS, optional Grafana, and manual seed Jobs |
 | per-branch dev | SQLite under `/tmp` in the AuthProxy pod | in-process `miniredis` | filesystem under `/tmp/authproxy-blobs` in the AuthProxy pod | AuthProxy, demo shell, seed Job, go-oauth2-server, and optional Grafana |
 
 This cuts the required stateful backing containers from three to zero
-for PR environments: no Postgres, Redis, or MinIO pods are rendered. The
+for PR environments: no Postgres, Redis, or SeaweedFS pods are rendered. The
 tradeoff is durability. A pod restart, reschedule, or redeploy can lose
 SQLite data, miniredis state, queue/session/OAuth round-trip state, and
 filesystem blobs. That is acceptable for PR demos because the next
@@ -268,14 +270,14 @@ To verify the rendered profile before deploying:
 kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev \
   >/tmp/authproxy-dev.yaml
 
-rg -n "provider: (sqlite|miniredis|filesystem)|/tmp/authproxy-blobs|kind: (Deployment|Job|StatefulSet)|name: dev-(postgresql|redis|minio)" \
+rg -n "provider: (sqlite|miniredis|filesystem)|/tmp/authproxy-blobs|kind: (Deployment|Job|StatefulSet)|name: dev-(postgresql|redis|seaweedfs)" \
   /tmp/authproxy-dev.yaml
 ```
 
 Expected result: the AuthProxy config contains `provider: sqlite`,
 `provider: miniredis`, and `provider: filesystem`; the AuthProxy pod
 mounts `/tmp/authproxy-blobs`; there are no `dev-postgresql`,
-`dev-redis`, `dev-minio`, or `StatefulSet` matches.
+`dev-redis`, `dev-seaweedfs`, or `StatefulSet` matches.
 
 To verify a live PR namespace:
 
@@ -285,7 +287,7 @@ NS=dev-my-feature-branch
 kubectl -n "$NS" get deploy,job,statefulset,pod
 kubectl -n "$NS" get pod -l app.kubernetes.io/name=postgresql
 kubectl -n "$NS" get pod -l app.kubernetes.io/name=redis
-kubectl -n "$NS" get pod -l app.kubernetes.io/name=minio
+kubectl -n "$NS" get pod -l app.kubernetes.io/name=seaweedfs
 kubectl -n "$NS" get configmap -o yaml | rg -n "provider: (sqlite|miniredis|filesystem)|/tmp/authproxy-blobs"
 ```
 

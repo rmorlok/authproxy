@@ -8,8 +8,9 @@ The base contains the shared AuthProxy, demo-shell, and go-oauth2-server
 workloads. Overlays choose backing services and public hostnames:
 
 - `overlays/demo` targets `demo.authproxy.net` and includes Postgres, Redis,
-  and MinIO backing workloads. Each stateful backing workload uses an encrypted
-  `gp3` persistent volume so data survives pod rescheduling and node replacement.
+  and SeaweedFS (S3-compatible blob storage) backing workloads. Each stateful
+  backing workload uses an encrypted `gp3` persistent volume so data survives
+  pod rescheduling and node replacement.
 - `overlays/dev` targets an example per-branch namespace and keeps the slim
   dev profile: SQLite, embedded miniredis, and filesystem blob storage. Its
   disposable pod-local database uses `serve --auto-migrate`; it removes the
@@ -61,6 +62,13 @@ Set the `DEMO_GRAFANA_ADMIN_USER` repo variable and
 `DEMO_GRAFANA_ADMIN_PASSWORD` repo secret to control those credentials; if the
 password is unset, the first deploy generates a random password and stores it
 in the cluster Secret.
+
+The demo overlay stores full request/response logs in SeaweedFS. `Deploy Demo`
+creates or reuses the `demo-seaweedfs-creds` Secret, which holds the S3
+gateway identity file (`s3.json`) and the matching `secret-key` that AuthProxy
+reads. See the
+[blob storage guide](https://docs.authproxy.net/operations/blob-storage/)
+for browsing the hosted demo bucket.
 
 Both demo and dev deployment workflows run their seed job after the environment
 is ready. The `Seed Demo` GitHub Actions workflow remains available to rerun
