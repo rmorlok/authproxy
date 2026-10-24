@@ -186,8 +186,9 @@ func (s *service) toolSetInventoryNamespace(
 // inventory and advances its epoch in one transaction. The target must remain
 // primary and the captured selector, membership, and binding epoch must still
 // match. The binding pins that generation; later publication does not migrate it.
-// All failures preserve the prior database state and caller inputs. Generated
-// discovery/current-definition reads remain disabled until admission checks land.
+// All failures preserve the prior database state and caller inputs. Installation
+// makes the inventory eligible for internal current-definition and candidate
+// reads, which do not confer authorization or assert execution readiness.
 func (s *service) InstallExplicitToolSetInventory(
 	ctx context.Context,
 	params ToolSetInventoryInstall,

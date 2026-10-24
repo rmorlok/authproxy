@@ -115,6 +115,17 @@ func TestReplaceExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, request.Tools[1].Tool.Name, newTool.Name)
 	require.Equal(t, uint64(1), newTool.ActiveRevision)
 
+	// Current reads switch to the new definition and the replacement's complete set.
+	current, err := f.db.GetCurrentToolRevision(f.ctx, first.Id)
+	require.NoError(t, err)
+	require.Equal(t, stored.ActiveRevision, current.Revision)
+	require.Equal(t, migrated.AppliedGeneration, current.SourceGeneration)
+	require.Equal(t, before.Tools[0].EncryptedDefinition, current.EncryptedDefinition)
+	page, err := f.db.ListToolCandidates(f.ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 10})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []apid.ID{first.Id, newTool.Id}, toolCandidateIDsForTest(page))
+	require.Empty(t, page.Cursor)
+
 	// Mutating the caller's maps and slices must not change the stored metadata.
 	request.Tools[0].Tool.Labels["updated"] = "mutated"
 	request.Tools[0].Tool.Annotations["note"] = "mutated"
@@ -165,12 +176,22 @@ func TestReplaceExplicitToolSetInventoryLifecycle(t *testing.T) {
 	require.Equal(t, request.Generation, *prior.SourceGeneration)
 	require.NotNil(t, readToolRowForTest(t, f.ctx, f.db, newTool.Id).DeletedAt)
 
-	// Inventory changes do not yet admit generated Tools to execution or discovery.
-	_, err = f.db.GetCurrentToolRevision(f.ctx, first.Id)
-	require.ErrorIs(t, err, ErrNotFound)
-	page, err := f.db.ListToolCandidates(f.ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 10})
+	// Current reads expose the rollback's restored definitions and complete set.
+	current, err = f.db.GetCurrentToolRevision(f.ctx, first.Id)
 	require.NoError(t, err)
-	require.Empty(t, page.Items)
+	require.Equal(t, uint64(3), current.Revision)
+	require.Equal(t, rolledBack.AppliedGeneration, current.SourceGeneration)
+	require.Equal(t, original.Tools[0].EncryptedDefinition, current.EncryptedDefinition)
+	page, err = f.db.ListToolCandidates(f.ctx, ToolCandidateQuery{NamespaceMatchers: []string{"root.**"}, Limit: 10})
+	require.NoError(t, err)
+	var restoredIDs []apid.ID
+	for _, entry := range original.Tools {
+		restoredIDs = append(restoredIDs, entry.Tool.Id)
+	}
+	require.ElementsMatch(t, restoredIDs, toolCandidateIDsForTest(page))
+	require.Empty(t, page.Cursor)
+	_, err = f.db.GetCurrentToolRevision(f.ctx, newTool.Id)
+	require.ErrorIs(t, err, ErrNotFound, "rollback retires keys absent from the restored generation")
 }
 
 // TestReplaceExplicitToolSetInventoryNames permits complete-inventory name swaps

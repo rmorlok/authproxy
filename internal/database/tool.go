@@ -37,7 +37,7 @@ var ErrToolManaged = errors.New("tool is managed by a toolset")
 // remain immutable and inspectable. Labels include authored values and derived
 // parent/self projections. Description and Verbs project the active definition.
 // Generated inventories are installed atomically through their binding;
-// generated rows are not yet eligible for current-definition or candidate reads.
+// current-definition and candidate reads check that installed ownership.
 type Tool struct {
 	Id             apid.ID
 	Namespace      string

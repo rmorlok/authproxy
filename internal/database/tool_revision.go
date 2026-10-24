@@ -214,8 +214,9 @@ func (s *service) getToolRevision(
 
 	if current {
 		query = query.Where("r.revision = t.active_revision").
-			Join(ConnectionsTable + " c ON c.id = t.connection_id AND c.id = r.connection_id").
-			Where(sq.Eq{"c.deleted_at": nil, "t.binding_id": nil})
+			Join(ConnectionsTable + " c ON c.id = t.connection_id AND c.id = r.connection_id AND c.namespace = t.namespace").
+			Where(sq.Eq{"c.deleted_at": nil}).
+			Where(s.currentToolOwnershipCondition())
 	} else {
 		query = query.Where(sq.Eq{"r.revision": revision})
 	}
@@ -236,8 +237,9 @@ func (s *service) getToolRevision(
 // GetCurrentToolRevision returns the active encrypted definition and its captured
 // connection through a single joined read. This is a storage snapshot, not an
 // authorization decision or execution-readiness check.
-// Generated Tools are excluded until atomic binding inventory activation and
-// its admission checks are implemented; retained history remains inspectable.
+// Generated revisions require a live installed binding and matching published
+// source generation. Connection readiness and caller permissions still need to
+// be checked by admission; historical reads do not use these ownership checks.
 func (s *service) GetCurrentToolRevision(
 	ctx context.Context,
 	id apid.ID,
