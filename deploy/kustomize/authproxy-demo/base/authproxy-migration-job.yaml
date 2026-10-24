@@ -32,9 +32,6 @@ spec:
             - secretRef:
                 name: redis-creds
                 optional: true
-            - secretRef:
-                name: minio-creds
-                optional: true
           volumeMounts:
             - name: config
               mountPath: /etc/authproxy/config.yaml

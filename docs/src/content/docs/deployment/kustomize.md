@@ -17,7 +17,8 @@ deploy/kustomize/authproxy-demo/
     └── dev/           # Disposable per-branch environment
 ```
 
-The persistent demo adds PostgreSQL, Redis, MinIO, Grafana, Prometheus, Tempo,
+The persistent demo adds PostgreSQL, Redis, SeaweedFS (S3-compatible blob
+storage), Grafana, Prometheus, Tempo,
 Loki, and an OpenTelemetry Collector. The dev overlay uses SQLite, in-process
 miniredis, and filesystem blob storage so it can be recreated cheaply.
 
@@ -43,7 +44,10 @@ the overlay's `namePrefix`, it expects names for:
 - the global encryption key;
 - configured actor keys;
 - the Demo Shell signing key; and
-- database, Redis, and MinIO credentials in the persistent demo.
+- database and Redis credentials in the persistent demo.
+
+The `Deploy Demo` workflow generates the SeaweedFS S3 credentials
+(`demo-seaweedfs-creds`) on first deploy and reuses them afterwards.
 
 Both deployment workflows run the overlay's `seed` Job after rollout and
 before smoke tests. The job configures the disposable OAuth provider, then

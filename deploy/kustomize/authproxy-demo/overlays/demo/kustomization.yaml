@@ -8,10 +8,10 @@ resources:
   - ../../base
   - grafana.yaml
   - ingress.yaml
-  - minio.yaml
   - otel-lgtm.yaml
   - postgres.yaml
   - redis.yaml
+  - seaweedfs.yaml
 
 configMapGenerator:
   - name: authproxy-config

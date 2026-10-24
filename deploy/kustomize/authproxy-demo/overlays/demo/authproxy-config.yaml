@@ -43,14 +43,14 @@ appMetrics:
       envVar: AUTHPROXY_DB_PASSWORD
   blobStorage:
     provider: s3
-    endpoint: http://demo-minio:9000
+    endpoint: http://demo-seaweedfs:8333
     region: us-east-1
     bucket: authproxy-request-logs
     credentials:
       type: access_key
       accessKeyId: authproxy
       secretAccessKey:
-        envVar: MINIO_ROOT_PASSWORD
+        envVar: SEAWEEDFS_S3_SECRET_KEY
     forcePathStyle: true
   requestEvents:
     fullRequestRecording: never

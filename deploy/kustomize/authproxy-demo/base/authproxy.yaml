@@ -47,9 +47,6 @@ spec:
             - secretRef:
                 name: redis-creds
                 optional: true
-            - secretRef:
-                name: minio-creds
-                optional: true
           livenessProbe:
             httpGet:
               path: /healthz
