@@ -86,7 +86,12 @@ func validRequestHeaderValue(value string) bool {
 // authored header to discard declared body parameters or replace MIME framing.
 // Raw and absent bodies may use any concrete authored type. Structured JSON may
 // use any json or +json subtype; all other encodings retain their declared base.
-func requestContentType(authored string, present bool, generated string, mode bodyMode) (string, error) {
+func requestContentType(
+	authored string,
+	present bool,
+	generated string,
+	mode bodyMode,
+) (string, error) {
 	var authoredBase string
 	var authoredParams map[string]string
 	if present {
@@ -97,22 +102,27 @@ func requestContentType(authored string, present bool, generated string, mode bo
 		}
 		_, authoredParams, _ = mime.ParseMediaType(authored)
 	}
+
 	if mode == bodyAbsent || mode == bodyBinary {
 		return authored, nil
 	}
+
 	switch mode {
 	case bodyJSON, bodyText, bodyForm, bodyMultipart:
 	default:
 		return "", errors.New("request body mode is invalid")
 	}
+
 	generatedBase, err := tools.ParseBodyMediaType(generated)
 	if err != nil {
 		return "", err
 	}
+
 	_, generatedParams, _ := mime.ParseMediaType(generated)
 	if mode == bodyMultipart && generatedParams["boundary"] == "" {
 		return "", errors.New("multipart content type must contain a generated boundary")
 	}
+
 	if !present {
 		return generated, nil
 	}
@@ -124,26 +134,32 @@ func requestContentType(authored string, present bool, generated string, mode bo
 	} else if authoredBase != generatedBase {
 		return "", errors.New("authored content type conflicts with body encoding")
 	}
+
 	if mode == bodyMultipart {
 		if _, exists := authoredParams["boundary"]; exists {
 			return "", errors.New("multipart boundary must be supplied by the body encoder")
 		}
 	}
+
 	for name, value := range generatedParams {
 		if other, exists := authoredParams[name]; exists && !compatibleMediaParameter(name, value, other) {
 			return "", errors.New("authored content type parameters conflict with body encoding")
 		}
+
 		// Preserve declared parameter values when an equivalent spelling was
 		// authored (for example charset=UTF-8 versus charset=utf-8).
 		authoredParams[name] = value
 	}
+
 	if len(generatedParams) == 0 {
 		return authored, nil
 	}
+
 	result := mime.FormatMediaType(authoredBase, authoredParams)
 	if result == "" {
 		return "", errors.New("request content type parameters cannot be encoded")
 	}
+
 	return result, nil
 }
 

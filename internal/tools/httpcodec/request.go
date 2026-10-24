@@ -36,28 +36,38 @@ type Request struct {
 // Positive limits apply separately to the envelope, query, and body programs,
 // giving at most three MaxSteps allowances. MaxBytes also bounds combined raw
 // source and final prepared data. It is not an exact HTTP wire-size or memory cap.
-func CompileRequest(source *tools.ProxyHTTP, limits render.Limits) (*Request, error) {
+func CompileRequest(
+	source *tools.ProxyHTTP,
+	limits render.Limits,
+) (*Request, error) {
 	if source == nil {
 		return nil, errors.New("HTTP request definition is required")
 	}
+
 	if limits.MaxBytes <= 0 || limits.MaxDepth <= 0 || limits.MaxSteps <= 0 {
 		return nil, errors.New("request rendering limits must all be positive")
 	}
+
 	if err := checkRequestSource(source, limits); err != nil {
 		return nil, err
 	}
+
 	if !tools.IsHTTPToken(source.Method) {
 		return nil, errors.New("request method must be an HTTP token")
 	}
+
 	if !utf8.ValidString(source.URL) || strings.TrimSpace(source.URL) == "" {
 		return nil, errors.New("request URL template must be nonempty valid UTF-8")
 	}
+
 	if !strings.Contains(source.URL, "{{") {
 		if _, err := prepareRequestURL(source.URL, ""); err != nil {
 			return nil, err
 		}
 	}
+
 	names, err := requestHeaderNames(source.Headers)
+
 	if err != nil {
 		return nil, err
 	}
@@ -68,36 +78,45 @@ func CompileRequest(source *tools.ProxyHTTP, limits render.Limits) (*Request, er
 	values := make([]string, 1, len(names)+1)
 	values[0] = source.URL
 	staticHeaders := make(map[string]string, len(names))
+
 	for _, name := range names {
 		value := source.Headers[name]
 		if !utf8.ValidString(value) || strings.ContainsAny(value, "\r\n") {
 			return nil, errors.New("request header templates must be valid UTF-8 without newlines")
 		}
+
 		if !strings.Contains(value, "{{") {
 			staticHeaders[name] = value
 		}
+
 		values = append(values, value)
 	}
+
 	literalHeaders, _, err := prepareRequestHeaders(staticHeaders, RenderedBody{}, bodyAbsent)
 	if err != nil {
 		return nil, err
 	}
+
 	encoded, err := json.Marshal(values)
 	if err != nil {
 		return nil, errors.New("cannot compile request envelope")
 	}
+
 	envelope, err := render.CompileValue(encoded, limits)
 	if err != nil {
 		return nil, err
 	}
+
 	query, err := CompileParameters(source.Query, limits)
 	if err != nil {
 		return nil, err
 	}
+
 	body, err := CompileBody(source, limits)
 	if err != nil {
 		return nil, err
 	}
+
 	if _, present := literalHeaders["Content-Type"]; present {
 		generatedType := body.contentType
 		if body.mode == bodyMultipart {
@@ -106,7 +125,12 @@ func CompileRequest(source *tools.ProxyHTTP, limits render.Limits) (*Request, er
 			// the actual boundary independently for each invocation.
 			generatedType = "multipart/form-data; boundary=compile-validation"
 		}
-		if _, err := requestContentType(literalHeaders.Get("Content-Type"), true, generatedType, body.mode); err != nil {
+		if _, err := requestContentType(
+			literalHeaders.Get("Content-Type"),
+			true, // present
+			generatedType,
+			body.mode,
+		); err != nil {
 			return nil, err
 		}
 	}
