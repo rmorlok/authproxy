@@ -52,6 +52,13 @@ https://crm.example.com/v1/tenants/acme/contacts/sales%2F42?fields=name+email
 the space in `name email` as `+`. These are explicit choices made by the template
 author; ordinary interpolation does no URL encoding.
 
+Use raw interpolation only when a value is intended to supply URL syntax.
+Putting it immediately after a host without a `/` can change the authority;
+putting it in a path can introduce slashes or query parameters. The HTTP codec's
+[URL interpolation examples](../httpcodec/README.md#choosing-url-interpolation)
+show the component boundaries and explain which inputs still need schema
+constraints after encoding.
+
 The same invocation can render this JSON body with `RenderValue`:
 
 ```json

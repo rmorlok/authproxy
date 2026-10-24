@@ -29,9 +29,9 @@ type Request struct {
 
 // CompileRequest compiles the outbound fields of an HTTP Tool without accessing
 // invocation data, credentials, or the network. Response mapping is deliberately
-// left to the execution layer. Malformed literal URLs and header syntax fail
-// during compilation; final values and body/header compatibility are checked
-// after rendering and before a request exists.
+// left to the execution layer. Malformed literal URLs, header syntax, and known
+// body/content-type conflicts fail during compilation. Final values and dynamic
+// body/header compatibility are checked after rendering, before a request exists.
 //
 // Positive limits apply separately to the envelope, query, and body programs,
 // giving at most three MaxSteps allowances. MaxBytes also bounds combined raw
@@ -78,7 +78,8 @@ func CompileRequest(source *tools.ProxyHTTP, limits render.Limits) (*Request, er
 		}
 		values = append(values, value)
 	}
-	if _, _, err := prepareRequestHeaders(staticHeaders, RenderedBody{}, bodyAbsent); err != nil {
+	literalHeaders, _, err := prepareRequestHeaders(staticHeaders, RenderedBody{}, bodyAbsent)
+	if err != nil {
 		return nil, err
 	}
 	encoded, err := json.Marshal(values)
@@ -96,6 +97,18 @@ func CompileRequest(source *tools.ProxyHTTP, limits render.Limits) (*Request, er
 	body, err := CompileBody(source, limits)
 	if err != nil {
 		return nil, err
+	}
+	if _, present := literalHeaders["Content-Type"]; present {
+		generatedType := body.contentType
+		if body.mode == bodyMultipart {
+			// Compatibility checks need a generated boundary, but no payload is
+			// rendered here. This placeholder is discarded; the encoder creates
+			// the actual boundary independently for each invocation.
+			generatedType = "multipart/form-data; boundary=compile-validation"
+		}
+		if _, err := requestContentType(literalHeaders.Get("Content-Type"), true, generatedType, body.mode); err != nil {
+			return nil, err
+		}
 	}
 	return &Request{method: source.Method, names: names, envelope: envelope, query: query, body: body, limits: limits}, nil
 }
@@ -169,15 +182,12 @@ func (r *Request) Render(ctx context.Context, data *render.Context) (*http.Reque
 	for i, name := range r.names {
 		fields[name] = values[i+1]
 	}
-	headers, host, err := prepareRequestHeaders(fields, body, r.body.mode)
+	headers, hostOverride, err := prepareRequestHeaders(fields, body, r.body.mode)
 	if err != nil {
 		return nil, err
 	}
-	if host == "" {
-		host = u.Host
-	}
 	urlText := u.String()
-	if err := checkPreparedRequestSize(r.method, urlText, host, headers, body.Bytes, r.limits.MaxBytes); err != nil {
+	if err := checkPreparedRequestSize(r.method, urlText, hostOverride, headers, body.Bytes, r.limits.MaxBytes); err != nil {
 		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
@@ -191,14 +201,18 @@ func (r *Request) Render(ctx context.Context, data *render.Context) (*http.Reque
 	if err != nil {
 		return nil, errors.New("cannot prepare HTTP request")
 	}
-	request.Header, request.Host = headers, host
+	request.Header = headers
+	if hostOverride != "" {
+		request.Host = hostOverride
+	}
 	return request, nil
 }
 
-// checkPreparedRequestSize counts method, serialized URL, effective authority,
-// header names/values, and encoded body. Credentials, transport framing, and
-// automatically added HTTP headers belong to later layers and are not counted.
-func checkPreparedRequestSize(method, url, host string, headers http.Header, body []byte, maxBytes int) error {
+// checkPreparedRequestSize counts method, serialized URL, explicit Host override,
+// header names/values, and encoded body. The default authority is already counted
+// in the URL. Credentials, transport framing, and automatically added HTTP headers
+// belong to later layers and are not counted.
+func checkPreparedRequestSize(method, url, hostOverride string, headers http.Header, body []byte, maxBytes int) error {
 	remaining := maxBytes
 	add := func(size int) bool {
 		if size > remaining {
@@ -207,7 +221,7 @@ func checkPreparedRequestSize(method, url, host string, headers http.Header, bod
 		remaining -= size
 		return true
 	}
-	if !add(len(method)) || !add(len(url)) || !add(len(host)) || !add(len(body)) {
+	if !add(len(method)) || !add(len(url)) || !add(len(hostOverride)) || !add(len(body)) {
 		return errors.New("prepared request byte limit exceeded")
 	}
 	for name, values := range headers {

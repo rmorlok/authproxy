@@ -134,6 +134,42 @@ func TestRequestBodyAndContentType(t *testing.T) {
 	}
 }
 
+// TestRequestCompileRejectsKnownContentTypeConflicts rejects literal header/body
+// mismatches at admission while retaining runtime checks for evaluated headers.
+func TestRequestCompileRejectsKnownContentTypeConflicts(t *testing.T) {
+	for _, test := range []struct {
+		name, contentType string
+		body              tools.ProxyHTTP
+	}{
+		{"JSON requires JSON type", "text/plain", tools.ProxyHTTP{BodyJSON: common.RawJSON(`null`)}},
+		{"template base mismatch", "application/json", tools.ProxyHTTP{BodyTemplate: &tools.BodyTemplate{MediaType: "text/plain", Template: "text"}}},
+		{"template charset mismatch", "text/plain; charset=latin-1", tools.ProxyHTTP{BodyTemplate: &tools.BodyTemplate{MediaType: "text/plain; charset=utf-8", Template: "text"}}},
+		{"template profile mismatch", "text/plain; profile=other", tools.ProxyHTTP{BodyTemplate: &tools.BodyTemplate{MediaType: "text/plain; profile=original", Template: "text"}}},
+		{"form base mismatch", "application/json", tools.ProxyHTTP{Form: &tools.FormBody{Fields: map[string]common.RawJSON{}}}},
+		{"multipart base mismatch", "multipart/mixed", tools.ProxyHTTP{Multipart: &tools.MultipartBody{Parts: []tools.MultipartPart{{Name: "field", Text: bodyString("value")}}}}},
+		{"multipart authored boundary", "multipart/form-data; boundary=chosen", tools.ProxyHTTP{Multipart: &tools.MultipartBody{Parts: []tools.MultipartPart{{Name: "field", Text: bodyString("value")}}}}},
+		{"multipart empty boundary", `multipart/form-data; boundary=""`, tools.ProxyHTTP{Multipart: &tools.MultipartBody{Parts: []tools.MultipartPart{{Name: "field", Text: bodyString("value")}}}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Both the encoding and literal header are known without invocation data.
+			source := test.body
+			source.Method, source.URL = "POST", "https://example.test/upload"
+			source.Headers = map[string]string{"cOnTeNt-TyPe": test.contentType}
+			program, compileErr := httpcodec.CompileRequest(&source, parameterLimits())
+			require.Error(t, compileErr)
+			require.Nil(t, program)
+
+			// A dynamic header must compile, then fail under the same compatibility rule.
+			source.Headers["cOnTeNt-TyPe"] = "{{params.mediaType}}"
+			program, err := httpcodec.CompileRequest(&source, parameterLimits())
+			require.NoError(t, err)
+			request, err := program.Render(context.Background(), parameterContext(t, render.Input{Params: map[string]any{"mediaType": test.contentType}}))
+			require.EqualError(t, err, compileErr.Error())
+			require.Nil(t, request)
+		})
+	}
+}
+
 // TestRequestMultipartBoundary pairs the generated boundary with its bytes,
 // retains declared parameters, and prevents authors from selecting a boundary.
 func TestRequestMultipartBoundary(t *testing.T) {
@@ -409,7 +445,7 @@ func TestRequestSharedEnvelopeLimits(t *testing.T) {
 }
 
 // TestRequestSourceAndPreparedByteLimits checks the aggregate boundaries across
-// stages, including effective Host and generated content-type header bytes.
+// stages, including explicit Host overrides and generated content-type bytes.
 func TestRequestSourceAndPreparedByteLimits(t *testing.T) {
 	// Each field fits by itself, but source data across envelope/query/body does not.
 	limits := parameterLimits()
@@ -422,31 +458,52 @@ func TestRequestSourceAndPreparedByteLimits(t *testing.T) {
 	require.ErrorContains(t, err, "source byte limit")
 	require.Nil(t, program)
 
-	// Every stage's rendered data fits; only their complete prepared request reaches the cap.
-	source := tools.ProxyHTTP{
-		Method: "POST", URL: "https://example.test/{{params.value}}", Headers: map[string]string{"X-Info": "{{params.value}}", "Host": "{{cfg.host}}"},
-		Query:        map[string]common.RawJSON{"q": common.RawJSON(`{"$value":"params.value"}`)},
-		BodyTemplate: &tools.BodyTemplate{MediaType: "text/plain", Template: "{{params.value}}"},
-	}
-	value, host := strings.Repeat("x", 80), "upstream.example"
-	data := parameterContext(t, render.Input{Params: map[string]any{"value": value}, Cfg: map[string]any{"host": host}})
-	preparedURL := "https://example.test/" + value + "?q=" + value
-	limits = parameterLimits()
-	limits.MaxBytes = len("POST") + len(preparedURL) + len(host) + len("X-Info") + len(value) + len("Content-Type") + len("text/plain") + len(value)
-	program, err = httpcodec.CompileRequest(&source, limits)
-	require.NoError(t, err)
-	request, err := program.Render(context.Background(), data)
-	require.NoError(t, err)
-	require.Equal(t, preparedURL, request.URL.String())
-	require.Equal(t, value, string(readRequestBody(t, request)))
+	for _, tc := range []struct {
+		name         string
+		hostOverride string
+	}{
+		{"default Host", ""},
+		{"explicit matching Host", "example.test"},
+		{"explicit different Host", "upstream.example"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Every component fits; the complete request reaches the aggregate cap.
+			source := tools.ProxyHTTP{
+				Method: "POST", URL: "https://example.test/{{params.value}}", Headers: map[string]string{"X-Info": "{{params.value}}"},
+				Query:        map[string]common.RawJSON{"q": common.RawJSON(`{"$value":"params.value"}`)},
+				BodyTemplate: &tools.BodyTemplate{MediaType: "text/plain", Template: "{{params.value}}"},
+			}
+			if tc.hostOverride != "" {
+				source.Headers["Host"] = "{{cfg.host}}"
+			}
+			value := strings.Repeat("x", 80)
+			data := parameterContext(t, render.Input{Params: map[string]any{"value": value}, Cfg: map[string]any{"host": tc.hostOverride}})
+			preparedURL := "https://example.test/" + value + "?q=" + value
+			limits := parameterLimits()
+			limits.MaxBytes = len("POST") + len(preparedURL) + len(tc.hostOverride) + len("X-Info") + len(value) + len("Content-Type") + len("text/plain") + len(value)
+			program, err := httpcodec.CompileRequest(&source, limits)
+			require.NoError(t, err)
+			request, err := program.Render(context.Background(), data)
+			require.NoError(t, err)
+			require.Equal(t, preparedURL, request.URL.String())
+			require.Equal(t, value, string(readRequestBody(t, request)))
+			if tc.hostOverride == "" {
+				// net/http derives the default Host without charging its bytes twice.
+				require.Equal(t, request.URL.Host, request.Host)
+			} else {
+				// Explicit Host data counts even when it matches the URL authority.
+				require.Equal(t, tc.hostOverride, request.Host)
+			}
 
-	// Reducing only the aggregate allowance by one returns no partial request.
-	limits.MaxBytes--
-	program, err = httpcodec.CompileRequest(&source, limits)
-	require.NoError(t, err)
-	request, err = program.Render(context.Background(), data)
-	require.ErrorContains(t, err, "prepared request byte limit")
-	require.Nil(t, request)
+			// One byte less fails only the aggregate check and returns no request.
+			limits.MaxBytes--
+			program, err = httpcodec.CompileRequest(&source, limits)
+			require.NoError(t, err)
+			request, err = program.Render(context.Background(), data)
+			require.ErrorContains(t, err, "prepared request byte limit")
+			require.Nil(t, request)
+		})
+	}
 }
 
 // TestRequestRequiredArgumentsAndCancellation rejects invalid programs and

@@ -1,13 +1,99 @@
 package httpcodec
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"net/url"
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/stretchr/testify/require"
 )
+
+// TestRequestURLComponentEncoding keeps caller values within the URL component
+// chosen by the author, including characters that would otherwise change routing.
+func TestRequestURLComponentEncoding(t *testing.T) {
+	limits := render.Limits{MaxBytes: 4096, MaxDepth: 16, MaxSteps: 1000}
+	program, err := CompileRequest(&tools.ProxyHTTP{
+		Method: "GET", URL: "https://api.example.com/v1/items/{{path.params.id}}",
+	}, limits)
+	require.NoError(t, err)
+	for _, id := range []string{"42?include=secrets&admin=true", "../../admin", "@other.example/x", "a/b#fragment", "%2F"} {
+		t.Run("path "+id, func(t *testing.T) {
+			// Encode one identifier after a literal authority/path boundary.
+			data, err := render.NewContext(render.Input{Params: map[string]any{"id": id}}, limits)
+			require.NoError(t, err)
+			request, err := program.Render(context.Background(), data)
+			require.NoError(t, err)
+
+			// URL delimiters in the value cannot select a host, query, or fragment.
+			require.Equal(t, "api.example.com", request.URL.Host)
+			require.Nil(t, request.URL.User)
+			require.Equal(t, "/v1/items/"+url.PathEscape(id), request.URL.EscapedPath())
+			require.Empty(t, request.URL.RawQuery)
+			require.Empty(t, request.URL.Fragment)
+		})
+	}
+	for _, id := range []string{"", ".", ".."} {
+		// Path escaping alone would leave these routing-sensitive segments intact.
+		data, err := render.NewContext(render.Input{Params: map[string]any{"id": id}}, limits)
+		require.NoError(t, err)
+		request, err := program.Render(context.Background(), data)
+		require.ErrorContains(t, err, "nonempty, non-dot path segment")
+		require.Nil(t, request)
+	}
+
+	for _, style := range []string{"URL template", "structured query"} {
+		t.Run(style, func(t *testing.T) {
+			// Both supported query styles encode an argument as one value.
+			source := tools.ProxyHTTP{Method: "GET", URL: "https://api.example.com/search?q={{query.params.term}}"}
+			if style == "structured query" {
+				source.URL = "https://api.example.com/search"
+				source.Query = map[string]common.RawJSON{"q": common.RawJSON(`{"$value":"params.term"}`)}
+			}
+			program, err := CompileRequest(&source, limits)
+			require.NoError(t, err)
+			term := "x&admin=true#fragment"
+			data, err := render.NewContext(render.Input{Params: map[string]any{"term": term}}, limits)
+			require.NoError(t, err)
+			request, err := program.Render(context.Background(), data)
+			require.NoError(t, err)
+
+			// Neither query syntax nor a fragment can escape from that value.
+			require.Equal(t, url.Values{"q": []string{term}}, request.URL.Query())
+			require.Empty(t, request.URL.Fragment)
+		})
+	}
+}
+
+// TestRequestURLRawInterpolation preserves deliberate author-controlled URL
+// construction. Input constraints belong to the Tool definition/execution layer.
+func TestRequestURLRawInterpolation(t *testing.T) {
+	limits := render.Limits{MaxBytes: 4096, MaxDepth: 16, MaxSteps: 1000}
+	for _, test := range []struct {
+		name, source, want string
+		input              render.Input
+	}{
+		{"parameter host", "https://{{params.host}}/v1/items", "https://tenant.example.com/v1/items", render.Input{Params: map[string]any{"host": "tenant.example.com"}}},
+		{"configuration host", "https://{{cfg.host}}/v1/items", "https://tenant.example.com/v1/items", render.Input{Cfg: map[string]any{"host": "tenant.example.com"}}},
+		{"complete URL", "{{params.url}}", "https://tenant.example.com/v1/items?view=summary", render.Input{Params: map[string]any{"url": "https://tenant.example.com/v1/items?view=summary"}}},
+		{"raw route", "https://api.example.com/{{params.route}}", "https://api.example.com/v1/reports?view=summary", render.Input{Params: map[string]any{"route": "v1/reports?view=summary"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Raw substitution intentionally supplies syntax rather than encoded data.
+			program, err := CompileRequest(&tools.ProxyHTTP{Method: "GET", URL: test.source}, limits)
+			require.NoError(t, err)
+			data, err := render.NewContext(test.input, limits)
+			require.NoError(t, err)
+			request, err := program.Render(context.Background(), data)
+			require.NoError(t, err)
+			require.Equal(t, test.want, request.URL.String())
+		})
+	}
+}
 
 // TestPrepareRequestURLPreservesEncoding checks that request assembly appends
 // fields while preserving literal URL spelling and repeated-value order.

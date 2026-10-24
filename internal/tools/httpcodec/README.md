@@ -345,13 +345,53 @@ For example, `url: "https://{{cfg.apiHost}}/upload"` with
 sending another HTTP Host value. The codec performs no DNS lookup or destination
 allowlisting; deployment egress policy still applies at execution.
 
+### Choosing URL interpolation
+
+Raw interpolation inserts URL syntax. Use it only when the trusted Tool author
+intends the value to control that part of the URL. For example,
+`https://{{cfg.apiHost}}/v1/items` selects a host from connection configuration;
+`https://{{params.host}}/v1/items` deliberately lets an argument select it.
+The compiler validates the final URL's syntax; it does not pin a destination or
+infer which URL components an argument was intended to control. The proxy later
+applies the connection's credentials to that destination. Configuration can also
+come from setup input, so selecting a value from `cfg` does not validate it.
+
+Keep the `/` between an authority and an interpolated path. In
+`https://api.example.com{{params.suffix}}`, the suffix is still part of the
+authority: `@other.example/x` changes the destination to `other.example` and
+turns `api.example.com` into URL userinfo. A fixed prefix alone does not fix the
+host. Neither the `path` nor `query` encoding view validates hostnames; constrain
+host inputs when an author deliberately allows them to vary.
+
+For an argument that represents one item ID, write:
+
+```yaml
+url: "https://api.example.com/v1/items/{{path.params.id}}"
+query:
+  search:
+    $value: params.search
+```
+
+An ID of `42?include=secrets&admin=true` becomes
+`42%3Finclude=secrets&admin=true` in the path, without creating query parameters.
+An ID of `../../admin` becomes `..%2F..%2Fadmin`. Structured query fields encode
+their values automatically; use `{{query.params.search}}` if writing a query
+value directly in the URL instead. Raw `{{params.id}}` would insert `?`, `&`,
+and `/` as URL syntax. The `path` view rejects empty values and the dot segments
+`.` and `..`. Encoding still does not decide which resource an argument may
+identify, and providers can apply their own path normalization. Use the Tool's
+input schema to constrain identifiers to the intended set.
+
+### Body content type
+
 Body codecs supply a default `Content-Type`. An authored header may add
 parameters but cannot contradict declared body parameters. Structured JSON may
 use a JSON media type such as `application/vnd.example+json`; text templates and
 forms must retain their declared base media type. Multipart accepts an authored
 `multipart/form-data` header, then adds the generated boundary. An authored
 boundary is rejected because it cannot describe the generated body. Raw or absent
-bodies use the authored media type, if supplied.
+bodies use the authored media type, if supplied. Literal Content-Type conflicts
+fail at compilation; templated values receive the same check after rendering.
 
 Compilation covers outbound request fields. Response rules, authorization,
 input-schema validation, credential capture, sending, and response handling
@@ -399,8 +439,10 @@ header.
 The complete-request compiler also caps combined raw source bytes and final
 prepared data with `MaxBytes`. Source counting includes the method, URL, header
 names/values, query names/JSON values, and all body source fields. Final counting
-includes the method, serialized URL, effective Host, header names/values
-(including generated content types), and body bytes. This is a prepared-data cap,
+includes the method, serialized URL, explicitly authored Host override, header
+names/values (including generated content types), and body bytes. The default
+Host is already represented by the URL and is not counted again. An explicitly
+authored Host counts even when it equals the URL authority. This is a prepared-data cap,
 not an exact wire-size cap: credentials, transport framing, and automatically
 added headers come later. A request can fit every component limit but exceed the
 combined limit; failures return no partial request.
