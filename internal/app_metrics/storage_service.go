@@ -195,8 +195,9 @@ func (ss *StorageService) recordCaptureLoadFailure(
 	span.SetAttributes(attribute.String("authproxy.request_event.capture_state", string(state)))
 }
 
-// Close flushes buffered request events and stops the background writer. It should be called once the services
-// that proxy requests have stopped, so their final events are persisted. It is safe to call more than once.
+// Close flushes buffered request events and stops the background writer. It
+// should be called once the services that proxy requests have stopped, so their
+// final events are persisted. It is safe to call more than once.
 func (ss *StorageService) Close() error {
 	if ss == nil ||
 		ss.eventStore == nil ||
@@ -230,9 +231,10 @@ func (ss *StorageService) Ping(ctx context.Context) bool {
 	return true
 }
 
-// NewStorageService that will store app metrics records and full request/response details.
-// dbOpts are forwarded to the underlying DB constructors — pass
-// sqlh.WithTelemetry(...) to instrument the request-events database tier.
+// NewStorageService that will store app metrics records and full
+// request/response details. dbOpts are forwarded to the underlying DB
+// constructors — pass sqlh.WithTelemetry(...) to instrument the request-events
+// database tier.
 func NewStorageService(
 	ctx context.Context,
 	cfg *config.AppMetrics,
