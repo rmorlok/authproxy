@@ -255,6 +255,141 @@ func TestValueTemplateRenderFailures(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestParameterValuesOptionalReferences preserves positional omission markers
+// and keeps false, zero, empty strings, and all supplied data distinguishable.
+func TestParameterValuesOptionalReferences(t *testing.T) {
+	// Capture omitted, null, falsy, and template-looking values in one snapshot.
+	data, err := NewContext(Input{Params: map[string]any{
+		"null": nil, "false": false, "zero": 0, "blank": "",
+		"list":   []any{"first", "{{cfg.secret}}"},
+		"object": map[string]any{"$optional": "cfg.secret"},
+	}, Cfg: map[string]any{"secret": "private-configuration"}}, testLimits())
+	require.NoError(t, err)
+	source := common.RawJSON(`[
+		{"$optional":"params.missing"}, {"$optional":"params.pagination.cursor"},
+		{"$optional":"params.null"}, {"$optional":"params.null.child"},
+		{"$optional":"cfg.secret.child"}, {"$optional":"params.false"},
+		{"$optional":"params.zero"}, {"$optional":"params.blank"},
+		{"$optional":"params.list"}, {"$optional":"params.object"},
+		null, {"$value":"params.null"}, {"$literal":{"$optional":"cfg.secret"}}
+	]`)
+	program, err := CompileParameterValues(source, testLimits())
+	require.NoError(t, err)
+
+	// The compiled program owns its source, and injected data is never reinterpreted.
+	for i := range source {
+		source[i] = '!'
+	}
+	result, err := program.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.JSONEq(t, `[[],[],[],[],[],false,0,"",["first","{{cfg.secret}}"],
+		{"$optional":"cfg.secret"},null,null,{"$optional":"cfg.secret"}]`, string(result))
+	require.NotContains(t, string(result), "private-configuration")
+
+	// Mutating returned bytes leaves later renders and the captured context intact.
+	result[0] = '!'
+	again, err := program.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.True(t, json.Valid(again))
+}
+
+// TestParameterValuesRestrictOptionalDirectives catches unsupported placements
+// and malformed references before any invocation data is available.
+func TestParameterValuesRestrictOptionalDirectives(t *testing.T) {
+	for _, source := range []string{
+		`null`, `{}`, `"text"`, `{"$optional":"params.cursor"}`,
+		`[[{"$optional":"params.cursor"}]]`,
+		`[{"nested":{"$optional":"params.cursor"}}]`,
+		`[{"$optional":"params.cursor","default":[]}]`,
+		`[{"$optional":42}]`, `[{"$optional":""}]`,
+		`[{"$optional":"params..cursor"}]`, `[{"$optional":"query.params.cursor"}]`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			// Only exact, whole-field directives belong to the parameter language.
+			program, err := CompileParameterValues(common.RawJSON(source), testLimits())
+			require.Error(t, err)
+			require.Nil(t, program)
+		})
+	}
+
+	// Ordinary JSON bodies still reject optional directives at every nesting level.
+	for _, source := range []string{
+		`{"$optional":"params.cursor"}`, `[{"$optional":"params.cursor"}]`,
+		`{"cursor":{"$optional":"params.cursor"}}`,
+	} {
+		program, err := CompileValue(common.RawJSON(source), testLimits())
+		require.Error(t, err)
+		require.Nil(t, program)
+	}
+
+	// A valid parameter program may be empty, but it must still have an array root.
+	program, err := CompileParameterValues(common.RawJSON(`[]`), testLimits())
+	require.NoError(t, err)
+	data, err := NewContext(Input{}, testLimits())
+	require.NoError(t, err)
+	result, err := program.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.Equal(t, common.RawJSON(`[]`), result)
+}
+
+// TestParameterValuesKeepRequiredReferencesStrict proves opting one field into
+// omission never suppresses errors from other required lookups or templates.
+func TestParameterValuesKeepRequiredReferencesStrict(t *testing.T) {
+	data, err := NewContext(Input{Cfg: map[string]any{"secret": "private-configuration"}}, testLimits())
+	require.NoError(t, err)
+	for _, source := range []string{
+		`[{"$optional":"params.cursor"},{"$value":"params.required"}]`,
+		`[{"$optional":"params.cursor"},"{{params.required}}"]`,
+		`[{"$optional":"params.cursor"},{"$value":"cfg.secret.child"}]`,
+	} {
+		// An omitted field does not turn subsequent missing references into omissions.
+		program, err := CompileParameterValues(common.RawJSON(source), testLimits())
+		require.NoError(t, err)
+		result, err := program.Render(context.Background(), data)
+		require.ErrorIs(t, err, errMissingReference)
+		require.Nil(t, result)
+		require.NotContains(t, err.Error(), "private-configuration")
+	}
+}
+
+// TestParameterValuesShareLimits applies one work, byte, and depth allowance to
+// optional fields, including omitted fields, and honors invocation cancellation.
+func TestParameterValuesShareLimits(t *testing.T) {
+	data, err := NewContext(Input{Params: map[string]any{
+		"large": strings.Repeat("x", 60), "list": []any{1, 2, 3},
+	}}, testLimits())
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name   string
+		source string
+		limits Limits
+		error  string
+	}{
+		{"output", `[{"$optional":"params.large"},{"$optional":"params.large"}]`, Limits{MaxBytes: 100, MaxDepth: 32, MaxSteps: 100}, "byte limit"},
+		{"work", `[{"$optional":"params.list"},{"$optional":"params.list"}]`, Limits{MaxBytes: 100, MaxDepth: 32, MaxSteps: 6}, "step limit"},
+		{"omitted work", `[{"$optional":"params.a"},{"$optional":"params.b"}]`, Limits{MaxBytes: 100, MaxDepth: 32, MaxSteps: 4}, "step limit"},
+		{"depth", `[{"$optional":"params.list"}]`, Limits{MaxBytes: 100, MaxDepth: 1, MaxSteps: 100}, "depth limit"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Source compilation fits, but the complete rendered program exceeds policy.
+			program, err := CompileParameterValues(common.RawJSON(tc.source), tc.limits)
+			require.NoError(t, err)
+			result, err := program.Render(context.Background(), data)
+			require.ErrorContains(t, err, tc.error)
+			require.Nil(t, result)
+		})
+	}
+
+	// A cancelled invocation cannot produce even an omission marker.
+	program, err := CompileParameterValues(common.RawJSON(`[{"$optional":"params.cursor"}]`), testLimits())
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	result, err := program.Render(ctx, data)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, result)
+}
+
 // FuzzValueTemplateRender exercises JSON structure, directives, and embedded
 // templates together. Successful reusable and one-off renders must agree.
 func FuzzValueTemplateRender(f *testing.F) {

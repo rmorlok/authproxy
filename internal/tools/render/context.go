@@ -66,6 +66,10 @@ type Context struct {
 	root map[string]any
 }
 
+// errMissingReference identifies absent lookups without classifying other
+// rendering failures as optional. Wrapped errors retain the authored reference.
+var errMissingReference = errors.New("missing template reference")
+
 // NewContext copies only JSON-compatible data, preserving numeric precision.
 // Structs, pointers, custom marshalers, functions, and other Go objects are
 // rejected instead of exposing their fields or methods to templates. Cycles
@@ -341,19 +345,19 @@ func (c *Context) lookupRaw(name string, scopes []any) (any, error) {
 		for _, part := range parts[1:] {
 			object, ok = value.(map[string]any)
 			if !ok {
-				return nil, fmt.Errorf("missing template reference %q", name)
+				return nil, fmt.Errorf("%w %q", errMissingReference, name)
 			}
-			
+
 			value, exists = object[part]
 			if !exists {
-				return nil, fmt.Errorf("missing template reference %q", name)
+				return nil, fmt.Errorf("%w %q", errMissingReference, name)
 			}
 		}
 
 		return value, nil
 	}
 
-	return nil, fmt.Errorf("missing template reference %q", name)
+	return nil, fmt.Errorf("%w %q", errMissingReference, name)
 }
 
 // scalarText defines raw interpolation without HTML escaping or Go formatting

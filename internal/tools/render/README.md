@@ -169,8 +169,8 @@ field; `{{query.params.text}}` encodes the root `params.text` field.
 Encoding views are resolved on demand, so both `json.params.object` and
 `json.params.object.child` work. Path encoding rejects empty values, `.` and `..`
 to avoid empty or traversing path segments. Use the query view only in manually
-authored query strings; the future structured-query encoder will apply its own
-encoding.
+authored query strings; the [structured query/form codec](../httpcodec/README.md)
+applies its own encoding.
 
 For a body authored as a raw string template, the `json` view supplies JSON
 quoting and preserves scalar types. With the contact data above, this template:
@@ -239,6 +239,16 @@ For example, `{"$value":"params.tags","default":[]}` is an authoring error.
 Wrap ordinary data containing such keys in `$literal`. Values inserted through
 `$value` also remain uninterpreted data. Structured output uses deterministic
 key order and owns its bytes independently of the source and context.
+
+The query/form codec uses `CompileParameterValues` to compile a whole array of
+field values under one budget. That entry point additionally accepts an exact
+`{"$optional":"params.cursor"}` as a whole array element: a missing or null
+lookup produces an empty-array placeholder, which the codec omits. Other values
+retain their original type. Positions are preserved so later fields cannot be
+paired with the wrong names. This directive is rejected inside repeated values
+and by ordinary `CompileValue`; it does not change required lookups or JSON body
+rendering. See [optional query/form fields](../httpcodec/README.md#optional-fields)
+for the authored request syntax.
 
 ## Limits and verification
 

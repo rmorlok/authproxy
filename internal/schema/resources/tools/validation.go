@@ -279,18 +279,35 @@ func (r *HTTPResponse) Validate(vc *common.ValidationContext) error {
 	return result.ErrorOrNil()
 }
 
-// validateFields accepts scalars, repeated scalar values, and typed lookups.
-// Structured parameter values are encoded later, never pre-encoded here.
+// validateFields accepts nonempty names with scalar, repeated-scalar, or typed
+// lookup values. An exact $optional lookup may omit a complete field at runtime;
+// array entries cannot omit themselves. Values are encoded after rendering.
 func validateFields(fields map[string]common.RawJSON, vc *common.ValidationContext) error {
 	var result *multierror.Error
 
 	for key, raw := range fields {
+		if key == "" {
+			result = multierror.Append(result, vc.NewError("parameter names must be nonempty"))
+			continue
+		}
 		path := vc.PushField(key)
 		value, err := decodeJSONValue(raw)
 
 		if err != nil {
 			result = multierror.Append(result, path.NewError("must contain valid JSON"))
 			continue
+		}
+
+		// Optional lookups describe whole-field presence, so handle them here
+		// rather than admitting them recursively among repeated scalar values.
+		if object, ok := value.(map[string]any); ok {
+			if reference, optional := object["$optional"]; optional {
+				text, valid := reference.(string)
+				if len(object) != 1 || !valid || strings.TrimSpace(text) == "" {
+					result = multierror.Append(result, path.NewError("must be a single-key $optional lookup with a nonempty context reference"))
+				}
+				continue
+			}
 		}
 
 		if err := validateFieldValue(value, path); err != nil {

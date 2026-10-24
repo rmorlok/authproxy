@@ -47,6 +47,14 @@
       "additionalProperties": { "$ref": "#/$defs/NonBlankString" },
       "description": "The exact single-key typed-value directive. Its key belongs to the template language."
     },
+    "OptionalParameterDirective": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "propertyNames": { "const": "$optional" },
+      "additionalProperties": { "$ref": "#/$defs/NonBlankString" },
+      "description": "An exact single-key lookup for a complete query or form field. An absent or null reference omits the field; other values use ordinary parameter encoding. It cannot be an array entry."
+    },
     "ParameterValue": {
       "oneOf": [
         { "$ref": "#/$defs/Scalar" },
@@ -59,11 +67,13 @@
             ]
           }
         },
-        { "$ref": "#/$defs/ValueDirective" }
+        { "$ref": "#/$defs/ValueDirective" },
+        { "$ref": "#/$defs/OptionalParameterDirective" }
       ]
     },
     "ParameterMap": {
       "type": "object",
+      "propertyNames": { "minLength": 1 },
       "additionalProperties": { "$ref": "#/$defs/ParameterValue" }
     },
     "BodyTemplate": {

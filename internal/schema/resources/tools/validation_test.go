@@ -1,12 +1,16 @@
 package tools
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/schema"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 // requireValidationPath checks the typed field path, including a caller's
@@ -115,6 +119,101 @@ func TestProxyHTTPValidateProgrammaticValues(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestProxyHTTPOptionalParameterContracts checks native and embedded-schema
+// validation agree on complete-field optional lookups and nonempty names.
+func TestProxyHTTPOptionalParameterContracts(t *testing.T) {
+	compiled, err := schema.CompileSchema(SchemaIDTools + "#/$defs/ProxyHTTP")
+	require.NoError(t, err)
+	for _, mode := range []string{"query", "form"} {
+		for _, tc := range []struct {
+			name string
+			key  string
+			raw  string
+			fail string
+		}{
+			{"optional lookup", "cursor", `{"$optional":"params.cursor"}`, ""},
+			{"required lookup unchanged", "cursor", `{"$value":"params.cursor"}`, ""},
+			{"literal null unchanged", "cursor", `null`, ""},
+			{"repeated typed lookup unchanged", "cursor", `[false,null,{"$value":"params.cursor"}]`, ""},
+			{"empty reference", "cursor", `{"$optional":""}`, ".cursor"},
+			{"blank reference", "cursor", `{"$optional":" \t"}`, ".cursor"},
+			{"null reference", "cursor", `{"$optional":null}`, ".cursor"},
+			{"boolean reference", "cursor", `{"$optional":false}`, ".cursor"},
+			{"array reference", "cursor", `{"$optional":["params.cursor"]}`, ".cursor"},
+			{"mixed optional object", "cursor", `{"$optional":"params.cursor","other":true}`, ".cursor"},
+			{"mixed directives", "cursor", `{"$optional":"params.cursor","$value":"params.cursor"}`, ".cursor"},
+			{"optional array entry", "cursor", `[{"$optional":"params.cursor"}]`, ".cursor[0]"},
+			{"empty name", "", `{"$optional":"params.cursor"}`, "field map"},
+		} {
+			t.Run(mode+"/"+tc.name, func(t *testing.T) {
+				// Both authoring locations share one field-value contract.
+				fields := map[string]common.RawJSON{tc.key: common.RawJSON(tc.raw)}
+				request := ProxyHTTP{Method: "POST", URL: "https://example.test/items"}
+				path := "$.query"
+				if mode == "query" {
+					request.Query = fields
+				} else {
+					request.Form = &FormBody{Fields: fields}
+					path = "$.form.fields"
+				}
+				nativeErr := request.Validate(nil)
+
+				// Validate the serialized shape separately from the native boundary.
+				encoded, err := json.Marshal(request)
+				require.NoError(t, err)
+				var document any
+				require.NoError(t, json.Unmarshal(encoded, &document))
+				schemaErr := compiled.Validate(document)
+				if tc.fail == "" {
+					require.NoError(t, nativeErr)
+					require.NoError(t, schemaErr)
+					return
+				}
+				if tc.fail != "field map" {
+					path += tc.fail
+				}
+				requireValidationPath(t, nativeErr, path)
+				require.Error(t, schemaErr)
+			})
+		}
+	}
+}
+
+// TestProxyHTTPParameterPresenceRoundTrip preserves optional directives and
+// explicit values through JSON and YAML without applying runtime omission.
+func TestProxyHTTPParameterPresenceRoundTrip(t *testing.T) {
+	// Required, optional, and explicit-null values must remain distinct in storage.
+	fields := map[string]common.RawJSON{
+		"optional": common.RawJSON(`{"$optional":"params.cursor"}`),
+		"required": common.RawJSON(`{"$value":"params.cursor"}`),
+		"null":     common.RawJSON(`null`),
+		"empty":    common.RawJSON(`""`),
+		"false":    common.RawJSON(`false`),
+		"zero":     common.RawJSON(`0`),
+		"repeated": common.RawJSON(`[]`),
+	}
+	request := ProxyHTTP{Method: "POST", URL: "https://example.test/items", Query: fields, Form: &FormBody{Fields: fields}}
+	require.NoError(t, request.Validate(nil))
+	expected, err := json.Marshal(request)
+	require.NoError(t, err)
+	var fromJSON ProxyHTTP
+	require.NoError(t, util.DecodeJSONStrict(expected, &fromJSON))
+	require.NoError(t, fromJSON.Validate(nil))
+	roundTrip, err := json.Marshal(fromJSON)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expected), string(roundTrip))
+
+	// YAML's null handling must not erase explicit field values or directives.
+	yamlBytes, err := yaml.Marshal(request)
+	require.NoError(t, err)
+	var fromYAML ProxyHTTP
+	require.NoError(t, util.DecodeYAMLStrict(yamlBytes, &fromYAML))
+	require.NoError(t, fromYAML.Validate(nil))
+	roundTrip, err = json.Marshal(fromYAML)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expected), string(roundTrip))
 }
 
 // TestMultipartPartValidateMetadata protects MIME header boundaries without

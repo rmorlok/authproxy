@@ -593,7 +593,13 @@ encoding is an explicit context operation rather than HTML escaping.
   literal object that would otherwise look like a directive.
 
 Structured `query` values use scalar or repeated-value encoding through the
-request encoder; do not pre-encode them. Structured body objects recursively
+request encoder; do not pre-encode them. Query and form field names must be
+nonempty. An exact whole-field `{$optional: params.cursor}` omits a missing or
+null value while preserving false, zero, empty strings, and present arrays.
+This explicit exception to strict lookup applies only to whole query/form
+fields; ordinary `$value` lookups remain strict and ordinary null encodes as
+the text `null`. It does not omit JSON body properties or individual array
+elements. Structured body objects recursively
 render string templates and typed directives. Permit exactly one body mode:
 `bodyJson`, `bodyTemplate`, `bodyRaw`, `form`, or `multipart`. `bodyTemplate`
 declares its media type; parse it as JSON when JSON is declared. `bodyRaw` uses
