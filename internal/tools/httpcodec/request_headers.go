@@ -111,12 +111,14 @@ func requestContentType(
 ) (string, error) {
 	var authoredBase string
 	var authoredParams map[string]string
+
 	if present {
 		var err error
 		authoredBase, err = tools.ParseBodyMediaType(authored)
 		if err != nil {
 			return "", err
 		}
+
 		_, authoredParams, _ = mime.ParseMediaType(authored)
 	}
 

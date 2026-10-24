@@ -94,15 +94,26 @@ type Response struct {
 // A nil definition selects default passthrough for 2xx and UPSTREAM_FAILED for
 // other statuses. Configured JavaScript transforms are rejected until a pure
 // transform runtime is supplied; they are never silently ignored.
-func CompileResponse(source *tools.HTTPResponse, limits ResponseLimits) (*Response, error) {
-	if limits.MaxSourceBytes <= 0 || limits.MaxResponseBytes <= 0 || limits.MaxOutputBytes <= 0 || limits.MaxEncodedResultBytes <= 0 {
+func CompileResponse(
+	source *tools.HTTPResponse,
+	limits ResponseLimits,
+) (*Response, error) {
+	if limits.MaxSourceBytes <= 0 ||
+		limits.MaxResponseBytes <= 0 ||
+		limits.MaxOutputBytes <= 0 ||
+		limits.MaxEncodedResultBytes <= 0 {
 		return nil, errors.New("response limits must all be positive")
 	}
+
 	rules, err := compileResponseRules(source, limits.MaxSourceBytes)
 	if err != nil {
 		return nil, err
 	}
-	return &Response{rules: rules, limits: limits}, nil
+
+	return &Response{
+		rules:  rules,
+		limits: limits,
+	}, nil
 }
 
 // Map translates a complete buffered response into a detached ToolResult.
@@ -115,16 +126,22 @@ func CompileResponse(source *tools.HTTPResponse, limits ResponseLimits) (*Respon
 // too small for the safe error envelope return a Go error and no result. The
 // caller remains responsible for output-schema validation, aggregate execution
 // budgets, and any higher-level API serialization around this result.
-func (r *Response) Map(ctx context.Context, input ResponseInput) (*api.ToolResult, error) {
+func (r *Response) Map(
+	ctx context.Context,
+	input ResponseInput,
+) (*api.ToolResult, error) {
 	if r == nil || r.rules == nil || ctx == nil {
 		return nil, errors.New("response program and context are required")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if input.ExecutionState != api.ToolExecutionStateMayHaveExecuted && input.ExecutionState != api.ToolExecutionStateCompleted {
+
+	if input.ExecutionState != api.ToolExecutionStateMayHaveExecuted &&
+		input.ExecutionState != api.ToolExecutionStateCompleted {
 		return nil, errors.New("response execution state must be mayHaveExecuted or completed")
 	}
+
 	// ID validators check resource prefixes, not storage size or UTF-8. Bound
 	// these required fields before validation/serialization, and never let JSON
 	// encoding silently replace bytes in a captured correlation identity.
@@ -133,17 +150,23 @@ func (r *Response) Map(ctx context.Context, input ResponseInput) (*api.ToolResul
 		if len(identity) > remainingIdentityBytes {
 			return nil, ErrEncodedResultLimit
 		}
+
 		remainingIdentityBytes -= len(identity)
 		if !utf8.ValidString(identity) {
 			return nil, errors.New("response invocation identities must be valid UTF-8")
 		}
 	}
+
 	result := &api.ToolResult{
-		ToolID: input.ToolID, Revision: input.Revision, InvocationID: input.InvocationID,
-		Content: []api.ToolContentBlock{}, Metadata: input.Metadata,
+		ToolID:       input.ToolID,
+		Revision:     input.Revision,
+		InvocationID: input.InvocationID,
+		Content:      []api.ToolContentBlock{},
+		Metadata:     input.Metadata,
 	}
 	result.Metadata.ToolSetGeneration = util.CloneValue(input.Metadata.ToolSetGeneration)
 	result.Metadata.CatalogRevision = util.CloneValue(input.Metadata.CatalogRevision)
+
 	if err := result.Validate(nil); err != nil {
 		return nil, errors.New("response invocation identity or metadata is invalid")
 	}
@@ -151,13 +174,24 @@ func (r *Response) Map(ctx context.Context, input ResponseInput) (*api.ToolResul
 	var failure *api.ToolResultError
 	switch {
 	case input.StatusCode < 100 || input.StatusCode > 599:
-		failure = &api.ToolResultError{Code: "UPSTREAM_PROTOCOL_ERROR", Message: "The upstream response has an invalid HTTP status."}
+		failure = &api.ToolResultError{
+			Code:    "UPSTREAM_PROTOCOL_ERROR",
+			Message: "The upstream response has an invalid HTTP status.",
+		}
 	default:
 		if rule, matched := r.rules.lookup(input.StatusCode); matched {
-			failure = &api.ToolResultError{Code: rule.code, Message: rule.message, Retryable: rule.retryable}
+			failure = &api.ToolResultError{
+				Code:      rule.code,
+				Message:   rule.message,
+				Retryable: rule.retryable,
+			}
 		} else if input.StatusCode < 200 || input.StatusCode >= 300 {
-			failure = &api.ToolResultError{Code: "UPSTREAM_FAILED", Message: "The upstream service returned an unsuccessful HTTP status."}
+			failure = &api.ToolResultError{
+				Code:    "UPSTREAM_FAILED",
+				Message: "The upstream service returned an unsuccessful HTTP status.",
+			}
 		}
+
 		if failure != nil {
 			// Status alone is safe diagnostic data. Never copy a provider's
 			// status text, error body, headers, or URL into the public failure.
@@ -171,15 +205,26 @@ func (r *Response) Map(ctx context.Context, input ResponseInput) (*api.ToolResul
 			failure = mapResponseBody(result, input.ContentType, input.Body, r.limits.MaxEncodedResultBytes)
 		}
 	}
+
 	if failure != nil {
 		setResponseFailure(result, failure, input.ExecutionState)
 	}
-	return finishResponseResult(ctx, result, input.ExecutionState, r.limits.MaxEncodedResultBytes)
+
+	return finishResponseResult(
+		ctx,
+		result,
+		input.ExecutionState,
+		r.limits.MaxEncodedResultBytes,
+	)
 }
 
 // setResponseFailure discards all partial content before installing a safe
 // error. The caller supplies a fresh failure owned by this invocation.
-func setResponseFailure(result *api.ToolResult, failure *api.ToolResultError, state api.ToolExecutionState) {
+func setResponseFailure(
+	result *api.ToolResult,
+	failure *api.ToolResultError,
+	state api.ToolExecutionState,
+) {
 	result.StructuredContent = nil
 	result.Content = []api.ToolContentBlock{}
 	result.IsError = true
@@ -190,23 +235,40 @@ func setResponseFailure(result *api.ToolResult, failure *api.ToolResultError, st
 // finishResponseResult bounds the complete serialized result, not just its
 // payload. An oversized success or authored error is replaced once by a small
 // platform failure; if that cannot fit either, no result is returned.
-func finishResponseResult(ctx context.Context, result *api.ToolResult, state api.ToolExecutionState, maxBytes int) (*api.ToolResult, error) {
+func finishResponseResult(
+	ctx context.Context,
+	result *api.ToolResult,
+	state api.ToolExecutionState,
+	maxBytes int,
+) (*api.ToolResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	encoded, err := json.Marshal(result)
 	if err != nil {
 		return nil, errors.New("cannot encode HTTP Tool result")
 	}
+
 	if len(encoded) > maxBytes {
-		setResponseFailure(result, &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The encoded Tool result exceeds the result byte limit."}, state)
+		setResponseFailure(
+			result,
+			&api.ToolResultError{
+				Code:    "OUTPUT_TOO_LARGE",
+				Message: "The encoded Tool result exceeds the result byte limit.",
+			},
+			state,
+		)
+
 		encoded, err = json.Marshal(result)
 		if err != nil || len(encoded) > maxBytes {
 			return nil, ErrEncodedResultLimit
 		}
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
