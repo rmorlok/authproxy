@@ -70,6 +70,14 @@ bodies belong in the headers; `bodyTemplate` declares its media type explicitly.
 Multipart parts contain either `text` or `bodyRaw` with optional filename and
 media type.
 
+Query and form fields have nonempty names and scalar or repeated scalar values.
+An exact `{"$optional":"params.cursor"}` value omits the complete field when
+the reference is absent or null. Otherwise it encodes the referenced value,
+including `false`, zero, and the empty string. Use `$optional` as the entire
+field value, never inside an array or alongside other keys. A regular `$value`
+lookup still requires its reference to exist; literal null still encodes as
+`null`. `$optional` is specific to query and form fields.
+
 HTTP error rules select exact `statuses`, one `statusClass` (1 through 5), or
 `default: true`. Repeated selectors at the same priority conflict. Exact status,
 class, and default rules may overlap, with that precedence. Response transforms

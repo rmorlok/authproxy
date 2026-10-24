@@ -360,3 +360,103 @@ func TestParametersRequireProgramAndInvocation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "value=valid", encoded)
 }
+
+// TestParametersOptionalFields exercises first and later page requests without
+// making missing required references or ordinary null values optional.
+func TestParametersOptionalFields(t *testing.T) {
+	program, err := httpcodec.CompileParameters(map[string]common.RawJSON{
+		"cursor": common.RawJSON(`{"$optional":"params.cursor"}`),
+		"limit":  common.RawJSON(`10`),
+	}, parameterLimits())
+	require.NoError(t, err)
+	for _, tc := range []struct {
+		name   string
+		params map[string]any
+		want   string
+	}{
+		{"first page", nil, "limit=10"},
+		{"null cursor", map[string]any{"cursor": nil}, "limit=10"},
+		{"next page", map[string]any{"cursor": "page+2"}, "cursor=page%2B2&limit=10"},
+		{"empty string", map[string]any{"cursor": ""}, "cursor=&limit=10"},
+		{"false", map[string]any{"cursor": false}, "cursor=false&limit=10"},
+		{"zero", map[string]any{"cursor": 0}, "cursor=0&limit=10"},
+		{"empty array", map[string]any{"cursor": []any{}}, "limit=10"},
+		{"repeated values", map[string]any{"cursor": []any{"a", nil, false}}, "cursor=a&cursor=null&cursor=false&limit=10"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Omission preserves the following field's position; false-like scalars remain.
+			encoded, err := program.Render(context.Background(), parameterContext(t, render.Input{Params: tc.params}))
+			require.NoError(t, err)
+			require.Equal(t, tc.want, encoded)
+		})
+	}
+
+	// Optional lookup cannot make a required lookup of the same missing value succeed.
+	strict, err := httpcodec.CompileParameters(map[string]common.RawJSON{
+		"optional": common.RawJSON(`{"$optional":"params.cursor"}`),
+		"required": common.RawJSON(`{"$value":"params.cursor"}`),
+	}, parameterLimits())
+	require.NoError(t, err)
+	encoded, err := strict.Render(context.Background(), parameterContext(t, render.Input{}))
+	require.ErrorContains(t, err, "missing template reference")
+	require.Empty(t, encoded)
+
+	// Explicit ordinary nulls keep their original encoding for callers that want it.
+	encoded, err = strict.Render(context.Background(), parameterContext(t, render.Input{Params: map[string]any{"cursor": nil}}))
+	require.NoError(t, err)
+	require.Equal(t, "required=null", encoded)
+}
+
+// TestParametersOptionalValidation keeps omission scoped to whole fields and
+// applies ordinary parameter shape validation to any present optional value.
+func TestParametersOptionalValidation(t *testing.T) {
+	for _, source := range []string{
+		`{"$optional":42}`, `{"$optional":""}`, `{"$optional":"params..cursor"}`,
+		`{"$optional":"query.params.cursor"}`, `{"$optional":"params.cursor","extra":true}`,
+		`[{"$optional":"params.cursor"}]`,
+	} {
+		// Malformed directives and optional repeated elements are authoring errors.
+		program, err := httpcodec.CompileParameters(map[string]common.RawJSON{"cursor": common.RawJSON(source)}, parameterLimits())
+		require.Error(t, err)
+		require.Nil(t, program)
+	}
+	program, err := httpcodec.CompileParameters(map[string]common.RawJSON{
+		"cursor": common.RawJSON(`{"$optional":"params.page.cursor"}`),
+	}, parameterLimits())
+	require.NoError(t, err)
+
+	// Missing intermediate objects omit the field, while present illegal shapes fail.
+	encoded, err := program.Render(context.Background(), parameterContext(t, render.Input{}))
+	require.NoError(t, err)
+	require.Empty(t, encoded)
+	for _, value := range []any{map[string]any{"secret": "private-data"}, []any{[]any{"private-data"}}} {
+		data := parameterContext(t, render.Input{Params: map[string]any{"page": map[string]any{"cursor": value}}})
+		encoded, err := program.Render(context.Background(), data)
+		require.Error(t, err)
+		require.Empty(t, encoded)
+		require.NotContains(t, err.Error(), "private-data")
+	}
+}
+
+// TestParametersUnicodeExpansion documents how the same byte ceiling applies
+// independently to rendered JSON and its potentially larger URL encoding.
+func TestParametersUnicodeExpansion(t *testing.T) {
+	// UTF-8 text can fit in the render allowance while exceeding it after escaping.
+	data := parameterContext(t, render.Input{Params: map[string]any{"search": strings.Repeat("界", 8500)}})
+	fields := map[string]common.RawJSON{"search": common.RawJSON(`{"$value":"params.search"}`)}
+	limits := parameterLimits()
+	limits.MaxBytes = 64 * 1024
+	program, err := httpcodec.CompileParameters(fields, limits)
+	require.NoError(t, err)
+	encoded, err := program.Render(context.Background(), data)
+	require.ErrorContains(t, err, "encoded parameter byte limit exceeded")
+	require.Empty(t, encoded)
+
+	// Sizing the allowance for the actual encoded representation permits that input.
+	limits.MaxBytes = len("search=") + 8500*len("%E7%95%8C")
+	program, err = httpcodec.CompileParameters(fields, limits)
+	require.NoError(t, err)
+	encoded, err = program.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.Equal(t, "search="+strings.Repeat("%E7%95%8C", 8500), encoded)
+}

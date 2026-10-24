@@ -20,6 +20,8 @@ type ProxyHTTP struct {
 
 	// Query contains unencoded scalar or repeated scalar values. A single-key
 	// $value object inserts a typed value from invocation context at runtime.
+	// An exact $optional lookup omits the complete field when absent or null;
+	// it cannot appear inside a repeated-value array. Names must be nonempty.
 	Query map[string]common.RawJSON `json:"query,omitempty" yaml:"query,omitempty"`
 
 	//
@@ -50,7 +52,8 @@ type BodyTemplate struct {
 }
 
 // FormBody supplies application/x-www-form-urlencoded fields. Values use the
-// same scalar/repeated-value encoding as structured query parameters.
+// same scalar/repeated-value encoding and whole-field $optional lookups as
+// structured query parameters. Names must be nonempty.
 type FormBody struct {
 	Fields map[string]common.RawJSON `json:"fields" yaml:"fields"`
 }

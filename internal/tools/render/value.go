@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -25,17 +26,32 @@ type ValueTemplate struct {
 // occur in decoded JSON or invocation data, so inserted values remain inert.
 type valueReference string
 
+// optionalReference inserts a whole query/form field when it is present and
+// non-null. An empty array represents omission without changing field positions.
+type optionalReference string
+
 // CompileValue parses structured JSON and all embedded string templates under
 // one compilation budget. $value preserves referenced types; $literal leaves
 // its payload uninterpreted. Other $-prefixed source keys are rejected to catch
 // malformed directives. Source bytes are not retained by the returned program.
 func CompileValue(source common.RawJSON, limits Limits) (*ValueTemplate, error) {
-	return compileValue(source, newBudget(context.Background(), limits))
+	return compileValue(source, newBudget(context.Background(), limits), false)
+}
+
+// CompileParameterValues compiles an array of query/form field values under one
+// shared budget. Exact $optional directives are allowed only as whole array
+// elements; a missing or null reference renders as an empty array so the codec
+// omits that field while preserving positions. False, zero, and empty strings
+// remain present. Other values retain the normal structured rendering behavior;
+// the codec validates their final scalar or repeated-scalar shape.
+func CompileParameterValues(source common.RawJSON, limits Limits) (*ValueTemplate, error) {
+	return compileValue(source, newBudget(context.Background(), limits), true)
 }
 
 // compileValue shares accounting across JSON nodes and embedded Mustache syntax.
-// The caller chooses whether compilation uses an invocation cancellation context.
-func compileValue(source common.RawJSON, b *budget) (*ValueTemplate, error) {
+// The caller chooses the cancellation context and whether the source is an array
+// of parameter values that permits optional references at the field boundary.
+func compileValue(source common.RawJSON, b *budget, parameterValues bool) (*ValueTemplate, error) {
 	if err := b.limit.validate(); err != nil {
 		return nil, err
 	}
@@ -62,7 +78,13 @@ func compileValue(source common.RawJSON, b *budget) (*ValueTemplate, error) {
 		return nil, errors.New("render source must contain exactly one JSON value")
 	}
 
-	root, err := compileValueNode(value, true, b, 0)
+	if parameterValues {
+		if _, ok := value.([]any); !ok {
+			return nil, errors.New("parameter values must be a JSON array")
+		}
+	}
+
+	root, err := compileValueNode(value, true, parameterValues, b, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -71,8 +93,9 @@ func compileValue(source common.RawJSON, b *budget) (*ValueTemplate, error) {
 
 // compileValueNode replaces authored strings and directives with private
 // executable nodes. Literal payloads are still traversed to enforce limits,
-// but their keys and strings have no template meaning.
-func compileValueNode(value any, interpret bool, b *budget, depth int) (any, error) {
+// but their keys and strings have no template meaning. Parameter programs allow
+// $optional only at depth one, where each node describes one complete field.
+func compileValueNode(value any, interpret, parameterValues bool, b *budget, depth int) (any, error) {
 	if err := b.step(); err != nil {
 		return nil, err
 	}
@@ -84,25 +107,21 @@ func compileValueNode(value any, interpret bool, b *budget, depth int) (any, err
 		if interpret {
 			if len(v) == 1 {
 				if reference, found := v["$value"]; found {
-					name, ok := reference.(string)
-					if !ok {
-						return nil, errors.New("$value requires a dotted reference string")
-					}
-					name = strings.TrimSpace(name)
-					if name != "." {
-						for _, part := range strings.Split(name, ".") {
-							if part == "" {
-								return nil, errors.New("$value requires a nonempty dotted reference")
-							}
-						}
-					}
-					if encoding, _ := encodingReference(name); encoding != "" {
-						return nil, errors.New("$value requires a plain reference without an encoding view")
+					name, err := compileReference(reference, "$value")
+					if err != nil {
+						return nil, err
 					}
 					return valueReference(name), nil
 				}
+				if reference, found := v["$optional"]; found && parameterValues && depth == 1 {
+					name, err := compileReference(reference, "$optional")
+					if err != nil {
+						return nil, err
+					}
+					return optionalReference(name), nil
+				}
 				if literal, found := v["$literal"]; found {
-					return compileValueNode(literal, false, b, depth)
+					return compileValueNode(literal, false, parameterValues, b, depth)
 				}
 			}
 			for key := range v {
@@ -112,7 +131,7 @@ func compileValueNode(value any, interpret bool, b *budget, depth int) (any, err
 			}
 		}
 		for key, child := range v {
-			compiled, err := compileValueNode(child, interpret, b, depth+1)
+			compiled, err := compileValueNode(child, interpret, parameterValues, b, depth+1)
 			if err != nil {
 				return nil, err
 			}
@@ -121,7 +140,7 @@ func compileValueNode(value any, interpret bool, b *budget, depth int) (any, err
 		return v, nil
 	case []any:
 		for i, child := range v {
-			compiled, err := compileValueNode(child, interpret, b, depth+1)
+			compiled, err := compileValueNode(child, interpret, parameterValues, b, depth+1)
 			if err != nil {
 				return nil, err
 			}
@@ -134,6 +153,27 @@ func compileValueNode(value any, interpret bool, b *budget, depth int) (any, err
 		}
 	}
 	return value, nil
+}
+
+// compileReference validates the shared plain dotted-reference syntax without
+// resolving invocation data or including its contents in authoring errors.
+func compileReference(reference any, directive string) (string, error) {
+	name, ok := reference.(string)
+	if !ok {
+		return "", fmt.Errorf("%s requires a dotted reference string", directive)
+	}
+	name = strings.TrimSpace(name)
+	if name != "." {
+		for _, part := range strings.Split(name, ".") {
+			if part == "" {
+				return "", fmt.Errorf("%s requires a nonempty dotted reference", directive)
+			}
+		}
+	}
+	if encoding, _ := encodingReference(name); encoding != "" {
+		return "", fmt.Errorf("%s requires a plain reference without an encoding view", directive)
+	}
+	return name, nil
 }
 
 // Render evaluates a compiled JSON program against an invocation snapshot.
@@ -167,7 +207,7 @@ func RenderValue(
 		return nil, errors.New("render requires a context and invocation snapshot")
 	}
 	b := newBudget(ctx, limits)
-	v, err := compileValue(source, b)
+	v, err := compileValue(source, b, false)
 	if err != nil {
 		return nil, err
 	}
@@ -203,6 +243,17 @@ func (w *valueWriter) emit(value any, depth int) error {
 	}
 
 	switch v := value.(type) {
+	case optionalReference:
+		resolved, err := w.data.lookupRaw(string(v), nil)
+		if errors.Is(err, errMissingReference) || (err == nil && resolved == nil) {
+			// Empty repeated values emit no query/form pairs. Keeping an array
+			// element here preserves the codec's correspondence with field names.
+			return w.emit([]any{}, depth)
+		}
+		if err != nil {
+			return err
+		}
+		return w.emit(resolved, depth)
 	case valueReference:
 		resolved, err := w.data.lookupRaw(string(v), nil)
 		if err != nil {

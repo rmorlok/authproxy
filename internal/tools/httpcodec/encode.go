@@ -19,7 +19,7 @@ import (
 // interprets templates or directives. Values must be scalars or arrays of
 // scalars; objects and nested arrays are rejected. Numbers retain their JSON
 // spelling, null becomes "null", and an empty array emits no pairs. Key order is
-// deterministic and repeated values retain their order.
+// deterministic and repeated values retain their order. Names must be nonempty.
 //
 // maxBytes must be positive and bounds both aggregate input (names plus JSON
 // values framed as an array) and encoded output. Parsing and temporary escapes
@@ -73,6 +73,9 @@ func parameterSource(ctx context.Context, fields map[string]common.RawJSON, maxB
 		if err := ctx.Err(); err != nil {
 			return nil, nil, err
 		}
+		if name == "" {
+			return nil, nil, errors.New("parameter names must be nonempty")
+		}
 		if !utf8.ValidString(name) || !utf8.Valid(value) || !json.Valid(value) {
 			return nil, nil, errors.New("parameters require UTF-8 names and valid UTF-8 JSON values")
 		}
@@ -106,6 +109,11 @@ func encodeParameterValues(ctx context.Context, names []string, source common.Ra
 	var values []any
 	if err := decoder.Decode(&values); err != nil {
 		return "", errors.New("parameter values must be valid JSON")
+	}
+	// Both callers preserve one value per name; reject a broken internal plan
+	// before indexing or silently discarding any rendered values.
+	if len(values) != len(names) {
+		return "", errors.New("parameter names and values must have matching lengths")
 	}
 
 	var result strings.Builder

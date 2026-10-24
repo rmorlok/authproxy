@@ -70,11 +70,37 @@ from this module. The limits are examples; callers supply their effective
 execution policy.
 
 Compiled programs own their source and can be reused concurrently. Field names
-stay literal, even if they contain Mustache syntax or are named `$value`.
+must be nonempty and stay literal, even if they contain Mustache syntax or are
+named `$value`.
 All field values are compiled as one structured program, so they share rendering
 work and output limits. See [the renderer README](../render/README.md) for string
 templates and typed directives. Compilation checks template syntax; rendering
 also checks that the resulting values have a valid parameter shape.
+
+## Optional fields
+
+Use `$optional` for a whole field that should be absent when its input is
+missing or null. For example, a paginated request can use:
+
+```json
+{
+  "cursor": {"$optional": "params.cursor"},
+  "limit": 10
+}
+```
+
+The first call can supply `{}` or `{"cursor": null}`; both produce `limit=10`.
+A later call with `{"cursor": "page+2"}` produces
+`cursor=page%2B2&limit=10`. False, zero, and an empty string are present values:
+an empty cursor produces `cursor=&limit=10`.
+
+`$optional` must be the field's entire value and its only key. It takes a plain
+dotted reference, like `$value`. It cannot appear inside a repeated-value array
+or a JSON body template. A present value uses the ordinary scalar/repeated-value
+rules below; nulls inside a present array still encode as `null`.
+Ordinary `$value` remains strict: a missing reference is an error, and a present
+null encodes as the text `null`. Marking one lookup optional does not change
+other lookups of the same input.
 
 ## Encoding rules
 
@@ -114,6 +140,13 @@ Source accounting includes literal field-name bytes and the JSON values framed
 as an array. `MaxDepth` and `MaxSteps` apply across all compiled field values.
 `EncodeParameters` takes a positive byte cap for the same source accounting and
 encoded output. Percent escaping and repeated names count toward the output cap.
+These checks use the **same numeric cap**, not separate source and encoded-size
+settings. A value can fit the JSON limit and still exceed the encoded limit:
+each UTF-8 byte in a Chinese character becomes three bytes (`%XX`), so about
+25 KiB of such text becomes about 75 KiB in the query and exceeds a 64 KiB cap.
+Repeated parameters also repeat their field names. Choose `MaxBytes` (or
+`maxBytes`) for the largest encoded output the execution policy permits; fitting
+the source limit alone does not guarantee that encoding will succeed.
 Temporary parsing and encoding allocations are proportional to these limits;
 the limits are not a hard memory quota.
 

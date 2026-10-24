@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +40,6 @@ func TestEncodeParametersScalarAndRepeatedValues(t *testing.T) {
 func TestEncodeParametersLiteralNamesAndInertData(t *testing.T) {
 	// Both names and values are literal data, including template-like text.
 	encoded, err := EncodeParameters(context.Background(), map[string]common.RawJSON{
-		"":                      common.RawJSON(`""`),
 		"$value":                common.RawJSON(`"{{cfg.secret}}"`),
 		"a&injected=true +%☃\n": common.RawJSON(`"%2F&admin=true\r\n"`),
 	}, 4096)
@@ -47,7 +47,6 @@ func TestEncodeParametersLiteralNamesAndInertData(t *testing.T) {
 	parsed, err := url.ParseQuery(encoded)
 	require.NoError(t, err)
 	require.Equal(t, url.Values{
-		"":                      {""},
 		"$value":                {"{{cfg.secret}}"},
 		"a&injected=true +%☃\n": {"%2F&admin=true\r\n"},
 	}, parsed)
@@ -56,18 +55,65 @@ func TestEncodeParametersLiteralNamesAndInertData(t *testing.T) {
 	require.NotContains(t, encoded, "\n")
 }
 
+// TestParameterSourceRejectsEmptyNames keeps raw encoding and compilation
+// consistent with the HTTP Tool definition's nonempty parameter name contract.
+func TestParameterSourceRejectsEmptyNames(t *testing.T) {
+	// Include a valid field so rejection cannot return a partially useful result.
+	fields := map[string]common.RawJSON{
+		"":  common.RawJSON(`"private-config"`),
+		"a": common.RawJSON(`"valid"`),
+	}
+	encoded, err := EncodeParameters(context.Background(), fields, 4096)
+	require.ErrorContains(t, err, "names must be nonempty")
+	require.Empty(t, encoded)
+	require.NotContains(t, err.Error(), "private-config")
+
+	// Compilation applies the same source validation before creating a program.
+	program, err := CompileParameters(fields, render.Limits{MaxBytes: 4096, MaxDepth: 32, MaxSteps: 10000})
+	require.ErrorContains(t, err, "names must be nonempty")
+	require.Nil(t, program)
+	require.NotContains(t, err.Error(), "private-config")
+}
+
+// TestEncodeParameterValuesRejectsInvalidSource verifies internal plan failures
+// return errors instead of panicking, discarding values, or emitting partial data.
+func TestEncodeParameterValuesRejectsInvalidSource(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		names  []string
+		source string
+		fail   string
+	}{
+		{"fewer values", []string{"a", "b"}, `["private-config"]`, "matching lengths"},
+		{"more values", []string{"a"}, `["valid","private-config"]`, "matching lengths"},
+		{"missing values", []string{"a"}, `[]`, "matching lengths"},
+		{"unexpected values", nil, `["private-config"]`, "matching lengths"},
+		{"malformed array", []string{"a", "b"}, `["private-config",`, "valid JSON"},
+		{"nonarray value", []string{"a"}, `{"private-config":true}`, "valid JSON"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Bypass the public preparation step to exercise the defensive decoder.
+			encoded, err := encodeParameterValues(context.Background(), tc.names, common.RawJSON(tc.source), 4096)
+			require.ErrorContains(t, err, tc.fail)
+			require.Empty(t, encoded)
+			require.NotContains(t, err.Error(), "private-config")
+		})
+	}
+}
+
 func TestEncodeParametersRejectsInvalidValues(t *testing.T) {
 	for name, raw := range map[string]string{
-		"object":          `{"secret":"private-config"}`,
-		"directive":       `{"$value":"cfg.secret"}`,
-		"literal":         `{"$literal":"value"}`,
-		"nested array":    `[["private-config"]]`,
-		"repeated object": `["okay",{"secret":"private-config"}]`,
-		"empty JSON":      ``,
-		"broken JSON":     `"private-config`,
-		"two values":      `1,2`,
-		"trailing data":   `true false`,
-		"invalid UTF-8":   string([]byte{'"', 0xff, '"'}),
+		"object":             `{"secret":"private-config"}`,
+		"directive":          `{"$value":"cfg.secret"}`,
+		"optional directive": `{"$optional":"cfg.secret"}`,
+		"literal":            `{"$literal":"value"}`,
+		"nested array":       `[["private-config"]]`,
+		"repeated object":    `["okay",{"secret":"private-config"}]`,
+		"empty JSON":         ``,
+		"broken JSON":        `"private-config`,
+		"two values":         `1,2`,
+		"trailing data":      `true false`,
+		"invalid UTF-8":      string([]byte{'"', 0xff, '"'}),
 	} {
 		t.Run(name, func(t *testing.T) {
 			// Invalid fields fail the entire encoding and never expose their values.
