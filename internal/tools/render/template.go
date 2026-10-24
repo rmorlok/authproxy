@@ -31,19 +31,30 @@ type templateParser struct {
 	source      string
 	position    int
 	open, close string
-	limits      Limits
-	steps       int
+	budget      *budget
 }
 
 // Compile validates and parses Tool Mustache syntax under explicit limits.
 // Sections, inverted sections, comments, dotted names, custom delimiters, and
 // unescaped variables are supported. Partials and inheritance are rejected even
-// inside sections that would not render. Errors contain no invocation values.
+// inside sections that would not render. Encoding views are only valid in
+// interpolations, so section truthiness always uses the underlying JSON value.
+// Errors contain no invocation values.
 func Compile(source string, limits Limits) (*Template, error) {
 	if err := limits.validate(); err != nil {
 		return nil, err
 	}
-	if len(source) > limits.MaxBytes {
+	return compileTemplate(source, newBudget(context.Background(), limits))
+}
+
+// compileTemplate shares syntax accounting across strings in a structured
+// program. Its caller provides validated limits and a non-nil context. Compiled
+// templates retain only the limits; the mutable compilation budget is discarded.
+func compileTemplate(source string, b *budget) (*Template, error) {
+	if err := b.ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(source) > b.limit.MaxBytes {
 		return nil, errors.New("template source exceeds byte limit")
 	}
 
@@ -54,7 +65,7 @@ func Compile(source string, limits Limits) (*Template, error) {
 		source: source,
 		open:   "{{",
 		close:  "}}",
-		limits: limits,
+		budget: b,
 	}
 
 	nodes, err := p.parse("", 0)
@@ -64,7 +75,7 @@ func Compile(source string, limits Limits) (*Template, error) {
 
 	return &Template{
 		nodes:  nodes,
-		limits: limits,
+		limits: b.limit,
 	}, nil
 }
 
@@ -76,6 +87,9 @@ func (p *templateParser) parse(section string, depth int) ([]templateNode, error
 	for p.position < len(p.source) {
 		relative := strings.Index(p.source[p.position:], p.open)
 		if relative < 0 {
+			if err := p.budget.step(); err != nil {
+				return nil, err
+			}
 			nodes = append(nodes, templateNode{text: p.source[p.position:]})
 			p.position = len(p.source)
 			break
@@ -84,7 +98,9 @@ func (p *templateParser) parse(section string, depth int) ([]templateNode, error
 		start := p.position + relative
 		contentStart, close := start+len(p.open), p.close
 
-		triple := strings.HasPrefix(p.source[contentStart:], "{")
+		// Mustache's triple braces belong only to the default delimiters.
+		// With custom delimiters, braces are ordinary reference characters.
+		triple := p.open == "{{" && p.close == "}}" && strings.HasPrefix(p.source[contentStart:], "{")
 		if triple {
 			contentStart++
 			close = "}" + close
@@ -97,10 +113,8 @@ func (p *templateParser) parse(section string, depth int) ([]templateNode, error
 
 		end := contentStart + closing + len(close)
 		content := strings.TrimSpace(p.source[contentStart : contentStart+closing])
-		p.steps++
-
-		if p.steps > p.limits.MaxSteps {
-			return nil, errors.New("template syntax exceeds step limit")
+		if err := p.budget.step(); err != nil {
+			return nil, err
 		}
 
 		if content == "" {
@@ -123,6 +137,9 @@ func (p *templateParser) parse(section string, depth int) ([]templateNode, error
 		}
 
 		if textEnd > p.position {
+			if err := p.budget.step(); err != nil {
+				return nil, err
+			}
 			nodes = append(nodes, templateNode{text: p.source[p.position:textEnd]})
 		}
 		p.position = next
@@ -145,7 +162,10 @@ func (p *templateParser) parse(section string, depth int) ([]templateNode, error
 			}
 			node := templateNode{kind: kind, text: content}
 			if kind == '#' || kind == '^' {
-				if depth >= p.limits.MaxDepth {
+				if encoding, _ := encodingReference(content); encoding != "" {
+					return nil, errors.New("template sections cannot use encoding views")
+				}
+				if depth >= p.budget.limit.MaxDepth {
 					return nil, errors.New("template sections exceed depth limit")
 				}
 				var err error

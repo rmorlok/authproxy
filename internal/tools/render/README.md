@@ -81,9 +81,13 @@ renderer, so names containing quotes remain valid JSON strings.
 
 ## Calling the package
 
-Server code passes the maps above as `Input.Params` and `Input.Cfg`. The following
-helper accepts the URL template as a string and the body template as
-`common.RawJSON`, then returns their rendered values for HTTP request construction:
+Server code passes the maps above as `Input.Params` and `Input.Cfg`. Compile the
+URL string with `Compile` and the `common.RawJSON` body with `CompileValue` once
+per definition revision. Both compilers take the effective `Limits`, such as
+`Limits{MaxBytes: 64 * 1024, MaxDepth: 32, MaxSteps: 10000}`; these example values
+are illustrative, and callers choose their policy.
+
+Keep the resulting programs and pass them to this helper for each invocation:
 
 ```go
 package example
@@ -99,24 +103,19 @@ import (
 func renderContactUpdate(
     ctx context.Context,
     input render.Input,
-    urlSource string,
-    bodySource common.RawJSON,
+    urlTemplate *render.Template,
+    bodyTemplate *render.ValueTemplate,
+    limits render.Limits,
 ) (string, common.RawJSON, error) {
-    // Illustrative values; callers choose limits from their execution policy.
-    limits := render.Limits{MaxBytes: 64 * 1024, MaxDepth: 32, MaxSteps: 10000}
     data, err := render.NewContext(input, limits)
     if err != nil {
         return "", nil, err
     }
-    template, err := render.Compile(urlSource, limits)
+    url, err := urlTemplate.Render(ctx, data)
     if err != nil {
         return "", nil, err
     }
-    url, err := template.Render(ctx, data)
-    if err != nil {
-        return "", nil, err
-    }
-    body, err := render.RenderValue(ctx, bodySource, data, limits)
+    body, err := bodyTemplate.Render(ctx, data)
     if err != nil {
         return "", nil, err
     }
@@ -124,9 +123,9 @@ func renderContactUpdate(
 }
 ```
 
-The helper returns the URL and body; it performs no network I/O. A compiled
-`Template` can be reused across invocations. Each invocation captures its own
-context; independent renders can safely share that context.
+The helper returns the URL and body; it performs no network I/O or template
+parsing. Both compiled programs can be reused concurrently. Each invocation
+captures its own context; independent renders can safely share that context.
 
 ## Invocation snapshot
 
@@ -134,10 +133,13 @@ context; independent renders can safely share that context.
 `connection`, and `tool` scopes. The caller supplies validated input and current
 connection configuration/metadata. `connection` contains only `id` and
 `namespace`. `tool` contains `id`, `revision`, and optional `toolSetId`,
-`toolSetGeneration`, and `catalogRevision` provenance.
+`toolSetGeneration`, and `catalogRevision` provenance. Empty identity strings and
+an unset (zero) tool revision are omitted, so a template requiring them fails
+strict lookup rather than silently using an empty value.
 
-The snapshot accepts JSON maps, arrays, strings, booleans, nulls, `json.Number`,
-and native numeric primitives. String maps are also accepted for metadata.
+The snapshot accepts `map[string]any`, `[]any`, strings, booleans, nulls,
+`json.Number`, and native numeric primitives. String maps are also accepted for
+metadata. Other typed slices, such as `[]string`, must be converted to `[]any`.
 Numbers retain their precision; nonfinite numbers and invalid UTF-8 are rejected.
 Nested nil maps/slices remain JSON nulls, while absent root maps become empty
 objects. Other Go objects, including structs, pointers, functions, byte slices,
@@ -158,10 +160,17 @@ is unchanged.
 | `{{query.params.search}}` | Query-string component encoding; a space becomes `+`. |
 | `{{json.params.value}}` | A complete JSON literal, including quotes for strings. |
 
-The same views work for `cfg` and other scopes. Encoding views are resolved on
-demand, so both `json.params.object` and `json.params.object.child` work. Use the
-query view only in manually authored query strings; the future structured-query
-encoder will apply its own encoding.
+An encoding prefix is recognized only before an explicit invocation root:
+`params`, `cfg`, `labels`, `annotations`, `connection`, or `tool`. Encoded
+references always read that root, even inside a section. For example,
+`{{#params}}{{query.text}}{{/params}}` reads an ordinary `params.query.text`
+field; `{{query.params.text}}` encodes the root `params.text` field.
+
+Encoding views are resolved on demand, so both `json.params.object` and
+`json.params.object.child` work. Path encoding rejects empty values, `.` and `..`
+to avoid empty or traversing path segments. Use the query view only in manually
+authored query strings; the future structured-query encoder will apply its own
+encoding.
 
 For a body authored as a raw string template, the `json` view supplies JSON
 quoting and preserves scalar types. With the contact data above, this template:
@@ -180,6 +189,8 @@ The string renderer returns text; validation of the complete JSON body belongs
 to request construction.
 
 Ordinary, triple-brace, and ampersand interpolation have identical behavior.
+Triple braces apply only with the default `{{` / `}}` delimiters; use ampersand
+interpolation with custom delimiters.
 Raw arrays/objects are errors; use the JSON view or a typed directive. Numbers
 and booleans render as their JSON text, and explicit null renders as `null`.
 
@@ -200,6 +211,8 @@ Tags: {{#params.tags}}[{{.}}]{{/params.tags}}{{^params.phone}}; no phone supplie
 With the same invocation data, this produces
 `Tags: [lead][web]; no phone supplied`. `.` refers to each tag while the array
 section runs. The inverted phone section runs because `phone` is explicitly null.
+Encoding views are rejected in section controls: use `{{#params.subscribed}}`,
+not `{{#query.params.subscribed}}`, so conditions inspect the original JSON value.
 
 Every evaluated reference must exist, including section controls. References
 inside skipped sections are not evaluated. Partials and inheritance are rejected
@@ -208,7 +221,11 @@ again as a template.
 
 ## Structured JSON
 
-`RenderValue` recursively renders string values in a `common.RawJSON` document.
+`CompileValue` parses a `common.RawJSON` document and all embedded string
+templates once. `ValueTemplate.Render` evaluates that program against a captured
+context. `RenderValue` is a convenience function that compiles and renders a
+one-off value.
+
 Object keys remain literal. The `$value` form used in the contact body must have
 exactly one key, and its value must be a plain dotted reference. It preserves
 false, null, numbers, arrays, and objects without interpreting templates or
@@ -216,9 +233,12 @@ directives inside the inserted data. It does not apply an encoding view.
 
 `{"$literal": ...}` copies its entire payload without rendering. For example,
 `{"$literal":{"$value":"params.name"}}` produces the literal object
-`{"$value":"params.name"}`. An object containing `$value` or `$literal` alongside
-other keys is an ordinary object. Structured output uses deterministic key order
-and owns its bytes independently of the source and context.
+`{"$value":"params.name"}`. `$`-prefixed keys are reserved in template source;
+unknown directives and directive objects with additional keys fail compilation.
+For example, `{"$value":"params.tags","default":[]}` is an authoring error.
+Wrap ordinary data containing such keys in `$literal`. Values inserted through
+`$value` also remain uninterpreted data. Structured output uses deterministic
+key order and owns its bytes independently of the source and context.
 
 ## Limits and verification
 
@@ -227,9 +247,13 @@ Nested sections can also multiply the work without producing much output.
 Callers must supply positive `Limits` from their execution policy. `MaxBytes`
 bounds source and rendered output; during snapshot copying it bounds stored key
 and scalar data. `MaxDepth` bounds nesting, and `MaxSteps` bounds visited values,
-tags, and section iterations. A structured body shares its rendering work budget
-across all embedded templates and checks final JSON size after quoting. Both
-render entry points observe cancellation and return no partial result on error.
+tags, and section iterations. `CompileValue` shares one compilation work budget
+across all JSON nodes and embedded templates. Each compiled-body render gets a
+fresh work budget shared across its templates and checks final JSON size after
+quoting. The one-off `RenderValue` helper shares a work budget across compilation
+and rendering. Encoding views can only be interpolated, so encoded JSON always
+contributes to the output byte limit. Render methods observe cancellation and
+return no partial result on error.
 These are local rendering limits; the later invocation layer must also enforce
 its request, response, and total execution budgets.
 

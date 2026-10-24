@@ -68,6 +68,80 @@ func TestContextEncodings(t *testing.T) {
 	require.Equal(t, "9007199254740993.000", renderText(t, `{{json.params.number}}`, data))
 }
 
+func TestContextRejectsEmptyAndDotPathSegments(t *testing.T) {
+	for _, segment := range []string{"", ".", ".."} {
+		t.Run("segment="+segment, func(t *testing.T) {
+			// Empty and dot segments can change URL routing even after escaping.
+			data, err := NewContext(Input{Params: map[string]any{"id": segment}}, testLimits())
+			require.NoError(t, err)
+			template, err := Compile(`https://example.com/items/{{path.params.id}}/details`, testLimits())
+			require.NoError(t, err)
+
+			// Fail rendering before an HTTP caller can send the ambiguous path.
+			_, err = template.Render(context.Background(), data)
+			require.ErrorContains(t, err, "nonempty, non-dot path segment")
+		})
+	}
+
+	// Dots within an identifier and slashes within one segment remain supported.
+	data, err := NewContext(Input{Params: map[string]any{"id": "../v1.2"}}, testLimits())
+	require.NoError(t, err)
+	require.Equal(t, "/items/..%2Fv1.2", renderText(t, `/items/{{path.params.id}}`, data))
+}
+
+func TestContextEncodingNamesInSectionScopes(t *testing.T) {
+	// Ordinary JSON data may use the same names as the three encoding views.
+	data, err := NewContext(Input{Params: map[string]any{
+		"query": map[string]any{"text": "find & keep"},
+		"path":  map[string]any{"id": "a/b"},
+		"json":  map[string]any{"value": "plain"},
+	}}, testLimits())
+	require.NoError(t, err)
+
+	// Unqualified nested fields remain ordinary references inside the section.
+	source := `{{#params}}{{query.text}}|{{path.id}}|{{json.value}}{{/params}}`
+	require.Equal(t, "find & keep|a/b|plain", renderText(t, source, data))
+	sections := `{{#params}}{{#query.text}}{{.}}{{/query.text}}|{{#path.id}}{{.}}{{/path.id}}|{{#json.value}}{{.}}{{/json.value}}{{/params}}`
+	require.Equal(t, "find & keep|a/b|plain", renderText(t, sections, data))
+}
+
+func TestContextEncodedReferencesUseInvocationRoots(t *testing.T) {
+	// A section can shadow ordinary roots, but encoded references have explicit
+	// invocation-root names and must retain those roots' captured values.
+	data, err := NewContext(Input{
+		Params: map[string]any{
+			"id": "root/id",
+			"item": map[string]any{
+				"params": map[string]any{"id": "inner/id"},
+				"cfg":    map[string]any{"tenant": "inner tenant"},
+			},
+		},
+		Cfg: map[string]any{"tenant": "root tenant"},
+	}, testLimits())
+	require.NoError(t, err)
+	source := `{{#params.item}}{{params.id}}|{{path.params.id}}|{{query.cfg.tenant}}|{{json.cfg.tenant}}{{/params.item}}`
+	require.Equal(t, `inner/id|root%2Fid|root+tenant|"root tenant"`, renderText(t, source, data))
+
+	// Bare invocation-root references also select the corresponding JSON view.
+	require.JSONEq(t, `{"tenant":"root tenant"}`, renderText(t, `{{#params.item}}{{json.cfg}}{{/params.item}}`, data))
+}
+
+func TestContextMissingIdentity(t *testing.T) {
+	// Constructing a partial context is allowed, but absent identity stays absent.
+	data, err := NewContext(Input{}, testLimits())
+	require.NoError(t, err)
+	require.Equal(t, "{}|{}", renderText(t, `{{json.connection}}|{{json.tool}}`, data))
+	for _, name := range []string{"connection.id", "connection.namespace", "tool.id", "tool.revision"} {
+		t.Run(name, func(t *testing.T) {
+			// A required identity must fail lookup rather than silently render empty.
+			template, err := Compile("{{"+name+"}}", testLimits())
+			require.NoError(t, err)
+			_, err = template.Render(context.Background(), data)
+			require.ErrorContains(t, err, "missing template reference")
+		})
+	}
+}
+
 func TestContextStrictLookup(t *testing.T) {
 	data, err := NewContext(Input{Params: map[string]any{"object": map[string]any{}, "null": nil}}, testLimits())
 	require.NoError(t, err)
@@ -102,14 +176,20 @@ func TestContextRejectsNonJSONAndBounds(t *testing.T) {
 	cycle["cycle"] = cycle
 	for _, value := range []any{
 		func() {}, make(chan int), struct{ Secret string }{"private-configuration"},
-		new(string), []byte("private-configuration"), math.NaN(), math.Inf(1),
+		new(string), []byte("private-configuration"), []string{"private-configuration"}, math.NaN(), math.Inf(1),
 		json.Number(""), json.Number("01"), json.Number("private-configuration"), cycle, string([]byte{0xff}),
 	} {
 		// Reject arbitrary Go values without invoking marshalers or leaking values.
-		_, err := NewContext(Input{Cfg: map[string]any{"value": value}}, testLimits())
+		_, err := NewContext(Input{Cfg: map[string]any{"private-field": value}}, testLimits())
 		require.Error(t, err)
+		require.ErrorContains(t, err, "context field cfg:")
 		require.NotContains(t, err.Error(), "private-configuration")
+		require.NotContains(t, err.Error(), "private-field")
 	}
+	// Invalid input identifies the params scope using only the fixed root name.
+	_, err := NewContext(Input{Params: map[string]any{"private-field": func() {}}}, testLimits())
+	require.ErrorContains(t, err, "context field params:")
+	require.NotContains(t, err.Error(), "private-field")
 	for _, limits := range []Limits{
 		{}, {MaxBytes: 1, MaxDepth: 32, MaxSteps: 10000},
 		{MaxBytes: 1 << 20, MaxDepth: 1, MaxSteps: 10000},

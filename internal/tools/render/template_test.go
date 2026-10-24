@@ -128,12 +128,18 @@ func TestTemplateStandaloneLines(t *testing.T) {
 }
 
 // TestTemplateDelimiterChanges carries lexical delimiter changes through
-// sections and supports both unescaped forms under the active delimiters.
+// sections. Normal and ampersand variables use any active delimiters; triple
+// braces remain syntax only when both default delimiters are active.
 func TestTemplateDelimiterChanges(t *testing.T) {
-	data := templateContextForTest(t, map[string]any{"name": "<A>", "yes": true})
+	data := templateContextForTest(t, map[string]any{
+		"name": "<A>", "yes": true, "{name}": "braced", "{name": "open brace",
+	})
 	for _, test := range []struct{ source, expected string }{
-		{`{{=<% %>=}}<%params.name%>|<%#params.yes%><%{params.name}%><%&params.name%><%/params.yes%><%={{ }}=%>{{params.name}}`, `<A>|<A><A><A>`},
+		{`{{=<% %>=}}<%params.name%>|<%#params.yes%><%params.name%><%&params.name%><%/params.yes%><%={{ }}=%>{{{params.name}}}`, `<A>|<A><A><A>`},
 		{"{{=<% %>=}}\n<%#params.yes%>\n<%={{ }}=%>\n{{params.name}}\n{{/params.yes}}", "<A>\n"},
+		{`{{#params}}{{=<% %>=}}<%{name}%><%/params%>`, "braced"},
+		{`{{#params}}{{={{ %>=}}{{{name}%>{{/params%>`, "braced"},
+		{`{{#params}}{{=<% %>=}}<%=<% }}=%><%{name}}<%/params}}`, "open brace"},
 	} {
 		// Delimiter declarations do not become output or runtime lookups.
 		compiled, err := Compile(test.source, templateLimitsForTest())
@@ -142,6 +148,45 @@ func TestTemplateDelimiterChanges(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, test.expected, result)
 	}
+}
+
+// TestTemplateSectionsRejectEncodingViews catches encoded conditions before
+// invocation data is available, including references inside skipped sections.
+func TestTemplateSectionsRejectEncodingViews(t *testing.T) {
+	for _, encoding := range []string{"path", "query", "json"} {
+		for _, kind := range []string{"#", "^"} {
+			for _, reference := range []string{
+				"params.flag", "params.nothing", "params.items",
+				"params", "cfg", "labels", "annotations", "connection", "tool",
+			} {
+				name := encoding + "." + reference
+				source := "{{" + kind + name + "}}body{{/" + name + "}}"
+				t.Run(source, func(t *testing.T) {
+					// Encoding must never turn false, null, or a collection into a condition.
+					compiled, err := Compile(source, templateLimitsForTest())
+					require.ErrorContains(t, err, "sections cannot use encoding views")
+					require.Nil(t, compiled)
+				})
+			}
+		}
+	}
+
+	// An outer false section does not excuse invalid syntax in its children.
+	compiled, err := Compile(`{{#params.no}}{{#json.cfg}}hidden{{/json.cfg}}{{/params.no}}`, templateLimitsForTest())
+	require.ErrorContains(t, err, "sections cannot use encoding views")
+	require.Nil(t, compiled)
+
+	// Ordinary section-relative data may still have fields named path/query/json.
+	data := templateContextForTest(t, map[string]any{
+		"path":  map[string]any{"items": []any{"one", "two"}},
+		"query": map[string]any{"text": true},
+		"json":  map[string]any{"flag": false},
+	})
+	compiled, err = Compile(`{{#params}}{{#path.items}}[{{.}}]{{/path.items}}{{#query.text}}yes{{/query.text}}{{^json.flag}}no{{/json.flag}}{{/params}}`, templateLimitsForTest())
+	require.NoError(t, err)
+	result, err := compiled.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.Equal(t, "[one][two]yesno", result)
 }
 
 // TestTemplateStrictReferences rejects missing evaluated references and raw
@@ -234,6 +279,33 @@ func TestTemplateLimits(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestTemplateJSONViewBudget ensures each subtree encoding contributes to the
+// shared output limit, including encodings repeated through array sections.
+func TestTemplateJSONViewBudget(t *testing.T) {
+	data := templateContextForTest(t, map[string]any{
+		"items": []any{1, 2, 3}, "object": map[string]any{"text": strings.Repeat("x", 40)},
+	})
+	limits := templateLimitsForTest()
+	limits.MaxBytes = 100
+
+	// One encoded object fits; repeated interpolation cannot reset the byte budget.
+	compiled, err := Compile(`{{json.params.object}}`, limits)
+	require.NoError(t, err)
+	result, err := compiled.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.Contains(t, result, strings.Repeat("x", 40))
+	compiled, err = Compile(`{{#params.items}}{{json.params.object}}{{/params.items}}`, limits)
+	require.NoError(t, err)
+	result, err = compiled.Render(context.Background(), data)
+	require.ErrorContains(t, err, "byte limit")
+	require.Empty(t, result)
+
+	// Encodings cannot run as output-free section controls, even in a loop.
+	compiled, err = Compile(`{{#params.items}}{{#json.cfg}}{{/json.cfg}}{{/params.items}}`, limits)
+	require.ErrorContains(t, err, "sections cannot use encoding views")
+	require.Nil(t, compiled)
+}
+
 // TestTemplateCancellationAndSharedBudget rejects canceled empty renders and
 // shares emitted-byte accounting across embedded structured-value strings.
 func TestTemplateCancellationAndSharedBudget(t *testing.T) {
@@ -266,6 +338,29 @@ func TestTemplateCancellationAndSharedBudget(t *testing.T) {
 	result, err = compiled.renderWithBudget(data, shared)
 	require.Error(t, err)
 	require.Empty(t, result)
+}
+
+// TestTemplateCompilationSharedBudget accounts for literal nodes and tags
+// across embedded templates, rather than restarting the allowance per string.
+func TestTemplateCompilationSharedBudget(t *testing.T) {
+	limits := templateLimitsForTest()
+	limits.MaxSteps = 2
+	shared := newBudget(context.Background(), limits)
+
+	// One literal and one variable consume the full shared syntax allowance.
+	compiled, err := compileTemplate("literal {{params.text}}", shared)
+	require.NoError(t, err)
+	require.NotNil(t, compiled)
+	compiled, err = compileTemplate("another literal", shared)
+	require.ErrorContains(t, err, "step limit")
+	require.Nil(t, compiled)
+
+	// Compilation observes cancellation even when there are no syntax nodes.
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	compiled, err = compileTemplate("", newBudget(canceled, templateLimitsForTest()))
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, compiled)
 }
 
 // TestTemplateConcurrentReuse keeps the compiled program and captured context

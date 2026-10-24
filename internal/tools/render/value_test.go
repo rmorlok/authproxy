@@ -3,7 +3,9 @@ package render
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -52,7 +54,7 @@ func TestRenderValueLiteralAndInertData(t *testing.T) {
 		"injected":{"$value":"params.data"},
 		"literal":{"$literal":{"$value":"cfg.secret","text":"{{>private-file}}"}},
 		"literalScalar":{"$literal":"{{cfg.secret}}"},
-		"ordinary":{"$value":"not.a.reference","another":true},
+		"ordinary":{"$literal":{"$value":"not.a.reference","another":true}},
 		"{{cfg.secret}}":"literal key"
 	}`)
 	result, err := RenderValue(context.Background(), source, data, testLimits())
@@ -114,4 +116,181 @@ func TestRenderValueLimitsAndCancellation(t *testing.T) {
 	cancel()
 	_, err = RenderValue(ctx, common.RawJSON(`null`), data, testLimits())
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// TestCompileValueRejectsMalformedDirectives catches authoring mistakes before
+// an invocation supplies values, while $literal explicitly preserves such data.
+func TestCompileValueRejectsMalformedDirectives(t *testing.T) {
+	for _, source := range []string{
+		`{"$value":"params.tags","default":[]}`, `{"$literal":{},"extra":true}`,
+		`{"nested":{"$typo":"params.tags"}}`, `{"$unknown":1,"ordinary":2}`,
+		`{"$value":42}`, `{"$value":""}`, `{"$value":"params..name"}`,
+		`{"$value":"json.params.name"}`, `{"nested":["{{>file}}"]}`,
+	} {
+		t.Run(source, func(t *testing.T) {
+			// Reserved keys and invalid templates are compile errors without data.
+			compiled, err := CompileValue(common.RawJSON(source), testLimits())
+			require.Error(t, err)
+			require.Nil(t, compiled)
+		})
+	}
+
+	// Explicit literal data can contain reserved keys and uninterpreted templates.
+	source := common.RawJSON(`{"$literal":{"$value":"params.tags","$unknown":"{{>file}}","default":[]}}`)
+	compiled, err := CompileValue(source, testLimits())
+	require.NoError(t, err)
+	data, err := NewContext(Input{}, testLimits())
+	require.NoError(t, err)
+	result, err := compiled.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"$value":"params.tags","$unknown":"{{>file}}","default":[]}`, string(result))
+}
+
+// TestCompileValueSharesSyntaxBudget includes all embedded templates in one
+// allowance, including comments that produce no rendering work or output.
+func TestCompileValueSharesSyntaxBudget(t *testing.T) {
+	limits := testLimits()
+	limits.MaxSteps = 6
+	source := common.RawJSON(`["{{!one}}{{!two}}","{{!three}}{{!four}}"]`)
+
+	// Each string fits alone, but both strings plus their JSON nodes exceed six.
+	_, err := Compile(`{{!one}}{{!two}}`, limits)
+	require.NoError(t, err)
+	compiled, err := CompileValue(source, limits)
+	require.ErrorContains(t, err, "step limit")
+	require.Nil(t, compiled)
+
+	// Once compiled under a sufficient policy, comment-heavy source renders cheaply.
+	limits.MaxSteps = 7
+	compiled, err = CompileValue(source, limits)
+	require.NoError(t, err)
+	data, err := NewContext(Input{}, testLimits())
+	require.NoError(t, err)
+	result, err := compiled.Render(context.Background(), data)
+	require.NoError(t, err)
+	require.Equal(t, `["",""]`, string(result))
+
+	// The one-off helper counts both phases instead of resetting after compilation.
+	result, err = RenderValue(context.Background(), source, data, limits)
+	require.ErrorContains(t, err, "step limit")
+	require.Nil(t, result)
+}
+
+// TestValueTemplateConcurrentReuse proves a compiled body owns its source and
+// keeps invocation data and output buffers independent between renders.
+func TestValueTemplateConcurrentReuse(t *testing.T) {
+	source := common.RawJSON(`{"name":"Hello {{params.name}}","items":{"$value":"params.items"}}`)
+	compiled, err := CompileValue(source, testLimits())
+	require.NoError(t, err)
+
+	// Destroy the caller's source after compiling; the reusable program owns its data.
+	for i := range source {
+		source[i] = '!'
+	}
+	inputs := make([]*Context, 20)
+	for i := range inputs {
+		inputs[i], err = NewContext(Input{Params: map[string]any{
+			"name": fmt.Sprintf("contact-%d", i), "items": []any{i, false, nil},
+		}}, testLimits())
+		require.NoError(t, err)
+	}
+
+	// Concurrent calls share only the compiled program and their own immutable input.
+	results := make([]common.RawJSON, len(inputs))
+	errors := make([]error, len(inputs))
+	var workers sync.WaitGroup
+	for i := range inputs {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			results[i], errors[i] = compiled.Render(context.Background(), inputs[i])
+		}()
+	}
+	workers.Wait()
+	for i, result := range results {
+		require.NoError(t, errors[i])
+		require.JSONEq(t, fmt.Sprintf(`{"name":"Hello contact-%d","items":[%d,false,null]}`, i, i), string(result))
+	}
+
+	// A returned byte slice can be changed without affecting subsequent calls.
+	results[0][0] = '!'
+	again, err := compiled.Render(context.Background(), inputs[0])
+	require.NoError(t, err)
+	require.True(t, json.Valid(again))
+}
+
+// TestValueTemplateRenderFailures applies strict lookup and runtime limits on
+// every reuse; successful compilation does not grant unlimited execution.
+func TestValueTemplateRenderFailures(t *testing.T) {
+	limits := testLimits()
+	limits.MaxBytes = 100
+	data, err := NewContext(Input{Params: map[string]any{"large": strings.Repeat("x", 60)}}, testLimits())
+	require.NoError(t, err)
+	for _, source := range []string{
+		`[{"$value":"params.large"},{"$value":"params.large"}]`,
+		`{"$value":"params.missing"}`,
+		`["{{params.large}}","{{params.large}}"]`,
+	} {
+		// Repeated references share the output cap; missing values return no body.
+		compiled, err := CompileValue(common.RawJSON(source), limits)
+		require.NoError(t, err)
+		result, err := compiled.Render(context.Background(), data)
+		require.Error(t, err)
+		require.Nil(t, result)
+	}
+
+	// Cancellation and absent API inputs fail even for an otherwise literal value.
+	compiled, err := CompileValue(common.RawJSON(`null`), limits)
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = compiled.Render(ctx, data)
+	require.ErrorIs(t, err, context.Canceled)
+	_, err = compiled.Render(nil, data)
+	require.Error(t, err)
+	_, err = compiled.Render(context.Background(), nil)
+	require.Error(t, err)
+	var absent *ValueTemplate
+	_, err = absent.Render(context.Background(), data)
+	require.Error(t, err)
+}
+
+// FuzzValueTemplateRender exercises JSON structure, directives, and embedded
+// templates together. Successful reusable and one-off renders must agree.
+func FuzzValueTemplateRender(f *testing.F) {
+	limits := Limits{MaxBytes: 4096, MaxDepth: 8, MaxSteps: 128}
+	data, err := NewContext(Input{Params: map[string]any{
+		"name": "Ada", "flag": false, "items": []any{1, nil, "{{cfg.secret}}"},
+	}}, limits)
+	require.NoError(f, err)
+	for _, source := range []string{
+		`null`, `{"name":"{{params.name}}"}`, `{"$value":"params.items"}`,
+		`{"$literal":{"$value":"params.missing"}}`, `{"$value":"params.items","default":[]}`,
+		`["{{#json.params.flag}}bad{{/json.params.flag}}"]`, `{"bad":`,
+	} {
+		f.Add(source)
+	}
+	f.Fuzz(func(t *testing.T, source string) {
+		// Compile arbitrary JSON and Mustache under a fixed, small resource policy.
+		compiled, err := CompileValue(common.RawJSON(source), limits)
+		if err != nil {
+			require.Nil(t, compiled)
+			return
+		}
+		result, err := compiled.Render(context.Background(), data)
+		if err != nil {
+			require.Nil(t, result)
+			return
+		}
+		require.True(t, json.Valid(result))
+		require.LessOrEqual(t, len(result), limits.MaxBytes)
+
+		// The one-off path has a combined work budget; when it fits, bytes agree.
+		once, err := RenderValue(context.Background(), common.RawJSON(source), data, limits)
+		if err != nil {
+			require.Nil(t, once)
+			return
+		}
+		require.Equal(t, result, once)
+	})
 }

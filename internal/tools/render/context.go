@@ -14,17 +14,40 @@ import (
 // Params and capture configuration/metadata before constructing this snapshot.
 // There is deliberately no connection object or credential field to reflect on.
 type Input struct {
-	Params              map[string]any
-	Cfg                 map[string]any
-	Labels              map[string]string
-	Annotations         map[string]string
-	ConnectionID        string
+	// Params is the caller-validated tool input, exposed as params. Nested values
+	// must be JSON primitives, map[string]any, map[string]string, or []any; typed
+	// slices such as []string and arbitrary Go objects are rejected. NewContext
+	// copies these caller-owned values, including nested maps and slices.
+	Params map[string]any
+	// Cfg is the captured connection configuration, exposed as cfg. It follows
+	// the same type and copy rules as Params and must not contain credentials.
+	Cfg map[string]any
+	// Labels is the captured effective label set, copied into labels.
+	Labels map[string]string
+	// Annotations is the captured connection annotation set, copied into annotations.
+	Annotations map[string]string
+	// ConnectionID is the connection identity exposed as connection.id. An empty
+	// value is omitted so templates that require it fail strict lookup.
+	ConnectionID string
+	// ConnectionNamespace is the owning namespace exposed as connection.namespace;
+	// an empty value is omitted from the snapshot.
 	ConnectionNamespace string
-	ToolID              string
-	Revision            uint64
-	ToolSetID           string
-	ToolSetGeneration   *uint64
-	CatalogRevision     *uint64
+	// ToolID identifies the invoked tool as tool.id; an empty value is omitted.
+	ToolID string
+	// Revision identifies the captured executable tool revision, exposed as
+	// tool.revision. Zero is omitted because revisions start at one. This is
+	// distinct from the source catalog's revision below.
+	Revision uint64
+	// ToolSetID identifies the source toolset as tool.toolSetId. Empty means the
+	// tool has no toolset provenance, so the field is omitted.
+	ToolSetID string
+	// ToolSetGeneration is the published source generation exposed as
+	// tool.toolSetGeneration. Nil omits it; a non-nil value is copied by value.
+	ToolSetGeneration *uint64
+	// CatalogRevision is the connection-specific source catalog revision exposed
+	// as tool.catalogRevision. Nil means no catalog provenance and omits it; a
+	// non-nil value is copied by value.
+	CatalogRevision *uint64
 }
 
 // Context owns detached JSON values. Its contents are private and immutable
@@ -41,7 +64,21 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 	if err := limits.validate(); err != nil {
 		return nil, err
 	}
-	tool := map[string]any{"id": input.ToolID, "revision": input.Revision}
+	connection := map[string]any{}
+	if input.ConnectionID != "" {
+		connection["id"] = input.ConnectionID
+	}
+	if input.ConnectionNamespace != "" {
+		connection["namespace"] = input.ConnectionNamespace
+	}
+
+	tool := map[string]any{}
+	if input.ToolID != "" {
+		tool["id"] = input.ToolID
+	}
+	if input.Revision != 0 {
+		tool["revision"] = input.Revision
+	}
 
 	if input.ToolSetID != "" {
 		tool["toolSetId"] = input.ToolSetID
@@ -60,19 +97,27 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 		"cfg":         input.Cfg,
 		"labels":      input.Labels,
 		"annotations": input.Annotations,
-		"connection": map[string]any{
-			"id":        input.ConnectionID,
-			"namespace": input.ConnectionNamespace,
-		},
-		"tool": tool,
+		"connection":  connection,
+		"tool":        tool,
 	}
 
-	copy, err := cloneValue(root, newBudget(context.Background(), limits), 0)
-	if err != nil {
+	b := newBudget(context.Background(), limits)
+	if err := b.step(); err != nil {
 		return nil, err
 	}
-
-	snapshot := copy.(map[string]any)
+	snapshot := make(map[string]any, len(root))
+	for _, name := range []string{"params", "cfg", "labels", "annotations", "connection", "tool"} {
+		if err := b.addBytes(len(name)); err != nil {
+			return nil, err
+		}
+		copy, err := cloneValue(root[name], b, 1)
+		if err != nil {
+			// Only these fixed root names are included: arbitrary nested keys and
+			// values may contain sensitive connection configuration.
+			return nil, fmt.Errorf("context field %s: %w", name, err)
+		}
+		snapshot[name] = copy
+	}
 
 	// Missing root maps are convenient empty scopes; nested nil collections
 	// retain their JSON null meaning instead of becoming empty objects/arrays.
@@ -169,14 +214,31 @@ func cloneValue(value any, b *budget, depth int) (any, error) {
 	}
 }
 
-// lookup resolves a strict dotted reference, with innermost section scopes
-// first and the invocation root last. Encoding prefixes are virtual views, so
-// both json.params.object and json.params.object.child work without eager copies.
+// encodingReference recognizes virtual encoding views only when they explicitly
+// name an invocation root. Section-relative fields such as query.text remain
+// ordinary data references, while json.params and json.params.child are encoded.
+func encodingReference(name string) (encoding, reference string) {
+	prefix, rest, found := strings.Cut(name, ".")
+	if !found || (prefix != "path" && prefix != "query" && prefix != "json") {
+		return "", name
+	}
+
+	root, _, _ := strings.Cut(rest, ".")
+	switch root {
+	case "params", "cfg", "labels", "annotations", "connection", "tool":
+		return prefix, rest
+	default:
+		return "", name
+	}
+}
+
+// lookup resolves ordinary references from the innermost section scope first.
+// Encoding views are anchored at the invocation root, so a section cannot
+// replace cfg or params inside an explicitly encoded reference.
 func (c *Context) lookup(name string, scopes []any) (any, error) {
-	encoding := ""
-	if prefix, rest, found := strings.Cut(name, "."); found &&
-		(prefix == "path" || prefix == "query" || prefix == "json") {
-		encoding, name = prefix, rest
+	encoding, name := encodingReference(name)
+	if encoding != "" {
+		scopes = nil
 	}
 
 	value, err := c.lookupRaw(name, scopes)
@@ -198,6 +260,9 @@ func (c *Context) lookup(name string, scopes []any) (any, error) {
 			return nil, err
 		}
 		if encoding == "path" {
+			if text == "" || text == "." || text == ".." {
+				return nil, errors.New("path encoding requires a nonempty, non-dot path segment")
+			}
 			return url.PathEscape(text), nil
 		}
 		return url.QueryEscape(text), nil
