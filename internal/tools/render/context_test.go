@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -293,4 +294,35 @@ func TestContextSnapshotJSONLimits(t *testing.T) {
 	require.Error(t, err)
 	_, err = (*Context)(nil).SnapshotJSON(context.Background(), testLimits())
 	require.Error(t, err)
+}
+
+// TestContextSnapshotJSONSmallerLimits applies a tighter consumer policy to a
+// previously captured snapshot, including large strings and wide objects.
+func TestContextSnapshotJSONSmallerLimits(t *testing.T) {
+	wide := make(map[string]any, 1024)
+	for i := range 1024 {
+		wide[strconv.Itoa(i)] = nil
+	}
+	for _, test := range []struct {
+		name   string
+		params map[string]any
+		limits Limits
+	}{
+		{"large string", map[string]any{"text": strings.Repeat("x", 4096)}, Limits{MaxBytes: 256, MaxDepth: 32, MaxSteps: 10000}},
+		{"wide map", wide, Limits{MaxBytes: 1 << 20, MaxDepth: 32, MaxSteps: 32}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Initial capture succeeds under the broader host policy.
+			data, err := NewContext(Input{Params: test.params}, testLimits())
+			require.NoError(t, err)
+
+			// A tighter caller gets no partial JSON and does not alter the snapshot.
+			result, err := data.SnapshotJSON(context.Background(), test.limits)
+			require.Error(t, err)
+			require.Nil(t, result)
+			result, err = data.SnapshotJSON(context.Background(), testLimits())
+			require.NoError(t, err)
+			require.True(t, json.Valid(result))
+		})
+	}
 }
