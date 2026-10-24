@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/database"
@@ -69,6 +68,10 @@ func validateRequestEventMetricsQuery(q RequestEventMetricsQuery) error {
 	if q.Step <= 0 {
 		return errors.New("step must be greater than zero")
 	}
+	// Buckets are computed in SQL on millisecond timestamps, so the step must be expressible in whole milliseconds.
+	if q.Step%time.Millisecond != 0 {
+		return errors.New("step must be a whole number of milliseconds")
+	}
 	for _, groupBy := range q.GroupBy {
 		if !isValidRequestEventGroupBy(groupBy) {
 			return fmt.Errorf("unsupported request event group_by dimension %q", groupBy)
@@ -113,37 +116,58 @@ func isValidRequestEventGroupBy(groupBy RequestEventGroupBy) bool {
 	}
 }
 
+// requestEventMetricAggregate is one row of pre-aggregated request-event data returned by a provider for a single
+// metrics query. Providers aggregate in the database (grouped by time bucket and the query's group-by dimensions) so
+// that only a handful of rows cross the wire instead of every raw request event in the range.
+//
+// For count/error/average metrics a row summarizes every event in its bucket+group. For percentile metrics, which
+// cannot be computed portably in SQL, providers return one row per event with Count=1 and DurationSumMS set to that
+// event's duration, and the percentile is computed in Go.
+type requestEventMetricAggregate struct {
+	// BucketStartMS is the start of the time bucket in Unix milliseconds, aligned to the query's Start and Step.
+	BucketStartMS int64
+	// Labels holds the values of the query's group-by dimensions for this row, keyed by dimension name.
+	Labels map[string]string
+	// Count is the number of request events in this row.
+	Count int64
+	// ErrorCount is the number of those events that are errors (see requestEventErrorSQL).
+	ErrorCount int64
+	// DurationSumMS is the summed duration of those events in milliseconds.
+	DurationSumMS int64
+}
+
+// requestEventMetricAccumulator folds aggregate rows for one bucket of one series into a metric value.
 type requestEventMetricAccumulator struct {
-	count     int
-	sum       float64
+	count         int64
+	errorCount    int64
+	durationSumMS int64
+	// durations collects individual event durations (ms); only populated for percentile metrics.
 	durations []float64
 }
 
-func (a *requestEventMetricAccumulator) add(metric RequestEventMetric, record *LogRecord) {
-	switch metric {
-	case RequestEventMetricCount:
-		a.count++
-	case RequestEventMetricErrorsCount:
-		if isRequestEventError(record) {
-			a.count++
-		}
-	case RequestEventMetricDurationAvgMS:
-		a.count++
-		a.sum += float64(record.MillisecondDuration.Duration().Milliseconds())
-	case RequestEventMetricDurationP95MS:
-		a.durations = append(a.durations, float64(record.MillisecondDuration.Duration().Milliseconds()))
+// add merges an aggregate row into the accumulator. Rows can be merged because count, error count, and duration sum
+// are all additive; for percentile metrics each row is a single event whose duration is retained.
+func (a *requestEventMetricAccumulator) add(metric RequestEventMetric, row requestEventMetricAggregate) {
+	a.count += row.Count
+	a.errorCount += row.ErrorCount
+	a.durationSumMS += row.DurationSumMS
+	if metric == RequestEventMetricDurationP95MS {
+		a.durations = append(a.durations, float64(row.DurationSumMS))
 	}
 }
 
+// value returns the accumulated value of the requested metric for the bucket.
 func (a *requestEventMetricAccumulator) value(metric RequestEventMetric) float64 {
 	switch metric {
-	case RequestEventMetricCount, RequestEventMetricErrorsCount:
+	case RequestEventMetricCount:
 		return float64(a.count)
+	case RequestEventMetricErrorsCount:
+		return float64(a.errorCount)
 	case RequestEventMetricDurationAvgMS:
 		if a.count == 0 {
 			return 0
 		}
-		return a.sum / float64(a.count)
+		return float64(a.durationSumMS) / float64(a.count)
 	case RequestEventMetricDurationP95MS:
 		return percentileNearestRank(a.durations, 0.95)
 	default:
@@ -151,37 +175,42 @@ func (a *requestEventMetricAccumulator) value(metric RequestEventMetric) float64
 	}
 }
 
-func isRequestEventError(record *LogRecord) bool {
-	return record.ResponseStatusCode >= 400 ||
-		record.ResponseError != "" ||
-		record.InternalTimeout ||
-		record.RequestCancelled
-}
+// requestEventErrorSQL is the SQL predicate for an errored request event. It mirrors the error definition used by the
+// request-event list/detail views: an HTTP error status, a transport error, an internal timeout, or a cancellation.
+const requestEventErrorSQL = "response_status_code >= 400 OR response_error <> '' OR internal_timeout OR request_cancelled"
 
+// executeRequestEventMetricsQueries validates each query, fetches its aggregate rows through the provider-specific
+// fetch function, and converts them into zero-filled time series. Queries are executed sequentially and the first
+// validation or fetch error aborts the whole batch.
 func executeRequestEventMetricsQueries(
 	ctx context.Context,
 	queries []RequestEventMetricsQuery,
-	fetch func(context.Context, RequestEventMetricsQuery) ([]*LogRecord, error),
+	fetch func(context.Context, RequestEventMetricsQuery) ([]requestEventMetricAggregate, error),
 ) ([]RequestEventMetricSeries, error) {
 	out := make([]RequestEventMetricSeries, 0)
 	for _, query := range queries {
 		if err := validateRequestEventMetricsQuery(query); err != nil {
 			return nil, err
 		}
-		records, err := fetch(ctx, query)
+		rows, err := fetch(ctx, query)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, buildRequestEventMetricSeries(query, records)...)
+		out = append(out, buildRequestEventMetricSeries(query, rows)...)
 	}
 	return out, nil
 }
 
-func buildRequestEventMetricSeries(query RequestEventMetricsQuery, records []*LogRecord) []RequestEventMetricSeries {
+// buildRequestEventMetricSeries converts aggregate rows into one series per distinct label set, with a point for every
+// bucket in [Start, End) (empty buckets are zero). Rows whose bucket falls outside that range are dropped; this covers
+// events stamped exactly at End, which the inclusive timestamp filter still returns.
+func buildRequestEventMetricSeries(query RequestEventMetricsQuery, rows []requestEventMetricAggregate) []RequestEventMetricSeries {
 	bucketCount := int(math.Ceil(float64(query.End.Sub(query.Start)) / float64(query.Step)))
 	if bucketCount < 1 {
 		bucketCount = 1
 	}
+	startMS := query.Start.UnixMilli()
+	stepMS := query.Step.Milliseconds()
 
 	accumulators := map[string][]requestEventMetricAccumulator{}
 	labelsByKey := map[string]map[string]string{}
@@ -192,21 +221,20 @@ func buildRequestEventMetricSeries(query RequestEventMetricsQuery, records []*Lo
 		labelsByKey[key] = map[string]string{}
 	}
 
-	for _, record := range records {
-		if record.Timestamp.Before(query.Start) || !record.Timestamp.Before(query.End) {
+	for _, row := range rows {
+		if row.BucketStartMS < startMS || row.BucketStartMS >= query.End.UnixMilli() {
 			continue
 		}
-		bucketIdx := int(record.Timestamp.Sub(query.Start) / query.Step)
+		bucketIdx := int((row.BucketStartMS - startMS) / stepMS)
 		if bucketIdx < 0 || bucketIdx >= bucketCount {
 			continue
 		}
-		labels := requestEventMetricLabels(record, query.GroupBy)
-		key := requestEventMetricGroupKey(labels)
+		key := requestEventMetricGroupKey(row.Labels)
 		if _, ok := accumulators[key]; !ok {
 			accumulators[key] = make([]requestEventMetricAccumulator, bucketCount)
-			labelsByKey[key] = labels
+			labelsByKey[key] = row.Labels
 		}
-		accumulators[key][bucketIdx].add(query.Metric, record)
+		accumulators[key][bucketIdx].add(query.Metric, row)
 	}
 
 	keys := make([]string, 0, len(accumulators))
@@ -231,29 +259,6 @@ func buildRequestEventMetricSeries(query RequestEventMetricsQuery, records []*Lo
 		})
 	}
 	return series
-}
-
-func requestEventMetricLabels(record *LogRecord, groupBy []RequestEventGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		switch group {
-		case RequestEventGroupByType:
-			labels[string(group)] = string(record.Type)
-		case RequestEventGroupByMethod:
-			labels[string(group)] = record.Method
-		case RequestEventGroupByResponseStatusCode:
-			labels[string(group)] = strconv.Itoa(record.ResponseStatusCode)
-		case RequestEventGroupByResponseSource:
-			source := record.ResponseSource
-			if source == "" {
-				source = ResponseSourceUpstream
-			}
-			labels[string(group)] = string(source)
-		case RequestEventGroupByConnectorID:
-			labels[string(group)] = record.ConnectorId.String()
-		}
-	}
-	return labels
 }
 
 func requestEventMetricGroupKey(labels map[string]string) string {
