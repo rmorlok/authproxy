@@ -5,7 +5,7 @@
 #
 # No frontend stage — the seed binary is a one-shot CLI.
 
-FROM golang:1.24-bookworm AS builder
+FROM golang:1.25-bookworm AS builder
 
 WORKDIR /build
 

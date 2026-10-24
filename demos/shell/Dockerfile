@@ -33,7 +33,7 @@ RUN yarn install --immutable
 RUN yarn workspace @authproxy/demo-shell build
 
 # Stage 2: build the Go backend with the dist tree embedded.
-FROM golang:1.24 AS backend-builder
+FROM golang:1.25 AS backend-builder
 
 WORKDIR /build
 
