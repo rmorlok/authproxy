@@ -17,35 +17,48 @@ import (
 // inserted by exact single-key $value directives. $literal copies its entire
 // payload without interpreting templates or directives. Object keys are literal.
 // Returned JSON owns its bytes and never aliases the context or input source.
-func RenderValue(ctx context.Context, source common.RawJSON, data *Context, limits Limits) (common.RawJSON, error) {
+func RenderValue(
+	ctx context.Context,
+	source common.RawJSON,
+	data *Context,
+	limits Limits,
+) (common.RawJSON, error) {
 	if err := limits.validate(); err != nil {
 		return nil, err
 	}
+
 	if data == nil || ctx == nil {
 		return nil, errors.New("render requires a context and invocation snapshot")
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if len(source) > limits.MaxBytes {
 		return nil, errors.New("render source byte limit exceeded")
 	}
+
 	if !utf8.Valid(source) {
 		return nil, errors.New("render source must be valid UTF-8")
 	}
+
 	decoder := json.NewDecoder(bytes.NewReader(source))
 	decoder.UseNumber()
+
 	var value any
 	if err := decoder.Decode(&value); err != nil {
 		return nil, errors.New("render source must be valid JSON")
 	}
+
 	if err := decoder.Decode(new(any)); err != io.EOF {
 		return nil, errors.New("render source must contain exactly one JSON value")
 	}
+
 	w := valueWriter{data: data, budget: newBudget(ctx, limits)}
 	if err := w.emit(value, true, 0); err != nil {
 		return nil, err
 	}
+
 	return common.RawJSON(w.output.Bytes()), nil
 }
 
@@ -72,9 +85,11 @@ func (w *valueWriter) emit(value any, render bool, depth int) error {
 	if err := w.budget.step(); err != nil {
 		return err
 	}
+
 	if depth > w.budget.limit.MaxDepth {
 		return errors.New("render depth limit exceeded")
 	}
+
 	switch v := value.(type) {
 	case map[string]any:
 		if render && len(v) == 1 {
@@ -83,24 +98,30 @@ func (w *valueWriter) emit(value any, render bool, depth int) error {
 				if !ok {
 					return errors.New("$value requires a dotted reference string")
 				}
+
 				resolved, err := w.data.lookupRaw(strings.TrimSpace(name), nil)
 				if err != nil {
 					return err
 				}
+
 				return w.emit(resolved, false, depth)
 			}
+
 			if literal, found := v["$literal"]; found {
 				return w.emit(literal, false, depth)
 			}
 		}
+
 		if err := w.write("{"); err != nil {
 			return err
 		}
+
 		// Stable ordering makes generated request bytes reproducible.
 		keys := make([]string, 0, len(v))
 		for key := range v {
 			keys = append(keys, key)
 		}
+
 		sort.Strings(keys)
 		for i, key := range keys {
 			if i > 0 {
@@ -108,16 +129,20 @@ func (w *valueWriter) emit(value any, render bool, depth int) error {
 					return err
 				}
 			}
+
 			if err := w.writeQuoted(key); err != nil {
 				return err
 			}
+
 			if err := w.write(":"); err != nil {
 				return err
 			}
+
 			if err := w.emit(v[key], render, depth+1); err != nil {
 				return err
 			}
 		}
+
 		return w.write("}")
 	case []any:
 		if err := w.write("["); err != nil {
@@ -164,10 +189,13 @@ func (w *valueWriter) emit(value any, render bool, depth int) error {
 // The input is bounded by source/context/template limits before encoding.
 func (w *valueWriter) writeQuoted(text string) error {
 	var encoded bytes.Buffer
+
 	encoder := json.NewEncoder(&encoded)
 	encoder.SetEscapeHTML(false)
+
 	if err := encoder.Encode(text); err != nil {
 		return errors.New("cannot encode rendered JSON string")
 	}
+	
 	return w.write(strings.TrimSuffix(encoded.String(), "\n"))
 }
