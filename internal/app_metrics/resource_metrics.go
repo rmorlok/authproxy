@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"strconv"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/database"
@@ -71,6 +70,10 @@ func validateResourceMetricsQuery(q ResourceMetricsQuery) error {
 	}
 	if q.Step <= 0 {
 		return errors.New("step must be greater than zero")
+	}
+	// Buckets are computed in SQL on millisecond timestamps, so the step must be expressible in whole milliseconds.
+	if q.Step%time.Millisecond != 0 {
+		return errors.New("step must be a whole number of milliseconds")
 	}
 	for _, groupBy := range q.GroupBy {
 		if !isValidResourceGroupBy(q.Metric, groupBy) {
@@ -152,167 +155,147 @@ func IsValidResourceGroupBy(metric ResourceMetric, groupBy ResourceGroupBy) bool
 	return false
 }
 
+// resourceMetricSpec describes where a resource metric's samples live and how its group-by dimensions map to columns.
+// It is the single source of truth used to build aggregate SQL for every provider; only identifiers from these specs
+// are ever interpolated into queries.
+type resourceMetricSpec struct {
+	// table is the sample table queried for the metric.
+	table string
+	// identityColumns identify one distinct resource. A resource sampled several times inside a bucket is counted
+	// once. Connector generations are identified by (resource_id, connector_generation).
+	identityColumns []string
+	// groupByColumns maps each group-by dimension supported by the metric to the column holding its value.
+	groupByColumns map[ResourceGroupBy]string
+}
+
+// resourceMetricSpecs holds the spec for every supported resource metric.
+var resourceMetricSpecs = map[ResourceMetric]resourceMetricSpec{
+	ResourceMetricConnectionsCount: {
+		table:           connectionResourceSamplesTable,
+		identityColumns: []string{"resource_id"},
+		groupByColumns: map[ResourceGroupBy]string{
+			ResourceGroupByState:               "state",
+			ResourceGroupByHealthState:         "health_state",
+			ResourceGroupByConnectorID:         "connector_id",
+			ResourceGroupByConnectorGeneration: "connector_generation",
+		},
+	},
+	ResourceMetricActorsCount: {
+		table:           actorResourceSamplesTable,
+		identityColumns: []string{"resource_id"},
+		groupByColumns: map[ResourceGroupBy]string{
+			ResourceGroupByNamespace: "namespace",
+		},
+	},
+	ResourceMetricConnectorsCount: {
+		table:           connectorResourceSamplesTable,
+		identityColumns: []string{"resource_id"},
+		groupByColumns: map[ResourceGroupBy]string{
+			ResourceGroupByState:               "state",
+			ResourceGroupByConnectorGeneration: "connector_generation",
+			ResourceGroupByNamespace:           "namespace",
+		},
+	},
+	ResourceMetricConnectorGenerationsCount: {
+		table:           connectorGenerationSamplesTable,
+		identityColumns: []string{"resource_id", "connector_generation"},
+		groupByColumns: map[ResourceGroupBy]string{
+			ResourceGroupByState: "state",
+			// A connector generation's resource_id is the connector's id.
+			ResourceGroupByConnectorID:         "resource_id",
+			ResourceGroupByConnectorGeneration: "connector_generation",
+			ResourceGroupByNamespace:           "namespace",
+		},
+	},
+	ResourceMetricNamespacesCount: {
+		table:           namespaceResourceSamplesTable,
+		identityColumns: []string{"resource_id"},
+		groupByColumns: map[ResourceGroupBy]string{
+			ResourceGroupByState:     "state",
+			ResourceGroupByNamespace: "namespace",
+		},
+	},
+	ResourceMetricRateLimitsCount: {
+		table:           rateLimitResourceSamplesTable,
+		identityColumns: []string{"resource_id"},
+		groupByColumns: map[ResourceGroupBy]string{
+			ResourceGroupByMode:      "mode",
+			ResourceGroupByNamespace: "namespace",
+		},
+	},
+}
+
+// resourceMetricAggregate is one pre-aggregated row returned by a provider for a resource metrics query: the number of
+// distinct resources sampled in one time bucket for one combination of group-by values.
+type resourceMetricAggregate struct {
+	// BucketStartMS is the start of the time bucket in Unix milliseconds, aligned to the query's Start and Step.
+	BucketStartMS int64
+	// Labels holds the values of the query's group-by dimensions for this row, keyed by dimension name.
+	Labels map[string]string
+	// Count is the number of distinct resources in this bucket and group.
+	Count int64
+}
+
+// executeResourceMetricsQueries validates each query, fetches its aggregate rows through the provider-specific fetch
+// function, and converts them into zero-filled time series. The first validation or fetch error aborts the batch.
 func executeResourceMetricsQueries(
 	ctx context.Context,
 	queries []ResourceMetricsQuery,
-	fetchConnections func(context.Context, ResourceMetricsQuery) ([]*ConnectionResourceSample, error),
-	fetchActors func(context.Context, ResourceMetricsQuery) ([]*ActorResourceSample, error),
-	fetchConnectors func(context.Context, ResourceMetricsQuery) ([]*ConnectorResourceSample, error),
-	fetchConnectorGenerations func(context.Context, ResourceMetricsQuery) ([]*ConnectorGenerationResourceSample, error),
-	fetchNamespaces func(context.Context, ResourceMetricsQuery) ([]*NamespaceResourceSample, error),
-	fetchRateLimits func(context.Context, ResourceMetricsQuery) ([]*RateLimitResourceSample, error),
+	fetch func(context.Context, ResourceMetricsQuery) ([]resourceMetricAggregate, error),
 ) ([]ResourceMetricSeries, error) {
 	out := make([]ResourceMetricSeries, 0)
 	for _, query := range queries {
 		if err := validateResourceMetricsQuery(query); err != nil {
 			return nil, err
 		}
-		switch query.Metric {
-		case ResourceMetricConnectionsCount:
-			samples, err := fetchConnections(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, buildConnectionResourceMetricSeries(query, samples)...)
-		case ResourceMetricActorsCount:
-			samples, err := fetchActors(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, buildActorResourceMetricSeries(query, samples)...)
-		case ResourceMetricConnectorsCount:
-			samples, err := fetchConnectors(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, buildConnectorResourceMetricSeries(query, samples)...)
-		case ResourceMetricConnectorGenerationsCount:
-			samples, err := fetchConnectorGenerations(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, buildConnectorGenerationResourceMetricSeries(query, samples)...)
-		case ResourceMetricNamespacesCount:
-			samples, err := fetchNamespaces(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, buildNamespaceResourceMetricSeries(query, samples)...)
-		case ResourceMetricRateLimitsCount:
-			samples, err := fetchRateLimits(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			out = append(out, buildRateLimitResourceMetricSeries(query, samples)...)
-		default:
-			return nil, fmt.Errorf("unsupported resource metric %q", query.Metric)
+		rows, err := fetch(ctx, query)
+		if err != nil {
+			return nil, err
 		}
+		out = append(out, buildResourceMetricSeries(query, rows)...)
 	}
 	return out, nil
 }
 
-func buildConnectionResourceMetricSeries(query ResourceMetricsQuery, samples []*ConnectionResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *ConnectionResourceSample) time.Time {
-		return sample.SampledAt
-	}, func(sample *ConnectionResourceSample) string {
-		return sample.ResourceID.String()
-	}, func(sample *ConnectionResourceSample) map[string]string {
-		return connectionResourceMetricLabels(sample, query.GroupBy)
-	})
-}
-
-func buildActorResourceMetricSeries(query ResourceMetricsQuery, samples []*ActorResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *ActorResourceSample) time.Time {
-		return sample.SampledAt
-	}, func(sample *ActorResourceSample) string {
-		return sample.ResourceID.String()
-	}, func(sample *ActorResourceSample) map[string]string {
-		return actorResourceMetricLabels(sample, query.GroupBy)
-	})
-}
-
-func buildConnectorResourceMetricSeries(query ResourceMetricsQuery, samples []*ConnectorResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *ConnectorResourceSample) time.Time {
-		return sample.SampledAt
-	}, func(sample *ConnectorResourceSample) string {
-		return sample.ResourceID.String()
-	}, func(sample *ConnectorResourceSample) map[string]string {
-		return connectorResourceMetricLabels(sample, query.GroupBy)
-	})
-}
-
-func buildConnectorGenerationResourceMetricSeries(query ResourceMetricsQuery, samples []*ConnectorGenerationResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *ConnectorGenerationResourceSample) time.Time {
-		return sample.SampledAt
-	}, func(sample *ConnectorGenerationResourceSample) string {
-		return sample.ResourceID.String() + ":" + strconv.FormatUint(sample.ConnectorGeneration, 10)
-	}, func(sample *ConnectorGenerationResourceSample) map[string]string {
-		return connectorGenerationResourceMetricLabels(sample, query.GroupBy)
-	})
-}
-
-func buildNamespaceResourceMetricSeries(query ResourceMetricsQuery, samples []*NamespaceResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *NamespaceResourceSample) time.Time {
-		return sample.SampledAt
-	}, func(sample *NamespaceResourceSample) string {
-		return sample.ResourceID
-	}, func(sample *NamespaceResourceSample) map[string]string {
-		return namespaceResourceMetricLabels(sample, query.GroupBy)
-	})
-}
-
-func buildRateLimitResourceMetricSeries(query ResourceMetricsQuery, samples []*RateLimitResourceSample) []ResourceMetricSeries {
-	return buildResourceMetricSeries(query, samples, func(sample *RateLimitResourceSample) time.Time {
-		return sample.SampledAt
-	}, func(sample *RateLimitResourceSample) string {
-		return sample.ResourceID.String()
-	}, func(sample *RateLimitResourceSample) map[string]string {
-		return rateLimitResourceMetricLabels(sample, query.GroupBy)
-	})
-}
-
-func buildResourceMetricSeries[T any](
-	query ResourceMetricsQuery,
-	samples []*T,
-	sampledAt func(*T) time.Time,
-	resourceID func(*T) string,
-	labelsFor func(*T) map[string]string,
-) []ResourceMetricSeries {
+// buildResourceMetricSeries converts aggregate rows into one series per distinct label set, with a point for every
+// bucket in [Start, End) (empty buckets are zero). Rows whose bucket falls outside that range are dropped; this covers
+// samples taken exactly at End, which the inclusive sampled_at filter still returns.
+func buildResourceMetricSeries(query ResourceMetricsQuery, rows []resourceMetricAggregate) []ResourceMetricSeries {
 	bucketCount := int(math.Ceil(float64(query.End.Sub(query.Start)) / float64(query.Step)))
 	if bucketCount < 1 {
 		bucketCount = 1
 	}
+	startMS := query.Start.UnixMilli()
+	stepMS := query.Step.Milliseconds()
 
-	seenByGroup := map[string][]map[string]struct{}{}
+	countsByGroup := map[string][]float64{}
 	labelsByKey := map[string]map[string]string{}
 
 	if len(query.GroupBy) == 0 {
 		key := resourceMetricGroupKey(nil)
-		seenByGroup[key] = makeResourceMetricBuckets(bucketCount)
+		countsByGroup[key] = make([]float64, bucketCount)
 		labelsByKey[key] = map[string]string{}
 	}
 
-	for _, sample := range samples {
-		ts := sampledAt(sample)
-		if ts.Before(query.Start) || !ts.Before(query.End) {
+	for _, row := range rows {
+		if row.BucketStartMS < startMS || row.BucketStartMS >= query.End.UnixMilli() {
 			continue
 		}
-		bucketIdx := int(ts.Sub(query.Start) / query.Step)
+		bucketIdx := int((row.BucketStartMS - startMS) / stepMS)
 		if bucketIdx < 0 || bucketIdx >= bucketCount {
 			continue
 		}
-
-		labels := labelsFor(sample)
-		key := resourceMetricGroupKey(labels)
-		if _, ok := seenByGroup[key]; !ok {
-			seenByGroup[key] = makeResourceMetricBuckets(bucketCount)
-			labelsByKey[key] = labels
+		key := resourceMetricGroupKey(row.Labels)
+		if _, ok := countsByGroup[key]; !ok {
+			countsByGroup[key] = make([]float64, bucketCount)
+			labelsByKey[key] = row.Labels
 		}
-		seenByGroup[key][bucketIdx][resourceID(sample)] = struct{}{}
+		// Each (bucket, group) row is already a distinct count, and the database returns at most one per key.
+		countsByGroup[key][bucketIdx] += float64(row.Count)
 	}
 
-	keys := make([]string, 0, len(seenByGroup))
-	for key := range seenByGroup {
+	keys := make([]string, 0, len(countsByGroup))
+	for key := range countsByGroup {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
@@ -323,7 +306,7 @@ func buildResourceMetricSeries[T any](
 		for i := range bucketCount {
 			points[i] = ResourceMetricPoint{
 				Timestamp: query.Start.Add(time.Duration(i) * query.Step),
-				Value:     float64(len(seenByGroup[key][i])),
+				Value:     countsByGroup[key][i],
 			}
 		}
 		series = append(series, ResourceMetricSeries{
@@ -333,99 +316,6 @@ func buildResourceMetricSeries[T any](
 		})
 	}
 	return series
-}
-
-func makeResourceMetricBuckets(bucketCount int) []map[string]struct{} {
-	buckets := make([]map[string]struct{}, bucketCount)
-	for i := range buckets {
-		buckets[i] = map[string]struct{}{}
-	}
-	return buckets
-}
-
-func connectionResourceMetricLabels(sample *ConnectionResourceSample, groupBy []ResourceGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		switch group {
-		case ResourceGroupByState:
-			labels[string(group)] = string(sample.State)
-		case ResourceGroupByHealthState:
-			labels[string(group)] = string(sample.HealthState)
-		case ResourceGroupByConnectorID:
-			labels[string(group)] = sample.ConnectorID.String()
-		case ResourceGroupByConnectorGeneration:
-			labels[string(group)] = strconv.FormatUint(sample.ConnectorGeneration, 10)
-		}
-	}
-	return labels
-}
-
-func actorResourceMetricLabels(sample *ActorResourceSample, groupBy []ResourceGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		if group == ResourceGroupByNamespace {
-			labels[string(group)] = sample.Namespace
-		}
-	}
-	return labels
-}
-
-func connectorResourceMetricLabels(sample *ConnectorResourceSample, groupBy []ResourceGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		switch group {
-		case ResourceGroupByState:
-			labels[string(group)] = string(sample.State)
-		case ResourceGroupByConnectorGeneration:
-			labels[string(group)] = strconv.FormatUint(sample.ConnectorGeneration, 10)
-		case ResourceGroupByNamespace:
-			labels[string(group)] = sample.Namespace
-		}
-	}
-	return labels
-}
-
-func connectorGenerationResourceMetricLabels(sample *ConnectorGenerationResourceSample, groupBy []ResourceGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		switch group {
-		case ResourceGroupByState:
-			labels[string(group)] = string(sample.State)
-		case ResourceGroupByConnectorID:
-			labels[string(group)] = sample.ResourceID.String()
-		case ResourceGroupByConnectorGeneration:
-			labels[string(group)] = strconv.FormatUint(sample.ConnectorGeneration, 10)
-		case ResourceGroupByNamespace:
-			labels[string(group)] = sample.Namespace
-		}
-	}
-	return labels
-}
-
-func namespaceResourceMetricLabels(sample *NamespaceResourceSample, groupBy []ResourceGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		switch group {
-		case ResourceGroupByState:
-			labels[string(group)] = string(sample.State)
-		case ResourceGroupByNamespace:
-			labels[string(group)] = sample.Namespace
-		}
-	}
-	return labels
-}
-
-func rateLimitResourceMetricLabels(sample *RateLimitResourceSample, groupBy []ResourceGroupBy) map[string]string {
-	labels := make(map[string]string, len(groupBy))
-	for _, group := range groupBy {
-		switch group {
-		case ResourceGroupByMode:
-			labels[string(group)] = sample.Mode
-		case ResourceGroupByNamespace:
-			labels[string(group)] = sample.Namespace
-		}
-	}
-	return labels
 }
 
 func resourceMetricGroupKey(labels map[string]string) string {

@@ -313,3 +313,60 @@ func TestResourceMetrics_InvalidGroupBy(t *testing.T) {
 	}})
 	require.Error(t, err)
 }
+
+func TestResourceMetrics_StateChangeWithinBucket(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	resourceStore := store.(ResourceSampleStore)
+
+	ctx := context.Background()
+	start := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	connID := apid.New(apid.PrefixConnection)
+	connectorID := apid.New(apid.PrefixConnector)
+	sample := func(at time.Time, state database.ConnectionState) *ConnectionResourceSample {
+		return &ConnectionResourceSample{
+			SampledAt:         at,
+			ResourceID:        connID,
+			Namespace:         "root",
+			State:             state,
+			HealthState:       database.ConnectionHealthStateHealthy,
+			ConnectorID:       connectorID,
+			ResourceCreatedAt: start,
+			ResourceUpdatedAt: at,
+		}
+	}
+
+	// One connection is sampled in setup, then configured, inside the same 15m bucket.
+	require.NoError(t, resourceStore.StoreConnectionResourceSamples(ctx, []*ConnectionResourceSample{
+		sample(start, database.ConnectionStateSetup),
+		sample(start.Add(5*time.Minute), database.ConnectionStateConfigured),
+	}))
+
+	query := func(groupBy ...ResourceGroupBy) ResourceMetricsQuery {
+		return ResourceMetricsQuery{
+			RefID:   "connections",
+			Metric:  ResourceMetricConnectionsCount,
+			Start:   start,
+			End:     start.Add(15 * time.Minute),
+			Step:    15 * time.Minute,
+			GroupBy: groupBy,
+		}
+	}
+
+	// Grouped by state, the connection counts once in each state it was seen in during the bucket.
+	series, err := retriever.QueryResourceMetrics(ctx, []ResourceMetricsQuery{query(ResourceGroupByState)})
+	require.NoError(t, err)
+	byState := map[string]float64{}
+	for _, s := range series {
+		byState[s.Labels["state"]] = s.Points[0].Value
+	}
+	require.Equal(t, map[string]float64{
+		string(database.ConnectionStateSetup):      1,
+		string(database.ConnectionStateConfigured): 1,
+	}, byState)
+
+	// Ungrouped, it is a single distinct resource.
+	series, err = retriever.QueryResourceMetrics(ctx, []ResourceMetricsQuery{query()})
+	require.NoError(t, err)
+	require.Len(t, series, 1)
+	require.Equal(t, 1.0, series[0].Points[0].Value)
+}
