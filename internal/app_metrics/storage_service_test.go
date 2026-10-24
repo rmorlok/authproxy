@@ -18,6 +18,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 type recordRetrieverStub struct {
@@ -382,14 +384,14 @@ func TestBlobStoreStore_ReturnsBlobPutError(t *testing.T) {
 	require.ErrorContains(t, err, "disk full")
 }
 
-func TestGetFullLog_MissingBlobReturnsNotFound(t *testing.T) {
-	testId := apid.New(apid.PrefixRequestEvents)
-	ts := time.Now().UTC().Truncate(time.Millisecond)
-	record := &LogRecord{
+// newCaptureLoadTestRecord returns a searchable record with representative
+// summary fields so degraded GetFullLog results can be checked against it.
+func newCaptureLoadTestRecord(testId apid.ID) *LogRecord {
+	return &LogRecord{
 		RequestId:           testId,
 		Namespace:           "root",
 		CorrelationId:       "corr-test",
-		Timestamp:           ts,
+		Timestamp:           time.Now().UTC().Truncate(time.Millisecond),
 		MillisecondDuration: MillisecondDuration(250 * time.Millisecond),
 		Method:              "POST",
 		Scheme:              "https",
@@ -402,40 +404,170 @@ func TestGetFullLog_MissingBlobReturnsNotFound(t *testing.T) {
 		ResponseStatusCode:  http.StatusOK,
 		ResponseSizeBytes:   456,
 		ResponseMimeType:    "application/json",
-		FullRequestRecorded: false,
+		FullRequestRecorded: true,
 		RequestBodySkipped:  BodySkippedStreaming,
 		ResponseBodySkipped: BodySkippedTooLarge,
 		InternalTimeout:     true,
 		RequestCancelled:    true,
 	}
+}
+
+// captureLoadObservers wires a StorageService with an in-memory log sink and a
+// recording tracer so tests can assert that blob failures stay observable.
+type captureLoadObservers struct {
+	logs  *bytes.Buffer
+	spans *tracetest.SpanRecorder
+	ctx   context.Context
+	end   func()
+}
+
+func newCaptureLoadObservers(t *testing.T) *captureLoadObservers {
+	t.Helper()
+	spans := tracetest.NewSpanRecorder()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spans))
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+	ctx, span := tp.Tracer("test").Start(context.Background(), "GET /metrics/request-events/:id")
+	return &captureLoadObservers{
+		logs:  &bytes.Buffer{},
+		spans: spans,
+		ctx:   ctx,
+		end:   func() { span.End() },
+	}
+}
+
+func TestGetFullLog_MissingBlobReturnsRecordSummary(t *testing.T) {
+	testId := apid.New(apid.PrefixRequestEvents)
+	record := newCaptureLoadTestRecord(testId)
+	obs := newCaptureLoadObservers(t)
+
+	// The record exists but blob storage has no blob for it.
 	fullStore := newMockFullStore()
 	fullStore.getErr = apblob.ErrBlobNotFound
 	ss := &StorageService{
-		logger:    newNoopLogger(),
+		logger:    slog.New(slog.NewJSONHandler(obs.logs, nil)),
 		retriever: &recordRetrieverStub{record: record},
 		fullStore: fullStore,
 	}
 
-	_, err := ss.GetFullLog(context.Background(), testId)
-	require.ErrorIs(t, err, ErrNotFound)
+	result, err := ss.GetFullLog(obs.ctx, testId)
+	obs.end()
+
+	// The read succeeds with the record's summary and a "missing" state.
+	require.NoError(t, err)
+	require.Same(t, record, result.Record)
+	require.Equal(t, CaptureLoadStateMissing, result.CaptureLoadState)
+	require.False(t, result.Full, "no captured details are available to render")
+	require.Equal(t, testId, result.Id)
+	require.Equal(t, "POST", result.Request.Method)
+	require.Equal(t, "https://api.example.com/v1/oauth/tokens", result.Request.URL)
+	require.Equal(t, http.StatusOK, result.Response.StatusCode)
+
+	// A missing blob is logged as a warning, not an error.
+	require.Contains(t, obs.logs.String(), `"level":"WARN"`)
+	require.Contains(t, obs.logs.String(), `"capture_state":"missing"`)
+	require.Contains(t, obs.logs.String(), testId.String())
+
+	// The active span carries the error event and the resulting state.
+	ended := obs.spans.Ended()
+	require.Len(t, ended, 1)
+	requireSpanCaptureState(t, ended[0], "missing")
 }
 
-func TestGetFullLog_ReturnsNonMissingBlobError(t *testing.T) {
+func TestGetFullLog_BlobErrorReturnsRecordSummaryAndIsObservable(t *testing.T) {
 	testId := apid.New(apid.PrefixRequestEvents)
-	record := &LogRecord{
-		RequestId: testId,
-		Namespace: "root",
-	}
+	record := newCaptureLoadTestRecord(testId)
+	obs := newCaptureLoadObservers(t)
+
+	// Blob storage fails the read, as MinIO did with 503 SlowDownRead.
 	fullStore := newMockFullStore()
-	fullStore.getErr = errors.New("decrypt full log")
+	fullStore.getErr = errors.New("operation error S3: GetObject, https response error StatusCode: 503, api error SlowDownRead")
+	ss := &StorageService{
+		logger:    slog.New(slog.NewJSONHandler(obs.logs, nil)),
+		retriever: &recordRetrieverStub{record: record},
+		fullStore: fullStore,
+	}
+
+	result, err := ss.GetFullLog(obs.ctx, testId)
+	obs.end()
+
+	// The read still succeeds with the summary, flagged as "unavailable".
+	require.NoError(t, err)
+	require.Same(t, record, result.Record)
+	require.Equal(t, CaptureLoadStateUnavailable, result.CaptureLoadState)
+	require.False(t, result.Full)
+	require.Equal(t, "POST", result.Request.Method)
+
+	// The underlying storage error is logged at ERROR with identifying fields.
+	logs := obs.logs.String()
+	require.Contains(t, logs, `"level":"ERROR"`)
+	require.Contains(t, logs, "SlowDownRead")
+	require.Contains(t, logs, `"capture_state":"unavailable"`)
+	require.Contains(t, logs, `"namespace":"root"`)
+
+	// The span records the exception so it is visible in tracing.
+	ended := obs.spans.Ended()
+	require.Len(t, ended, 1)
+	requireSpanCaptureState(t, ended[0], "unavailable")
+	require.Contains(t, spanExceptionMessages(ended[0]), "SlowDownRead")
+}
+
+func TestGetFullLog_LoadedBlobSetsLoadedState(t *testing.T) {
+	testId := apid.New(apid.PrefixRequestEvents)
+	record := newCaptureLoadTestRecord(testId)
+
+	// A stored blob loads normally and is marked as loaded.
+	fullStore := newMockFullStore()
+	fullStore.getLog = &FullLog{Id: testId, Namespace: "root", Full: true}
 	ss := &StorageService{
 		logger:    newNoopLogger(),
 		retriever: &recordRetrieverStub{record: record},
 		fullStore: fullStore,
 	}
 
-	_, err := ss.GetFullLog(context.Background(), testId)
-	require.ErrorContains(t, err, "decrypt full log")
+	result, err := ss.GetFullLog(context.Background(), testId)
+	require.NoError(t, err)
+	require.Equal(t, CaptureLoadStateLoaded, result.CaptureLoadState)
+	require.True(t, result.Full)
+	require.Same(t, record, result.Record)
+}
+
+func TestGetFullLog_MissingRecordStillReturnsNotFound(t *testing.T) {
+	// Without a searchable record there is nothing to degrade to.
+	ss := &StorageService{
+		logger:    newNoopLogger(),
+		retriever: &recordRetrieverStub{err: ErrNotFound},
+		fullStore: newMockFullStore(),
+	}
+
+	_, err := ss.GetFullLog(context.Background(), apid.New(apid.PrefixRequestEvents))
+	require.ErrorIs(t, err, ErrNotFound)
+}
+
+// requireSpanCaptureState asserts the capture-state attribute recorded on span.
+func requireSpanCaptureState(t *testing.T, span sdktrace.ReadOnlySpan, want string) {
+	t.Helper()
+	for _, kv := range span.Attributes() {
+		if string(kv.Key) == "authproxy.request_event.capture_state" {
+			require.Equal(t, want, kv.Value.AsString())
+			return
+		}
+	}
+	t.Fatalf("span %q has no capture_state attribute", span.Name())
+}
+
+// spanExceptionMessages joins the exception.message attributes of the span's
+// recorded error events.
+func spanExceptionMessages(span sdktrace.ReadOnlySpan) string {
+	var msgs []string
+	for _, ev := range span.Events() {
+		for _, kv := range ev.Attributes {
+			if string(kv.Key) == "exception.message" {
+				msgs = append(msgs, kv.Value.AsString())
+			}
+		}
+	}
+	return strings.Join(msgs, "\n")
 }
 
 // RoundTripperFunc is an adapter to allow the use of ordinary functions as http.RoundTripper.

@@ -14,6 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type StorageService struct {
@@ -108,6 +110,15 @@ func (ss *StorageService) ListRateLimitResourceSamples(ctx context.Context, quer
 	return ss.retriever.(ResourceSampleRetriever).ListRateLimitResourceSamples(ctx, query)
 }
 
+// GetFullLog loads the searchable record for id and then the full-log blob
+// holding its captured request/response details.
+//
+// Only a failure to load the record is returned as an error (ErrNotFound when
+// it does not exist). A blob that is missing or cannot be read does not fail
+// the call: the result carries the record with CaptureLoadState set to
+// CaptureLoadStateMissing or CaptureLoadStateUnavailable so callers can still
+// show the request's metadata. Blob failures are logged and recorded on the
+// active trace span so they remain visible to operators.
 func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error) {
 	log, err := ss.GetRecord(ctx, id)
 	if err != nil {
@@ -116,14 +127,46 @@ func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog,
 
 	fullLog, err := ss.fullStore.GetFullLog(ctx, log.Namespace, id)
 	if err != nil {
+		state := CaptureLoadStateUnavailable
 		if errors.Is(err, apblob.ErrBlobNotFound) {
-			return nil, ErrNotFound
+			state = CaptureLoadStateMissing
 		}
-		return nil, err
+		ss.recordCaptureLoadFailure(ctx, log, state, err)
+
+		degraded := NewFullLogFromRecord(log)
+		degraded.Record = log
+		degraded.CaptureLoadState = state
+		return degraded, nil
 	}
 	fullLog.Record = log
+	fullLog.CaptureLoadState = CaptureLoadStateLoaded
 
 	return fullLog, nil
+}
+
+// recordCaptureLoadFailure makes a failed full-log blob read observable even
+// though GetFullLog degrades to returning only the record. It logs the
+// failure (Warn for a missing blob, Error for any other failure, since that
+// signals blob storage is unhealthy) and records the error and resulting
+// state on the active trace span, if any.
+func (ss *StorageService) recordCaptureLoadFailure(ctx context.Context, record *LogRecord, state CaptureLoadState, err error) {
+	level := slog.LevelError
+	if state == CaptureLoadStateMissing {
+		level = slog.LevelWarn
+	}
+	ss.logger.Log(ctx, level, "failed to load full request log from blob storage",
+		"error", err,
+		"request_id", record.RequestId.String(),
+		"namespace", record.Namespace,
+		"capture_state", string(state),
+		"full_request_recorded", record.FullRequestRecorded,
+	)
+
+	span := trace.SpanFromContext(ctx)
+	span.RecordError(err, trace.WithAttributes(
+		attribute.String("authproxy.request_event.id", record.RequestId.String()),
+	))
+	span.SetAttributes(attribute.String("authproxy.request_event.capture_state", string(state)))
 }
 
 // Ping checks if the storage backends are reachable.

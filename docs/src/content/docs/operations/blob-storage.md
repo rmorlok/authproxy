@@ -13,6 +13,34 @@ encrypted with that namespace's encryption key. Browsing the bucket shows which
 requests were recorded and how large they are. To read a request's contents,
 open it in the Admin UI's request detail view, which decrypts it for you.
 
+## When blob storage is unavailable
+
+Request summaries live in the request-events database, not in blob storage.
+If a blob is missing or blob storage returns an error,
+`GET /metrics/request-events/{id}` still returns `200` with the summary in
+`spec`, leaves out `spec.capture`, and reports why in `status`:
+
+| `status.captureState` | Meaning |
+|---|---|
+| `loaded` | Captured details were read successfully. |
+| `missing` | Blob storage has no object for this request. |
+| `unavailable` | Blob storage failed to return the object, or it could not be decrypted. |
+
+The Admin UI shows a notice above the request detail in either degraded
+state. The underlying error is not returned to clients. To track it:
+
+- **Logs:** look for `failed to load full request log from blob storage`. It is
+  logged at `ERROR` for `unavailable` and `WARN` for `missing`, with
+  `request_id`, `namespace`, and `capture_state` attributes.
+- **Traces:** the request's span records the error as an exception event and
+  sets `authproxy.request_event.capture_state`.
+
+In Grafana Explore, for example:
+
+```logql
+{service_name=~"authproxy.*"} |= "failed to load full request log from blob storage" | capture_state="unavailable"
+```
+
 ## Local development
 
 The Compose stack publishes the SeaweedFS S3 endpoint at

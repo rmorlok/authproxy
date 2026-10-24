@@ -1,5 +1,6 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {
+    Alert,
     Box,
     CircularProgress,
     Divider,
@@ -434,6 +435,16 @@ export default function RequestDetail({requestId, record, onClose, showOpenFullP
             )}
             {!loading && !error && data && (
                 <>
+                    {/* The summary still renders when captured details could not be loaded;
+                        tell the operator why headers/bodies are absent. */}
+                    {data.status && data.status.captureState !== 'loaded' && (
+                        <Alert
+                            severity={data.status.captureState === 'unavailable' ? 'warning' : 'info'}
+                            sx={{m: 2, mb: 0}}
+                            data-testid="request-capture-status">
+                            {data.status.message || 'Captured request details are unavailable; only the summary is shown.'}
+                        </Alert>
+                    )}
                     <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
                         <Tab label="Overview"/>
                         <Tab label="Headers"/>

@@ -440,6 +440,10 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
 			require.Equal(t, testId.String(), response.Metadata.ID)
 			require.NotNil(t, response.Spec.Capture)
+			// A fully loaded read reports the loaded capture state.
+			require.NotNil(t, response.Status)
+			require.Equal(t, sapi.RequestEventCaptureStateLoaded, response.Status.CaptureState)
+			require.Empty(t, response.Status.Message)
 		})
 
 		t.Run("valid with secret replay", func(t *testing.T) {
@@ -479,6 +483,73 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.Contains(t, w.Body.String(), "Bearer secret")
 			require.Contains(t, w.Body.String(), "api_key=secret")
 		})
+
+		// degradedEntry mimics StorageService.GetFullLog when the record loads
+		// but the blob does not: summary fields only, no captured details.
+		degradedEntry := func(state app_metrics.CaptureLoadState) *app_metrics.FullLog {
+			record := &app_metrics.LogRecord{
+				RequestId:           testId,
+				Namespace:           "root",
+				Timestamp:           time.Now().UTC(),
+				Method:              "GET",
+				Scheme:              "https",
+				Host:                "api.example.com",
+				Path:                "/items",
+				ResponseStatusCode:  http.StatusOK,
+				FullRequestRecorded: true,
+			}
+			entry := app_metrics.NewFullLogFromRecord(record)
+			entry.Record = record
+			entry.CaptureLoadState = state
+			return entry
+		}
+
+		for _, tc := range []struct {
+			name      string
+			state     app_metrics.CaptureLoadState
+			wantState sapi.RequestEventCaptureState
+		}{
+			{"blob unavailable returns summary", app_metrics.CaptureLoadStateUnavailable, sapi.RequestEventCaptureStateUnavailable},
+			{"blob missing returns summary", app_metrics.CaptureLoadStateMissing, sapi.RequestEventCaptureStateMissing},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/metrics/request-events/"+testId.String(),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "request-events", "get"),
+				)
+				require.NoError(t, err)
+
+				// Storage returns the record summary with a degraded capture state.
+				tu.MockRetriever.EXPECT().
+					GetFullLog(gomock.Any(), testId).
+					Return(degradedEntry(tc.state), nil)
+
+				tu.Gin.ServeHTTP(w, req)
+
+				// The read succeeds rather than failing the whole request.
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var response sapi.RequestEventJson
+				require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+
+				// Summary metadata from the record is present; captured details are not.
+				require.Equal(t, testId.String(), response.Metadata.ID)
+				require.Equal(t, "GET", response.Spec.Request.Method)
+				require.Equal(t, "/items", response.Spec.Request.Path)
+				require.Equal(t, http.StatusOK, response.Spec.Response.StatusCode)
+				require.Nil(t, response.Spec.Capture)
+
+				// Status explains the degradation without leaking storage internals.
+				require.NotNil(t, response.Status)
+				require.Equal(t, tc.wantState, response.Status.CaptureState)
+				require.NotEmpty(t, response.Status.Message)
+			})
+		}
 	})
 
 	t.Run("list with label_selector", func(t *testing.T) {

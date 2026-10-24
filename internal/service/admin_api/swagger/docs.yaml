@@ -1296,6 +1296,10 @@ definitions:
         $ref: '#/definitions/meta.ObjectMeta'
       spec:
         $ref: '#/definitions/openapi.RequestEventSpecJson'
+      status:
+        allOf:
+        - $ref: '#/definitions/openapi.RequestEventStatusJson'
+        description: Status is present only on single-event reads.
     required:
     - apiVersion
     - kind
@@ -1476,6 +1480,20 @@ definitions:
     - request
     - requestType
     - response
+    type: object
+  openapi.RequestEventStatusJson:
+    properties:
+      captureState:
+        enum:
+        - loaded
+        - missing
+        - unavailable
+        example: loaded
+        type: string
+      message:
+        type: string
+    required:
+    - captureState
     type: object
   openapi.SearchResultListMetaJson:
     properties:
@@ -2122,6 +2140,10 @@ definitions:
         $ref: '#/definitions/meta.ObjectMeta'
       spec:
         $ref: '#/definitions/openapi.RequestEventSpecJson'
+      status:
+        allOf:
+        - $ref: '#/definitions/openapi.RequestEventStatusJson'
+        description: Status is present only on single-event reads.
     required:
     - apiVersion
     - kind

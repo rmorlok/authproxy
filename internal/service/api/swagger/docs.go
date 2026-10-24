@@ -6319,6 +6319,14 @@ const docTemplateApi = `{
                 },
                 "spec": {
                     "$ref": "#/definitions/openapi.RequestEventSpecJson"
+                },
+                "status": {
+                    "description": "Status is present only on single-event reads.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openapi.RequestEventStatusJson"
+                        }
+                    ]
                 }
             }
         },
@@ -6565,6 +6573,26 @@ const docTemplateApi = `{
                 },
                 "response": {
                     "$ref": "#/definitions/openapi.RequestEventResponseJson"
+                }
+            }
+        },
+        "openapi.RequestEventStatusJson": {
+            "type": "object",
+            "required": [
+                "captureState"
+            ],
+            "properties": {
+                "captureState": {
+                    "type": "string",
+                    "enum": [
+                        "loaded",
+                        "missing",
+                        "unavailable"
+                    ],
+                    "example": "loaded"
+                },
+                "message": {
+                    "type": "string"
                 }
             }
         },
@@ -7481,6 +7509,14 @@ const docTemplateApi = `{
                 },
                 "spec": {
                     "$ref": "#/definitions/openapi.RequestEventSpecJson"
+                },
+                "status": {
+                    "description": "Status is present only on single-event reads.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/openapi.RequestEventStatusJson"
+                        }
+                    ]
                 }
             }
         },
