@@ -42,26 +42,38 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 		return nil, err
 	}
 	tool := map[string]any{"id": input.ToolID, "revision": input.Revision}
+
 	if input.ToolSetID != "" {
 		tool["toolSetId"] = input.ToolSetID
 	}
+
 	if input.ToolSetGeneration != nil {
 		tool["toolSetGeneration"] = *input.ToolSetGeneration
 	}
+
 	if input.CatalogRevision != nil {
 		tool["catalogRevision"] = *input.CatalogRevision
 	}
+
 	root := map[string]any{
-		"params": input.Params, "cfg": input.Cfg,
-		"labels": input.Labels, "annotations": input.Annotations,
-		"connection": map[string]any{"id": input.ConnectionID, "namespace": input.ConnectionNamespace},
-		"tool":       tool,
+		"params":      input.Params,
+		"cfg":         input.Cfg,
+		"labels":      input.Labels,
+		"annotations": input.Annotations,
+		"connection": map[string]any{
+			"id":        input.ConnectionID,
+			"namespace": input.ConnectionNamespace,
+		},
+		"tool": tool,
 	}
+
 	copy, err := cloneValue(root, newBudget(context.Background(), limits), 0)
 	if err != nil {
 		return nil, err
 	}
+
 	snapshot := copy.(map[string]any)
+
 	// Missing root maps are convenient empty scopes; nested nil collections
 	// retain their JSON null meaning instead of becoming empty objects/arrays.
 	for _, name := range []string{"params", "cfg", "labels", "annotations"} {
@@ -69,6 +81,7 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 			snapshot[name] = map[string]any{}
 		}
 	}
+
 	return &Context{root: snapshot}, nil
 }
 
@@ -78,9 +91,11 @@ func cloneValue(value any, b *budget, depth int) (any, error) {
 	if err := b.step(); err != nil {
 		return nil, err
 	}
+
 	if depth > b.limit.MaxDepth {
 		return nil, errors.New("render depth limit exceeded")
 	}
+
 	switch v := value.(type) {
 	case map[string]any:
 		if v == nil {
@@ -159,13 +174,16 @@ func cloneValue(value any, b *budget, depth int) (any, error) {
 // both json.params.object and json.params.object.child work without eager copies.
 func (c *Context) lookup(name string, scopes []any) (any, error) {
 	encoding := ""
-	if prefix, rest, found := strings.Cut(name, "."); found && (prefix == "path" || prefix == "query" || prefix == "json") {
+	if prefix, rest, found := strings.Cut(name, "."); found &&
+		(prefix == "path" || prefix == "query" || prefix == "json") {
 		encoding, name = prefix, rest
 	}
+
 	value, err := c.lookupRaw(name, scopes)
 	if err != nil {
 		return nil, err
 	}
+
 	switch encoding {
 	case "json":
 		// Encoding is performed only on the already bounded JSON snapshot.
@@ -197,25 +215,30 @@ func (c *Context) lookupRaw(name string, scopes []any) (any, error) {
 	if name == "." {
 		return c.root, nil
 	}
+
 	parts := strings.Split(name, ".")
 	for _, part := range parts {
 		if part == "" {
 			return nil, errors.New("invalid empty reference segment")
 		}
 	}
+
 	for i := 0; i <= len(scopes); i++ {
 		var scope any = c.root
 		if i < len(scopes) {
 			scope = scopes[i]
 		}
+
 		object, ok := scope.(map[string]any)
 		if !ok {
 			continue
 		}
+
 		value, exists := object[parts[0]]
 		if !exists {
 			continue
 		}
+
 		for _, part := range parts[1:] {
 			object, ok = value.(map[string]any)
 			if !ok {
@@ -226,8 +249,10 @@ func (c *Context) lookupRaw(name string, scopes []any) (any, error) {
 				return nil, fmt.Errorf("missing template reference %q", name)
 			}
 		}
+
 		return value, nil
 	}
+
 	return nil, fmt.Errorf("missing template reference %q", name)
 }
 
