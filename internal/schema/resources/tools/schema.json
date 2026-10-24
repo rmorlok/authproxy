@@ -130,7 +130,7 @@
           "items": { "type": "integer", "minimum": 100, "maximum": 599 }
         },
         "statusClass": { "type": "integer", "minimum": 1, "maximum": 5 },
-        "default": { "const": true },
+        "default": { "const": true, "description": "Matches otherwise-unmatched non-2xx statuses. Mapping a 2xx response to an error requires an explicit status or class selector." },
         "code": { "$ref": "#/$defs/NonBlankString" },
         "message": { "$ref": "#/$defs/NonBlankString" },
         "retryable": { "type": "boolean" }
