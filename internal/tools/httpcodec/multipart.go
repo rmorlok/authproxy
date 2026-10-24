@@ -22,20 +22,29 @@ import (
 // and the complete encoded body, including headers and boundaries. The returned
 // content type contains the generated boundary and must accompany those bytes.
 // Cancellation or any error returns neither partial bytes nor a content type.
-func EncodeMultipart(ctx context.Context, parts []tools.MultipartPart, maxBytes int) ([]byte, string, error) {
+func EncodeMultipart(
+	ctx context.Context,
+	parts []tools.MultipartPart,
+	maxBytes int,
+) ([]byte, string, error) {
 	if err := validateMultipartSource(ctx, parts, maxBytes); err != nil {
 		return nil, "", err
 	}
+
 	output := multipartBuffer{ctx: ctx, maxBytes: maxBytes}
 	writer := multipart.NewWriter(&output)
+
 	for _, part := range parts {
 		if err := ctx.Err(); err != nil {
 			return nil, "", err
 		}
+
 		contentType := part.MediaType
 		var payload []byte
+
 		if part.Text != nil {
 			payload = []byte(*part.Text)
+
 			if contentType == "" {
 				contentType = "text/plain; charset=utf-8"
 			}
@@ -45,6 +54,7 @@ func EncodeMultipart(ctx context.Context, parts []tools.MultipartPart, maxBytes 
 			if err != nil {
 				return nil, "", err
 			}
+
 			if contentType == "" {
 				contentType = "application/octet-stream"
 			}
@@ -56,24 +66,29 @@ func EncodeMultipart(ctx context.Context, parts []tools.MultipartPart, maxBytes 
 		if part.Filename != "" {
 			disposition += `; filename="` + quoteMultipartParameter(part.Filename) + `"`
 		}
+
 		header := textproto.MIMEHeader{
 			"Content-Disposition": {disposition},
 			"Content-Type":        {contentType},
 		}
+
 		partWriter, err := writer.CreatePart(header)
 		if err != nil {
 			return nil, "", err
 		}
+
 		if _, err := partWriter.Write(payload); err != nil {
 			return nil, "", err
 		}
 	}
+
 	if err := writer.Close(); err != nil {
 		return nil, "", err
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
+
 	return output.Bytes(), writer.FormDataContentType(), nil
 }
 
@@ -83,32 +98,39 @@ func validateMultipartSource(ctx context.Context, parts []tools.MultipartPart, m
 	if ctx == nil {
 		return errors.New("multipart encoding context is required")
 	}
+
 	if maxBytes <= 0 {
 		return errors.New("multipart byte limit must be positive")
 	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if len(parts) == 0 {
 		return errors.New("multipart body must contain at least one part")
 	}
+
 	// Every valid part requires a nonempty name, so count alone can exceed
 	// the source cap without traversing or allocating anything per part.
 	if len(parts) > maxBytes {
 		return errors.New("multipart source byte limit exceeded")
 	}
+
 	remaining := maxBytes
 	for _, part := range parts {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		lengths := [5]int{len(part.Name), len(part.Filename), len(part.MediaType)}
+
 		if part.Text != nil {
 			lengths[3] = len(*part.Text)
 		}
+
 		if part.BodyRaw != nil {
 			lengths[4] = len(*part.BodyRaw)
 		}
+
 		for _, length := range lengths {
 			if length > remaining {
 				return errors.New("multipart source byte limit exceeded")
@@ -116,25 +138,32 @@ func validateMultipartSource(ctx context.Context, parts []tools.MultipartPart, m
 			remaining -= length
 		}
 	}
+
 	for _, part := range parts {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if strings.TrimSpace(part.Name) == "" || !tools.IsValidMultipartMetadata(part.Name) || !tools.IsValidMultipartMetadata(part.Filename) {
+		if strings.TrimSpace(part.Name) == "" ||
+			!tools.IsValidMultipartMetadata(part.Name) ||
+			!tools.IsValidMultipartMetadata(part.Filename) {
 			return errors.New("multipart names and filenames must be valid UTF-8 without control characters; names must be nonempty")
 		}
+
 		if part.MediaType != "" {
 			if _, err := tools.ParseBodyMediaType(part.MediaType); err != nil {
 				return err
 			}
 		}
+
 		if (part.Text == nil) == (part.BodyRaw == nil) {
 			return errors.New("multipart parts must contain exactly one text or base64 body")
 		}
+
 		if part.Text != nil && !utf8.ValidString(*part.Text) {
 			return errors.New("multipart text must be valid UTF-8")
 		}
 	}
+
 	return nil
 }
 

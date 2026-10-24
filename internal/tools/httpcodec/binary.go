@@ -12,16 +12,23 @@ import (
 // limit counts actual bytes rather than the encoding's padded upper estimate.
 // Strict decoding rejects nonzero padding bits. Errors return no partial data
 // and never include the supplied data.
-func DecodeBase64(ctx context.Context, encoded string, maxEncodedBytes, maxDecodedBytes int) ([]byte, error) {
+func DecodeBase64(
+	ctx context.Context,
+	encoded string,
+	maxEncodedBytes, maxDecodedBytes int,
+) ([]byte, error) {
 	if ctx == nil {
 		return nil, errors.New("base64 decoding context is required")
 	}
+
 	if maxEncodedBytes <= 0 || maxDecodedBytes <= 0 {
 		return nil, errors.New("base64 byte limits must be positive")
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	if len(encoded) > maxEncodedBytes {
 		return nil, errors.New("base64 encoded byte limit exceeded")
 	}
@@ -36,14 +43,17 @@ func DecodeBase64(ctx context.Context, encoded string, maxEncodedBytes, maxDecod
 				return nil, err
 			}
 		}
+
 		if encoded[i] != '\r' && encoded[i] != '\n' {
 			count++
 			previous, last = last, encoded[i]
 		}
 	}
+
 	if count%4 != 0 {
 		return nil, errors.New("body must contain valid standard base64")
 	}
+
 	decodedLength := count / 4 * 3
 	if count > 0 && last == '=' {
 		decodedLength--
@@ -51,15 +61,18 @@ func DecodeBase64(ctx context.Context, encoded string, maxEncodedBytes, maxDecod
 			decodedLength--
 		}
 	}
+
 	if decodedLength > maxDecodedBytes {
 		return nil, errors.New("base64 decoded byte limit exceeded")
 	}
 
 	decoded := make([]byte, decodedLength)
+
 	n, err := base64.StdEncoding.Strict().Decode(decoded, []byte(encoded))
 	if err != nil {
 		return nil, errors.New("body must contain valid standard base64")
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
