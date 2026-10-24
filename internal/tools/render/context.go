@@ -19,31 +19,41 @@ type Input struct {
 	// slices such as []string and arbitrary Go objects are rejected. NewContext
 	// copies these caller-owned values, including nested maps and slices.
 	Params map[string]any
+
 	// Cfg is the captured connection configuration, exposed as cfg. It follows
 	// the same type and copy rules as Params and must not contain credentials.
 	Cfg map[string]any
+
 	// Labels is the captured effective label set, copied into labels.
 	Labels map[string]string
+
 	// Annotations is the captured connection annotation set, copied into annotations.
 	Annotations map[string]string
+
 	// ConnectionID is the connection identity exposed as connection.id. An empty
 	// value is omitted so templates that require it fail strict lookup.
 	ConnectionID string
+
 	// ConnectionNamespace is the owning namespace exposed as connection.namespace;
 	// an empty value is omitted from the snapshot.
 	ConnectionNamespace string
+
 	// ToolID identifies the invoked tool as tool.id; an empty value is omitted.
 	ToolID string
+
 	// Revision identifies the captured executable tool revision, exposed as
 	// tool.revision. Zero is omitted because revisions start at one. This is
 	// distinct from the source catalog's revision below.
 	Revision uint64
+
 	// ToolSetID identifies the source toolset as tool.toolSetId. Empty means the
 	// tool has no toolset provenance, so the field is omitted.
 	ToolSetID string
+
 	// ToolSetGeneration is the published source generation exposed as
 	// tool.toolSetGeneration. Nil omits it; a non-nil value is copied by value.
 	ToolSetGeneration *uint64
+
 	// CatalogRevision is the connection-specific source catalog revision exposed
 	// as tool.catalogRevision. Nil means no catalog provenance and omits it; a
 	// non-nil value is copied by value.
@@ -64,18 +74,22 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 	if err := limits.validate(); err != nil {
 		return nil, err
 	}
+
 	connection := map[string]any{}
 	if input.ConnectionID != "" {
 		connection["id"] = input.ConnectionID
 	}
+
 	if input.ConnectionNamespace != "" {
 		connection["namespace"] = input.ConnectionNamespace
 	}
 
 	tool := map[string]any{}
+
 	if input.ToolID != "" {
 		tool["id"] = input.ToolID
 	}
+
 	if input.Revision != 0 {
 		tool["revision"] = input.Revision
 	}
@@ -105,17 +119,20 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 	if err := b.step(); err != nil {
 		return nil, err
 	}
+
 	snapshot := make(map[string]any, len(root))
 	for _, name := range []string{"params", "cfg", "labels", "annotations", "connection", "tool"} {
 		if err := b.addBytes(len(name)); err != nil {
 			return nil, err
 		}
+
 		copy, err := cloneValue(root[name], b, 1)
 		if err != nil {
 			// Only these fixed root names are included: arbitrary nested keys and
 			// values may contain sensitive connection configuration.
 			return nil, fmt.Errorf("context field %s: %w", name, err)
 		}
+
 		snapshot[name] = copy
 	}
 
@@ -146,57 +163,72 @@ func cloneValue(value any, b *budget, depth int) (any, error) {
 		if v == nil {
 			return nil, b.addBytes(1)
 		}
+
 		out := make(map[string]any)
 		for key, child := range v {
 			if !utf8.ValidString(key) {
 				return nil, errors.New("context contains invalid UTF-8")
 			}
+
 			if err := b.addBytes(len(key)); err != nil {
 				return nil, err
 			}
+
 			copy, err := cloneValue(child, b, depth+1)
 			if err != nil {
 				return nil, err
 			}
+
 			out[key] = copy
 		}
+
 		return out, nil
 	case map[string]string:
 		if v == nil {
 			return nil, b.addBytes(1)
 		}
+
 		out := make(map[string]any)
 		for key, child := range v {
 			if !utf8.ValidString(key) {
 				return nil, errors.New("context contains invalid UTF-8")
 			}
+
 			if err := b.addBytes(len(key)); err != nil {
 				return nil, err
 			}
+
 			copy, err := cloneValue(child, b, depth+1)
 			if err != nil {
 				return nil, err
 			}
+
 			out[key] = copy
 		}
+
 		return out, nil
 	case []any:
 		if v == nil {
 			return nil, b.addBytes(1)
 		}
+
 		out := make([]any, 0)
+
 		for _, child := range v {
 			copy, err := cloneValue(child, b, depth+1)
 			if err != nil {
 				return nil, err
 			}
+
 			out = append(out, copy)
 		}
+
 		return out, nil
 	case string:
 		if !utf8.ValidString(v) {
 			return nil, errors.New("context contains invalid UTF-8")
 		}
+
 		return v, b.addBytes(len(v))
 	case nil, bool:
 		return v, b.addBytes(1)
@@ -204,10 +236,12 @@ func cloneValue(value any, b *budget, depth int) (any, error) {
 		if number, ok := v.(json.Number); ok && number == "" {
 			return nil, errors.New("context contains an invalid JSON number")
 		}
+
 		encoded, err := json.Marshal(v)
 		if err != nil {
 			return nil, errors.New("context contains an invalid JSON number")
 		}
+
 		return json.Number(encoded), b.addBytes(len(encoded))
 	default:
 		return nil, errors.New("context contains a non-JSON value")
@@ -309,6 +343,7 @@ func (c *Context) lookupRaw(name string, scopes []any) (any, error) {
 			if !ok {
 				return nil, fmt.Errorf("missing template reference %q", name)
 			}
+			
 			value, exists = object[part]
 			if !exists {
 				return nil, fmt.Errorf("missing template reference %q", name)

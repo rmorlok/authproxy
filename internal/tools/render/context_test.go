@@ -29,13 +29,34 @@ func TestContextSnapshot(t *testing.T) {
 	// Capture nested input, connection metadata, and immutable revision identity.
 	generation, catalog := uint64(7), uint64(12)
 	input := Input{
-		Params: map[string]any{"items": []any{map[string]any{"name": "original"}}},
-		Cfg:    map[string]any{"tenant": "acme", "nested": map[string]any{"region": "us"}},
-		Labels: map[string]string{"team": "blue"}, Annotations: map[string]string{"note": "original"},
-		ConnectionID: "cxn_example", ConnectionNamespace: "root.product.user",
-		ToolID: "tol_example", Revision: 9007199254740993,
-		ToolSetID: "tls_example", ToolSetGeneration: &generation, CatalogRevision: &catalog,
+		Params: map[string]any{
+			"items": []any{
+				map[string]any{
+					"name": "original",
+				},
+			},
+		},
+		Cfg: map[string]any{
+			"tenant": "acme",
+			"nested": map[string]any{
+				"region": "us",
+			},
+		},
+		Labels: map[string]string{
+			"team": "blue",
+		},
+		Annotations: map[string]string{
+			"note": "original",
+		},
+		ConnectionID:        "cxn_example",
+		ConnectionNamespace: "root.product.user",
+		ToolID:              "tol_example",
+		Revision:            9007199254740993,
+		ToolSetID:           "tls_example",
+		ToolSetGeneration:   &generation,
+		CatalogRevision:     &catalog,
 	}
+	
 	data, err := NewContext(input, testLimits())
 	require.NoError(t, err)
 
