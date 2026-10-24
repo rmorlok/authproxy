@@ -437,6 +437,18 @@ func (dm *DependencyManager) ShutdownDatabase() {
 	dm.sqlDB = nil
 }
 
+// ShutdownAppMetrics flushes buffered request events and stops the app-metrics background writer, if the service was
+// created. Call it after the services that proxy requests have stopped. Safe to call multiple times.
+func (dm *DependencyManager) ShutdownAppMetrics() {
+	if dm.appMetricsService == nil {
+		return
+	}
+	if err := dm.appMetricsService.Close(); err != nil {
+		dm.GetLogger().Warn("failed to close app metrics service", "error", err)
+	}
+	dm.appMetricsService = nil
+}
+
 func (dm *DependencyManager) GetAppMetricsService() *app_metrics.StorageService {
 	ctx := context.Background()
 	var err error

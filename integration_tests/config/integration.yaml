@@ -62,6 +62,8 @@ appMetrics:
   resourceSnapshotInterval: 15m
   requestEvents:
     fullRequestRecording: always
+    # Tests poll for request events shortly after proxying, so flush the write buffer quickly.
+    flushInterval: 100ms
   database:
     provider: clickhouse
     user: authproxy

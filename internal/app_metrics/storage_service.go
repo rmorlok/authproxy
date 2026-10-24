@@ -19,16 +19,25 @@ import (
 )
 
 type StorageService struct {
-	logger        *slog.Logger
-	store         RecordStore
+	logger *slog.Logger
+	// store is the underlying provider store. Resource samples are written to it directly because snapshots are
+	// already written in bulk pages by the snapshot task.
+	store RecordStore
+	// eventStore receives request-event records from the proxy round tripper. It batches writes to store; see
+	// bufferedRecordStore. It is the same as store when the service was built without buffering (e.g. in tests).
+	eventStore    RecordStore
 	fullStore     FullStore
 	retriever     RecordRetriever
 	captureConfig captureConfig
 }
 
 func (ss *StorageService) NewRoundTripper(ri httpf.RequestInfo, transport http.RoundTripper) http.RoundTripper {
+	eventStore := ss.eventStore
+	if eventStore == nil {
+		eventStore = ss.store
+	}
 	return &RoundTripper{
-		store:         ss.store,
+		store:         eventStore,
 		fullStore:     ss.fullStore,
 		logger:        ss.logger,
 		captureConfig: ss.captureConfig,
@@ -178,6 +187,18 @@ func (ss *StorageService) recordCaptureLoadFailure(
 	span.SetAttributes(attribute.String("authproxy.request_event.capture_state", string(state)))
 }
 
+// Close flushes buffered request events and stops the background writer. It should be called once the services
+// that proxy requests have stopped, so their final events are persisted. It is safe to call more than once.
+func (ss *StorageService) Close() error {
+	if ss == nil || ss.eventStore == nil || util.SameInstance(ss.eventStore, ss.store) {
+		return nil
+	}
+	if c, ok := ss.eventStore.(interface{ Close() error }); ok {
+		return c.Close()
+	}
+	return nil
+}
+
 // Ping checks if the storage backends are reachable.
 func (ss *StorageService) Ping(ctx context.Context) bool {
 	if p, ok := ss.store.(pingable); ok {
@@ -224,10 +245,22 @@ func NewStorageService(
 	fullStore := NewBlobStore(blobStore, encryptor, logger)
 
 	cc := captureConfig{}
-	cc.setFromConfig(cfg.GetRequestEvents())
+	requestEvents := cfg.GetRequestEvents()
+	cc.setFromConfig(requestEvents)
+
+	// Request events are recorded once per proxied request, so they are batched rather than inserted one row at a
+	// time. Close flushes anything still buffered.
+	eventStore := NewBufferedStore(
+		store,
+		requestEvents.GetFlushBatchSize(),
+		requestEvents.GetFlushInterval(),
+		requestEvents.GetMaxBufferedRecords(),
+		logger,
+	)
 
 	return &StorageService{
 		store:         store,
+		eventStore:    eventStore,
 		logger:        logger,
 		retriever:     retriever,
 		fullStore:     fullStore,

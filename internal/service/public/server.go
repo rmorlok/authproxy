@@ -283,6 +283,9 @@ func Serve(cfg config.C) {
 
 	defer dm.ShutdownDatabase()
 	defer dm.ShutdownWorkflowRuntime()
+	// Deferred after the shutdowns above so it runs before them (LIFO): buffered request events are flushed
+	// while telemetry is still up.
+	defer dm.ShutdownAppMetrics()
 	defer dm.GetEncryptService().Shutdown()
 
 	server, healthChecker, err := GetGinServer(dm)
