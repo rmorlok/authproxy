@@ -422,8 +422,9 @@ headers are never copied into these public errors. Status failures include only
 the HTTP status in `error.details`, such as `{"status":404}`.
 
 Exact status rules take precedence over class rules, then a `default: true`
-rule. Rule order does not change the result. Rules can deliberately map a 2xx
-status to an error; a default rule also catches otherwise-unmatched 2xx statuses.
+rule. Rule order does not change the result. A default rule matches only non-2xx
+statuses, so adding a catch-all error preserves successful responses. Use an
+exact status or `statusClass: 2` to deliberately map a 2xx status to an error.
 Without a matching rule, only 2xx is successful. Overlapping selectors at the
 same priority and reserved platform error codes fail compilation. An authored
 `retryable: true` is advice; this package never retries a request.
@@ -472,10 +473,23 @@ Successful responses use these representations:
 | No Content-Type | An embedded `application/octet-stream` blob; no content sniffing. |
 
 The JSON subtype rule takes precedence, including for `text/json`. JSON bytes
-must be valid UTF-8 and contain exactly one JSON value. A malformed Content-Type
-becomes `UPSTREAM_PROTOCOL_ERROR`; malformed JSON or supported text becomes
-`OUTPUT_INVALID`. Content decoding happens only after status classification,
-so a status error does not depend on the provider's error-body format.
+must be valid UTF-8 and contain exactly one JSON value. If a Content-Type has a
+valid base type but a recoverable parameter syntax error, such as
+`application/json; charset`, the mapper drops the parameters and uses the base
+type. Text with uncertain charset parameters becomes a blob to preserve its
+bytes. An invalid base type, conflicting duplicate parameters, or invalid header
+bytes still produce `UPSTREAM_PROTOCOL_ERROR`; malformed JSON or supported text
+becomes `OUTPUT_INVALID`. Content decoding happens only after status
+classification, so a status error does not depend on the provider's error-body
+format.
+
+This mapper returns AuthProxy's transport-neutral `ToolResult`. JSON arrays,
+scalars, and null retain their original shape, without a duplicate text block.
+An adapter must render structured data for clients that need model-facing text;
+the Python integration must also retain the complete result as an artifact.
+A future MCP server adapter must apply the negotiated protocol's result
+requirements at that boundary, including text compatibility and any required
+object wrapping.
 
 Generated blob URIs have the form
 `urn:authproxy:tool-invocation:tiv_01example0000001:response`. They identify inline
@@ -495,10 +509,12 @@ All four limits must be positive:
 
 - `MaxSourceBytes` bounds the raw rule codes, messages, and selector data before
   compilation. It does not count JSON/YAML framing.
-- `MaxResponseBytes` bounds the supplied decoded body, including bodies of status
-  errors. Content-Type text is independently capped at the same size before
-  parsing. The executor must enforce read/decompression bounds before allocating
-  the buffer and account for responses across a multi-request invocation.
+- `MaxResponseBytes` bounds the supplied decoded body on the success path.
+  Content-Type text is independently capped at the same size before parsing.
+  Status errors use neither field, so unused content cannot replace a status
+  error or its retry advice. The executor must still enforce read/decompression
+  bounds before allocating buffers and account for all responses across a
+  multi-request invocation.
 - `MaxOutputBytes` bounds successful raw JSON, UTF-8 text, or decoded binary
   content before wrapping it in an envelope or encoding it as base64.
 - `MaxEncodedResultBytes` bounds the complete serialized `ToolResult`, including

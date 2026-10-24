@@ -20,9 +20,12 @@ func responseBodyResult() *api.ToolResult {
 }
 
 // TestMapResponseBodyJSONPreservesValues retains JSON scalars, null, whitespace,
-// and numbers that cannot be represented precisely by a floating-point value.
+// and exact numbers, including when optional MIME parameters are malformed.
 func TestMapResponseBodyJSONPreservesValues(t *testing.T) {
-	for _, mediaType := range []string{"application/json", "Application/Problem+JSON; charset=UTF-8", "text/json"} {
+	for _, mediaType := range []string{
+		"application/json", "Application/Problem+JSON; charset=UTF-8", "text/json",
+		"application/json; charset=", "Application/Problem+JSON; ignored", "text/json; charset=\"unterminated",
+	} {
 		for _, body := range []string{`null`, `false`, `"text"`, `9007199254740993.0100`, `1e9999`, " \n[null,false,9007199254740993]\t", `{"value":42}`} {
 			t.Run(mediaType+"/"+body, func(t *testing.T) {
 				// Mapping copies one complete JSON value without decoding its numbers.
@@ -68,6 +71,8 @@ func TestMapResponseBodyTextPreservesSupportedCharsets(t *testing.T) {
 		{"Text/HTML; charset=UTF-8", `<script>{{cfg.secret}}</script>`},
 		{"text/plain; charset=utf8", "résumé"},
 		{"text/csv; charset=US-ASCII", "name,value\r\nAda,42\x00\x7f"},
+		{"text/plain; charset=utf-8;", "雪 and café"},
+		{"text/plain; charset=utf-8; charset=utf-8", "雪 and café"},
 	} {
 		t.Run(test.mediaType, func(t *testing.T) {
 			// Supported text becomes a plain text block with the exact original bytes.
@@ -83,8 +88,8 @@ func TestMapResponseBodyTextPreservesSupportedCharsets(t *testing.T) {
 	}
 }
 
-// TestMapResponseBodyBinaryVariants preserves exact bytes and authored MIME
-// parameters in typed media blocks or invocation-scoped embedded resources.
+// TestMapResponseBodyBinaryVariants preserves exact bytes and valid MIME
+// parameters, discarding malformed optional parameters from the public result.
 func TestMapResponseBodyBinaryVariants(t *testing.T) {
 	for _, test := range []struct {
 		mediaType string
@@ -97,6 +102,11 @@ func TestMapResponseBodyBinaryVariants(t *testing.T) {
 		{"", "application/octet-stream", api.ToolContentTypeResource},
 		{"text/plain; charset=iso-8859-1", "text/plain; charset=iso-8859-1", api.ToolContentTypeResource},
 		{"text/plain; charset=utf-16", "text/plain; charset=utf-16", api.ToolContentTypeResource},
+		{"Image/PNG; profile=", "image/png", api.ToolContentTypeImage},
+		{"audio/wav; ignored", "audio/wav", api.ToolContentTypeAudio},
+		{"application/pdf; name=\"unterminated", "application/pdf", api.ToolContentTypeResource},
+		{"text/plain; charset=", "text/plain", api.ToolContentTypeResource},
+		{"text/plain; charset=iso-8859-1; ignored", "text/plain", api.ToolContentTypeResource},
 	} {
 		t.Run(test.wantMIME, func(t *testing.T) {
 			// Unsupported text encodings stay binary, including bytes invalid as UTF-8.
@@ -126,6 +136,27 @@ func TestMapResponseBodyBinaryVariants(t *testing.T) {
 			require.NoError(t, result.Validate(nil))
 		})
 	}
+}
+
+// TestMapResponseBodyMalformedTextParametersStayBinary avoids interpreting
+// bytes as UTF-8 when an invalid parameter section obscures the actual charset.
+func TestMapResponseBodyMalformedTextParametersStayBinary(t *testing.T) {
+	// Even valid UTF-8 bytes are ambiguous when the provider's charset is unknown.
+	body := []byte("café")
+	result := responseBodyResult()
+	require.Nil(t, mapResponseBody(result, "text/plain; charset=iso-8859-1; ignored", body, 4096))
+	require.Len(t, result.Content, 1)
+	block := result.Content[0]
+	require.Equal(t, api.ToolContentTypeResource, block.Type)
+	require.NotNil(t, block.Resource)
+	require.Equal(t, "text/plain", block.Resource.MIMEType)
+	require.Nil(t, block.Resource.Text)
+
+	// A valid public MIME type accompanies the exact original bytes without decoding.
+	decoded, err := base64.StdEncoding.DecodeString(*block.Resource.Blob)
+	require.NoError(t, err)
+	require.Equal(t, body, decoded)
+	require.NoError(t, result.Validate(nil))
 }
 
 // TestMapResponseBodyResourceEscapesInvocationID preserves supported identifiers
@@ -174,7 +205,13 @@ func TestMapResponseBodyInvalidDataIsPrivate(t *testing.T) {
 		{"header controls", "text/plain\r\nprivate-provider-header", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
 		{"malformed media empty body", "private-provider-header", "", "UPSTREAM_PROTOCOL_ERROR"},
 		{"wildcard", "text/*", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
+		{"invalid base with invalid parameters", "private-provider-header; charset=", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
+		{"wildcard with invalid parameters", "text/*; charset=", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
+		{"parameter controls", "text/plain; private-provider-header=\r", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
+		{"parameter invalid UTF-8", "text/plain; private-provider-header=\xff", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
+		{"conflicting duplicate parameters", "text/plain; charset=utf-8; charset=iso-8859-1", "private-provider-body", "UPSTREAM_PROTOCOL_ERROR"},
 		{"invalid JSON", "application/json", `{"secret":"private-provider-body"`, "OUTPUT_INVALID"},
+		{"invalid JSON with invalid parameters", "application/json; charset=", `{"secret":"private-provider-body"`, "OUTPUT_INVALID"},
 		{"multiple JSON values", "application/json", `"private-provider-body" true`, "OUTPUT_INVALID"},
 		{"JSON whitespace only", "application/json", " \n\t", "OUTPUT_INVALID"},
 		{"invalid UTF-8 in JSON", "application/json", "\"private-provider-body\xff\"", "OUTPUT_INVALID"},
@@ -273,11 +310,15 @@ func FuzzMapResponseBody(f *testing.F) {
 		{"application/json", []byte(`null`), 64},
 		{"application/problem+json", []byte(`false`), 64},
 		{"application/json", []byte(`9007199254740993.0100`), 64},
+		{"application/json; charset=", []byte(`9007199254740993.0100`), 64},
 		{"application/json", []byte{'"', 0xff, '"'}, 64},
 		{"text/plain", []byte("café\n{{cfg.secret}}"), 64},
 		{"text/plain; charset=us-ascii", []byte{0xff}, 64},
 		{"text/plain; charset=utf-16", []byte{0xff, 0, 0x80}, 64},
+		{"text/plain; charset=iso-8859-1; ignored", []byte{0xe9}, 64},
+		{"text/plain; charset=utf-8; charset=iso-8859-1", []byte{0xe9}, 64},
 		{"image/png", []byte{0, 0xff, 0x80}, 4},
+		{"image/png; profile=", []byte{0, 0xff, 0x80}, 4},
 		{"audio/wav", []byte{0, 0xff, 0x80}, 3},
 		{"private-header\r\n", []byte("private-body"), 64},
 		{"", []byte{0, 0xff}, 64},

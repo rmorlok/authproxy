@@ -67,6 +67,7 @@ func TestResponseStatusMappings(t *testing.T) {
 		{Default: true, Code: "PROVIDER_OTHER", Message: "The provider returned an unexpected status."},
 		{StatusClass: util.ToPtr(4), Code: "PROVIDER_CLIENT", Message: "The provider declined the request."},
 		{Statuses: []int{404, 410}, Code: "ITEM_MISSING", Message: "The item is unavailable.", Retryable: util.ToPtr(true)},
+		{StatusClass: util.ToPtr(2), Code: "UNEXPECTED_SUCCESS_CLASS", Message: "This operation must not succeed."},
 		{Statuses: []int{200}, Code: "UNEXPECTED_SUCCESS", Message: "This operation must return a different status."},
 	}}, responseLimits())
 	for _, test := range []struct {
@@ -76,7 +77,7 @@ func TestResponseStatusMappings(t *testing.T) {
 	}{
 		{404, "ITEM_MISSING", true}, {410, "ITEM_MISSING", true},
 		{429, "PROVIDER_CLIENT", false}, {503, "PROVIDER_OTHER", false},
-		{201, "PROVIDER_OTHER", false}, {200, "UNEXPECTED_SUCCESS", false},
+		{201, "UNEXPECTED_SUCCESS_CLASS", false}, {200, "UNEXPECTED_SUCCESS", false},
 	} {
 		t.Run(fmt.Sprint(test.status), func(t *testing.T) {
 			// Neither invalid MIME metadata nor a private upstream body enters the error.
@@ -96,6 +97,30 @@ func TestResponseStatusMappings(t *testing.T) {
 			encoded, err := json.Marshal(result)
 			require.NoError(t, err)
 			require.NotContains(t, string(encoded), "private-")
+		})
+	}
+}
+
+// TestResponseDefaultPreservesSuccess keeps a catch-all error rule from
+// discarding successful content when no exact or class rule targets that status.
+func TestResponseDefaultPreservesSuccess(t *testing.T) {
+	program := compileResponse(t, &tools.HTTPResponse{Errors: []tools.HTTPErrorRule{
+		{Statuses: []int{404}, Code: "CONTACT_MISSING", Message: "The contact is unavailable."},
+		{Default: true, Code: "CRM_ERROR", Message: "The CRM request failed."},
+	}}, responseLimits())
+	for _, status := range []int{200, 201, 204, 299} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			// JSON success and an empty 204 retain their normal result forms.
+			input := responseInput()
+			input.StatusCode = status
+			if status == 204 {
+				input.Body = nil
+			}
+			result := mapResponse(t, program, input)
+			require.False(t, result.IsError)
+			require.Nil(t, result.Error)
+			require.Equal(t, input.Body, []byte(result.StructuredContent))
+			require.Empty(t, result.Content)
 		})
 	}
 }
@@ -251,8 +276,8 @@ func TestResponseInvalidOutput(t *testing.T) {
 	}
 }
 
-// TestResponseDecodedByteLimits separates upstream buffering allowances from
-// emitted content limits and applies the former even to mapped HTTP errors.
+// TestResponseDecodedByteLimits bounds successful response data before decoding
+// and separately limits the content emitted by the mapper.
 func TestResponseDecodedByteLimits(t *testing.T) {
 	input := responseInput()
 	input.ContentType, input.Body = "text/plain", []byte(strings.Repeat("x", 32))
@@ -279,17 +304,64 @@ func TestResponseDecodedByteLimits(t *testing.T) {
 		})
 	}
 
-	// Status mapping avoids decoding private content but cannot bypass its byte cap.
+	// A long content type is independently bounded even for an empty success body.
 	limits := responseLimits()
 	limits.MaxResponseBytes = len(input.Body) - 1
-	input.StatusCode = 500
+	input.Body, input.ContentType = nil, strings.Repeat("x", limits.MaxResponseBytes+1)
 	result := mapResponse(t, compileResponse(t, nil, limits), input)
 	require.Equal(t, "OUTPUT_TOO_LARGE", result.Error.Code)
+}
 
-	// A long content type is independently bounded even for an empty response body.
-	input.Body, input.ContentType = nil, strings.Repeat("x", limits.MaxResponseBytes+1)
-	result = mapResponse(t, compileResponse(t, nil, limits), input)
-	require.Equal(t, "OUTPUT_TOO_LARGE", result.Error.Code)
+// TestResponseStatusErrorsIgnoreUnusedContentLimits preserves status policy
+// and retry advice when an upstream error's unused body or MIME text is large.
+func TestResponseStatusErrorsIgnoreUnusedContentLimits(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		status int
+		rule   *tools.HTTPErrorRule
+		code   string
+	}{
+		{"exact", 503, &tools.HTTPErrorRule{Statuses: []int{503}}, "SERVICE_UNAVAILABLE"},
+		{"class", 503, &tools.HTTPErrorRule{StatusClass: util.ToPtr(5)}, "SERVICE_UNAVAILABLE"},
+		{"default", 503, &tools.HTTPErrorRule{Default: true}, "SERVICE_UNAVAILABLE"},
+		{"explicit success error", 200, &tools.HTTPErrorRule{Statuses: []int{200}}, "SERVICE_UNAVAILABLE"},
+		{"unmapped", 503, nil, "UPSTREAM_FAILED"},
+		{"invalid status", 600, nil, "UPSTREAM_PROTOCOL_ERROR"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Both unused fields exceed the success limits and cannot be decoded.
+			limits := responseLimits()
+			limits.MaxResponseBytes, limits.MaxOutputBytes = 8, 4
+			input := responseInput()
+			input.StatusCode = test.status
+			input.ContentType = strings.Repeat("private-invalid-type", 16)
+			input.Body = []byte(strings.Repeat("private-provider-body", 16))
+			input.ExecutionState = api.ToolExecutionStateMayHaveExecuted
+			var source *tools.HTTPResponse
+			if test.rule != nil {
+				rule := *test.rule
+				rule.Code, rule.Message, rule.Retryable = test.code, "Please try again later.", util.ToPtr(true)
+				source = &tools.HTTPResponse{Errors: []tools.HTTPErrorRule{rule}}
+			}
+			result := mapResponse(t, compileResponse(t, source, limits), input)
+
+			// Status errors retain safe details and the executor's execution state.
+			require.True(t, result.IsError)
+			require.Equal(t, test.code, result.Error.Code)
+			require.Equal(t, test.rule != nil, result.Error.Retryable)
+			require.Equal(t, input.ExecutionState, result.Error.ExecutionState)
+			if test.status == 600 {
+				require.Nil(t, result.Error.Details)
+			} else {
+				require.JSONEq(t, fmt.Sprintf(`{"status":%d}`, test.status), string(result.Error.Details))
+			}
+			require.Nil(t, result.StructuredContent)
+			require.Empty(t, result.Content)
+			encoded, err := json.Marshal(result)
+			require.NoError(t, err)
+			require.NotContains(t, string(encoded), "private-")
+		})
+	}
 }
 
 // TestResponseEncodedEnvelopeLimit includes JSON escaping, binary expansion,

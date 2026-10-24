@@ -88,8 +88,10 @@ type HTTPResponse struct {
 // HTTPErrorRule maps selected HTTP statuses to a safe administrator-authored
 // error. Exactly one selector applies: Statuses, StatusClass, or Default.
 // Exact statuses outrank classes, which outrank the default. Overlaps at one
-// priority are invalid. Retryable is advice and never triggers an automatic
-// invocation retry or proves that repeating an operation is safe.
+// priority are invalid. Default matches only non-2xx statuses; mapping a 2xx
+// response to an error requires an explicit status or class selector.
+// Retryable is advice and never triggers an automatic invocation retry or proves
+// that repeating an operation is safe.
 type HTTPErrorRule struct {
 	Statuses    []int  `json:"statuses,omitempty" yaml:"statuses,omitempty"`
 	StatusClass *int   `json:"statusClass,omitempty" yaml:"statusClass,omitempty"`

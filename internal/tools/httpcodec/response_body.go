@@ -3,6 +3,7 @@ package httpcodec
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"mime"
 	"net/url"
 	"slices"
@@ -23,9 +24,17 @@ func mapResponseBody(result *api.ToolResult, mediaType string, body []byte, maxE
 	if mediaType == "" {
 		mediaType = "application/octet-stream"
 	}
-	base, err := tools.ParseBodyMediaType(mediaType)
-	if err != nil {
+	base, params, parameterErr := mime.ParseMediaType(mediaType)
+	_, baseErr := tools.ParseBodyMediaType(base)
+	if !tools.IsValidMultipartMetadata(mediaType) || baseErr != nil ||
+		(parameterErr != nil && !errors.Is(parameterErr, mime.ErrInvalidMediaParameter)) {
 		return &api.ToolResultError{Code: "UPSTREAM_PROTOCOL_ERROR", Message: "Provider response has an invalid content type."}
+	}
+	if parameterErr != nil {
+		// A valid base type still identifies JSON and binary media when optional
+		// parameters are malformed. Publish only that valid type; the original
+		// value would make rich results invalid. Unknown text charsets stay binary.
+		mediaType = base
 	}
 	// An empty response has no content, including when JSON was declared.
 	if len(body) == 0 {
@@ -41,8 +50,7 @@ func mapResponseBody(result *api.ToolResult, mediaType string, body []byte, maxE
 		return nil
 	}
 
-	if major == "text" {
-		_, params, _ := mime.ParseMediaType(mediaType)
+	if major == "text" && parameterErr == nil {
 		charset := strings.ToLower(params["charset"])
 		if charset == "" || charset == "utf-8" || charset == "utf8" || charset == "us-ascii" {
 			if !utf8.Valid(body) || (charset == "us-ascii" && !isASCIIResponseBody(body)) {

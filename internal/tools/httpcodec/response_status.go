@@ -26,7 +26,7 @@ type responseRules struct {
 	exact map[int]responseRule
 	// classes indexes HTTP status classes from 1 through 5.
 	classes map[int]responseRule
-	// fallback applies to every valid status, including successful 2xx responses.
+	// fallback applies to valid non-2xx statuses without an exact or class rule.
 	fallback *responseRule
 }
 
@@ -135,7 +135,8 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 
 // lookup returns the highest-priority mapping for a valid HTTP status. The
 // returned value cannot mutate the compiled policy. Nil policies and statuses
-// outside 100 through 599 have no match, even when a fallback exists.
+// outside 100 through 599 have no match, even when a fallback exists. Successful
+// 2xx statuses require an explicit exact or class selector to become errors.
 func (r *responseRules) lookup(status int) (responseRule, bool) {
 	if r == nil || status < 100 || status > 599 {
 		return responseRule{}, false
@@ -146,7 +147,7 @@ func (r *responseRules) lookup(status int) (responseRule, bool) {
 	if rule, found := r.classes[status/100]; found {
 		return rule, true
 	}
-	if r.fallback != nil {
+	if r.fallback != nil && (status < 200 || status >= 300) {
 		return *r.fallback, true
 	}
 	return responseRule{}, false

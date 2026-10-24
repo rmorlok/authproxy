@@ -80,9 +80,11 @@ lookup still requires its reference to exist; literal null still encodes as
 
 HTTP error rules select exact `statuses`, one `statusClass` (1 through 5), or
 `default: true`. Repeated selectors at the same priority conflict. Exact status,
-class, and default rules may overlap, with that precedence. Response transforms
-and request templates are only stored here; later compilers validate their
-syntax and the executor checks rendered URLs, headers, and encoded values.
+class, and default rules may overlap, with that precedence. The default matches
+only non-2xx statuses; use an exact status or `statusClass: 2` to deliberately
+map a successful status to an error. Response transforms and request templates
+are only stored here; later compilers validate their syntax and the executor
+checks rendered URLs, headers, and encoded values.
 
 Optional execution limits use exact positive integers: `timeoutMillis` is in
 milliseconds; `maxInputBytes`, `maxOutputBytes`, `maxResponseBytes`, and

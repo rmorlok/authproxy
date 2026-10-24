@@ -24,10 +24,11 @@ type ResponseLimits struct {
 	// during compilation. It does not count JSON/YAML serialization framing.
 	MaxSourceBytes int
 
-	// MaxResponseBytes caps the decoded upstream body supplied to one Map call.
+	// MaxResponseBytes caps a successful response's decoded body supplied to Map.
 	// ContentType is independently capped at this size before MIME parsing.
-	// The executor must bound reads/decompression and account for all responses
-	// in a multi-request invocation; this stateless mapper does neither.
+	// Status errors ignore both fields. The executor must still bound upstream
+	// reads/decompression and account for all responses in a multi-request
+	// invocation; this stateless mapper does neither.
 	MaxResponseBytes int
 
 	// MaxOutputBytes caps successful content before base64 or envelope encoding:
@@ -149,8 +150,6 @@ func (r *Response) Map(ctx context.Context, input ResponseInput) (*api.ToolResul
 
 	var failure *api.ToolResultError
 	switch {
-	case len(input.Body) > r.limits.MaxResponseBytes || len(input.ContentType) > r.limits.MaxResponseBytes:
-		failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The upstream response exceeds the response byte limit."}
 	case input.StatusCode < 100 || input.StatusCode > 599:
 		failure = &api.ToolResultError{Code: "UPSTREAM_PROTOCOL_ERROR", Message: "The upstream response has an invalid HTTP status."}
 	default:
@@ -162,7 +161,10 @@ func (r *Response) Map(ctx context.Context, input ResponseInput) (*api.ToolResul
 		if failure != nil {
 			// Status alone is safe diagnostic data. Never copy a provider's
 			// status text, error body, headers, or URL into the public failure.
+			// Unused body/MIME size cannot replace an authored status error.
 			failure.Details = []byte(fmt.Sprintf(`{"status":%d}`, input.StatusCode))
+		} else if len(input.Body) > r.limits.MaxResponseBytes || len(input.ContentType) > r.limits.MaxResponseBytes {
+			failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The upstream response exceeds the response byte limit."}
 		} else if len(input.Body) > r.limits.MaxOutputBytes {
 			failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The response content exceeds the output byte limit."}
 		} else {

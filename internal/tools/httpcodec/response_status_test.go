@@ -46,7 +46,7 @@ func TestResponseRulesDefaults(t *testing.T) {
 }
 
 // TestResponseRulesPrecedence verifies that selector priority is independent of
-// declaration order and that both classes and defaults can map successful HTTP.
+// declaration order and that explicit selectors can map successful HTTP.
 func TestResponseRulesPrecedence(t *testing.T) {
 	source := []tools.HTTPErrorRule{
 		{Default: true, Code: "FALLBACK", Message: "fallback"},
@@ -84,19 +84,28 @@ func TestResponseRulesPrecedence(t *testing.T) {
 		})
 	}
 
-	// A default rule also covers 2xx when no more specific selector exists.
+	// A default error rule preserves every 2xx response for successful mapping.
 	rules, err := compileResponseRules(&tools.HTTPResponse{Errors: source[:1]}, 1024)
 	require.NoError(t, err)
-	rule, matched := rules.lookup(200)
-	require.True(t, matched)
-	require.Equal(t, "FALLBACK", rule.code)
+	for status := 200; status < 300; status++ {
+		rule, matched := rules.lookup(status)
+		require.False(t, matched, "default error rule must not match status %d", status)
+		require.Zero(t, rule)
+	}
+	// Statuses immediately outside the success range still use the fallback.
+	for _, status := range []int{100, 199, 300, 599} {
+		rule, matched := rules.lookup(status)
+		require.True(t, matched)
+		require.Equal(t, "FALLBACK", rule.code)
+	}
+	// Invalid statuses never become authored errors, even with a default rule.
 	for _, status := range []int{-1, 0, 99, 600} {
 		rule, matched := rules.lookup(status)
 		require.False(t, matched)
 		require.Zero(t, rule)
 	}
 	var absent *responseRules
-	_, matched = absent.lookup(404)
+	_, matched := absent.lookup(404)
 	require.False(t, matched)
 }
 
