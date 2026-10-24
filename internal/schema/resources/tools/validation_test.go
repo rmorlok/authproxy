@@ -31,8 +31,115 @@ func TestValidateNilContracts(t *testing.T) {
 	var limits *ExecutionLimits
 	requireValidationPath(t, definition.Validate(nil), "$")
 	requireValidationPath(t, request.Validate(&common.ValidationContext{Path: "spec.proxyHttp"}), "spec.proxyHttp")
+	requireValidationPath(t, request.ValidateBody(&common.ValidationContext{Path: "spec.proxyHttp"}), "spec.proxyHttp")
 	require.NoError(t, limits.Validate(nil))
 	require.NoError(t, (&ExecutionLimits{}).Validate(nil))
+}
+
+// TestProxyHTTPValidateBodyIgnoresOtherRequestFields allows body compilation
+// independently of the request envelope and response mapping.
+func TestProxyHTTPValidateBodyIgnoresOtherRequestFields(t *testing.T) {
+	// Every non-body component is invalid, but the explicit JSON body is valid.
+	blank := ""
+	request := ProxyHTTP{
+		Headers:  map[string]string{"Bad Header": "x"},
+		Query:    map[string]common.RawJSON{"q": common.RawJSON(`{`)},
+		BodyJSON: common.RawJSON(`null`),
+		Response: &HTTPResponse{TransformJavascript: &blank},
+	}
+	require.NoError(t, request.ValidateBody(nil))
+
+	// Full validation continues to report every unrelated failure.
+	err := request.Validate(nil)
+	var aggregate *multierror.Error
+	require.ErrorAs(t, err, &aggregate)
+	var paths []string
+	for _, failure := range aggregate.Errors {
+		var fieldError *common.ValidationError
+		require.ErrorAs(t, failure, &fieldError)
+		paths = append(paths, fieldError.Path)
+	}
+	require.ElementsMatch(t, []string{
+		"$.method", "$.url", "$.headers.Bad Header", "$.query.q", "$.response.transformJavascript",
+	}, paths)
+}
+
+// TestProxyHTTPValidateBodyDecodedPresence preserves omitted bodies and JSON
+// null while rejecting explicit null for all other body modes in both codecs.
+func TestProxyHTTPValidateBodyDecodedPresence(t *testing.T) {
+	for _, codec := range []string{"JSON", "YAML"} {
+		for _, test := range []struct {
+			name, document, path string
+			jsonBody             bool
+		}{
+			{"omitted body", `{}`, "", false},
+			{"JSON null body", `{"bodyJson":null}`, "", true},
+			{"null template", `{"bodyTemplate":null}`, "bodyTemplate", false},
+			{"null raw body", `{"bodyRaw":null}`, "bodyRaw", false},
+			{"null form", `{"form":null}`, "form", false},
+			{"null multipart", `{"multipart":null}`, "multipart", false},
+		} {
+			t.Run(codec+"/"+test.name, func(t *testing.T) {
+				// JSON syntax is also valid YAML, exercising each decoder's presence handling.
+				var request ProxyHTTP
+				if codec == "JSON" {
+					require.NoError(t, json.Unmarshal([]byte(test.document), &request))
+				} else {
+					require.NoError(t, yaml.Unmarshal([]byte(test.document), &request))
+				}
+
+				// Body validation uses the original decoded object, including private null markers.
+				err := request.ValidateBody(&common.ValidationContext{Path: "spec.proxyHttp"})
+				if test.path != "" {
+					requireValidationPath(t, err, "spec.proxyHttp."+test.path)
+					return
+				}
+				require.NoError(t, err)
+				if test.jsonBody {
+					require.JSONEq(t, "null", string(request.BodyJSON))
+				} else {
+					require.Nil(t, request.BodyJSON)
+				}
+			})
+		}
+	}
+}
+
+// TestProxyHTTPValidateBodyModes checks each mode alone and every conflicting
+// pair without requiring a method or URL for the body-only validation boundary.
+func TestProxyHTTPValidateBodyModes(t *testing.T) {
+	empty := ""
+	modes := []struct {
+		name  string
+		apply func(*ProxyHTTP)
+	}{
+		{"JSON", func(p *ProxyHTTP) { p.BodyJSON = common.RawJSON(`null`) }},
+		{"template", func(p *ProxyHTTP) { p.BodyTemplate = &BodyTemplate{MediaType: "text/plain"} }},
+		{"raw", func(p *ProxyHTTP) { p.BodyRaw = &empty }},
+		{"form", func(p *ProxyHTTP) { p.Form = &FormBody{Fields: map[string]common.RawJSON{}} }},
+		{"multipart", func(p *ProxyHTTP) {
+			p.Multipart = &MultipartBody{Parts: []MultipartPart{{Name: "field", Text: &empty}}}
+		}},
+	}
+	for i, first := range modes {
+		t.Run(first.name, func(t *testing.T) {
+			// A single complete mode is valid even when its content is empty or null.
+			var request ProxyHTTP
+			first.apply(&request)
+			require.NoError(t, request.ValidateBody(nil))
+		})
+		for _, second := range modes[i+1:] {
+			t.Run(first.name+" and "+second.name, func(t *testing.T) {
+				// No pair may silently select one mode and discard the other.
+				var request ProxyHTTP
+				first.apply(&request)
+				second.apply(&request)
+				err := request.ValidateBody(&common.ValidationContext{Path: "spec.proxyHttp"})
+				requireValidationPath(t, err, "spec.proxyHttp")
+				require.ErrorContains(t, err, "at most one")
+			})
+		}
+	}
 }
 
 // TestToolDefinitionValidateAccumulatesErrors retains all independent failures

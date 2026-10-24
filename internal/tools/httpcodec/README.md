@@ -1,9 +1,13 @@
-# Tool HTTP parameter encoding
+# Tool HTTP request encoding
 
-An HTTP Tool often needs to send caller arguments as query parameters or form
-fields. This package renders those fields and encodes them as
-`application/x-www-form-urlencoded` text. The same encoding works in a URL's
-query string and in a form request body.
+An HTTP Tool sends caller arguments in query parameters or a request body. This
+package compiles their templates once, then renders and encodes them for each
+invocation. It supports query parameters, JSON, text, base64 binary, form fields,
+and multipart uploads. It returns bytes and content types without making network
+requests.
+
+Query parameters and form fields use `application/x-www-form-urlencoded`
+encoding. The same encoding works in a URL's query string and a form body.
 
 For example, a CRM search Tool can declare these `proxyHttp.query` fields:
 
@@ -132,6 +136,141 @@ It rejects directive objects just as it rejects other objects.
 Each map entry must contain a complete JSON value: use `common.RawJSON("null")`
 for null. Nil or empty byte slices are invalid; omit the key to omit a field.
 
+## Request bodies
+
+`CompileBody` takes the body fields of a `tools.ProxyHTTP` definition. Choose at
+most one of `bodyJson`, `bodyTemplate`, `bodyRaw`, `form`, or `multipart`.
+
+### JSON
+
+For a CRM contact update, use typed insertion to preserve booleans and nulls:
+
+```yaml
+bodyJson:
+  name: "{{params.name}}"
+  active:
+    $value: params.active
+  manager:
+    $value: params.manager
+```
+
+Arguments `{"name":"Ada","active":false,"manager":null}` produce
+`{"active":false,"manager":null,"name":"Ada"}` with content type
+`application/json`. String values are JSON-escaped automatically. Missing
+required references fail before a body is returned.
+
+### Text templates
+
+Use `bodyTemplate` when the entire payload is authored as text:
+
+```yaml
+bodyTemplate:
+  mediaType: text/plain; charset=utf-8
+  template: "Contact {{params.name}} is ready."
+```
+
+For a JSON text template, use the renderer's `json` view to insert a complete,
+escaped JSON value, including quotes around strings:
+
+```yaml
+bodyTemplate:
+  mediaType: application/json
+  template: '{"name":{{json.params.name}}}'
+```
+
+The codec checks the final text is valid JSON for media subtypes `json` and
+`+json`, including types such as `application/problem+json`. Other media types
+retain the rendered text as-is. Media types and their parameters are literal;
+they are never evaluated as templates.
+
+### Binary and form bodies
+
+For binary data, supply standard base64 in `bodyRaw`:
+
+```yaml
+bodyRaw: "{{params.fileBase64}}"
+```
+
+An argument of `AP+A` produces the three bytes `00 ff 80`. This mode leaves the
+content type to the request headers. It accepts standard padded base64, including
+CR/LF line breaks, and rejects invalid padding bits, URL-safe variants, and
+missing required padding. The base64 text is never a filename or a template
+source to evaluate again.
+
+For a form body, put the query-style field definitions under `form.fields`:
+
+```yaml
+form:
+  fields:
+    search: "{{params.search}}"
+    tag:
+      $value: params.tags
+    cursor:
+      $optional: params.cursor
+```
+
+This uses the parameter rules above and returns content type
+`application/x-www-form-urlencoded`.
+
+### Multipart uploads
+
+A document upload can combine a text comment with binary file content:
+
+```yaml
+multipart:
+  parts:
+    - name: comment
+      text: "{{params.comment}}"
+    - name: upload
+      filename: "{{params.filename}}"
+      mediaType: application/pdf
+      bodyRaw: "{{params.fileBase64}}"
+```
+
+Each part has exactly one of `text` or `bodyRaw`. Names, filenames, and payloads
+can use templates; media types stay literal. A filename is metadata sent to the
+provider, never a path to read from disk. Part order and repeated names are
+preserved. Text defaults to `text/plain`; binary defaults to
+`application/octet-stream`. Rendered names and filenames must be valid UTF-8
+without control characters, and names must be nonempty.
+
+The returned `multipart/form-data` content type includes a generated boundary.
+Request assembly must send that exact content type with the returned bytes.
+
+### Compiling and rendering a body
+
+Using the limits and invocation context from the earlier example:
+
+```go
+bodyProgram, err := httpcodec.CompileBody(&tools.ProxyHTTP{
+    BodyJSON: common.RawJSON(`{
+        "search":"{{params.search}}",
+        "active":{"$value":"params.active"}
+    }`),
+}, limits)
+if err != nil {
+    return err
+}
+body, err := bodyProgram.Render(ctx, data)
+if err != nil {
+    return err
+}
+// body.Present is true, body.ContentType is "application/json", and
+// body.Bytes contains {"active":false,"search":"Ada & Bob"}.
+```
+
+Here `tools` is `internal/schema/resources/tools`. Compilation checks only body
+fields; method, URL, headers, query, and response rules are separate concerns.
+Compiled bodies own their source and support concurrent rendering. Each result
+owns its bytes.
+
+`Present` distinguishes an omitted body from a present empty text, binary, or
+form body. `bodyJson: null` is present and produces the four bytes `null`.
+Explicit nulls for the other body modes are invalid.
+
+`EncodeMultipart` and `DecodeBase64` are also available for already-resolved
+input. They apply the same encoding rules without interpreting templates.
+
 ## Bounds and integration
 
 `CompileParameters` requires positive `render.Limits`. `MaxBytes` independently
@@ -150,11 +289,25 @@ the source limit alone does not guarantee that encoding will succeed.
 Temporary parsing and encoding allocations are proportional to these limits;
 the limits are not a hard memory quota.
 
+`CompileBody` also requires positive limits. `MaxBytes` separately caps the
+source strings, serialized template source, rendered intermediate values,
+and final body. All multipart fields share one rendering budget. Their
+intermediate JSON representation counts escaping and field names; their final
+MIME body counts part headers, boundaries, and the closing delimiter. A small
+payload can therefore exceed the cap after framing. `MaxDepth` and `MaxSteps`
+apply to the compiled render program, not independently to each part.
+
+`EncodeMultipart` takes one positive cap for source and final MIME bytes.
+`DecodeBase64` takes separate positive caps for encoded and decoded bytes; body
+compilation uses `MaxBytes` for both. Encoded CR/LF bytes count toward its input
+cap even though the decoder ignores them.
+
 Cancellation and errors return no partial encoded result. Encoding errors do
 not include resolved configuration values. The codecs do no network or file I/O.
 Request assembly must validate the final URL and headers, decide how structured
-fields combine with an existing query, and use the returned text as the query
-or form body. Authorization, input-schema validation, credentials, request
+fields combine with an existing query, and reconcile body content types with
+authored headers while preserving multipart boundaries. Authorization,
+input-schema validation, credentials, request
 sending, and response handling belong to the execution layer. This package
 does not yet assemble or execute complete Tool requests.
 

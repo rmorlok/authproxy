@@ -134,6 +134,27 @@ func (p *ProxyHTTP) Validate(vc *common.ValidationContext) error {
 	}
 
 	result = multierror.Append(result, validateFields(p.Query, vc.PushField("query")))
+	result = multierror.Append(result, p.ValidateBody(vc))
+
+	if p.Response != nil {
+		result = multierror.Append(result, p.Response.Validate(vc.PushField("response")))
+	}
+
+	return result.ErrorOrNil()
+}
+
+// ValidateBody checks body-mode presence, exclusivity, and static body values
+// without validating the method, URL, headers, query, or response mapping. Body
+// compilers can use this boundary independently while retaining explicit nulls
+// captured by decoding. Rendered values still require runtime validation.
+func (p *ProxyHTTP) ValidateBody(vc *common.ValidationContext) error {
+	vc = validationContext(vc)
+
+	if p == nil {
+		return vc.NewError("HTTP executor is required")
+	}
+
+	var result *multierror.Error
 	for _, name := range p.nullBodyFields {
 		result = multierror.Append(result, vc.NewErrorForField(name, "must not be null"))
 	}
@@ -174,10 +195,6 @@ func (p *ProxyHTTP) Validate(vc *common.ValidationContext) error {
 
 	if bodies > 1 {
 		result = multierror.Append(result, vc.NewError("must contain at most one of bodyJson, bodyTemplate, bodyRaw, form, or multipart"))
-	}
-
-	if p.Response != nil {
-		result = multierror.Append(result, p.Response.Validate(vc.PushField("response")))
 	}
 
 	return result.ErrorOrNil()
