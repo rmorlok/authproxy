@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -305,8 +306,8 @@ func (r *sqlRecordRetriever) ListRequestsFromCursor(ctx context.Context, cursor 
 }
 
 func (r *sqlRecordRetriever) QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error) {
-	return executeRequestEventMetricsQueries(ctx, queries, func(ctx context.Context, query RequestEventMetricsQuery) ([]*LogRecord, error) {
-		return fetchRequestEventMetricRecords(ctx, r.db, r.placeholderFormat, r.provider, query)
+	return executeRequestEventMetricsQueries(ctx, queries, func(ctx context.Context, query RequestEventMetricsQuery) ([]requestEventMetricAggregate, error) {
+		return fetchRequestEventMetricAggregates(ctx, r.db, r.placeholderFormat, r.provider, query)
 	})
 }
 
@@ -682,23 +683,81 @@ func (l *sqlListRequestsBuilder) Enumerate(ctx context.Context, callback paginat
 var _ ListRequestExecutor = (*sqlListRequestsBuilder)(nil)
 var _ ListRequestBuilder = (*sqlListRequestsBuilder)(nil)
 
-func fetchRequestEventMetricRecords(
+// requestEventGroupByColumns maps each supported group-by dimension to the request-event column it groups on. Only
+// columns from this allowlist are ever interpolated into metrics SQL.
+var requestEventGroupByColumns = map[RequestEventGroupBy]string{
+	RequestEventGroupByType:               "type",
+	RequestEventGroupByMethod:             "method",
+	RequestEventGroupByResponseStatusCode: "response_status_code",
+	RequestEventGroupByResponseSource:     "response_source",
+	RequestEventGroupByConnectorID:        "connector_id",
+}
+
+// sqlInt64Expr wraps an aggregate expression so it scans as a 64-bit integer on every provider: Postgres returns
+// NUMERIC for SUM(bigint) and ClickHouse returns unsigned types for COUNT/SUM.
+func sqlInt64Expr(provider config.DatabaseProvider, expr string) string {
+	if provider == config.DatabaseProviderClickhouse {
+		return "toInt64(" + expr + ")"
+	}
+	return "CAST(" + expr + " AS BIGINT)"
+}
+
+// fetchRequestEventMetricAggregates runs a request-event metrics query against a SQL provider (Postgres, SQLite, or
+// ClickHouse) and returns rows aggregated by time bucket and the query's group-by dimensions.
+//
+// Aggregation happens in the database so the result size is bounded by buckets × groups rather than by the number of
+// request events in the range; loading raw events made dashboard queries over busy namespaces exceed client timeouts.
+// The exception is the p95 duration metric: nearest-rank percentiles are not portable across providers, so it selects
+// a narrow (bucket, group columns, duration) projection per event and the percentile is computed in Go.
+func fetchRequestEventMetricAggregates(
 	ctx context.Context,
 	db *sql.DB,
 	placeholderFormat sq.PlaceholderFormat,
 	provider config.DatabaseProvider,
 	query RequestEventMetricsQuery,
-) ([]*LogRecord, error) {
+) ([]requestEventMetricAggregate, error) {
+	startMS := query.Start.UnixMilli()
+	stepMS := query.Step.Milliseconds()
+
+	// Align each event to the start of its bucket. The integers are derived from validated time values (not user
+	// strings), and inlining them keeps the SELECT and GROUP BY expressions textually identical, which Postgres
+	// requires when grouping by an expression. Modulo (rather than division) keeps the expression integer-valued on
+	// ClickHouse, whose "/" operator always produces a float.
+	bucketExpr := fmt.Sprintf("timestamp_ms - ((timestamp_ms - %d) %% %d)", startMS, stepMS)
+
+	groupColumns := make([]string, 0, len(query.GroupBy))
+	for _, groupBy := range query.GroupBy {
+		column, ok := requestEventGroupByColumns[groupBy]
+		if !ok {
+			return nil, fmt.Errorf("unsupported request event group_by dimension %q", groupBy)
+		}
+		groupColumns = append(groupColumns, column)
+	}
+
+	perEvent := query.Metric == RequestEventMetricDurationP95MS
+	columns := append([]string{bucketExpr}, groupColumns...)
+	if perEvent {
+		columns = append(columns, "duration_ms")
+	} else {
+		columns = append(columns,
+			sqlInt64Expr(provider, "COUNT(*)"),
+			sqlInt64Expr(provider, "SUM(CASE WHEN "+requestEventErrorSQL+" THEN 1 ELSE 0 END)"),
+			sqlInt64Expr(provider, "SUM(duration_ms)"),
+		)
+	}
+
 	builder := &sqlListRequestsBuilder{
 		ListFilters:       requestEventMetricsFilters(query),
 		db:                db,
 		placeholderFormat: placeholderFormat,
 		provider:          provider,
 	}
-	selectBuilder := builder.applyFilters(sq.Select(entryRecordColumns...).
+	selectBuilder := builder.applyFilters(sq.Select(columns...).
 		From(entryRecordsTable).
-		PlaceholderFormat(placeholderFormat)).
-		OrderBy("timestamp_ms ASC")
+		PlaceholderFormat(placeholderFormat))
+	if !perEvent {
+		selectBuilder = selectBuilder.GroupBy(append([]string{bucketExpr}, groupColumns...)...)
+	}
 
 	sqlQuery, args, err := selectBuilder.ToSql()
 	if err != nil {
@@ -711,18 +770,52 @@ func fetchRequestEventMetricRecords(
 	}
 	defer rows.Close()
 
-	records := make([]*LogRecord, 0)
+	out := make([]requestEventMetricAggregate, 0)
 	for rows.Next() {
-		record, err := scanLogRecord(rows)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan request event metric record: %w", err)
+		var row requestEventMetricAggregate
+		var statusCode int64
+		groupValues := make([]string, len(query.GroupBy))
+
+		dest := make([]any, 0, len(columns))
+		dest = append(dest, &row.BucketStartMS)
+		for i, groupBy := range query.GroupBy {
+			if groupBy == RequestEventGroupByResponseStatusCode {
+				dest = append(dest, &statusCode)
+			} else {
+				dest = append(dest, &groupValues[i])
+			}
 		}
-		records = append(records, record)
+		if perEvent {
+			row.Count = 1
+			dest = append(dest, &row.DurationSumMS)
+		} else {
+			dest = append(dest, &row.Count, &row.ErrorCount, &row.DurationSumMS)
+		}
+
+		if err := rows.Scan(dest...); err != nil {
+			return nil, fmt.Errorf("failed to scan request event metric row: %w", err)
+		}
+
+		row.Labels = make(map[string]string, len(query.GroupBy))
+		for i, groupBy := range query.GroupBy {
+			value := groupValues[i]
+			switch groupBy {
+			case RequestEventGroupByResponseStatusCode:
+				value = strconv.FormatInt(statusCode, 10)
+			case RequestEventGroupByResponseSource:
+				// Rows written before response_source existed may be blank; they were upstream responses.
+				if value == "" {
+					value = string(ResponseSourceUpstream)
+				}
+			}
+			row.Labels[string(groupBy)] = value
+		}
+		out = append(out, row)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("failed to iterate request event metric records: %w", err)
+		return nil, fmt.Errorf("failed to iterate request event metric rows: %w", err)
 	}
-	return records, nil
+	return out, nil
 }
 
 // Suppress unused import warnings

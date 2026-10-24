@@ -205,8 +205,8 @@ func (r *clickhouseRecordRetriever) ListRequestsFromCursor(ctx context.Context, 
 }
 
 func (r *clickhouseRecordRetriever) QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error) {
-	return executeRequestEventMetricsQueries(ctx, queries, func(ctx context.Context, query RequestEventMetricsQuery) ([]*LogRecord, error) {
-		return fetchRequestEventMetricRecords(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
+	return executeRequestEventMetricsQueries(ctx, queries, func(ctx context.Context, query RequestEventMetricsQuery) ([]requestEventMetricAggregate, error) {
+		return fetchRequestEventMetricAggregates(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
 	})
 }
 

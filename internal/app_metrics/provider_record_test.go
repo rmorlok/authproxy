@@ -567,6 +567,75 @@ func TestRequestEvents_Metrics_ErrorsAndDurations(t *testing.T) {
 	require.Equal(t, []float64{900, 300}, byRef["p95"])
 }
 
+func TestRequestEvents_Metrics_GroupedAggregatesAcrossBuckets(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	ctx := context.Background()
+
+	// Events spread across two 15m buckets and two methods, plus one stamped exactly at End, which the inclusive
+	// timestamp filter returns but must not land in any bucket.
+	base := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{
+		makeRecord("root", recordOpts{timestamp: base, method: "GET", statusCode: 200, duration: 100 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(time.Minute), method: "GET", statusCode: 500, duration: 300 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(2 * time.Minute), method: "POST", statusCode: 503, duration: 50 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(15 * time.Minute), method: "GET", statusCode: 404, duration: 20 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(29 * time.Minute), method: "GET", statusCode: 201, duration: 40 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(30 * time.Minute), method: "GET", statusCode: 500, duration: 999 * time.Millisecond}),
+	}))
+
+	byMethod := func(metric RequestEventMetric) RequestEventMetricsQuery {
+		return RequestEventMetricsQuery{
+			RefID:   string(metric),
+			Metric:  metric,
+			Start:   base,
+			End:     base.Add(30 * time.Minute),
+			Step:    15 * time.Minute,
+			GroupBy: []RequestEventGroupBy{RequestEventGroupByMethod},
+		}
+	}
+	series, err := retriever.QueryRequestEventMetrics(ctx, []RequestEventMetricsQuery{
+		byMethod(RequestEventMetricCount),
+		byMethod(RequestEventMetricErrorsCount),
+		byMethod(RequestEventMetricDurationAvgMS),
+	})
+	require.NoError(t, err)
+
+	values := map[string][]float64{}
+	for _, s := range series {
+		key := s.RefID + "/" + s.Labels["method"]
+		for _, point := range s.Points {
+			values[key] = append(values[key], point.Value)
+		}
+	}
+
+	// Per-bucket counts are split by method; the event at End is excluded.
+	require.Equal(t, []float64{2, 2}, values["request_events.count/GET"])
+	require.Equal(t, []float64{1, 0}, values["request_events.count/POST"])
+
+	// Error counts use the >= 400 status rule within each group and bucket.
+	require.Equal(t, []float64{1, 1}, values["request_events.errors.count/GET"])
+	require.Equal(t, []float64{1, 0}, values["request_events.errors.count/POST"])
+
+	// Averages divide the summed duration by the event count per group and bucket.
+	require.Equal(t, []float64{200, 30}, values["request_events.duration_ms.avg/GET"])
+	require.Equal(t, []float64{50, 0}, values["request_events.duration_ms.avg/POST"])
+}
+
+func TestRequestEvents_Metrics_RejectsSubMillisecondStep(t *testing.T) {
+	_, retriever, _ := MustNewBlankRequestEventsStore(t)
+	base := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+
+	// Buckets are computed on millisecond timestamps, so fractional-millisecond steps are rejected up front.
+	_, err := retriever.QueryRequestEventMetrics(context.Background(), []RequestEventMetricsQuery{{
+		RefID:  "requests",
+		Metric: RequestEventMetricCount,
+		Start:  base,
+		End:    base.Add(time.Second),
+		Step:   1500 * time.Microsecond,
+	}})
+	require.ErrorContains(t, err, "whole number of milliseconds")
+}
+
 func collectIDs(records []*LogRecord) map[apid.ID]bool {
 	out := make(map[apid.ID]bool, len(records))
 	for _, r := range records {
