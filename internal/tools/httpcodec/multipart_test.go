@@ -22,9 +22,9 @@ func multipartText(value string) *string { return &value }
 func TestEncodeMultipartRoundTrip(t *testing.T) {
 	// Already-resolved template-like strings stay inert, including file paths.
 	parts := []tools.MultipartPart{
-		{Name: "tag", Text: multipartText("first\nline")},
+		{Name: "tag", Text: multipartText("Ünïcödé note\nline")},
 		{Name: "tag", Text: multipartText("")},
-		{Name: `a"\☃`, Filename: `résumé"\.txt`, MediaType: "text/plain; charset=utf-8", Text: multipartText("{{cfg.secret}}")},
+		{Name: `a"\☃`, Filename: `résumé"\.txt`, MediaType: "text/plain", Text: multipartText("{{cfg.secret}}")},
 		{Name: "attachment", Filename: "/server/private/credentials.bin", BodyRaw: multipartText("AP+A")},
 		{Name: "image", MediaType: "image/png", BodyRaw: multipartText("aW1hZ2U=")},
 	}
@@ -36,10 +36,11 @@ func TestEncodeMultipartRoundTrip(t *testing.T) {
 	require.NotEmpty(t, parameters["boundary"])
 	require.NotContains(t, string(body), "filename*=")
 
-	// Parse ordinary MIME parts to verify their order, headers, and exact bytes.
+	// Default text parts declare UTF-8 and preserve Unicode bytes; an explicit
+	// text/plain type stays as authored without an added charset parameter.
 	reader := multipart.NewReader(bytes.NewReader(body), parameters["boundary"])
-	wantTypes := []string{"text/plain", "text/plain", "text/plain; charset=utf-8", "application/octet-stream", "image/png"}
-	wantBodies := [][]byte{[]byte("first\nline"), {}, []byte("{{cfg.secret}}"), {0, 255, 128}, []byte("image")}
+	wantTypes := []string{"text/plain; charset=utf-8", "text/plain; charset=utf-8", "text/plain", "application/octet-stream", "image/png"}
+	wantBodies := [][]byte{[]byte("Ünïcödé note\nline"), {}, []byte("{{cfg.secret}}"), {0, 255, 128}, []byte("image")}
 	for i, source := range parts {
 		part, err := reader.NextPart()
 		require.NoError(t, err)
@@ -164,30 +165,6 @@ func TestEncodeMultipartArgumentsAndCancellation(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	require.Zero(t, n)
 	require.Empty(t, buffer.Bytes())
-}
-
-// TestParseBodyMediaType accepts concrete MIME types while rejecting header
-// controls, wildcards, and bare tokens accepted by the standard MIME parser.
-func TestParseBodyMediaType(t *testing.T) {
-	// MIME type comparison is case-insensitive; parameter values stay external.
-	for input, want := range map[string]string{
-		"Application/JSON; charset=utf-8": "application/json",
-		"application/problem+json":        "application/problem+json",
-		"text/plain; charset=\"UTF-8\"":   "text/plain",
-		"application/octet-stream":        "application/octet-stream",
-	} {
-		actual, err := parseBodyMediaType(input)
-		require.NoError(t, err)
-		require.Equal(t, want, actual)
-	}
-
-	// Errors stay generic even if an invalid header contains private data.
-	for _, input := range []string{"", "private-config", "text/", "/json", "text/*", "*/json", "application/*+json", "text/plain; broken", "text/plain\r\nprivate-config", "text/plain\x00", "text/plain\t", "text/plain\x7f", string([]byte{0xff})} {
-		actual, err := parseBodyMediaType(input)
-		require.Error(t, err)
-		require.Empty(t, actual)
-		require.NotContains(t, err.Error(), "private-config")
-	}
 }
 
 // FuzzEncodeMultipart checks quoted metadata cannot change names or payloads

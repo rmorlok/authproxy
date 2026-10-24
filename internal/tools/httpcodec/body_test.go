@@ -145,10 +145,11 @@ func TestBodyFormReusesParameterRules(t *testing.T) {
 // TestBodyMultipartRendersMetadataAndPayload preserves part order and literal
 // MIME types while templating names, filenames, and both payload modes.
 func TestBodyMultipartRendersMetadataAndPayload(t *testing.T) {
-	// Both parts deliberately use the same rendered name to model repeated uploads.
+	// Both parts use the same rendered name; template whitespace is allowed in
+	// the source even though tabs would be rejected in the final MIME metadata.
 	program, err := httpcodec.CompileBody(&tools.ProxyHTTP{Multipart: &tools.MultipartBody{Parts: []tools.MultipartPart{
-		{Name: "{{params.name}}", Text: bodyString("{{params.text}}"), MediaType: `text/plain; note="{{cfg.absent}}"`},
-		{Name: "{{params.name}}", Filename: "{{params.filename}}", BodyRaw: bodyString("{{params.binary}}")},
+		{Name: "{{\tparams.name\t}}", Text: bodyString("{{params.text}}"), MediaType: `text/plain; note="{{cfg.absent}}"`},
+		{Name: "{{params.name}}", Filename: "{{\tparams.filename\t}}", BodyRaw: bodyString("{{params.binary}}")},
 	}}}, parameterLimits())
 	require.NoError(t, err)
 	result, err := program.Render(context.Background(), parameterContext(t, render.Input{Params: map[string]any{

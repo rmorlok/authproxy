@@ -47,6 +47,7 @@ type ProxyHTTP struct {
 // BodyTemplate supplies rendered text and its declared media type. A JSON
 // media type requires parsing the rendered result as JSON before sending it.
 type BodyTemplate struct {
+	// MediaType is a literal content type; it does not evaluate templates.
 	MediaType string `json:"mediaType" yaml:"mediaType"`
 	Template  string `json:"template" yaml:"template"`
 }
@@ -68,8 +69,9 @@ type MultipartBody struct {
 // MultipartPart contains either text or base64 binary data. Filename and
 // MediaType describe a part and never cause server filesystem access.
 type MultipartPart struct {
-	Name      string  `json:"name" yaml:"name"`
-	Filename  string  `json:"filename,omitempty" yaml:"filename,omitempty"`
+	Name     string `json:"name" yaml:"name"`
+	Filename string `json:"filename,omitempty" yaml:"filename,omitempty"`
+	// MediaType is literal for a compiled Tool; it cannot vary with invocation data.
 	MediaType string  `json:"mediaType,omitempty" yaml:"mediaType,omitempty"`
 	Text      *string `json:"text,omitempty" yaml:"text,omitempty"`
 	BodyRaw   *string `json:"bodyRaw,omitempty" yaml:"bodyRaw,omitempty"`

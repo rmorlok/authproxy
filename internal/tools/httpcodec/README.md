@@ -230,9 +230,15 @@ multipart:
 Each part has exactly one of `text` or `bodyRaw`. Names, filenames, and payloads
 can use templates; media types stay literal. A filename is metadata sent to the
 provider, never a path to read from disk. Part order and repeated names are
-preserved. Text defaults to `text/plain`; binary defaults to
+preserved. Text defaults to `text/plain; charset=utf-8`; binary defaults to
 `application/octet-stream`. Rendered names and filenames must be valid UTF-8
 without control characters, and names must be nonempty.
+
+A compiled body does not support `mediaType: "{{params.contentType}}"`. The upload
+above sends `application/pdf` on every invocation, even when the supplied bytes
+contain a PNG. Use separate definitions for specific types, or omit `mediaType`
+to send `application/octet-stream` when the provider accepts generic binary data.
+The codec does not infer a media type from the filename or file contents.
 
 The returned `multipart/form-data` content type includes a generated boundary.
 Request assembly must send that exact content type with the returned bytes.

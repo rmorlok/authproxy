@@ -15,8 +15,8 @@ import (
 // EncodeMultipart encodes already-rendered fields and binary parts in input
 // order, preserving repeated names. It does not interpret templates or read
 // filenames. Each part must have exactly one text or base64 body. Text defaults
-// to text/plain and binary to application/octet-stream unless a concrete media
-// type is supplied. Names and filenames are quoted UTF-8 metadata.
+// to text/plain; charset=utf-8 and binary to application/octet-stream unless a
+// concrete media type is supplied. Names and filenames are quoted UTF-8 metadata.
 //
 // maxBytes must be positive and separately caps aggregate source string bytes
 // and the complete encoded body, including headers and boundaries. The returned
@@ -37,7 +37,7 @@ func EncodeMultipart(ctx context.Context, parts []tools.MultipartPart, maxBytes 
 		if part.Text != nil {
 			payload = []byte(*part.Text)
 			if contentType == "" {
-				contentType = "text/plain"
+				contentType = "text/plain; charset=utf-8"
 			}
 		} else {
 			var err error
@@ -120,11 +120,11 @@ func validateMultipartSource(ctx context.Context, parts []tools.MultipartPart, m
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if strings.TrimSpace(part.Name) == "" || !validPartMetadata(part.Name) || !validPartMetadata(part.Filename) {
+		if strings.TrimSpace(part.Name) == "" || !tools.IsValidMultipartMetadata(part.Name) || !tools.IsValidMultipartMetadata(part.Filename) {
 			return errors.New("multipart names and filenames must be valid UTF-8 without control characters; names must be nonempty")
 		}
 		if part.MediaType != "" {
-			if _, err := parseBodyMediaType(part.MediaType); err != nil {
+			if _, err := tools.ParseBodyMediaType(part.MediaType); err != nil {
 				return err
 			}
 		}

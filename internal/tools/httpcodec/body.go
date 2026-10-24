@@ -80,7 +80,7 @@ func CompileBody(source *tools.ProxyHTTP, limits render.Limits) (*Body, error) {
 	case source.BodyTemplate != nil:
 		body.mode, body.contentType = bodyText, source.BodyTemplate.MediaType
 		var mediaType string
-		mediaType, err = parseBodyMediaType(body.contentType)
+		mediaType, err = tools.ParseBodyMediaType(body.contentType)
 		if err == nil {
 			_, subtype, _ := strings.Cut(mediaType, "/")
 			body.jsonText = subtype == "json" || strings.HasSuffix(subtype, "+json")
@@ -160,11 +160,6 @@ func (b *Body) compileMultipart(source []tools.MultipartPart) error {
 		if !utf8.ValidString(part.Name) || !utf8.ValidString(part.Filename) ||
 			(part.Text != nil && !utf8.ValidString(*part.Text)) || (part.BodyRaw != nil && !utf8.ValidString(*part.BodyRaw)) {
 			return errors.New("multipart template strings must be valid UTF-8")
-		}
-		if part.MediaType != "" {
-			if _, err := parseBodyMediaType(part.MediaType); err != nil {
-				return err
-			}
 		}
 		parts[i] = part
 		parts[i].MediaType = ""
