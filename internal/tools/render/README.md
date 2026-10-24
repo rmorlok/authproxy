@@ -7,10 +7,10 @@ values such as the provider's API host and the tenant selected during setup.
 
 This package combines those values into strings and structured JSON for request
 construction. It copies invocation data, resolves template references, applies
-explicit encoding, and limits rendering work. The HTTP execution layer is
-responsible for authorization, input-schema validation, final URL/header/body
-validation, authentication, and sending the request. Integration with that layer
-is separate from this package's rendering API.
+explicit encoding, and limits rendering work. The [HTTP codec](../httpcodec/README.md)
+uses these programs to validate and assemble complete outbound requests.
+Authorization, input-schema validation, authentication, sending, and response
+handling remain responsibilities of the execution layer.
 
 ## Example: update a CRM contact
 
@@ -51,6 +51,13 @@ https://crm.example.com/v1/tenants/acme/contacts/sales%2F42?fields=name+email
 `sales/42` so the contact ID remains one path segment. The `query` view encodes
 the space in `name email` as `+`. These are explicit choices made by the template
 author; ordinary interpolation does no URL encoding.
+
+Use raw interpolation only when a value is intended to supply URL syntax.
+Putting it immediately after a host without a `/` can change the authority;
+putting it in a path can introduce slashes or query parameters. The HTTP codec's
+[URL interpolation examples](../httpcodec/README.md#choosing-url-interpolation)
+show the component boundaries and explain which inputs still need schema
+constraints after encoding.
 
 The same invocation can render this JSON body with `RenderValue`:
 
