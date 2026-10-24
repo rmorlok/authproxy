@@ -1,10 +1,10 @@
-# Tool HTTP request encoding
+# Tool HTTP request preparation
 
 An HTTP Tool sends caller arguments in query parameters or a request body. This
 package compiles their templates once, then renders and encodes them for each
 invocation. It supports query parameters, JSON, text, base64 binary, form fields,
-and multipart uploads. It returns bytes and content types without making network
-requests.
+and multipart uploads. It can return individual encoded components or a complete
+outbound `http.Request`, without making network requests.
 
 Query parameters and form fields use `application/x-www-form-urlencoded`
 encoding. The same encoding works in a URL's query string and a form body.
@@ -277,6 +277,86 @@ Explicit nulls for the other body modes are invalid.
 `EncodeMultipart` and `DecodeBase64` are also available for already-resolved
 input. They apply the same encoding rules without interpreting templates.
 
+## Complete requests
+
+`CompileRequest` combines the envelope, query, and body codecs. For example, a
+CRM contact update can declare:
+
+```yaml
+method: PATCH
+url: "https://{{cfg.apiHost}}/v1/contacts/{{path.params.contactId}}?audit=1"
+headers:
+  X-Tenant: "{{cfg.tenant}}"
+query:
+  tag:
+    $value: params.tags
+bodyJson:
+  name: "{{params.name}}"
+```
+
+With `cfg.apiHost` set to `crm.example.com`, tenant `acme`, contact ID `sales/42`,
+tags `["lead", "web"]`, and name `Ada`, the prepared request contains:
+
+```http
+PATCH /v1/contacts/sales%2F42?audit=1&tag=lead&tag=web
+Host: crm.example.com
+X-Tenant: acme
+Content-Type: application/json
+
+{"name":"Ada"}
+```
+
+After decoding the definition into a `*tools.ProxyHTTP` and capturing invocation
+data with `render.NewContext`, compile once and render each invocation:
+
+```go
+requestProgram, err := httpcodec.CompileRequest(definition, limits)
+if err != nil {
+    return err
+}
+outbound, err := requestProgram.Render(ctx, data)
+if err != nil {
+    return err
+}
+// outbound is ready for the connection's streaming proxy. No request has
+// been sent and no credentials have been applied.
+```
+
+Each result owns its URL, headers, and body reader. The caller must close the
+body or transfer it to the proxy. Present bodies have `GetBody` readers for the
+proxy's existing authentication-recovery behavior; each reader starts at byte
+zero. Absent bodies have a nil reader, while present empty bodies use
+`http.NoBody`. The method is a literal HTTP token, including extension methods;
+URL and header values can use templates. Header names stay literal.
+
+Final validation and combination rules are:
+
+| Component | Rule |
+| --- | --- |
+| URL | Absolute HTTP or HTTPS with a valid authority. Reject fragments, opaque URLs, unescaped whitespace/control bytes, and malformed escapes. Preserve existing path/query spelling, including semicolons in query data. |
+| Structured query | Append encoded fields after the existing query. Reject a key present in both sources; repeated values within one source are allowed. An omitted `$optional` field does not collide. |
+| Header names | HTTP tokens, unique without regard to case. Reject hop-by-hop and framing headers such as `Connection`, `Transfer-Encoding`, `Trailer`, and `Content-Length`; the transport handles framing. |
+| Header values | Reject control bytes other than horizontal tabs. Validate a rendered `Content-Type` as a concrete media type. |
+| Host override | A `Host` header template becomes `outbound.Host`, separate from ordinary headers. It changes the HTTP authority; the URL still selects the network destination and TLS server name. |
+| Credentials | Preserve authored authorization headers and query values. Connection credentials are applied later by the proxy with its existing precedence. |
+
+For example, `url: "https://{{cfg.apiHost}}/upload"` with
+`headers: {Host: "{{cfg.virtualHost}}"}` can connect to one configured host while
+sending another HTTP Host value. The codec performs no DNS lookup or destination
+allowlisting; deployment egress policy still applies at execution.
+
+Body codecs supply a default `Content-Type`. An authored header may add
+parameters but cannot contradict declared body parameters. Structured JSON may
+use a JSON media type such as `application/vnd.example+json`; text templates and
+forms must retain their declared base media type. Multipart accepts an authored
+`multipart/form-data` header, then adds the generated boundary. An authored
+boundary is rejected because it cannot describe the generated body. Raw or absent
+bodies use the authored media type, if supplied.
+
+Compilation covers outbound request fields. Response rules, authorization,
+input-schema validation, credential capture, sending, and response handling
+remain execution-layer responsibilities.
+
 ## Bounds and integration
 
 `CompileParameters` requires positive `render.Limits`. `MaxBytes` independently
@@ -310,12 +390,20 @@ cap even though the decoder ignores them.
 
 Cancellation and errors return no partial encoded result. Encoding errors do
 not include resolved configuration values. The codecs do no network or file I/O.
-Request assembly must validate the final URL and headers, decide how structured
-fields combine with an existing query, and reconcile body content types with
-authored headers while preserving multipart boundaries. Authorization,
-input-schema validation, credentials, request
-sending, and response handling belong to the execution layer. This package
-does not yet assemble or execute complete Tool requests.
+`CompileRequest` uses three bounded programs: one for the URL and all header
+values together, one for query values, and one for the body. `MaxDepth` and
+`MaxSteps` apply per program, so the entire request can use up to three
+`MaxSteps` allowances. Adding headers does not create a separate allowance per
+header.
+
+The complete-request compiler also caps combined raw source bytes and final
+prepared data with `MaxBytes`. Source counting includes the method, URL, header
+names/values, query names/JSON values, and all body source fields. Final counting
+includes the method, serialized URL, effective Host, header names/values
+(including generated content types), and body bytes. This is a prepared-data cap,
+not an exact wire-size cap: credentials, transport framing, and automatically
+added headers come later. A request can fit every component limit but exceed the
+combined limit; failures return no partial request.
 
 Run `go test -race ./internal/tools/httpcodec ./internal/tools/render` for the
 codec and renderer tests.
