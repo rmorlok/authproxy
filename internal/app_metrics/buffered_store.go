@@ -2,14 +2,33 @@ package app_metrics
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
+
+	"github.com/rmorlok/authproxy/internal/aptelemetry"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
+
+// telemetryInstrumentationName is the OTel instrumentation scope for metrics emitted by this package.
+const telemetryInstrumentationName = "github.com/rmorlok/authproxy/internal/app_metrics"
 
 const (
 	// bufferedStoreWriteTimeout bounds each batch write so a hung database cannot stall the flush loop indefinitely.
 	bufferedStoreWriteTimeout = 30 * time.Second
+
+	// droppedRequestEventsMetric counts request events that were never persisted, so operators can alert on lost
+	// request metrics. The reason attribute is one of the droppedReason* values.
+	droppedRequestEventsMetric = "authproxy.app_metrics.request_events.dropped"
+
+	// droppedReasonBufferFull marks events rejected because the write buffer was at maxBuffered.
+	droppedReasonBufferFull = "buffer_full"
+	// droppedReasonWriteFailed marks events discarded because their batch write to the database failed.
+	droppedReasonWriteFailed = "write_failed"
 
 	// bufferedStoreMaxChunk caps the number of rows in one INSERT. Request-event inserts bind ~32 parameters per row
 	// and Postgres allows at most 65535 bind parameters per statement, so larger configured batch sizes are written
@@ -39,16 +58,43 @@ type bufferedRecordStore struct {
 	// dropped counts records discarded because the buffer was full since the last report.
 	dropped int
 
+	// droppedCounter, when non-nil, records lost events by reason; see droppedRequestEventsMetric.
+	droppedCounter metric.Int64Counter
+
 	flushCh   chan struct{}
 	closeCh   chan struct{}
 	doneCh    chan struct{}
 	closeOnce sync.Once
 }
 
+// newDroppedRequestEventsCounter creates the counter for lost request events. It returns nil (no metric) when
+// telemetry or the metrics signal is disabled; the buffered store treats a nil counter as a no-op.
+func newDroppedRequestEventsCounter(providers *aptelemetry.Providers, cfg *sconfig.Telemetry) (metric.Int64Counter, error) {
+	if providers == nil || !providers.Enabled || providers.MeterProvider == nil || !cfg.MetricsEnabled() {
+		return nil, nil
+	}
+	counter, err := providers.MeterProvider.Meter(telemetryInstrumentationName).Int64Counter(
+		droppedRequestEventsMetric,
+		metric.WithDescription("Request events that were not persisted to app metrics storage, by reason."),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("app_metrics: create dropped request events counter: %w", err)
+	}
+	return counter, nil
+}
+
 // NewBufferedStore wraps inner so that StoreRecord/StoreRecords enqueue records and return immediately; a background
 // goroutine writes them in batches. flushBatchSize, flushInterval, and maxBuffered fall back to safe defaults when
-// non-positive. The caller must Close the returned store to flush pending records and stop the goroutine.
-func NewBufferedStore(inner RecordStore, flushBatchSize int, flushInterval time.Duration, maxBuffered int, logger *slog.Logger) RecordStore {
+// non-positive. droppedCounter may be nil; when set, it is incremented for every event that is never persisted. The
+// caller must Close the returned store to flush pending records and stop the goroutine.
+func NewBufferedStore(
+	inner RecordStore,
+	flushBatchSize int,
+	flushInterval time.Duration,
+	maxBuffered int,
+	droppedCounter metric.Int64Counter,
+	logger *slog.Logger,
+) RecordStore {
 	if flushBatchSize <= 0 {
 		flushBatchSize = 1000
 	}
@@ -68,6 +114,7 @@ func NewBufferedStore(inner RecordStore, flushBatchSize int, flushInterval time.
 		flushBatchSize: flushBatchSize,
 		flushInterval:  flushInterval,
 		maxBuffered:    maxBuffered,
+		droppedCounter: droppedCounter,
 		buffer:         make([]*LogRecord, 0, flushBatchSize),
 		flushCh:        make(chan struct{}, 1),
 		closeCh:        make(chan struct{}),
@@ -124,6 +171,7 @@ func (s *bufferedRecordStore) flush() {
 		cancel()
 		if err != nil {
 			s.logger.Error("failed to write buffered request event records", "error", err, "records", len(chunk))
+			s.recordDropped(droppedReasonWriteFailed, len(chunk))
 		}
 	}
 }
@@ -135,6 +183,7 @@ func (s *bufferedRecordStore) StoreRecord(_ context.Context, record *LogRecord) 
 	if len(s.buffer) >= s.maxBuffered {
 		s.dropped++
 		s.mu.Unlock()
+		s.recordDropped(droppedReasonBufferFull, 1)
 		return nil
 	}
 	s.buffer = append(s.buffer, record)
@@ -150,6 +199,15 @@ func (s *bufferedRecordStore) StoreRecord(_ context.Context, record *LogRecord) 
 	}
 
 	return nil
+}
+
+// recordDropped adds n lost events with the given reason to the dropped-events counter, if one is configured. It uses
+// a background context because the counter must be recorded even when the caller's request context is done.
+func (s *bufferedRecordStore) recordDropped(reason string, n int) {
+	if s.droppedCounter == nil || n <= 0 {
+		return
+	}
+	s.droppedCounter.Add(context.Background(), int64(n), metric.WithAttributes(attribute.String("reason", reason)))
 }
 
 // StoreRecords enqueues each record; see StoreRecord.

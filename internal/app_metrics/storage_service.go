@@ -265,11 +265,18 @@ func NewStorageService(
 	// Request events are recorded once per proxied request, so they are batched
 	// rather than inserted one row at a time. Close flushes anything still
 	// buffered.
+	// The dropped-events counter reuses the telemetry handed to the database tier so operators can alert on lost
+	// request metrics; it is nil (a no-op) when metrics are disabled.
+	droppedCounter, err := newDroppedRequestEventsCounter(sqlh.TelemetryFromOptions(dbOpts...))
+	if err != nil {
+		return nil, err
+	}
 	eventStore := NewBufferedStore(
 		store,
 		requestEvents.GetFlushBatchSize(),
 		requestEvents.GetFlushInterval(),
 		requestEvents.GetMaxBufferedRecords(),
+		droppedCounter,
 		logger,
 	)
 

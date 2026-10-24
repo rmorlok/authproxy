@@ -92,6 +92,10 @@ Standard `db.client.connections.*` and per-command histograms emitted by the red
 
 OAuth2 counters also receive any **allowlisted** connection-label dimensions from `telemetry.proxy.metricDimensionLabels` (e.g. `type=google_drive`, `env=prod`). The raw `authproxy.connector_id` is intentionally **not** emitted as a metric attribute — see the [label projection](#label-projection) section.
 
+### App metrics
+
+- `authproxy.app_metrics.request_events.dropped{reason}` — counter. Request events that were never written to app-metrics storage. `reason` is `buffer_full` (the in-memory write buffer was at `appMetrics.requestEvents.maxBufferedRecords` because the database could not keep up) or `write_failed` (a batch write returned an error). Alert on any sustained non-zero rate: request listings and metrics are missing data.
+
 ## Configuration reference
 
 Full schema, with comments. Every field is optional unless noted.

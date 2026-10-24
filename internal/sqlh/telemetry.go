@@ -46,6 +46,13 @@ func resolveOpts(opts []Option) *telemetryOpts {
 	return o
 }
 
+// TelemetryFromOptions returns the OTel providers and config carried by opts (set via WithTelemetry), so callers that
+// accept sqlh options can instrument their own non-database work with the same settings. Either result may be nil.
+func TelemetryFromOptions(opts ...Option) (*aptelemetry.Providers, *sconfig.Telemetry) {
+	o := resolveOpts(opts)
+	return o.providers, o.cfg
+}
+
 // telemetryEnabled reports whether the resolved telemetry options should
 // produce an instrumented sql.DB. Both a live providers handle and at least
 // one enabled signal are required.
