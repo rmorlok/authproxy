@@ -20,18 +20,26 @@ import (
 
 type StorageService struct {
 	logger *slog.Logger
-	// store is the underlying provider store. Resource samples are written to it directly because snapshots are
-	// already written in bulk pages by the snapshot task.
+
+	// store is the underlying provider store. Resource samples are written to
+	// it directly because snapshots are already written in bulk pages by the
+	// snapshot task.
 	store RecordStore
-	// eventStore receives request-event records from the proxy round tripper. It batches writes to store; see
-	// bufferedRecordStore. It is the same as store when the service was built without buffering (e.g. in tests).
-	eventStore    RecordStore
+
+	// eventStore receives request-event records from the proxy round tripper.
+	// It batches writes to store; see bufferedRecordStore. It is the same as
+	// store when the service was built without buffering (e.g. in tests).
+	eventStore RecordStore
+
 	fullStore     FullStore
 	retriever     RecordRetriever
 	captureConfig captureConfig
 }
 
-func (ss *StorageService) NewRoundTripper(ri httpf.RequestInfo, transport http.RoundTripper) http.RoundTripper {
+func (ss *StorageService) NewRoundTripper(
+	ri httpf.RequestInfo,
+	transport http.RoundTripper,
+) http.RoundTripper {
 	eventStore := ss.eventStore
 	if eventStore == nil {
 		eventStore = ss.store
@@ -190,12 +198,16 @@ func (ss *StorageService) recordCaptureLoadFailure(
 // Close flushes buffered request events and stops the background writer. It should be called once the services
 // that proxy requests have stopped, so their final events are persisted. It is safe to call more than once.
 func (ss *StorageService) Close() error {
-	if ss == nil || ss.eventStore == nil || util.SameInstance(ss.eventStore, ss.store) {
+	if ss == nil ||
+		ss.eventStore == nil ||
+		util.SameInstance(ss.eventStore, ss.store) {
 		return nil
 	}
+
 	if c, ok := ss.eventStore.(interface{ Close() error }); ok {
 		return c.Close()
 	}
+
 	return nil
 }
 
@@ -248,8 +260,9 @@ func NewStorageService(
 	requestEvents := cfg.GetRequestEvents()
 	cc.setFromConfig(requestEvents)
 
-	// Request events are recorded once per proxied request, so they are batched rather than inserted one row at a
-	// time. Close flushes anything still buffered.
+	// Request events are recorded once per proxied request, so they are batched
+	// rather than inserted one row at a time. Close flushes anything still
+	// buffered.
 	eventStore := NewBufferedStore(
 		store,
 		requestEvents.GetFlushBatchSize(),
