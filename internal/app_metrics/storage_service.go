@@ -119,7 +119,10 @@ func (ss *StorageService) ListRateLimitResourceSamples(ctx context.Context, quer
 // CaptureLoadStateMissing or CaptureLoadStateUnavailable so callers can still
 // show the request's metadata. Blob failures are logged and recorded on the
 // active trace span so they remain visible to operators.
-func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error) {
+func (ss *StorageService) GetFullLog(
+	ctx context.Context,
+	id apid.ID,
+) (*FullLog, error) {
 	log, err := ss.GetRecord(ctx, id)
 	if err != nil {
 		return nil, err
@@ -149,11 +152,17 @@ func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog,
 // failure (Warn for a missing blob, Error for any other failure, since that
 // signals blob storage is unhealthy) and records the error and resulting
 // state on the active trace span, if any.
-func (ss *StorageService) recordCaptureLoadFailure(ctx context.Context, record *LogRecord, state CaptureLoadState, err error) {
+func (ss *StorageService) recordCaptureLoadFailure(
+	ctx context.Context,
+	record *LogRecord,
+	state CaptureLoadState,
+	err error,
+) {
 	level := slog.LevelError
 	if state == CaptureLoadStateMissing {
 		level = slog.LevelWarn
 	}
+
 	ss.logger.Log(ctx, level, "failed to load full request log from blob storage",
 		"error", err,
 		"request_id", record.RequestId.String(),
