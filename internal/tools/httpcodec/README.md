@@ -1,10 +1,11 @@
-# Tool HTTP request preparation
+# Tool HTTP requests and results
 
 An HTTP Tool sends caller arguments in query parameters or a request body. This
-package compiles their templates once, then renders and encodes them for each
-invocation. It supports query parameters, JSON, text, base64 binary, form fields,
-and multipart uploads. It can return individual encoded components or a complete
-outbound `http.Request`, without making network requests.
+package compiles request templates and response rules once, then applies them
+for each invocation. It supports query parameters, JSON, text, base64 binary,
+form fields, and multipart uploads. It can prepare a complete outbound
+`http.Request` and map a buffered upstream response into a rich Tool result,
+without making network requests.
 
 Query parameters and form fields use `application/x-www-form-urlencoded`
 encoding. The same encoding works in a URL's query string and a form body.
@@ -393,9 +394,122 @@ boundary is rejected because it cannot describe the generated body. Raw or absen
 bodies use the authored media type, if supplied. Literal Content-Type conflicts
 fail at compilation; templated values receive the same check after rendering.
 
-Compilation covers outbound request fields. Response rules, authorization,
-input-schema validation, credential capture, sending, and response handling
-remain execution-layer responsibilities.
+`CompileRequest` covers outbound request fields. Compile response rules separately
+with `CompileResponse`, described below. Authorization, input-schema validation,
+credential capture, sending, and response-stream handling belong to the executor.
+
+## Response results
+
+`CompileResponse` captures HTTP status rules and the limits for mapping one
+buffered response. For example, a CRM Tool can describe two safe errors:
+
+```yaml
+response:
+  errors:
+    - statuses: [404, 410]
+      code: CONTACT_MISSING
+      message: The contact is no longer available.
+    - statusClass: 4
+      code: PROVIDER_REQUEST_REJECTED
+      message: The provider rejected the request.
+```
+
+A 404 or 410 becomes `CONTACT_MISSING`; another 4xx becomes
+`PROVIDER_REQUEST_REJECTED`. A 200 response containing `{"id":"contact-42"}`
+becomes `structuredContent` with that JSON value. A 503 becomes the generic
+`UPSTREAM_FAILED` error. Provider error bodies, status text, and arbitrary
+headers are never copied into these public errors. Status failures include only
+the HTTP status in `error.details`, such as `{"status":404}`.
+
+Exact status rules take precedence over class rules, then a `default: true`
+rule. Rule order does not change the result. Rules can deliberately map a 2xx
+status to an error; a default rule also catches otherwise-unmatched 2xx statuses.
+Without a matching rule, only 2xx is successful. Overlapping selectors at the
+same priority and reserved platform error codes fail compilation. An authored
+`retryable: true` is advice; this package never retries a request.
+
+After the executor has read and decoded the upstream body, it can map the result:
+
+```go
+program, err := httpcodec.CompileResponse(definition.Response, httpcodec.ResponseLimits{
+    MaxSourceBytes:        4096,
+    MaxResponseBytes:      1024 * 1024,
+    MaxOutputBytes:        512 * 1024,
+    MaxEncodedResultBytes: 1024 * 1024,
+})
+if err != nil {
+    return err
+}
+result, err := program.Map(ctx, httpcodec.ResponseInput{
+    StatusCode:  upstreamStatus,
+    ContentType: upstreamContentType,
+    Body:        decodedBody,
+    ToolID:      "tol_01example0000001",
+    Revision:    7,
+    InvocationID: "tiv_01example0000001",
+    Metadata: api.ToolResultMetadata{
+        ConnectionID: "cxn_01example0000001",
+    },
+    ExecutionState: api.ToolExecutionStateMayHaveExecuted,
+})
+```
+
+Here `api` is `internal/schema/api`. Identities and source revisions come from
+the captured invocation. The executor supplies its known execution state:
+`mayHaveExecuted` or `completed`. Every mapped error preserves that state;
+HTTP status alone cannot establish whether upstream side effects occurred.
+`notStarted` is invalid when mapping an already-received response.
+
+Successful responses use these representations:
+
+| Body and Content-Type | Tool result |
+| --- | --- |
+| Empty bytes, including with a JSON content type | Empty `content` array; no `structuredContent`. |
+| `application/json` or another `json` / `+json` subtype | `structuredContent`, preserving scalars, large numbers, and explicit JSON `null`. |
+| `text/*` with UTF-8, US-ASCII, or no declared charset | A text block. Invalid bytes fail instead of being replaced. |
+| `image/*` or `audio/*` | A typed block with base64 data and the declared media type. |
+| Other media, or text with an unsupported charset | An embedded blob resource preserving bytes and the declared media type. |
+| No Content-Type | An embedded `application/octet-stream` blob; no content sniffing. |
+
+The JSON subtype rule takes precedence, including for `text/json`. JSON bytes
+must be valid UTF-8 and contain exactly one JSON value. A malformed Content-Type
+becomes `UPSTREAM_PROTOCOL_ERROR`; malformed JSON or supported text becomes
+`OUTPUT_INVALID`. Content decoding happens only after status classification,
+so a status error does not depend on the provider's error-body format.
+
+Generated blob URIs have the form
+`urn:authproxy:tool-invocation:tiv_01example0000001:response`. They identify inline
+content; they are not download endpoints. Input bytes and metadata pointers are
+copied into independent results. Every result has a nonnil `content` array,
+including JSON-only and error results.
+
+Configured `transformJavascript` is currently rejected at compilation. It must
+be handled by a future pure transform runtime, never silently bypassed. The
+executor also owns response reading, decompression, cancellation of network I/O,
+aggregate invocation accounting, and output-schema validation. `Map` operates
+only on supplied bytes and does not access the network or close a stream.
+
+### Response limits
+
+All four limits must be positive:
+
+- `MaxSourceBytes` bounds the raw rule codes, messages, and selector data before
+  compilation. It does not count JSON/YAML framing.
+- `MaxResponseBytes` bounds the supplied decoded body, including bodies of status
+  errors. Content-Type text is independently capped at the same size before
+  parsing. The executor must enforce read/decompression bounds before allocating
+  the buffer and account for responses across a multi-request invocation.
+- `MaxOutputBytes` bounds successful raw JSON, UTF-8 text, or decoded binary
+  content before wrapping it in an envelope or encoding it as base64.
+- `MaxEncodedResultBytes` bounds the complete serialized `ToolResult`, including
+  identities, metadata, JSON escaping, and base64 expansion. It does not include
+  any enclosing API action response.
+
+Size failures become `OUTPUT_TOO_LARGE` without truncated content. An oversized
+result, including an authored error message, is replaced once by a safe error.
+If even that envelope cannot fit, `Map` returns `ErrEncodedResultLimit` with no
+result. Invalid invocation metadata and cancellation also return Go errors with
+no partial result. These caps bound processing; they are not hard memory quotas.
 
 ## Bounds and integration
 
