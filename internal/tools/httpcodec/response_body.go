@@ -20,22 +20,31 @@ import (
 // JSON bytes are copied exactly; text and encoded binary content own their data.
 // Errors contain only safe code/message fields and leave the result unchanged.
 // maxEncodedBytes bounds base64 allocation; the caller bounds the final envelope.
-func mapResponseBody(result *api.ToolResult, mediaType string, body []byte, maxEncodedBytes int) *api.ToolResultError {
+func mapResponseBody(
+	result *api.ToolResult,
+	mediaType string,
+	body []byte,
+	maxEncodedBytes int,
+) *api.ToolResultError {
 	if mediaType == "" {
 		mediaType = "application/octet-stream"
 	}
+
 	base, params, parameterErr := mime.ParseMediaType(mediaType)
 	_, baseErr := tools.ParseBodyMediaType(base)
+
 	if !tools.IsValidMultipartMetadata(mediaType) || baseErr != nil ||
 		(parameterErr != nil && !errors.Is(parameterErr, mime.ErrInvalidMediaParameter)) {
 		return &api.ToolResultError{Code: "UPSTREAM_PROTOCOL_ERROR", Message: "Provider response has an invalid content type."}
 	}
+
 	if parameterErr != nil {
 		// A valid base type still identifies JSON and binary media when optional
 		// parameters are malformed. Publish only that valid type; the original
 		// value would make rich results invalid. Unknown text charsets stay binary.
 		mediaType = base
 	}
+
 	// An empty response has no content, including when JSON was declared.
 	if len(body) == 0 {
 		return nil
@@ -52,12 +61,21 @@ func mapResponseBody(result *api.ToolResult, mediaType string, body []byte, maxE
 
 	if major == "text" && parameterErr == nil {
 		charset := strings.ToLower(params["charset"])
-		if charset == "" || charset == "utf-8" || charset == "utf8" || charset == "us-ascii" {
+		if charset == "" ||
+			charset == "utf-8" ||
+			charset == "utf8" ||
+			charset == "us-ascii" {
+
 			if !utf8.Valid(body) || (charset == "us-ascii" && !isASCIIResponseBody(body)) {
 				return &api.ToolResultError{Code: "OUTPUT_INVALID", Message: "Provider response body is not valid text."}
 			}
+
 			text := string(body)
-			result.Content = append(result.Content, api.ToolContentBlock{Type: api.ToolContentTypeText, Text: &text})
+			result.Content = append(result.Content, api.ToolContentBlock{
+				Type: api.ToolContentTypeText,
+				Text: &text,
+			})
+
 			return nil
 		}
 		// Unsupported charsets remain opaque bytes instead of being decoded
@@ -65,14 +83,25 @@ func mapResponseBody(result *api.ToolResult, mediaType string, body []byte, maxE
 	}
 
 	if !responseBase64Fits(len(body), maxEncodedBytes) {
-		return &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "Provider response body exceeds the encoded output limit."}
+		return &api.ToolResultError{
+			Code:    "OUTPUT_TOO_LARGE",
+			Message: "Provider response body exceeds the encoded output limit.",
+		}
 	}
+
 	encoded := base64.StdEncoding.EncodeToString(body)
 	switch major {
 	case "image":
-		result.Content = append(result.Content, api.ToolContentBlock{Type: api.ToolContentTypeImage, Data: &encoded, MIMEType: mediaType})
+		result.Content = append(result.Content, api.ToolContentBlock{
+			Type: api.ToolContentTypeImage,
+			Data: &encoded, MIMEType: mediaType,
+		})
 	case "audio":
-		result.Content = append(result.Content, api.ToolContentBlock{Type: api.ToolContentTypeAudio, Data: &encoded, MIMEType: mediaType})
+		result.Content = append(result.Content, api.ToolContentBlock{
+			Type:     api.ToolContentTypeAudio,
+			Data:     &encoded,
+			MIMEType: mediaType,
+		})
 	default:
 		// Supported IDs may contain URI-reserved characters. Escape the complete
 		// value as one component without changing the captured invocation identity.
@@ -80,7 +109,9 @@ func mapResponseBody(result *api.ToolResult, mediaType string, body []byte, maxE
 		result.Content = append(result.Content, api.ToolContentBlock{
 			Type: api.ToolContentTypeResource,
 			Resource: &api.ToolResourceContent{
-				URI: resourceURI, MIMEType: mediaType, Blob: &encoded,
+				URI:      resourceURI,
+				MIMEType: mediaType,
+				Blob:     &encoded,
 			},
 		})
 	}
@@ -105,9 +136,11 @@ func responseBase64Fits(sourceBytes, maxEncodedBytes int) bool {
 	if sourceBytes < 0 || maxEncodedBytes < 0 {
 		return false
 	}
+
 	groups := sourceBytes / 3
 	if sourceBytes%3 != 0 {
 		groups++
 	}
+	
 	return groups <= maxEncodedBytes/4
 }
