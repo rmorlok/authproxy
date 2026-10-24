@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -134,6 +136,27 @@ func (p *ProxyHTTP) Validate(vc *common.ValidationContext) error {
 	}
 
 	result = multierror.Append(result, validateFields(p.Query, vc.PushField("query")))
+	result = multierror.Append(result, p.ValidateBody(vc))
+
+	if p.Response != nil {
+		result = multierror.Append(result, p.Response.Validate(vc.PushField("response")))
+	}
+
+	return result.ErrorOrNil()
+}
+
+// ValidateBody checks body-mode presence, exclusivity, and static body values
+// without validating the method, URL, headers, query, or response mapping. Body
+// compilers can use this boundary independently while retaining explicit nulls
+// captured by decoding. Rendered values still require runtime validation.
+func (p *ProxyHTTP) ValidateBody(vc *common.ValidationContext) error {
+	vc = validationContext(vc)
+
+	if p == nil {
+		return vc.NewError("HTTP executor is required")
+	}
+
+	var result *multierror.Error
 	for _, name := range p.nullBodyFields {
 		result = multierror.Append(result, vc.NewErrorForField(name, "must not be null"))
 	}
@@ -176,10 +199,6 @@ func (p *ProxyHTTP) Validate(vc *common.ValidationContext) error {
 		result = multierror.Append(result, vc.NewError("must contain at most one of bodyJson, bodyTemplate, bodyRaw, form, or multipart"))
 	}
 
-	if p.Response != nil {
-		result = multierror.Append(result, p.Response.Validate(vc.PushField("response")))
-	}
-
 	return result.ErrorOrNil()
 }
 
@@ -189,12 +208,12 @@ func (p MultipartPart) Validate(vc *common.ValidationContext) error {
 	vc = validationContext(vc)
 
 	var result *multierror.Error
-	if strings.TrimSpace(p.Name) == "" || strings.ContainsAny(p.Name, "\r\n") {
-		result = multierror.Append(result, vc.NewErrorForField("name", "must be nonempty without newline characters"))
+	if strings.TrimSpace(p.Name) == "" || !isValidAuthoredMultipartMetadata(p.Name) {
+		result = multierror.Append(result, vc.NewErrorForField("name", "must be nonempty valid UTF-8 without control characters"))
 	}
 
-	if strings.ContainsAny(p.Filename, "\r\n") {
-		result = multierror.Append(result, vc.NewErrorForField("filename", "must not contain newline characters"))
+	if !isValidAuthoredMultipartMetadata(p.Filename) {
+		result = multierror.Append(result, vc.NewErrorForField("filename", "must be valid UTF-8 without control characters"))
 	}
 
 	if p.MediaType != "" {
@@ -436,11 +455,56 @@ func validateBase64(value string, vc *common.ValidationContext) error {
 // validateMediaType requires a concrete media type so request encoding can be
 // selected before rendering body text.
 func validateMediaType(value string, vc *common.ValidationContext) error {
-	if _, _, err := mime.ParseMediaType(value); err != nil {
-		return vc.NewError("must be a valid media type")
+	if _, err := ParseBodyMediaType(value); err != nil {
+		return vc.NewError(err.Error())
 	}
 
 	return nil
+}
+
+// ParseBodyMediaType validates a concrete Content-Type and returns its lowercase
+// base type for codec selection. The original string can be retained for header
+// output, including its literal parameters. Bare tokens, wildcards, invalid
+// UTF-8, and ASCII control bytes are rejected without including the input in
+// errors. Authoring validation and runtime encoders share this contract.
+func ParseBodyMediaType(value string) (string, error) {
+	if !IsValidMultipartMetadata(value) {
+		return "", errors.New("body media type must be valid UTF-8 without control characters")
+	}
+	base, _, err := mime.ParseMediaType(value)
+	major, minor, hasSlash := strings.Cut(base, "/")
+	if err != nil || !hasSlash || !IsHTTPToken(major) || !IsHTTPToken(minor) || strings.Contains(base, "*") {
+		return "", errors.New("body media type must be a concrete type/subtype")
+	}
+	return base, nil
+}
+
+// IsValidMultipartMetadata reports whether text is valid UTF-8 without ASCII
+// control bytes, including tabs and DEL. Empty strings are valid metadata;
+// callers enforce presence for required fields such as part names. Quoting
+// names and filenames remains the encoder's responsibility. This check does not
+// apply to payload text, which may contain ordinary line breaks.
+func IsValidMultipartMetadata(value string) bool {
+	if !utf8.ValidString(value) {
+		return false
+	}
+	for i := 0; i < len(value); i++ {
+		if value[i] < ' ' || value[i] == 0x7f {
+			return false
+		}
+	}
+	return true
+}
+
+// isValidAuthoredMultipartMetadata checks literal metadata immediately while
+// allowing template syntax to use whitespace such as tabs inside Mustache tags.
+// UTF-8 and the existing CR/LF prohibition apply to all authored strings. Other
+// controls in templates are checked by IsValidMultipartMetadata after rendering.
+func isValidAuthoredMultipartMetadata(value string) bool {
+	if !utf8.ValidString(value) || strings.ContainsAny(value, "\r\n") {
+		return false
+	}
+	return strings.Contains(value, "{{") || IsValidMultipartMetadata(value)
 }
 
 // IsHTTPToken reports whether value is a nonempty HTTP token, without changing

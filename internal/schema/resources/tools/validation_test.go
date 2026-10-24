@@ -2,6 +2,7 @@ package tools
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -31,8 +32,115 @@ func TestValidateNilContracts(t *testing.T) {
 	var limits *ExecutionLimits
 	requireValidationPath(t, definition.Validate(nil), "$")
 	requireValidationPath(t, request.Validate(&common.ValidationContext{Path: "spec.proxyHttp"}), "spec.proxyHttp")
+	requireValidationPath(t, request.ValidateBody(&common.ValidationContext{Path: "spec.proxyHttp"}), "spec.proxyHttp")
 	require.NoError(t, limits.Validate(nil))
 	require.NoError(t, (&ExecutionLimits{}).Validate(nil))
+}
+
+// TestProxyHTTPValidateBodyIgnoresOtherRequestFields allows body compilation
+// independently of the request envelope and response mapping.
+func TestProxyHTTPValidateBodyIgnoresOtherRequestFields(t *testing.T) {
+	// Every non-body component is invalid, but the explicit JSON body is valid.
+	blank := ""
+	request := ProxyHTTP{
+		Headers:  map[string]string{"Bad Header": "x"},
+		Query:    map[string]common.RawJSON{"q": common.RawJSON(`{`)},
+		BodyJSON: common.RawJSON(`null`),
+		Response: &HTTPResponse{TransformJavascript: &blank},
+	}
+	require.NoError(t, request.ValidateBody(nil))
+
+	// Full validation continues to report every unrelated failure.
+	err := request.Validate(nil)
+	var aggregate *multierror.Error
+	require.ErrorAs(t, err, &aggregate)
+	var paths []string
+	for _, failure := range aggregate.Errors {
+		var fieldError *common.ValidationError
+		require.ErrorAs(t, failure, &fieldError)
+		paths = append(paths, fieldError.Path)
+	}
+	require.ElementsMatch(t, []string{
+		"$.method", "$.url", "$.headers.Bad Header", "$.query.q", "$.response.transformJavascript",
+	}, paths)
+}
+
+// TestProxyHTTPValidateBodyDecodedPresence preserves omitted bodies and JSON
+// null while rejecting explicit null for all other body modes in both codecs.
+func TestProxyHTTPValidateBodyDecodedPresence(t *testing.T) {
+	for _, codec := range []string{"JSON", "YAML"} {
+		for _, test := range []struct {
+			name, document, path string
+			jsonBody             bool
+		}{
+			{"omitted body", `{}`, "", false},
+			{"JSON null body", `{"bodyJson":null}`, "", true},
+			{"null template", `{"bodyTemplate":null}`, "bodyTemplate", false},
+			{"null raw body", `{"bodyRaw":null}`, "bodyRaw", false},
+			{"null form", `{"form":null}`, "form", false},
+			{"null multipart", `{"multipart":null}`, "multipart", false},
+		} {
+			t.Run(codec+"/"+test.name, func(t *testing.T) {
+				// JSON syntax is also valid YAML, exercising each decoder's presence handling.
+				var request ProxyHTTP
+				if codec == "JSON" {
+					require.NoError(t, json.Unmarshal([]byte(test.document), &request))
+				} else {
+					require.NoError(t, yaml.Unmarshal([]byte(test.document), &request))
+				}
+
+				// Body validation uses the original decoded object, including private null markers.
+				err := request.ValidateBody(&common.ValidationContext{Path: "spec.proxyHttp"})
+				if test.path != "" {
+					requireValidationPath(t, err, "spec.proxyHttp."+test.path)
+					return
+				}
+				require.NoError(t, err)
+				if test.jsonBody {
+					require.JSONEq(t, "null", string(request.BodyJSON))
+				} else {
+					require.Nil(t, request.BodyJSON)
+				}
+			})
+		}
+	}
+}
+
+// TestProxyHTTPValidateBodyModes checks each mode alone and every conflicting
+// pair without requiring a method or URL for the body-only validation boundary.
+func TestProxyHTTPValidateBodyModes(t *testing.T) {
+	empty := ""
+	modes := []struct {
+		name  string
+		apply func(*ProxyHTTP)
+	}{
+		{"JSON", func(p *ProxyHTTP) { p.BodyJSON = common.RawJSON(`null`) }},
+		{"template", func(p *ProxyHTTP) { p.BodyTemplate = &BodyTemplate{MediaType: "text/plain"} }},
+		{"raw", func(p *ProxyHTTP) { p.BodyRaw = &empty }},
+		{"form", func(p *ProxyHTTP) { p.Form = &FormBody{Fields: map[string]common.RawJSON{}} }},
+		{"multipart", func(p *ProxyHTTP) {
+			p.Multipart = &MultipartBody{Parts: []MultipartPart{{Name: "field", Text: &empty}}}
+		}},
+	}
+	for i, first := range modes {
+		t.Run(first.name, func(t *testing.T) {
+			// A single complete mode is valid even when its content is empty or null.
+			var request ProxyHTTP
+			first.apply(&request)
+			require.NoError(t, request.ValidateBody(nil))
+		})
+		for _, second := range modes[i+1:] {
+			t.Run(first.name+" and "+second.name, func(t *testing.T) {
+				// No pair may silently select one mode and discard the other.
+				var request ProxyHTTP
+				first.apply(&request)
+				second.apply(&request)
+				err := request.ValidateBody(&common.ValidationContext{Path: "spec.proxyHttp"})
+				requireValidationPath(t, err, "spec.proxyHttp")
+				require.ErrorContains(t, err, "at most one")
+			})
+		}
+	}
 }
 
 // TestToolDefinitionValidateAccumulatesErrors retains all independent failures
@@ -225,17 +333,141 @@ func TestMultipartPartValidateMetadata(t *testing.T) {
 		path                      string
 	}{
 		{"field", "report.csv", "text/csv; charset=utf-8", ""},
+		{"資料", "résumé-雪.csv", `Text/CSV; charset="UTF-8"`, ""},
+		{"{{params.name}}", "{{cfg.filename}}", `text/plain; note="{{cfg.literal}}"`, ""},
+		{"{{\tparams.name\t}}", "{{\tparams.filename\t}}", "", ""},
+		{"field", "", "", ""},
+		{"", "report.csv", "", "name"},
+		{"   ", "report.csv", "", "name"},
 		{"field\r\nX-Injected: true", "", "", "name"},
 		{"field", "report.csv\nX-Injected: true", "", "filename"},
+		{"{{params.name}}\n", "", "", "name"},
+		{"field", "{{params.filename}}\r", "", "filename"},
+		{"field\xff", "", "", "name"},
+		{"field", "report\xff.csv", "", "filename"},
+		{"{{params.name}}\xff", "", "", "name"},
+		{"field", "{{params.filename}}\xff", "", "filename"},
 		{"field", "report.csv", "text/plain; charset=\"unclosed", "mediaType"},
 	} {
 		t.Run(test.name+test.filename+test.mediaType, func(t *testing.T) {
+			// Static fields and template syntax are checked without rendering inputs.
 			part := MultipartPart{Name: test.name, Filename: test.filename, MediaType: test.mediaType, Text: &text}
 			err := part.Validate(&common.ValidationContext{Path: "spec.proxyHttp.multipart.parts[2]"})
 			if test.path == "" {
 				require.NoError(t, err)
 			} else {
 				requireValidationPath(t, err, "spec.proxyHttp.multipart.parts[2]."+test.path)
+			}
+		})
+	}
+}
+
+// TestMultipartMetadataControls rejects every ASCII control in literal names
+// and filenames both directly and through either HTTP validation boundary.
+func TestMultipartMetadataControls(t *testing.T) {
+	text := ""
+	for code := byte(0); code <= 0x7f; code++ {
+		if code >= ' ' && code != 0x7f {
+			continue
+		}
+		for _, field := range []string{"name", "filename"} {
+			t.Run(fmt.Sprintf("%s/ASCII-%02x", field, code), func(t *testing.T) {
+				// The shared resolved-value predicate rejects the entire C0/DEL range.
+				value := "private-metadata" + string(code)
+				require.False(t, IsValidMultipartMetadata(value))
+				part := MultipartPart{Name: "field", Filename: "report.txt", Text: &text}
+				if field == "name" {
+					part.Name = value
+				} else {
+					part.Filename = value
+				}
+
+				// Admission reports the same field for direct, body-only, and full requests.
+				requireValidationPath(t, part.Validate(&common.ValidationContext{Path: "part"}), "part."+field)
+				request := ProxyHTTP{Method: "POST", URL: "https://example.test", Multipart: &MultipartBody{Parts: []MultipartPart{part}}}
+				for _, validate := range []func(*common.ValidationContext) error{request.Validate, request.ValidateBody} {
+					err := validate(&common.ValidationContext{Path: "spec.proxyHttp"})
+					requireValidationPath(t, err, "spec.proxyHttp.multipart.parts[0]."+field)
+					require.NotContains(t, err.Error(), "private-metadata")
+				}
+			})
+		}
+	}
+
+	// Empty optional filenames and Unicode/template source remain valid metadata.
+	for _, value := range []string{"", "résumé-雪.csv", `quote"and\slash`, "{{params.filename}}"} {
+		require.True(t, IsValidMultipartMetadata(value))
+	}
+	require.False(t, IsValidMultipartMetadata("filename\xff"))
+	// Tabs may belong to authored Mustache syntax but never to resolved MIME values.
+	require.False(t, IsValidMultipartMetadata("{{\tparams.filename\t}}"))
+}
+
+// TestBodyMediaTypeValidation uses the same concrete-media contract at schema
+// admission and runtime selection, including parameterized and uppercase types.
+func TestBodyMediaTypeValidation(t *testing.T) {
+	for _, test := range []struct {
+		name, value, base string
+	}{
+		{"JSON", "Application/JSON; charset=utf-8", "application/json"},
+		{"JSON suffix", "application/problem+json", "application/problem+json"},
+		{"quoted parameter", `Text/Plain; charset="UTF-8"`, "text/plain"},
+		{"literal template parameter", `text/plain; note="{{cfg.mime}}"`, "text/plain"},
+		{"missing type", "", ""},
+		{"bare token", "private-metadata", ""},
+		{"missing subtype", "text/", ""},
+		{"missing major type", "/json", ""},
+		{"wildcard subtype", "text/*", ""},
+		{"wildcard major type", "*/json", ""},
+		{"wildcard suffix", "application/*+json", ""},
+		{"bad parameter", "text/plain; broken", ""},
+		{"tab", "text/plain\t", ""},
+		{"NUL", "text/plain\x00", ""},
+		{"DEL", "text/plain\x7f", ""},
+		{"newlines", "text/plain\r\nprivate-metadata", ""},
+		{"invalid UTF-8", "text/plain\xff", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Parsing normalizes only the base media type and never reveals bad inputs.
+			base, err := ParseBodyMediaType(test.value)
+			require.Equal(t, test.base, base)
+			if test.base == "" {
+				require.Error(t, err)
+				require.NotContains(t, err.Error(), "private-metadata")
+			} else {
+				require.NoError(t, err)
+			}
+
+			// Both HTTP body paths and direct multipart validation use the same policy.
+			template := &BodyTemplate{MediaType: test.value, Template: ""}
+			text := ""
+			part := MultipartPart{Name: "field", MediaType: test.value, Text: &text}
+			for _, mode := range []string{"bodyTemplate", "multipart"} {
+				request := ProxyHTTP{Method: "POST", URL: "https://example.test"}
+				path := "spec.proxyHttp.bodyTemplate.mediaType"
+				valid := test.base != ""
+				if mode == "bodyTemplate" {
+					request.BodyTemplate = template
+				} else {
+					request.Multipart = &MultipartBody{Parts: []MultipartPart{part}}
+					path = "spec.proxyHttp.multipart.parts[0].mediaType"
+					valid = valid || test.value == "" // Omitted part media types use encoder defaults.
+					partErr := part.Validate(&common.ValidationContext{Path: "part"})
+					if valid {
+						require.NoError(t, partErr)
+					} else {
+						requireValidationPath(t, partErr, "part.mediaType")
+					}
+				}
+				for _, validate := range []func(*common.ValidationContext) error{request.Validate, request.ValidateBody} {
+					err := validate(&common.ValidationContext{Path: "spec.proxyHttp"})
+					if valid {
+						require.NoError(t, err)
+					} else {
+						requireValidationPath(t, err, path)
+						require.NotContains(t, err.Error(), "private-metadata")
+					}
+				}
 			}
 		})
 	}
