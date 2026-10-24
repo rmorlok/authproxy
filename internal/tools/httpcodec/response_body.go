@@ -141,6 +141,6 @@ func responseBase64Fits(sourceBytes, maxEncodedBytes int) bool {
 	if sourceBytes%3 != 0 {
 		groups++
 	}
-	
+
 	return groups <= maxEncodedBytes/4
 }

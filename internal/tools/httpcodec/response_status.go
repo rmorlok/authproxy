@@ -13,8 +13,10 @@ import (
 type responseRule struct {
 	// code identifies the provider-specific failure without impersonating a platform code.
 	code string
+
 	// message is the safe literal description exposed to the tool caller.
 	message string
+
 	// retryable is advice for the caller and never initiates another request.
 	retryable bool
 }
@@ -24,8 +26,10 @@ type responseRule struct {
 type responseRules struct {
 	// exact takes priority over a class and the fallback for the same status.
 	exact map[int]responseRule
+
 	// classes indexes HTTP status classes from 1 through 5.
 	classes map[int]responseRule
+
 	// fallback applies to valid non-2xx statuses without an exact or class rule.
 	fallback *responseRule
 }
@@ -49,12 +53,15 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 	if maxSourceBytes <= 0 {
 		return nil, errors.New("response source byte limit must be positive")
 	}
+
 	if source == nil {
 		return &responseRules{}, nil
 	}
+
 	if source.TransformJavascript != nil {
 		return nil, errors.New("response JavaScript transforms are not supported")
 	}
+
 	if len(source.Errors) > maxResponseRules {
 		return nil, errors.New("response error rule count exceeds the supported selector space")
 	}
@@ -77,21 +84,26 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 		remainingBytes -= size
 		return true
 	}
+
 	for _, rule := range source.Errors {
 		if !charge(1) || !charge(len(rule.Code)) || !charge(len(rule.Message)) {
 			return nil, errors.New("response source exceeds the byte limit")
 		}
+
 		for _, status := range rule.Statuses {
 			if !charge(len(strconv.Itoa(status))) {
 				return nil, errors.New("response source exceeds the byte limit")
 			}
 		}
+
 		if rule.StatusClass != nil && !charge(len(strconv.Itoa(*rule.StatusClass))) {
 			return nil, errors.New("response source exceeds the byte limit")
 		}
+
 		if rule.Default && !charge(len("true")) {
 			return nil, errors.New("response source exceeds the byte limit")
 		}
+
 		if rule.Retryable != nil && !charge(len(strconv.FormatBool(*rule.Retryable))) {
 			return nil, errors.New("response source exceeds the byte limit")
 		}
@@ -103,10 +115,12 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 		if !utf8.ValidString(rule.Code) || !utf8.ValidString(rule.Message) {
 			return nil, errors.New("response error codes and messages must be valid UTF-8")
 		}
+
 		if isReservedResponseCode(rule.Code) {
 			return nil, errors.New("response error rules cannot use reserved platform codes")
 		}
 	}
+
 	if err := source.Validate(nil); err != nil {
 		return nil, err
 	}
@@ -115,8 +129,13 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 		exact:   make(map[int]responseRule),
 		classes: make(map[int]responseRule),
 	}
+
 	for _, sourceRule := range source.Errors {
-		rule := responseRule{code: sourceRule.Code, message: sourceRule.Message}
+		rule := responseRule{
+			code:    sourceRule.Code,
+			message: sourceRule.Message,
+		}
+
 		if sourceRule.Retryable != nil {
 			rule.retryable = *sourceRule.Retryable
 		}
@@ -130,6 +149,7 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 			result.fallback = &rule
 		}
 	}
+
 	return result, nil
 }
 
@@ -157,9 +177,15 @@ func (r *responseRules) lookup(status int) (responseRule, bool) {
 // authored HTTP status mappings. Custom codes otherwise retain their spelling.
 func isReservedResponseCode(code string) bool {
 	switch code {
-	case "INPUT_INVALID", "CONNECTION_UNAVAILABLE", "UPSTREAM_AUTH_FAILED",
-		"UPSTREAM_FAILED", "UPSTREAM_PROTOCOL_ERROR", "UNSUPPORTED_CAPABILITY",
-		"EXECUTION_LIMIT_EXCEEDED", "OUTPUT_INVALID", "OUTPUT_TOO_LARGE",
+	case "INPUT_INVALID",
+		"CONNECTION_UNAVAILABLE",
+		"UPSTREAM_AUTH_FAILED",
+		"UPSTREAM_FAILED",
+		"UPSTREAM_PROTOCOL_ERROR",
+		"UNSUPPORTED_CAPABILITY",
+		"EXECUTION_LIMIT_EXCEEDED",
+		"OUTPUT_INVALID",
+		"OUTPUT_TOO_LARGE",
 		"TOOL_REVISION_CHANGED":
 		return true
 	default:
