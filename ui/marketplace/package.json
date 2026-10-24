@@ -37,15 +37,15 @@
   "devDependencies": {
     "@babel/traverse": "^7.28.0",
     "@chromatic-com/storybook": "^1.3.3",
-    "@storybook/addon-essentials": "^8.0.8",
-    "@storybook/addon-interactions": "^8.0.8",
-    "@storybook/addon-links": "^8.0.8",
-    "@storybook/addon-mdx-gfm": "^8.0.8",
-    "@storybook/addon-onboarding": "^8.0.8",
-    "@storybook/blocks": "^8.0.8",
-    "@storybook/react": "^8.0.8",
-    "@storybook/react-vite": "^8.0.8",
-    "@storybook/test": "^8.0.8",
+    "@storybook/addon-essentials": "^8.6.19",
+    "@storybook/addon-interactions": "^8.6.19",
+    "@storybook/addon-links": "^8.6.19",
+    "@storybook/addon-mdx-gfm": "^8.6.19",
+    "@storybook/addon-onboarding": "^8.6.19",
+    "@storybook/blocks": "^8.6.19",
+    "@storybook/react": "^8.6.19",
+    "@storybook/react-vite": "^8.6.19",
+    "@storybook/test": "^8.6.19",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.2",
@@ -62,11 +62,11 @@
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^24.0.0",
-    "storybook": "^8.0.8",
+    "storybook": "^8.6.19",
     "typescript": "latest",
     "vite": "^5.0.12",
     "vite-plugin-eslint": "^1.8.1",
-    "vitest": "^2.0.5"
+    "vitest": "^3.2.7"
   },
   "packageManager": "yarn@4.11.0"
 }

@@ -25,7 +25,7 @@ RUN yarn workspace @authproxy/admin build \
  && yarn workspace @authproxy/marketplace build
 
 # Stage 2: Build the Go server, embedding the UI artifacts produced above.
-FROM golang:1.24 AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /build
 
