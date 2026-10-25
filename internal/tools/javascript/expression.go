@@ -32,18 +32,24 @@ var (
 type Limits struct {
 	// MaxSourceBytes bounds the authored UTF-8 expression before parsing.
 	MaxSourceBytes int
+
 	// MaxInputBytes bounds serialized snapshot and response JSON together.
 	MaxInputBytes int
+
 	// MaxOutputBytes bounds the emitted JSON, including quotes and escaping.
 	// A later result envelope needs its own serialized byte allowance.
 	MaxOutputBytes int
+
 	// MaxDepth bounds JSON value nesting; the root is depth zero.
 	MaxDepth int
+
 	// MaxNodes bounds JSON values and object property inspections, separately
 	// for the combined input and output. It does not count JavaScript bytecode.
 	MaxNodes int
+
 	// MaxStackDepth bounds JavaScript function call depth, including recursion.
 	MaxStackDepth int
+
 	// Timeout covers input binding, expression execution, and result conversion.
 	// Expiry returns ErrLimitExceeded; caller cancellation/deadlines retain their
 	// context error. Native Goja built-ins cannot be preempted; cancellation is
@@ -53,8 +59,13 @@ type Limits struct {
 
 // validate disallows omitted or unlimited policy values.
 func (l Limits) validate() error {
-	if l.MaxSourceBytes <= 0 || l.MaxInputBytes <= 0 || l.MaxOutputBytes <= 0 ||
-		l.MaxDepth <= 0 || l.MaxNodes <= 0 || l.MaxStackDepth <= 0 || l.Timeout <= 0 {
+	if l.MaxSourceBytes <= 0 ||
+		l.MaxInputBytes <= 0 ||
+		l.MaxOutputBytes <= 0 ||
+		l.MaxDepth <= 0 ||
+		l.MaxNodes <= 0 ||
+		l.MaxStackDepth <= 0 ||
+		l.Timeout <= 0 {
 		return ErrInvalidInput
 	}
 	return nil
@@ -67,6 +78,7 @@ type Input struct {
 	// Context contains validated params and copied configuration, metadata, and
 	// identities. Each evaluation receives a fresh native JavaScript copy.
 	Context *render.Context
+
 	// Response is an object of caller-prepared response fields. Nil means {}.
 	// The HTTP executor will prepare status, headers, body, and mediaType; this
 	// primitive does not read streams or interpret HTTP content types.
@@ -95,17 +107,26 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 	if !utf8.ValidString(source) || strings.TrimSpace(source) == "" {
 		return nil, ErrInvalidSource
 	}
-	parsed, err := parser.ParseFile(nil, "tool-expression.js", "(\n"+source+"\n)", 0)
+
+	parsed, err := parser.ParseFile(
+		nil, // fileSet
+		"tool-expression.js",
+		"(\n"+source+"\n)",
+		0, // mode
+	)
 	if err != nil || len(parsed.Body) != 1 {
 		return nil, ErrInvalidSource
 	}
+
 	if _, ok := parsed.Body[0].(*ast.ExpressionStatement); !ok {
 		return nil, ErrInvalidSource
 	}
+
 	program, err := goja.CompileAST(parsed, true)
 	if err != nil {
 		return nil, ErrInvalidSource
 	}
+
 	return &Expression{program: program, limits: limits}, nil
 }
 
@@ -119,17 +140,24 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 // ctx.Err(), taking precedence if both have expired before evaluation returns.
 // Only the interrupt watcher accesses the VM from another goroutine, through
 // Goja's thread-safe Interrupt method. Thrown values and stacks are never exposed.
-func (e *Expression) Evaluate(ctx context.Context, input Input) (result common.RawJSON, err error) {
+func (e *Expression) Evaluate(
+	ctx context.Context,
+	input Input,
+) (result common.RawJSON, err error) {
 	if e == nil || e.program == nil || ctx == nil {
 		return nil, ErrInvalidInput
 	}
+
 	runCtx, cancel := context.WithTimeout(ctx, e.limits.Timeout)
 	defer cancel()
+
 	if err := expressionContextError(ctx, runCtx); err != nil {
 		return nil, err
 	}
+
 	vm := goja.New()
 	vm.SetMaxCallStackSize(e.limits.MaxStackDepth)
+
 	stop, stopped := make(chan struct{}), make(chan struct{})
 	go func() {
 		defer close(stopped)
@@ -189,6 +217,7 @@ func expressionContextError(ctx, runCtx context.Context) error {
 		}
 		return ErrLimitExceeded
 	}
+
 	// The caller can be canceled before that cancellation reaches its child.
 	return ctx.Err()
 }

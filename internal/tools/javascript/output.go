@@ -30,13 +30,28 @@ type outputEncoder struct {
 // globals have not yet been changed. The encoder and runtime belong to one
 // evaluation and must only be used by its goroutine.
 func newOutputEncoder(vm *goja.Runtime, limits Limits) *outputEncoder {
-	ownKeys, _ := goja.AssertFunction(vm.Get("Reflect").ToObject(vm).Get("ownKeys"))
-	propertyDescriptor, _ := goja.AssertFunction(vm.Get("Object").ToObject(vm).Get("getOwnPropertyDescriptor"))
+	ownKeys, _ := goja.
+		AssertFunction(vm.
+			Get("Reflect").
+			ToObject(vm).
+			Get("ownKeys"),
+		)
+	propertyDescriptor, _ := goja.AssertFunction(vm.
+		Get("Object").
+		ToObject(vm).
+		Get("getOwnPropertyDescriptor"),
+	)
 	object, array := vm.NewObject(), vm.NewArray()
+
 	return &outputEncoder{
-		vm: vm, limits: limits, ownKeys: ownKeys, propertyDescriptor: propertyDescriptor,
-		objectPrototype: object.Prototype(), arrayPrototype: array.Prototype(),
-		objectExportType: object.ExportType(), arrayExportType: array.ExportType(),
+		vm:                 vm,
+		limits:             limits,
+		ownKeys:            ownKeys,
+		propertyDescriptor: propertyDescriptor,
+		objectPrototype:    object.Prototype(),
+		arrayPrototype:     array.Prototype(),
+		objectExportType:   object.ExportType(),
+		arrayExportType:    array.ExportType(),
 	}
 }
 
@@ -56,10 +71,19 @@ type outputState struct {
 // do not. Root depth is zero. JSON escaping is charged before bytes are added.
 // The caller must keep the runtime's cancellation interrupt active until this
 // method returns and classify Goja interrupt/stack-overflow panics.
-func (e *outputEncoder) encode(ctx context.Context, value goja.Value) (common.RawJSON, error) {
-	state := &outputState{encoder: e, ctx: ctx, active: make(map[*goja.Object]bool)}
+func (e *outputEncoder) encode(
+	ctx context.Context,
+	value goja.Value,
+) (common.RawJSON, error) {
+	state := &outputState{
+		encoder: e,
+		ctx:     ctx,
+		active:  make(map[*goja.Object]bool),
+	}
 	var err error
-	if exception := e.vm.Try(func() { err = state.value(value, 0) }); exception != nil {
+	if exception := e.vm.Try(
+		func() { err = state.value(value, 0) },
+	); exception != nil {
 		return nil, ErrInvalidOutput
 	}
 	if err != nil {
@@ -96,6 +120,7 @@ func (s *outputState) value(value goja.Value, depth int) error {
 	if _, ok := value.(*goja.Symbol); ok {
 		return ErrInvalidOutput
 	}
+
 	switch value.ExportType().Kind() {
 	case reflect.Bool:
 		return s.append(strconv.FormatBool(value.ToBoolean()))
@@ -127,7 +152,8 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 		return ErrInvalidOutput
 	}
 	prototype := object.Prototype()
-	if prototype != nil && ((!isArray && prototype != e.objectPrototype) || (isArray && prototype != e.arrayPrototype)) {
+	if prototype != nil && ((!isArray && prototype != e.objectPrototype) ||
+		(isArray && prototype != e.arrayPrototype)) {
 		return ErrInvalidOutput
 	}
 	if s.active[object] {
