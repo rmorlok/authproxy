@@ -72,6 +72,12 @@ type ResponseInput struct {
 	// arrays of values. It is ignored by default passthrough and status errors.
 	// ContentType, not this map, controls body decoding. The caller must not mutate
 	// the map or value slices during Map; no references enter the JavaScript VM.
+	//
+	// Map does not filter sensitive fields: every supplied header is visible to
+	// the transform and can be projected into Tool output. Executors must pass
+	// the already-filtered httphost.Response.Header (or apply the same filter),
+	// which removes cookie, authentication, and hop-by-hop fields. Never pass the
+	// raw upstream http.Response.Header here.
 	Headers http.Header
 
 	// Context is the immutable params/connection snapshot from admission. It is

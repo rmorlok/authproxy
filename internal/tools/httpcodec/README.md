@@ -550,7 +550,11 @@ program, err := httpcodec.CompileResponse(definition.Response, limits)
 
 Here `javascript` is `internal/tools/javascript`. On each `Map` call, supply
 `ResponseInput.Context` from `render.NewContext` and `ResponseInput.Headers`
-from the captured upstream response. The executor must use the same admission
+from the filtered `httphost.Response.Header`, never the raw upstream
+`http.Response.Header`. `Map` does not remove sensitive fields itself: every
+supplied header reaches the transform and can be projected into Tool output.
+httphost removes cookie, authentication, and hop-by-hop fields such as
+`Set-Cookie` and `Authentication-Info`. The executor must use the same admission
 snapshot for the context and result identities. Neither field is needed for
 passthrough. Status errors run first and bypass the transform, including its
 context, header, and body checks; an error body never becomes a success projection.
