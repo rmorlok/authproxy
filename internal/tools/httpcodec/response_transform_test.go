@@ -101,6 +101,35 @@ func TestResponseTransformContextAndHeaders(t *testing.T) {
 	require.NotContains(t, input.Headers, "x-request-id")
 }
 
+// TestResponseTransformWithholdsCredentialHeaders keeps upstream session state
+// and transport-only metadata out of projections that echo every header.
+func TestResponseTransformWithholdsCredentialHeaders(t *testing.T) {
+	program := compileResponseTransform(t, `({headers: response.headers})`, transformResponseLimits())
+	input := transformResponseInput(t)
+	input.Body = []byte(`{}`)
+	input.Headers = http.Header{
+		"Set-Cookie":          {"session=private-cookie"},
+		"Set-Cookie2":         {"legacy=private-cookie"},
+		"Authentication-Info": {"nextnonce=\"private-nonce\""},
+		"Proxy-Authenticate":  {"Basic realm=\"private-realm\""},
+		"Connection":          {"keep-alive"},
+		"Keep-Alive":          {"timeout=5"},
+		"Trailer":             {"X-Checksum"},
+		"Upgrade":             {"h2c"},
+		"X-Request-Id":        {"req-7"},
+	}
+
+	// Only ordinary representation metadata survives; withheld values never
+	// reach the runtime, so no projection can copy them into the result.
+	result := mapResponse(t, program, input)
+	require.False(t, result.IsError)
+	require.JSONEq(t, `{"headers":{"x-request-id":["req-7"]}}`, string(result.StructuredContent))
+	require.NotContains(t, string(result.StructuredContent), "private-")
+
+	// The caller's header map is still left untouched.
+	require.Equal(t, []string{"session=private-cookie"}, input.Headers["Set-Cookie"])
+}
+
 // TestResponseTransformBodyRepresentations supplies a single documented body
 // representation for each MIME family, including explicit null versus no body.
 func TestResponseTransformBodyRepresentations(t *testing.T) {

@@ -20,6 +20,26 @@ import (
 // a header name or value that could contain provider or connection data.
 var errTransformHeaders = errors.New("invalid response transform headers")
 
+// withheldTransformHeaders lists lowercase response headers that never reach a
+// transform. Credential-bearing headers would let a projection copy upstream
+// session state into Tool output, bypassing the proxy's server-side credential
+// boundary; hop-by-hop headers describe one transport connection, not the
+// provider's representation.
+var withheldTransformHeaders = map[string]struct{}{
+	"set-cookie":                {},
+	"set-cookie2":               {},
+	"authentication-info":       {},
+	"proxy-authentication-info": {},
+	"proxy-authenticate":        {},
+	"connection":                {},
+	"keep-alive":                {},
+	"proxy-connection":          {},
+	"te":                        {},
+	"trailer":                   {},
+	"transfer-encoding":         {},
+	"upgrade":                   {},
+}
+
 // mapTransform projects a successful, bounded response using a fresh pure VM.
 // It populates result only after conversion succeeds; callers install execution
 // state on safe failures and enforce the complete serialized result allowance.
@@ -197,6 +217,8 @@ func encodeTransformResponse(
 // It returns lowercase names with borrowed value slices, used only during this
 // call. Duplicate names ignoring case are rejected instead of being merged in
 // map iteration order. Repeated values in one entry retain their original order.
+// Withheld credential and hop-by-hop headers are omitted after validation; they
+// still count toward the input allowance because they were bounded first.
 func transformHeaders(
 	ctx context.Context,
 	source http.Header,
@@ -252,6 +274,9 @@ func transformHeaders(
 			}
 		}
 
+		if _, withheld := withheldTransformHeaders[name]; withheld {
+			continue
+		}
 		headers[name] = values
 	}
 

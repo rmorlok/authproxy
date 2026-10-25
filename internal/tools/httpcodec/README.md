@@ -533,6 +533,14 @@ UTF-8 without prohibited HTTP control characters. Duplicate names differing
 only in case are rejected. `ResponseInput.ContentType` controls body decoding;
 the supplied header map is metadata and does not override it.
 
+Credential-bearing and hop-by-hop headers are withheld from `response.headers`:
+`Set-Cookie`, `Set-Cookie2`, `Authentication-Info`, `Proxy-Authentication-Info`,
+`Proxy-Authenticate`, `Connection`, `Keep-Alive`, `Proxy-Connection`, `TE`,
+`Trailer`, `Transfer-Encoding`, and `Upgrade`. A projection such as
+`({headers: response.headers})` therefore cannot copy upstream session cookies
+into Tool output. Withheld headers are still validated and still count toward
+the runtime's input allowance.
+
 Set positive runtime limits before compiling a transform:
 
 ```go
