@@ -91,12 +91,16 @@ var rateLimitResourceSampleColumns = []string{
 	"resource_deleted_at_ms",
 }
 
-func (s *sqlRecordStore) StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error {
+func (s *sqlRecordStore) StoreConnectionResourceSamples(
+	ctx context.Context,
+	samples []*ConnectionResourceSample,
+) error {
 	if len(samples) == 0 {
 		return nil
 	}
 
-	builder := sq.Insert(connectionResourceSamplesTable).
+	builder := sq.
+		Insert(connectionResourceSamplesTable).
 		PlaceholderFormat(s.placeholderFormat).
 		Columns(append(append([]string{}, connectionResourceSampleColumns...), "ingested_at_unix_nano")...)
 
@@ -146,7 +150,10 @@ func (s *sqlRecordStore) StoreConnectionResourceSamples(ctx context.Context, sam
 	return nil
 }
 
-func (s *sqlRecordStore) StoreActorResourceSamples(ctx context.Context, samples []*ActorResourceSample) error {
+func (s *sqlRecordStore) StoreActorResourceSamples(
+	ctx context.Context,
+	samples []*ActorResourceSample,
+) error {
 	if len(samples) == 0 {
 		return nil
 	}
