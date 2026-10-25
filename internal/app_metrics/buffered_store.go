@@ -153,8 +153,9 @@ func NewBufferedStore(
 	return s
 }
 
-// flushLoop runs until Close, flushing on the interval ticker or when a full batch is signalled. Flushes are
-// serialized on this goroutine, so at most one batch write is in flight at a time.
+// flushLoop runs until Close, flushing on the interval ticker or when a full
+// batch is signalled. Flushes are serialized on this goroutine, so at most one
+// batch write is in flight at a time.
 func (s *bufferedRecordStore) flushLoop() {
 	defer close(s.doneCh)
 
@@ -186,8 +187,9 @@ func (s *bufferedRecordStore) flush() {
 	s.dropped = 0
 	s.mu.Unlock()
 
-	// The buffer_full metric is already recorded in StoreRecord as each event is rejected, so dashboards see drops
-	// immediately rather than at the next flush. This is only a log summary of those drops; recording the metric
+	// The buffer_full metric is already recorded in StoreRecord as each event
+	// is rejected, so dashboards see drops immediately rather than at the next
+	//flush. This is only a log summary of those drops; recording the metric
 	// here as well would double-count them.
 	if dropped > 0 {
 		s.logger.Warn(
@@ -218,7 +220,10 @@ func (s *bufferedRecordStore) flush() {
 // StoreRecord enqueues a record for the next flush. It never blocks on the
 // database and always returns nil; if the buffer is full the record is dropped
 // and counted.
-func (s *bufferedRecordStore) StoreRecord(_ context.Context, record *LogRecord) error {
+func (s *bufferedRecordStore) StoreRecord(
+	_ context.Context,
+	record *LogRecord,
+) error {
 	s.mu.Lock()
 	if len(s.buffer) >= s.maxBuffered {
 		s.dropped++
