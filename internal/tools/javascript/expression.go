@@ -45,8 +45,9 @@ type Limits struct {
 	// MaxStackDepth bounds JavaScript function call depth, including recursion.
 	MaxStackDepth int
 	// Timeout covers input binding, expression execution, and result conversion.
-	// A shorter caller deadline wins. Native Goja built-ins cannot be preempted;
-	// cancellation is checked again before any result is returned.
+	// Expiry returns ErrLimitExceeded; caller cancellation/deadlines retain their
+	// context error. Native Goja built-ins cannot be preempted; cancellation is
+	// checked again before any result is returned.
 	Timeout time.Duration
 }
 
@@ -114,6 +115,8 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 // this is not a precision-preserving raw JSON passthrough.
 //
 // Cancellation and the configured timeout remain active through conversion.
+// A configured timeout is ErrLimitExceeded; caller cancellation/deadlines keep
+// ctx.Err(), taking precedence if both have expired before evaluation returns.
 // Only the interrupt watcher accesses the VM from another goroutine, through
 // Goja's thread-safe Interrupt method. Thrown values and stacks are never exposed.
 func (e *Expression) Evaluate(ctx context.Context, input Input) (result common.RawJSON, err error) {
@@ -122,7 +125,7 @@ func (e *Expression) Evaluate(ctx context.Context, input Input) (result common.R
 	}
 	runCtx, cancel := context.WithTimeout(ctx, e.limits.Timeout)
 	defer cancel()
-	if err := runCtx.Err(); err != nil {
+	if err := expressionContextError(ctx, runCtx); err != nil {
 		return nil, err
 	}
 	vm := goja.New()
@@ -151,7 +154,7 @@ func (e *Expression) Evaluate(ctx context.Context, input Input) (result common.R
 				panic(recovered)
 			}
 		}
-		if contextErr := runCtx.Err(); contextErr != nil {
+		if contextErr := expressionContextError(ctx, runCtx); contextErr != nil {
 			result, err = nil, contextErr
 		}
 	}()
@@ -171,4 +174,21 @@ func (e *Expression) Evaluate(ctx context.Context, input Input) (result common.R
 		return nil, ErrEvaluation
 	}
 	return encoder.encode(runCtx, value)
+}
+
+// expressionContextError distinguishes caller cancellation from the runtime's
+// own execution-time limit. The caller's error wins when both contexts are done.
+// runCtx is private and only canceled independently by the configured timeout
+// until Evaluate's final cleanup, so its remaining error means a policy limit.
+func expressionContextError(ctx, runCtx context.Context) error {
+	if runCtx.Err() != nil {
+		// Read the caller after observing the child: inherited cancellation
+		// must already be visible there, even if it arrived during this check.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		return ErrLimitExceeded
+	}
+	// The caller can be canceled before that cancellation reaches its child.
+	return ctx.Err()
 }

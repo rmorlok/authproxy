@@ -151,6 +151,24 @@ func TestBindInputNumericSemantics(t *testing.T) {
 	require.True(t, inputTestRun(t, vm, `typeof params.integer === "number" && params.integer === 9007199254740992 && params.fraction === 1.25 && params.tiny === 0`).ToBoolean())
 }
 
+func TestExpressionPreservesStringIdentifiers(t *testing.T) {
+	// Keep precision-sensitive identifiers as strings before either input path
+	// reaches JavaScript; converting an already rounded Number would be too late.
+	snapshot := inputTestContext(t, render.Input{Params: map[string]any{
+		"id": "18446744073709551615",
+	}})
+	program, err := CompileExpression(`({ inputId: params.id, responseId: response.body.id })`, inputTestLimits())
+	require.NoError(t, err)
+	result, err := program.Evaluate(context.Background(), Input{
+		Context:  snapshot,
+		Response: common.RawJSON(`{"body":{"id":"9007199254740993"}}`),
+	})
+
+	// Both strings survive parsing, projection, and final JSON serialization.
+	require.NoError(t, err)
+	require.JSONEq(t, `{"inputId":"18446744073709551615","responseId":"9007199254740993"}`, string(result))
+}
+
 func TestBindInputSurrogateEscapes(t *testing.T) {
 	for _, response := range []string{
 		`{"body":"\ud800"}`, `{"body":"\udfff"}`,

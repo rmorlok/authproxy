@@ -116,11 +116,25 @@ raw numeric spelling. Input numbers outside the finite Number range are
 rejected. The HTTP codec's default JSON passthrough remains the path for
 preserving original JSON number tokens without JavaScript evaluation.
 
+Supply identifiers that need exact digits as JSON strings before they enter the
+runtime. For example, a response body of `{"id":"9007199254740993"}` keeps the
+identifier unchanged in this projection:
+
+```javascript
+({ customerId: response.body.id }) // {"customerId":"9007199254740993"}
+```
+
+This also applies to identifiers in `params` and connection configuration.
+Calling `String(response.body.id)` after a numeric ID has been parsed cannot
+recover digits that were already rounded.
+
 Failures return no partial output. Fixed error classifications distinguish
 invalid source, input, output, execution limits, and thrown JavaScript errors.
 Errors never contain expression source, thrown values, stack traces, private
 configuration, or response data. Caller cancellation and deadlines remain Go
-context errors. The configured timeout returns `context.DeadlineExceeded`.
+context errors. The configured timeout returns `ErrLimitExceeded`, allowing an
+executor to report an execution-limit failure separately from a canceled
+caller request. If both contexts have expired, the caller's error wins.
 
 ## Limits and lifecycle
 

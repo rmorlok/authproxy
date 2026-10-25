@@ -136,6 +136,21 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 	s.active[object] = true
 	defer delete(s.active, object)
 
+	// Native arrays have an intrinsic own data length. Reject an array whose
+	// elements cannot fit before ownKeys allocates a second array of its keys.
+	// The container has already consumed one node, so only remaining work counts.
+	length := int64(0)
+	if isArray {
+		lengthValue, _, err := s.property(object, e.vm.ToValue("length").(goja.String))
+		if err != nil {
+			return err
+		}
+		length = lengthValue.ToInteger()
+		if length > int64(e.limits.MaxNodes-s.nodes) {
+			return ErrLimitExceeded
+		}
+	}
+
 	// Goja's public reflection API materializes a key array. Bound its traversal
 	// before inspecting properties; this is not a hard heap allocation quota.
 	keysValue, err := e.ownKeys(goja.Undefined(), object)
@@ -152,7 +167,7 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 		return ErrLimitExceeded
 	}
 	if isArray {
-		return s.array(object, keys, keyCount, depth)
+		return s.array(object, keys, keyCount, length, depth)
 	}
 	return s.properties(object, keys, keyCount, depth)
 }
@@ -198,18 +213,11 @@ func (s *outputState) properties(object, keys *goja.Object, keyCount int64, dept
 }
 
 // array requires a dense array with only indexed data properties and length.
+// Its intrinsic length has already been checked against the remaining nodes.
 // Checking every own key rejects extra properties that JSON would otherwise
 // drop, while checking each descriptor rejects holes even when a prototype
 // supplies an inherited value at the missing index.
-func (s *outputState) array(object, keys *goja.Object, keyCount int64, depth int) error {
-	lengthValue, _, err := s.property(object, s.encoder.vm.ToValue("length").(goja.String))
-	if err != nil {
-		return err
-	}
-	length := lengthValue.ToInteger()
-	if length > int64(s.encoder.limits.MaxNodes-s.nodes) {
-		return ErrLimitExceeded
-	}
+func (s *outputState) array(object, keys *goja.Object, keyCount, length int64, depth int) error {
 	if keyCount != length+1 {
 		return ErrInvalidOutput
 	}

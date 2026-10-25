@@ -255,6 +255,55 @@ func TestOutputLimits(t *testing.T) {
 	}
 }
 
+func TestOutputArrayLengthBeforeKeys(t *testing.T) {
+	tests := []struct {
+		name       string
+		expression string
+		maxNodes   int
+		want       string
+		wantErr    error
+		wantKeys   int
+	}{
+		{"empty exact", `[]`, 1, `[]`, nil, 1},
+		{"dense exact", `[1, 2]`, 3, `[1,2]`, nil, 1},
+		{"dense over", `[1, 2]`, 2, ``, ErrLimitExceeded, 0},
+		{"wide dense over", `new Array(64).fill(0)`, 4, ``, ErrLimitExceeded, 0},
+		{"wide sparse over", `new Array(4294967295)`, 4, ``, ErrLimitExceeded, 0},
+		{"nested exact", `[[1, 2]]`, 4, `[[1,2]]`, nil, 2},
+		{"nested remaining budget", `[[1, 2]]`, 3, ``, ErrLimitExceeded, 1},
+		{"sparse within budget", `[1, , 3]`, 4, ``, ErrInvalidOutput, 1},
+		{"extra property within budget", `Object.assign([1], {extra: 2})`, 4, ``, ErrInvalidOutput, 1},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Build small arrays but intercept key enumeration. This proves the
+			// ordering without allocating millions of values to provoke the bug.
+			limits := outputTestLimits()
+			limits.MaxNodes = test.maxNodes
+			encoder, value := outputTestValue(t, test.expression, limits)
+			ownKeys := encoder.ownKeys
+			keyCalls := 0
+			encoder.ownKeys = func(this goja.Value, args ...goja.Value) (goja.Value, error) {
+				keyCalls++
+				if keyCalls > test.wantKeys {
+					return nil, errors.New("unexpected key enumeration")
+				}
+				return ownKeys(this, args...)
+			}
+			actual, err := encoder.encode(context.Background(), value)
+
+			// Oversized arrays stop before enumeration; exact lengths still pass
+			// and affordable arrays still reject holes or additional properties.
+			require.Equal(t, test.wantKeys, keyCalls)
+			require.ErrorIs(t, err, test.wantErr)
+			require.Equal(t, test.want, string(actual))
+			if test.wantErr != nil {
+				require.Nil(t, actual)
+			}
+		})
+	}
+}
+
 func TestOutputCancellationAndOwnership(t *testing.T) {
 	// A previously canceled context must stop before inspecting the first value.
 	encoder, value := outputTestValue(t, `({value: [1, 2]})`, outputTestLimits())
