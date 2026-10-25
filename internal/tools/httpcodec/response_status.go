@@ -43,12 +43,12 @@ const (
 )
 
 // compileResponseRules validates and captures the response error policy. A nil
-// source supplies no custom rules. Transforms require a JavaScript runtime and
-// are explicitly unsupported by this compiler, including an empty expression.
+// source supplies no custom rules. A transform's source shares the byte allowance;
+// expression compilation belongs to CompileResponse, not the status mapper.
 //
-// maxSourceBytes must be positive. It caps combined code/message bytes, selector
-// and retryable scalar text, and one selector marker per rule. It is a bounded
-// source-work allowance, not the serialized JSON size or an exact memory cap.
+// maxSourceBytes must be positive. It caps expression and code/message bytes,
+// selector and retryable scalar text, and one selector marker per rule. It is a
+// bounded source-work allowance, not serialized JSON size or an exact memory cap.
 func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*responseRules, error) {
 	if maxSourceBytes <= 0 {
 		return nil, errors.New("response source byte limit must be positive")
@@ -56,10 +56,6 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 
 	if source == nil {
 		return &responseRules{}, nil
-	}
-
-	if source.TransformJavascript != nil {
-		return nil, errors.New("response JavaScript transforms are not supported")
 	}
 
 	if len(source.Errors) > maxResponseRules {
@@ -83,6 +79,9 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 		}
 		remainingBytes -= size
 		return true
+	}
+	if source.TransformJavascript != nil && !charge(len(*source.TransformJavascript)) {
+		return nil, errors.New("response source exceeds the byte limit")
 	}
 
 	for _, rule := range source.Errors {

@@ -88,8 +88,10 @@ methods, connection handles, or credentials are reflected into the runtime.
 
 Only standard Goja language facilities are available. There is no `fetch`,
 timer, module loader, filesystem, process environment, or application logger.
-Asynchronous Tool entry points, connector helper libraries, `ToolError`,
-`toolResult`, and HTTP response-transform integration are separate work.
+The [HTTP response mapper](../httpcodec/README.md#response-transforms) uses this
+runtime for `transformJavascript`, preparing the response object and converting
+the projection into a rich result. Asynchronous Tool entry points, connector
+helper libraries, `ToolError`, and `toolResult` remain separate work.
 
 ## Results and errors
 

@@ -19,6 +19,42 @@ func responseBodyResult() *api.ToolResult {
 	}
 }
 
+// TestDecodeResponseBodyRetainsEffectiveMediaAndBorrowedBytes verifies the shared
+// classification contract without imposing a particular rich-result mapping.
+func TestDecodeResponseBodyRetainsEffectiveMediaAndBorrowedBytes(t *testing.T) {
+	for _, test := range []struct {
+		name, mediaType, body, wantMIME string
+		wantKind                        responseBodyKind
+	}{
+		{"empty default", "", "", "application/octet-stream", responseBodyEmpty},
+		{"empty declared JSON", "application/json", "", "application/json", responseBodyEmpty},
+		{"exact JSON", "Application/Problem+JSON; charset=UTF-8", " \n9007199254740993.0100\t", "Application/Problem+JSON; charset=UTF-8", responseBodyJSON},
+		{"JSON repaired parameters", "Application/Problem+JSON; ignored", `null`, "application/problem+json", responseBodyJSON},
+		{"text JSON", "text/json", `false`, "text/json", responseBodyJSON},
+		{"text charset", "Text/Plain; charset=UTF-8", "café", "Text/Plain; charset=UTF-8", responseBodyText},
+		{"image", "Image/PNG; profile=original", "\x00\xff", "Image/PNG; profile=original", responseBodyImage},
+		{"audio repaired parameters", "Audio/WAV; ignored", "\x00\xff", "audio/wav", responseBodyAudio},
+		{"binary default", "", "\x00\xff", "application/octet-stream", responseBodyBinary},
+		{"unsupported charset", "text/plain; charset=utf-16", "\x00\xff", "text/plain; charset=utf-16", responseBodyBinary},
+		{"ambiguous charset", "Text/Plain; charset=", "café", "text/plain", responseBodyBinary},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Classification validates bytes and MIME metadata without converting
+			// JSON numbers, transcoding text, or copying the caller's buffer.
+			body := []byte(test.body)
+			decoded, failure := decodeResponseBody(test.mediaType, body)
+			require.Nil(t, failure)
+			require.Equal(t, test.wantKind, decoded.kind)
+			require.Equal(t, test.wantMIME, decoded.mediaType)
+			require.Equal(t, body, decoded.body)
+			if len(body) > 0 {
+				// Consumers must copy before retaining data beyond the source lifetime.
+				require.Same(t, &body[0], &decoded.body[0])
+			}
+		})
+	}
+}
+
 // TestMapResponseBodyJSONPreservesValues retains JSON scalars, null, whitespace,
 // and exact numbers, including when optional MIME parameters are malformed.
 func TestMapResponseBodyJSONPreservesValues(t *testing.T) {

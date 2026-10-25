@@ -461,7 +461,7 @@ the captured invocation. The executor supplies its known execution state:
 HTTP status alone cannot establish whether upstream side effects occurred.
 `notStarted` is invalid when mapping an already-received response.
 
-Successful responses use these representations:
+Successful responses without a transform use these representations:
 
 | Body and Content-Type | Tool result |
 | --- | --- |
@@ -497,18 +497,92 @@ content; they are not download endpoints. Input bytes and metadata pointers are
 copied into independent results. Every result has a nonnil `content` array,
 including JSON-only and error results.
 
-Configured `transformJavascript` is currently rejected at compilation. It must
-be handled by a future pure transform runtime, never silently bypassed. The
-executor also owns response reading, decompression, cancellation of network I/O,
+The executor owns response reading, decompression, cancellation of network I/O,
 aggregate invocation accounting, and output-schema validation. `Map` operates
 only on supplied bytes and does not access the network or close a stream.
 
+### Response transforms
+
+A pure JavaScript expression can select or reshape a successful response. For
+example, a CRM returns `{"id":"contact-42","profile":{"name":"Ada"},"debug":{"trace":"provider-only"}}`,
+but the Tool needs only the contact's identity and its tenant:
+
+```yaml
+response:
+  transformJavascript: |
+    ({ id: response.body.id, name: response.body.profile.name, tenant: cfg.tenant })
+```
+
+With `cfg.tenant` captured as `"acme"`, the result's `structuredContent` is
+`{"id":"contact-42","name":"Ada","tenant":"acme"}`. The full upstream body must fit
+the response input cap; only the smaller projection must fit the output cap.
+Compilation checks expression syntax without running the expression. Each
+mapping uses a fresh runtime with copied `params`, `context`, `cfg`, `labels`,
+and `annotations`, plus this `response` object:
+
+| Field | Value available to the expression |
+| --- | --- |
+| `status` | The received HTTP status number. |
+| `headers` | Lowercase names mapped to arrays of strings, such as `{"x-request-id":["req-7"]}`. Repeated values retain their order; empty lists stay arrays. |
+| `mediaType` | The effective Content-Type, including valid parameters, with the same fallback and repair rules as passthrough. |
+| `body` | Decoded JSON, a supported text string, or `{encoding:"base64",data:"..."}` for binary content, including images, audio, and unsupported text charsets. Empty content omits this field; JSON `null` remains explicit null. |
+
+For example, `response.headers["x-request-id"]?.[0] ?? null` selects an optional
+request ID. Header names must be valid HTTP tokens, and values must be valid
+UTF-8 without prohibited HTTP control characters. Duplicate names differing
+only in case are rejected. `ResponseInput.ContentType` controls body decoding;
+the supplied header map is metadata and does not override it.
+
+Set positive runtime limits before compiling a transform:
+
+```go
+limits.Transform = javascript.Limits{
+    MaxSourceBytes: 4096,
+    MaxInputBytes: 2 * 1024 * 1024,
+    MaxOutputBytes: 1024 * 1024,
+    MaxDepth: 32,
+    MaxNodes: 10000,
+    MaxStackDepth: 128,
+    Timeout: time.Second,
+}
+program, err := httpcodec.CompileResponse(definition.Response, limits)
+```
+
+Here `javascript` is `internal/tools/javascript`. On each `Map` call, supply
+`ResponseInput.Context` from `render.NewContext` and `ResponseInput.Headers`
+from the captured upstream response. The executor must use the same admission
+snapshot for the context and result identities. Neither field is needed for
+passthrough. Status errors run first and bypass the transform, including its
+context, header, and body checks; an error body never becomes a success projection.
+
+JSON-compatible results become `structuredContent`. A string also produces a
+text block with the same value; other values are not duplicated as text. Empty
+input and JSON null remain distinguishable with `"body" in response`. Returning
+an absent body directly returns `undefined` and fails; an expression can instead
+return an explicit fallback. A top-level string containing an unpaired UTF-16
+surrogate fails because a UTF-8 text block cannot preserve it. Nested strings
+retain the expression runtime's JSON representation.
+
+JavaScript uses Number precision: supply exact identifiers as strings before
+parsing. A projection cannot restore digits already rounded by JavaScript.
+Without a transform, JSON passthrough continues to preserve original numeric
+tokens. Transforms expose no network access or rich-result host helpers.
+
+Invalid JSON/text, unsupported JavaScript values, and thrown exceptions become
+safe `OUTPUT_INVALID` errors; malformed HTTP metadata produces
+`UPSTREAM_PROTOCOL_ERROR`. Runtime input, output, traversal, stack, or timeout
+limits become `EXECUTION_LIMIT_EXCEEDED`. The separate response output and
+envelope caps produce `OUTPUT_TOO_LARGE`. Caller cancellation retains its Go
+context error. All mapped failures preserve the supplied execution state and
+contain no partial output, source text, thrown values, or private input data.
+
 ### Response limits
 
-All four limits must be positive:
+The four response limits must be positive. `Transform` limits are additionally
+required when an expression is configured:
 
-- `MaxSourceBytes` bounds the raw rule codes, messages, and selector data before
-  compilation. It does not count JSON/YAML framing.
+- `MaxSourceBytes` bounds the combined expression source, rule codes, messages,
+  and selector data before compilation. It does not count JSON/YAML framing.
 - `MaxResponseBytes` bounds the supplied decoded body on the success path.
   Content-Type text is independently capped at the same size before parsing.
   Status errors use neither field, so unused content cannot replace a status
@@ -516,10 +590,18 @@ All four limits must be positive:
   bounds before allocating buffers and account for all responses across a
   multi-request invocation.
 - `MaxOutputBytes` bounds successful raw JSON, UTF-8 text, or decoded binary
-  content before wrapping it in an envelope or encoding it as base64.
+  content before wrapping it in an envelope or encoding it as base64. With a
+  transform, it bounds the returned JSON instead of the upstream body.
 - `MaxEncodedResultBytes` bounds the complete serialized `ToolResult`, including
   identities, metadata, JSON escaping, and base64 expansion. It does not include
   any enclosing API action response.
+- `Transform.MaxInputBytes` bounds serialized response metadata/body preparation
+  and, in the runtime, its combined size with the captured context. Header
+  counts and raw values are checked before normalization and escaping; serialized
+  framing and base64 expansion count toward this allowance. Runtime structural
+  limits apply across the response and context. Runtime output bytes count the
+  expression's JSON; the response caps separately bound content and the final
+  envelope, including both copies of a string result.
 
 Size failures become `OUTPUT_TOO_LARGE` without truncated content. An oversized
 result, including an authored error message, is replaced once by a safe error.
