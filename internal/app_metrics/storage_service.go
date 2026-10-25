@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -34,6 +35,10 @@ type StorageService struct {
 	fullStore     FullStore
 	retriever     RecordRetriever
 	captureConfig captureConfig
+
+	// resourceSnapshotInterval is the configured cadence of the resource snapshot task. Resource metrics queries
+	// need it to know how long a snapshot may be carried forward; zero falls back to the configuration default.
+	resourceSnapshotInterval time.Duration
 }
 
 func (ss *StorageService) NewRoundTripper(
@@ -74,9 +79,17 @@ func (ss *StorageService) QueryRequestEventMetrics(ctx context.Context, queries 
 	return ss.retriever.QueryRequestEventMetrics(ctx, queries)
 }
 
-// QueryResourceMetrics executes time-series metric queries over resource samples.
+// QueryResourceMetrics executes time-series metric queries over resource samples. Queries that do not specify a
+// SampleInterval get the configured snapshot interval so carry-forward matches how often samples are written.
 func (ss *StorageService) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
-	return ss.retriever.QueryResourceMetrics(ctx, queries)
+	withInterval := make([]ResourceMetricsQuery, len(queries))
+	for i, query := range queries {
+		if query.SampleInterval == 0 {
+			query.SampleInterval = ss.resourceSnapshotInterval
+		}
+		withInterval[i] = query
+	}
+	return ss.retriever.QueryResourceMetrics(ctx, withInterval)
 }
 
 func (ss *StorageService) StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error {
@@ -290,5 +303,7 @@ func NewStorageService(
 		retriever:     retriever,
 		fullStore:     fullStore,
 		captureConfig: cc,
+
+		resourceSnapshotInterval: cfg.GetResourceSnapshotInterval(),
 	}, nil
 }

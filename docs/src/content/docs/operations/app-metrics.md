@@ -188,6 +188,16 @@ Resource metrics are computed from periodic app-metrics resource samples.
 | `resources.namespaces` | `count` | `state`, `namespace` |
 | `resources.rate_limits` | `count` | `mode`, `namespace` |
 
+Resource metrics are gauges. Each bucket reports the counts from the most
+recent snapshot taken before the bucket ends, so a value carries forward
+into buckets that have no snapshot of their own. This covers steps shorter
+than `resourceSnapshotInterval` and buckets that don't line up with snapshot
+times. A snapshot is carried forward for at most 2.5 snapshot intervals past
+a bucket's end. Buckets with no snapshot in that window, such as those before
+the first snapshot or while the worker is stopped, have no point in the
+response, so charts show a gap instead of a drop to zero. Within a snapshot,
+a group with no matching resources reports `0`.
+
 All metric queries accept the same namespace matcher and label selector fields. Label selectors evaluate against the frozen labels stored with the request event or resource sample, not the current live resource.
 Implicit `apxy/<rt>/-/name` labels therefore preserve the name captured in that
 sample or request snapshot. Renaming a live resource does not rewrite

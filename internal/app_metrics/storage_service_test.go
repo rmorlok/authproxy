@@ -25,6 +25,9 @@ import (
 type recordRetrieverStub struct {
 	record *LogRecord
 	err    error
+
+	// resourceQueries records the queries passed to QueryResourceMetrics.
+	resourceQueries []ResourceMetricsQuery
 }
 
 func (r *recordRetrieverStub) GetRecord(_ context.Context, _ apid.ID) (*LogRecord, error) {
@@ -43,8 +46,9 @@ func (r *recordRetrieverStub) QueryRequestEventMetrics(context.Context, []Reques
 	panic("not implemented")
 }
 
-func (r *recordRetrieverStub) QueryResourceMetrics(context.Context, []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
-	panic("not implemented")
+func (r *recordRetrieverStub) QueryResourceMetrics(_ context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
+	r.resourceQueries = append(r.resourceQueries, queries...)
+	return nil, r.err
 }
 
 type errorEncryptor struct {
@@ -574,3 +578,20 @@ func spanExceptionMessages(span sdktrace.ReadOnlySpan) string {
 type RoundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f RoundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func TestStorageService_QueryResourceMetricsAppliesSnapshotInterval(t *testing.T) {
+	retriever := &recordRetrieverStub{}
+	ss := &StorageService{retriever: retriever, resourceSnapshotInterval: 5 * time.Minute}
+
+	// One query leaves the interval unset and one sets it explicitly.
+	_, err := ss.QueryResourceMetrics(context.Background(), []ResourceMetricsQuery{
+		{RefID: "default"},
+		{RefID: "explicit", SampleInterval: time.Hour},
+	})
+	require.NoError(t, err)
+
+	// The unset interval is filled from configuration; an explicit one is left alone.
+	require.Len(t, retriever.resourceQueries, 2)
+	require.Equal(t, 5*time.Minute, retriever.resourceQueries[0].SampleInterval)
+	require.Equal(t, time.Hour, retriever.resourceQueries[1].SampleInterval)
+}
