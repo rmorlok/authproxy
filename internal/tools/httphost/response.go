@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"net/textproto"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -18,7 +19,8 @@ import (
 type Response struct {
 	// StatusCode is the validated upstream status, including unsuccessful ones.
 	StatusCode int
-	// Header is a detached, canonicalized map owned by the caller.
+	// Header is a detached, canonicalized map owned by the caller. Known
+	// authentication, cookie, and hop-by-hop fields are removed before exposure.
 	Header http.Header
 	// Body is read lazily and must be closed, including when discarding a status.
 	Body io.ReadCloser
@@ -69,6 +71,9 @@ func (s *Session) prepareResponse(ctx context.Context, raw *http.Response, metho
 		headers.Del("Content-Encoding")
 		headers.Del("Content-Length")
 	}
+	// Capture decoding instructions first: a Connection nomination can remove
+	// Content-Encoding from the exposed map without changing the actual stream.
+	filterResponseHeaders(headers)
 	body.stream = &responseStream{raw: raw.Body, remaining: s.limits.MaxStreamBytes}
 	// Synchronize installing the stop function with an immediately scheduled
 	// cancellation callback; Close never needs the read mutex to unblock I/O.
@@ -120,6 +125,31 @@ func copyResponseHeaders(source http.Header, maxBytes int) (http.Header, error) 
 		headers[name] = append(headers[name], values...)
 	}
 	return headers, nil
+}
+
+// filterResponseHeaders removes known authentication/cookie fields and
+// hop-by-hop metadata from an already bounded, validated, canonicalized copy.
+// Connection nominations are removed before Connection itself. The fixed list
+// includes standard auth fields, legacy Set-Cookie2/Proxy-Connection/Trailers,
+// and transport-only fields; it cannot identify secrets in arbitrary provider
+// headers or bodies. Decoding must capture needed metadata before this call.
+func filterResponseHeaders(headers http.Header) {
+	for _, value := range headers.Values("Connection") {
+		for name := range strings.SplitSeq(value, ",") {
+			if name = textproto.TrimString(name); name != "" {
+				headers.Del(name)
+			}
+		}
+	}
+	for _, name := range []string{
+		"Authorization", "Cookie", "Set-Cookie", "Set-Cookie2",
+		"Www-Authenticate", "Authentication-Info", "Proxy-Authentication-Info",
+		"Connection", "Proxy-Connection", "Keep-Alive",
+		"Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Trailers",
+		"Transfer-Encoding", "Upgrade",
+	} {
+		headers.Del(name)
+	}
 }
 
 // responseBody coordinates lazy decoding, serialized reads, and an independent

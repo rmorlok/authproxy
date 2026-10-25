@@ -66,6 +66,15 @@ Caller-provided headers, URL, and host overrides retain existing proxy behavior.
 
 The returned response contains only status, copied headers, and a bounded body.
 It does not expose the proxy's credential-bearing `http.Response.Request`.
+Known authentication and cookie headers, including `Set-Cookie` and
+`Authentication-Info`, are removed. Hop-by-hop headers and every field nominated
+by `Connection` are also removed. Useful end-to-end metadata such as
+`Content-Type`, `Retry-After`, and rate-limit headers remains available. All raw
+headers count toward the header limit and are validated before filtering;
+decoding instructions are captured before their headers can be removed.
+This filter does not identify secrets in arbitrary provider-specific headers or
+bodies. Trusted Tool definitions still control what data reaches the caller.
+
 `Do` does not read the response body, including a gzip header. Callers can inspect
 status and close an unwanted response without draining it. A caller that needs
 the body must read it and handle errors before transforming the result.
@@ -112,9 +121,15 @@ response releases its request without canceling other calls in the session.
 
 ## Errors and execution uncertainty
 
-Transport and body failures return fixed error classifications, without URLs,
+Proxy and body failures return fixed error classifications, without URLs,
 credential text, response bodies, or upstream error messages. Callers can use
-`errors.Is` and map them to Tool error results.
+`errors.Is` and map them to Tool error results. Non-context errors returned by
+the proxy currently use `ErrTransport`, including credential-resolution failures.
+The proxy does not yet expose stable categories that distinguish revoked
+credentials from database, decryption, or configuration failures. Those categories
+must be added at their source before an executor can reliably recommend
+reconnecting. Local rate-limit rejections are 429 responses, not Go errors, and
+remain available to status rules.
 
 `ExecutionState()` is `notStarted` until the first proxy handoff. After that it
 remains `mayHaveExecuted`, including when a later call is rejected or a transport
@@ -122,6 +137,13 @@ error occurs. The proxy cannot always determine whether the upstream received a
 failed request, and a successful HTTP response does not establish completion of
 the whole logical action. A higher-level executor decides when the Tool action
 is complete.
+
+This is deliberately conservative even for failures that happened before the
+first send: the current proxy interface does not report that fact. An error
+category or final local 429 alone would not prove it either; an earlier attempt
+may already have reached the provider during credential recovery or redirects.
+More precise `notStarted` reporting needs trusted, cumulative send information
+from the proxy, independently of the logical request allowance.
 
 This package does not load Tool revisions, check permissions, validate input or
 output schemas, render requests, or build Tool results. The invocation layer must

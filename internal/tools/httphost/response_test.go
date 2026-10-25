@@ -97,6 +97,126 @@ func TestResponseHeadersPrecedeBodyDecoding(t *testing.T) {
 	}
 }
 
+func TestResponseFiltersCredentialAndHopHeaders(t *testing.T) {
+	// Provider metadata can include credentials, handshakes, or fields declared
+	// meaningful only for this connection. Normalize all names before filtering.
+	headers := http.Header{
+		"aUtHoRiZaTiOn":             {"Bearer private-token"},
+		"cOoKiE":                    {"private=session"},
+		"set-cookie":                {"private=first", "private=second"},
+		"SET-COOKIE":                {"private=third"},
+		"sEt-CoOkIe2":               {"private=legacy"},
+		"wWw-AuThEnTiCaTe":          {"Basic realm=private"},
+		"aUtHeNtIcAtIoN-InFo":       {"nextnonce=private"},
+		"pRoXy-AuThEnTiCaTiOn-InFo": {"nextnonce=private"},
+		"pRoXy-AuThEnTiCaTe":        {"Basic realm=private"},
+		"pRoXy-AuThOrIzAtIoN":       {"Basic private"},
+		"cOnNeCtIoN":                {"keep-alive, x-connection-only", "\tX-Other-Hop, Connection "},
+		"CONNECTION":                {"x-third-hop"},
+		"pRoXy-CoNnEcTiOn":          {"keep-alive"},
+		"kEeP-aLiVe":                {"timeout=5"},
+		"tE":                        {"trailers"},
+		"tRaIlEr":                   {"X-Private-Trailer"},
+		"tRaIlErS":                  {"X-Private-Trailer"},
+		"tRaNsFeR-EnCoDiNg":         {"chunked"},
+		"uPgRaDe":                   {"websocket"},
+		"X-Connection-Only":         {"private"},
+		"x-other-hop":               {"private", "also private"},
+		"X-Third-Hop":               {"private"},
+		"content-type":              {"application/json"},
+		"Retry-After":               {"60"},
+		"RateLimit-Limit":           {"100", "200"},
+		"X-Trace":                   {"first", "second"},
+		"X-Provider-Custom":         {"opaque metadata"},
+	}
+	before := headers.Clone()
+	body := &responseObservedBody{reader: strings.NewReader("{}")}
+	response, _ := responseTestPrepare(t, responseTestSession(t, 100, 100), &http.Response{
+		StatusCode: 200, Header: headers, Body: body,
+	})
+
+	// Useful end-to-end metadata and repeated value order survive; filtering
+	// neither mutates the transport map nor reads the response body.
+	require.Equal(t, http.Header{
+		"Content-Type": {"application/json"}, "Retry-After": {"60"},
+		"Ratelimit-Limit": {"100", "200"}, "X-Trace": {"first", "second"},
+		"X-Provider-Custom": {"opaque metadata"},
+	}, response.Header)
+	require.Equal(t, before, headers)
+	require.Empty(t, body.sizes)
+}
+
+func TestResponseFiltersAfterRawHeaderValidation(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		headers http.Header
+		limit   int
+		wantErr error
+	}{
+		{"credential bytes", http.Header{"Set-Cookie": {strings.Repeat("x", 100)}}, 30, ErrHeaderLimit},
+		{"credential values", http.Header{"Set-Cookie": make([]string, 100)}, 100, ErrHeaderLimit},
+		{"nominated bytes", http.Header{"Connection": {"X-Hop"}, "X-Hop": {strings.Repeat("x", 100)}}, 50, ErrHeaderLimit},
+		{"credential controls", http.Header{"Set-Cookie": {"private\r\nInjected: value"}}, 100, ErrInvalidResponse},
+		{"connection controls", http.Header{"Connection": {"X-Hop\x00"}}, 100, ErrInvalidResponse},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Fields destined for removal must still consume the original input
+			// allowance and pass HTTP syntax checks before any map is exposed.
+			s := responseTestSession(t, 100, 100)
+			s.limits.MaxHeaderBytes = test.limit
+			body := &responseObservedBody{reader: strings.NewReader("private body")}
+			var cleanups atomic.Int64
+			response, err := s.prepareResponse(s.ctx, &http.Response{
+				StatusCode: 200, Header: test.headers, Body: body,
+			}, http.MethodGet, func() { cleanups.Add(1) })
+			require.ErrorIs(t, err, test.wantErr)
+			require.Nil(t, response)
+			require.Empty(t, body.sizes)
+			require.EqualValues(t, 1, body.closes.Load())
+			require.EqualValues(t, 1, cleanups.Load())
+		})
+	}
+}
+
+func TestResponseCapturesEncodingBeforeHeaderFiltering(t *testing.T) {
+	for _, encoding := range []string{"gzip", "br"} {
+		t.Run(encoding, func(t *testing.T) {
+			// Connection can nominate encoding metadata for removal, but the
+			// transport bytes still require that captured decoding policy.
+			payload := responseGzip(t, "decoded payload")
+			headers := http.Header{
+				"connection":       {" CONTENT-encoding, X-Hop "},
+				"content-encoding": {encoding}, "Content-Length": {strconv.Itoa(len(payload))},
+				"X-Hop": {"private"}, "Content-Type": {"text/plain"},
+			}
+			before := headers.Clone()
+			body := &responseObservedBody{reader: bytes.NewReader(payload)}
+			response, _ := responseTestPrepare(t, responseTestSession(t, 100, 100), &http.Response{
+				StatusCode: 200, Header: headers, Body: body,
+			})
+			require.NotContains(t, response.Header, "Connection")
+			require.NotContains(t, response.Header, "Content-Encoding")
+			require.NotContains(t, response.Header, "X-Hop")
+			require.Equal(t, "text/plain", response.Header.Get("Content-Type"))
+			require.Equal(t, before, headers)
+			require.Empty(t, body.sizes)
+
+			// Gzip still decodes lazily; nominating unsupported coding cannot
+			// make the raw compressed stream appear to be an identity response.
+			actual, err := io.ReadAll(response.Body)
+			if encoding == "gzip" {
+				require.NoError(t, err)
+				require.Equal(t, "decoded payload", string(actual))
+				require.NotContains(t, response.Header, "Content-Length")
+			} else {
+				require.ErrorIs(t, err, ErrEncoding)
+				require.Empty(t, actual)
+				require.Empty(t, body.sizes)
+			}
+		})
+	}
+}
+
 func TestResponseGzipAndTransportDecoding(t *testing.T) {
 	// Host decoding removes encoded-length metadata and retains other headers.
 	payload := strings.Repeat("café", 10000)

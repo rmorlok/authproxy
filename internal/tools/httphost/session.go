@@ -183,6 +183,9 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 		if contextErr := s.contextError(ctx); contextErr != nil {
 			return nil, contextErr
 		}
+		// The proxy does not yet report stable failure categories or cumulative
+		// send evidence across recovery attempts. Do not infer reconnect advice
+		// or safe replay from generic error text or an HTTP-aware error's status.
 		return nil, ErrTransport
 	}
 	// Response preparation owns cleanup on failure and transfers it to the
