@@ -13,17 +13,20 @@ import (
 )
 
 // This file deals with taking output from Goja in a safe way. Return values
-// can be Javascript objects (or any arbitrary Javascript value) and this logic
-// handles converting that into a JSON payload that we can ultimately use from
-// go. Prior to the invocation starting we capture helper methods from javascript
-// in Goja which help with the translation. The protects against the javascript
-// itself from changing those helpers to alter the behavior of this translation.
-/ț
+// can be JavaScript objects (or any arbitrary JavaScript value) and this logic
+// handles converting supported values into a JSON payload that we can ultimately
+// use from Go, rejecting unsupported values. Before the authored JavaScript runs
+// we capture helper methods from JavaScript in Goja which help with the translation.
+// This protects against the JavaScript itself replacing those helpers to alter
+// the behavior of this translation.
+//
 // In the process of translating the data out, we track bytes, object depth, etc
-// to avoid situations where the output from javascript could yield a recursive
-// tree that grows unbounded. Because we are in-process with Goja, we can't
-// protect against the Javascript itself from crashing the process, but we can
-// make sure the output translation doesn't cause problems.
+// to avoid situations where traversing the output from JavaScript could yield
+// unbounded work or serialized output. We also reject cycles. Because we are
+// in-process with Goja, we can't protect against the JavaScript itself crashing
+// the process, but we can bound the output translation's traversal and result
+// size. Native Goja helpers can still allocate memory before we can check their
+// results, so this is not a hard memory limit.
 
 // outputEncoder captures pristine reflection intrinsics before the author's
 // program runs. It accepts JSON data without invoking getters, proxy traps, or
