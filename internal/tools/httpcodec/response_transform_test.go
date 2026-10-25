@@ -219,13 +219,6 @@ func TestResponseTransformInvalidInput(t *testing.T) {
 		}},
 		{"zero context", "OUTPUT_INVALID", func(i *httpcodec.ResponseInput) { i.Context = new(render.Context) }},
 		{"duplicate header", "UPSTREAM_PROTOCOL_ERROR", func(i *httpcodec.ResponseInput) { i.Headers = http.Header{"X-Private": {"one"}, "x-private": {"two"}} }},
-		{"header token", "UPSTREAM_PROTOCOL_ERROR", func(i *httpcodec.ResponseInput) { i.Headers = http.Header{"private invalid": {"value"}} }},
-		{"header name UTF-8", "UPSTREAM_PROTOCOL_ERROR", func(i *httpcodec.ResponseInput) { i.Headers = http.Header{string([]byte{0xff}): {"value"}} }},
-		{"header value UTF-8", "UPSTREAM_PROTOCOL_ERROR", func(i *httpcodec.ResponseInput) { i.Headers = http.Header{"X-Private": {string([]byte{0xff})}} }},
-		{"header line break", "UPSTREAM_PROTOCOL_ERROR", func(i *httpcodec.ResponseInput) {
-			i.Headers = http.Header{"X-Private": {"private-value\r\nInjected: true"}}
-		}},
-		{"header NUL", "UPSTREAM_PROTOCOL_ERROR", func(i *httpcodec.ResponseInput) { i.Headers = http.Header{"X-Private": {"private-value\x00"}} }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input := transformResponseInput(t)
@@ -242,6 +235,37 @@ func TestResponseTransformInvalidInput(t *testing.T) {
 	result, err := program.Map(context.Background(), input)
 	require.Error(t, err)
 	require.Nil(t, result)
+}
+
+// TestResponseTransformOmitsInvalidHeaders drops malformed provider metadata
+// instead of failing an otherwise successful response.
+func TestResponseTransformOmitsInvalidHeaders(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		headers http.Header
+	}{
+		{"header token", http.Header{"private invalid": {"value"}}},
+		{"header name UTF-8", http.Header{string([]byte{0xff}): {"value"}}},
+		{"header value UTF-8", http.Header{"X-Private": {string([]byte{0xff})}}},
+		{"obs-text filename", http.Header{"Content-Disposition": {"attachment; filename=\"r\xe9sum\xe9.pdf\""}}},
+		{"header line break", http.Header{"X-Private": {"private-value\r\nInjected: true"}}},
+		{"header NUL", http.Header{"X-Private": {"private-value\x00"}}},
+		{"one bad value among good", http.Header{"X-Private": {"ok", "private-value\x00"}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			program := compileResponseTransform(t, `({headers: response.headers, body: response.body})`, transformResponseLimits())
+			input := transformResponseInput(t)
+			input.Body = []byte(`{"name":"Ada"}`)
+			input.Headers = test.headers.Clone()
+			input.Headers["X-Request-Id"] = []string{"req-7"}
+
+			// The response still succeeds; only the invalid header disappears.
+			result := mapResponse(t, program, input)
+			require.False(t, result.IsError)
+			require.JSONEq(t, `{"headers":{"x-request-id":["req-7"]},"body":{"name":"Ada"}}`, string(result.StructuredContent))
+			require.NotContains(t, string(result.StructuredContent), "private-")
+		})
+	}
 }
 
 // TestResponseTransformFailuresArePrivate classifies author failures without

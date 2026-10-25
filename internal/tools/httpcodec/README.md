@@ -528,8 +528,10 @@ and `annotations`, plus this `response` object:
 | `body` | Decoded JSON, a supported text string, or `{encoding:"base64",data:"..."}` for binary content, including images, audio, and unsupported text charsets. Empty content omits this field; JSON `null` remains explicit null. |
 
 For example, `response.headers["x-request-id"]?.[0] ?? null` selects an optional
-request ID. Header names must be valid HTTP tokens, and values must be valid
-UTF-8 without prohibited HTTP control characters. Duplicate names differing
+request ID. A header whose name is not a valid HTTP token, or with any value
+that is not valid UTF-8 or contains prohibited HTTP control characters, is
+omitted from `response.headers` instead of failing the response. Omitted
+headers still count toward the input allowance. Duplicate names differing
 only in case are rejected. `ResponseInput.ContentType` controls body decoding;
 the supplied header map is metadata and does not override it.
 

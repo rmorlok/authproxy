@@ -124,30 +124,40 @@ func TestEncodeTransformResponseHeaders(t *testing.T) {
 	require.Nil(t, partial)
 }
 
-func TestTransformHeadersRejectsMalformedMetadata(t *testing.T) {
+func TestTransformHeadersOmitsMalformedMetadata(t *testing.T) {
 	for _, headers := range []http.Header{
 		{"": {"private-provider-value"}},
 		{"private field": {"private-provider-value"}},
-		{"X-Private": {"private-provider-value"}, "x-private": {"other-private-value"}},
 		{"X-Private": {"private-provider-value\r\nInjected: true"}},
 		{"X-Private": {"private-provider-value\x00"}},
 		{"X-Private": {"private-provider-value\x7f"}},
 		{"X-Private": {"private-provider-value" + string([]byte{0xff})}},
 		{"X-Privaté": {"private-provider-value"}},
 	} {
-		// Fixed protocol errors disclose neither malformed names nor private data.
-		normalized, err := transformHeaders(context.Background(), headers, transformInputLimits())
-		require.ErrorIs(t, err, errTransformHeaders)
-		require.Nil(t, normalized)
-		require.NotContains(t, err.Error(), "private")
+		// Malformed headers are dropped while valid ones survive unchanged.
+		withValid := headers.Clone()
+		withValid["X-Safe"] = []string{"ok"}
+		normalized, err := transformHeaders(context.Background(), withValid, transformInputLimits())
+		require.NoError(t, err)
+		require.Equal(t, http.Header{"x-safe": {"ok"}}, normalized)
 
-		// Encoder callers receive no partial response when metadata is invalid.
+		// The encoded response omits the malformed header and its private data.
 		decoded, failure := decodeResponseBody("application/json", []byte(`{"safe":true}`))
 		require.Nil(t, failure)
 		encoded, err := encodeTransformResponse(context.Background(), ResponseInput{StatusCode: 200, Headers: headers}, decoded, transformInputLimits())
-		require.ErrorIs(t, err, errTransformHeaders)
-		require.Nil(t, encoded)
+		require.NoError(t, err)
+		require.NotContains(t, string(encoded), "private")
 	}
+}
+
+func TestTransformHeadersRejectsAmbiguousDuplicates(t *testing.T) {
+	// Names differing only in case have no deterministic merge order, so they
+	// remain a fixed protocol error that discloses no names or values.
+	headers := http.Header{"X-Private": {"private-provider-value"}, "x-private": {"other-private-value"}}
+	normalized, err := transformHeaders(context.Background(), headers, transformInputLimits())
+	require.ErrorIs(t, err, errTransformHeaders)
+	require.Nil(t, normalized)
+	require.NotContains(t, err.Error(), "private")
 }
 
 func TestTransformHeadersBoundsMetadataWork(t *testing.T) {
@@ -272,7 +282,12 @@ func FuzzTransformResponseEncoding(f *testing.F) {
 		require.Equal(t, common.RawJSON("200"), response["status"])
 		var headers map[string][]string
 		require.NoError(t, json.Unmarshal(response["headers"], &headers))
-		require.Equal(t, map[string][]string{"x-provider": {header}}, headers)
+		// Invalid header values are omitted rather than failing the encoding.
+		wantHeaders := map[string][]string{}
+		if validRequestHeaderValue(header) {
+			wantHeaders["x-provider"] = []string{header}
+		}
+		require.Equal(t, wantHeaders, headers)
 		if len(body) == 0 {
 			require.NotContains(t, response, "body")
 			return
