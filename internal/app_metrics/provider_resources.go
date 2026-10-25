@@ -700,8 +700,10 @@ func (r *sqlRecordRetriever) ListRateLimitResourceSamples(ctx context.Context, q
 }
 
 func (r *sqlRecordRetriever) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
-	return executeResourceMetricsQueries(ctx, queries, func(ctx context.Context, query ResourceMetricsQuery) ([]resourceMetricAggregate, error) {
-		return fetchResourceMetricAggregates(ctx, r.db, r.placeholderFormat, r.provider, query)
+	return executeResourceMetricsQueries(ctx, queries, &sqlResourceMetricFetcher{
+		db:                r.db,
+		placeholderFormat: r.placeholderFormat,
+		provider:          r.provider,
 	})
 }
 
@@ -730,35 +732,106 @@ func (r *clickhouseRecordRetriever) ListRateLimitResourceSamples(ctx context.Con
 }
 
 func (r *clickhouseRecordRetriever) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
-	return executeResourceMetricsQueries(ctx, queries, func(ctx context.Context, query ResourceMetricsQuery) ([]resourceMetricAggregate, error) {
-		return fetchResourceMetricAggregates(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
+	return executeResourceMetricsQueries(ctx, queries, &sqlResourceMetricFetcher{
+		db:                r.db,
+		placeholderFormat: sq.Question,
+		provider:          config.DatabaseProviderClickhouse,
 	})
 }
 
+// resourceMetricSnapshotBatchSize caps how many snapshot times are bound into one aggregate query, keeping the IN
+// list well under every provider's bound-parameter limit.
+const resourceMetricSnapshotBatchSize = 500
+
+// sqlResourceMetricFetcher implements resourceMetricFetcher for the SQL providers (Postgres, SQLite, and ClickHouse).
+type sqlResourceMetricFetcher struct {
+	db                *sql.DB
+	placeholderFormat sq.PlaceholderFormat
+	provider          config.DatabaseProvider
+}
+
+// fetchSampleTimes returns the distinct snapshot times in [from, to] for the query's metric table, ascending. Filters
+// are intentionally not applied; see resourceMetricFetcher.
+func (f *sqlResourceMetricFetcher) fetchSampleTimes(
+	ctx context.Context,
+	query ResourceMetricsQuery,
+	from, to time.Time,
+) ([]int64, error) {
+	spec, ok := resourceMetricSpecs[query.Metric]
+	if !ok {
+		return nil, fmt.Errorf("unsupported resource metric %q", query.Metric)
+	}
+
+	sqlQuery, args, err := sq.Select("sampled_at_ms").
+		Distinct().
+		From(resourceSampleTableName(spec.table, f.provider)).
+		Where(sq.GtOrEq{"sampled_at_ms": from.UnixMilli()}).
+		Where(sq.LtOrEq{"sampled_at_ms": to.UnixMilli()}).
+		OrderBy("sampled_at_ms ASC").
+		PlaceholderFormat(f.placeholderFormat).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build resource snapshot times query: %w", err)
+	}
+	rows, err := f.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute resource snapshot times query: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]int64, 0)
+	for rows.Next() {
+		var sampledAtMS int64
+		if err := rows.Scan(&sampledAtMS); err != nil {
+			return nil, fmt.Errorf("failed to scan resource snapshot time: %w", err)
+		}
+		out = append(out, sampledAtMS)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate resource snapshot times: %w", err)
+	}
+	return out, nil
+}
+
+// fetchAggregates returns distinct-resource counts per snapshot and group for the given snapshot times, applying the
+// query's namespace and label filters. Large snapshot lists are queried in batches; each snapshot lands in exactly one
+// batch, so the batch results can simply be concatenated.
+func (f *sqlResourceMetricFetcher) fetchAggregates(
+	ctx context.Context,
+	query ResourceMetricsQuery,
+	sampledAtMS []int64,
+) ([]resourceMetricAggregate, error) {
+	out := make([]resourceMetricAggregate, 0)
+	for batchStart := 0; batchStart < len(sampledAtMS); batchStart += resourceMetricSnapshotBatchSize {
+		batchEnd := min(batchStart+resourceMetricSnapshotBatchSize, len(sampledAtMS))
+		rows, err := fetchResourceMetricAggregates(ctx, f.db, f.placeholderFormat, f.provider, query, sampledAtMS[batchStart:batchEnd])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, rows...)
+	}
+	return out, nil
+}
+
 // fetchResourceMetricAggregates runs a resource metrics query against a SQL provider (Postgres, SQLite, or
-// ClickHouse) and returns distinct-resource counts per time bucket and group.
+// ClickHouse) and returns distinct-resource counts per snapshot and group, restricted to the given snapshot times.
 //
-// The inner SELECT DISTINCT reduces samples to one row per (bucket, group values, resource identity), and the outer
-// query counts those rows per (bucket, group values). That keeps the result bounded by buckets × groups no matter
-// how many resources are sampled, and it avoids COUNT(DISTINCT tuple), which SQLite does not support. A resource
-// whose group values change inside a bucket (e.g. a state transition) is counted in each group it was seen in.
+// The inner SELECT DISTINCT reduces samples to one row per (snapshot, group values, resource identity), and the outer
+// query counts those rows per (snapshot, group values). That keeps the result bounded by snapshots × groups no matter
+// how many resources are sampled, de-duplicates a resource written twice for the same snapshot, and avoids
+// COUNT(DISTINCT tuple), which SQLite does not support.
 func fetchResourceMetricAggregates(
 	ctx context.Context,
 	db *sql.DB,
 	placeholderFormat sq.PlaceholderFormat,
 	provider config.DatabaseProvider,
 	query ResourceMetricsQuery,
+	sampledAtMS []int64,
 ) ([]resourceMetricAggregate, error) {
 	spec, ok := resourceMetricSpecs[query.Metric]
 	if !ok {
 		return nil, fmt.Errorf("unsupported resource metric %q", query.Metric)
 	}
-
-	startMS := query.Start.UnixMilli()
-	stepMS := query.Step.Milliseconds()
-	// Integers are derived from validated time values and inlined so the expression is identical wherever it is
-	// used. Modulo keeps the result integer-valued on ClickHouse, whose "/" operator always produces a float.
-	bucketExpr := fmt.Sprintf("sampled_at_ms - ((sampled_at_ms - %d) %% %d)", startMS, stepMS)
 
 	groupColumns := make([]string, 0, len(query.GroupBy))
 	for _, groupBy := range query.GroupBy {
@@ -771,7 +844,7 @@ func fetchResourceMetricAggregates(
 
 	// The inner projection lists each column once; a column can be both a group-by dimension and part of the
 	// resource identity (e.g. connector_generation), and ClickHouse rejects duplicate names in a subquery.
-	innerColumns := []string{bucketExpr + " AS bucket_start_ms"}
+	innerColumns := []string{"sampled_at_ms"}
 	seen := map[string]bool{}
 	for _, column := range append(append([]string{}, groupColumns...), spec.identityColumns...) {
 		if !seen[column] {
@@ -783,7 +856,8 @@ func fetchResourceMetricAggregates(
 	inner, err := applyResourceSampleQuery(
 		sq.Select(innerColumns...).
 			Distinct().
-			From(resourceSampleTableName(spec.table, provider)),
+			From(resourceSampleTableName(spec.table, provider)).
+			Where(sq.Eq{"sampled_at_ms": sampledAtMS}),
 		provider,
 		resourceMetricsSampleQuery(query),
 	)
@@ -791,7 +865,7 @@ func fetchResourceMetricAggregates(
 		return nil, err
 	}
 
-	outerGroup := append([]string{"bucket_start_ms"}, groupColumns...)
+	outerGroup := append([]string{"sampled_at_ms"}, groupColumns...)
 	outer := sq.Select(append(append([]string{}, outerGroup...), sqlInt64Expr(provider, "COUNT(*)"))...).
 		FromSelect(inner, "distinct_samples").
 		GroupBy(outerGroup...).
@@ -814,7 +888,7 @@ func fetchResourceMetricAggregates(
 		// connector_generation is BIGINT on Postgres and UInt64 on ClickHouse).
 		groupValues := make([]any, len(groupColumns))
 		dest := make([]any, 0, len(groupColumns)+2)
-		dest = append(dest, &row.BucketStartMS)
+		dest = append(dest, &row.SampledAtMS)
 		for i := range groupValues {
 			dest = append(dest, &groupValues[i])
 		}

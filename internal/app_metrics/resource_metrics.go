@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/database"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type ResourceMetric string
@@ -33,6 +34,9 @@ const (
 	ResourceGroupByMode                ResourceGroupBy = "mode"
 )
 
+// ResourceMetricsQuery asks for a gauge time series over periodic resource snapshots. Each bucket of [Start, End)
+// reports the counts from the most recent snapshot taken before the bucket ends, so values carry forward across
+// buckets that contain no snapshot of their own.
 type ResourceMetricsQuery struct {
 	RefID             string
 	Metric            ResourceMetric
@@ -42,6 +46,29 @@ type ResourceMetricsQuery struct {
 	NamespaceMatchers []string
 	LabelSelector     string
 	GroupBy           []ResourceGroupBy
+
+	// SampleInterval is the cadence at which the resource snapshot task writes samples. It bounds how far back a
+	// snapshot may be carried forward into a bucket; see maxSampleAge. Zero means the configured default
+	// (appMetrics.resourceSnapshotInterval's default). StorageService fills it from configuration.
+	SampleInterval time.Duration
+}
+
+// sampleInterval returns the snapshot cadence for the query, falling back to the configuration default.
+func (q ResourceMetricsQuery) sampleInterval() time.Duration {
+	if q.SampleInterval > 0 {
+		return q.SampleInterval
+	}
+	return (&sconfig.AppMetrics{}).GetResourceSnapshotInterval()
+}
+
+// maxSampleAge is how old the latest snapshot may be, relative to the end of a bucket, and still supply that
+// bucket's value. Snapshots are stamped with their run time truncated to the interval, and runs are scheduled every
+// interval from worker start rather than on clock boundaries, so just before a run the newest snapshot's stamp can be
+// nearly two intervals old. Half an interval more absorbs scheduling and execution delay. Beyond this age the bucket
+// is reported as having no data (e.g. while the worker is down) rather than repeating a stale value.
+func (q ResourceMetricsQuery) maxSampleAge() time.Duration {
+	interval := q.sampleInterval()
+	return 2*interval + interval/2
 }
 
 type ResourceMetricPoint struct {
@@ -70,6 +97,9 @@ func validateResourceMetricsQuery(q ResourceMetricsQuery) error {
 	}
 	if q.Step <= 0 {
 		return errors.New("step must be greater than zero")
+	}
+	if q.SampleInterval < 0 {
+		return errors.New("sample interval must not be negative")
 	}
 	// Buckets are computed in SQL on millisecond timestamps, so the step must be expressible in whole milliseconds.
 	if q.Step%time.Millisecond != 0 {
@@ -226,72 +256,135 @@ var resourceMetricSpecs = map[ResourceMetric]resourceMetricSpec{
 }
 
 // resourceMetricAggregate is one pre-aggregated row returned by a provider for a resource metrics query: the number of
-// distinct resources sampled in one time bucket for one combination of group-by values.
+// distinct resources in one snapshot for one combination of group-by values.
 type resourceMetricAggregate struct {
-	// BucketStartMS is the start of the time bucket in Unix milliseconds, aligned to the query's Start and Step.
-	BucketStartMS int64
+	// SampledAtMS identifies the snapshot (its sampled_at) in Unix milliseconds.
+	SampledAtMS int64
 	// Labels holds the values of the query's group-by dimensions for this row, keyed by dimension name.
 	Labels map[string]string
-	// Count is the number of distinct resources in this bucket and group.
+	// Count is the number of distinct resources in this snapshot and group.
 	Count int64
 }
 
-// executeResourceMetricsQueries validates each query, fetches its aggregate rows through the provider-specific fetch
-// function, and converts them into zero-filled time series. The first validation or fetch error aborts the batch.
+// resourceMetricFetcher is the provider-specific data access used to evaluate resource metrics queries.
+type resourceMetricFetcher interface {
+	// fetchSampleTimes returns the distinct sampled_at values (Unix ms, ascending) of the metric's sample table in
+	// [from, to]. It deliberately ignores the query's namespace and label filters: a snapshot in which no resource
+	// matches the filters must still count as a snapshot (with a value of zero) rather than as missing data.
+	fetchSampleTimes(ctx context.Context, query ResourceMetricsQuery, from, to time.Time) ([]int64, error)
+	// fetchAggregates returns distinct-resource counts per snapshot and group for the given snapshots, applying the
+	// query's filters.
+	fetchAggregates(ctx context.Context, query ResourceMetricsQuery, sampledAtMS []int64) ([]resourceMetricAggregate, error)
+}
+
+// executeResourceMetricsQueries validates each query, resolves which snapshot supplies each bucket, fetches counts for
+// those snapshots through the provider, and converts them into time series. The first validation or fetch error
+// aborts the batch.
 func executeResourceMetricsQueries(
 	ctx context.Context,
 	queries []ResourceMetricsQuery,
-	fetch func(context.Context, ResourceMetricsQuery) ([]resourceMetricAggregate, error),
+	fetcher resourceMetricFetcher,
 ) ([]ResourceMetricSeries, error) {
 	out := make([]ResourceMetricSeries, 0)
 	for _, query := range queries {
 		if err := validateResourceMetricsQuery(query); err != nil {
 			return nil, err
 		}
-		rows, err := fetch(ctx, query)
+
+		// Look back far enough that the first buckets can carry forward a snapshot taken before Start.
+		sampleTimes, err := fetcher.fetchSampleTimes(ctx, query, query.Start.Add(-query.maxSampleAge()), query.End)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, buildResourceMetricSeries(query, rows)...)
+		bucketSnapshots := selectResourceMetricBucketSnapshots(query, sampleTimes)
+
+		var rows []resourceMetricAggregate
+		if needed := distinctResourceMetricSnapshots(bucketSnapshots); len(needed) > 0 {
+			rows, err = fetcher.fetchAggregates(ctx, query, needed)
+			if err != nil {
+				return nil, err
+			}
+		}
+		out = append(out, buildResourceMetricSeries(query, bucketSnapshots, rows)...)
 	}
 	return out, nil
 }
 
-// buildResourceMetricSeries converts aggregate rows into one series per distinct label set, with a point for every
-// bucket in [Start, End) (empty buckets are zero). Rows whose bucket falls outside that range are dropped; this covers
-// samples taken exactly at End, which the inclusive sampled_at filter still returns.
-func buildResourceMetricSeries(query ResourceMetricsQuery, rows []resourceMetricAggregate) []ResourceMetricSeries {
+// resourceMetricBucketCount is the number of Step-sized buckets needed to cover [Start, End); the last bucket may
+// extend past End.
+func resourceMetricBucketCount(query ResourceMetricsQuery) int {
 	bucketCount := int(math.Ceil(float64(query.End.Sub(query.Start)) / float64(query.Step)))
 	if bucketCount < 1 {
 		bucketCount = 1
 	}
-	startMS := query.Start.UnixMilli()
-	stepMS := query.Step.Milliseconds()
+	return bucketCount
+}
 
-	countsByGroup := map[string][]float64{}
+// selectResourceMetricBucketSnapshots picks, for each bucket, the snapshot whose counts represent it: the latest
+// snapshot taken before the bucket ends (or before End, for the final partial bucket) that is no older than
+// maxSampleAge. Using the latest snapshot rather than every snapshot inside the bucket keeps the value a gauge reading,
+// and allowing older snapshots fills buckets that are shorter than, or misaligned with, the snapshot cadence.
+//
+// sampleTimes must be sorted ascending. The result has one entry per bucket; -1 marks a bucket with no usable
+// snapshot.
+func selectResourceMetricBucketSnapshots(query ResourceMetricsQuery, sampleTimes []int64) []int64 {
+	bucketCount := resourceMetricBucketCount(query)
+	startMS := query.Start.UnixMilli()
+	endMS := query.End.UnixMilli()
+	stepMS := query.Step.Milliseconds()
+	maxAgeMS := query.maxSampleAge().Milliseconds()
+
+	selected := make([]int64, bucketCount)
+	next := 0 // index of the first sample time not yet known to precede the current bucket's end
+	for i := range bucketCount {
+		bucketEndMS := min(startMS+int64(i+1)*stepMS, endMS)
+		for next < len(sampleTimes) && sampleTimes[next] < bucketEndMS {
+			next++
+		}
+		selected[i] = -1
+		if next > 0 && bucketEndMS-sampleTimes[next-1] <= maxAgeMS {
+			selected[i] = sampleTimes[next-1]
+		}
+	}
+	return selected
+}
+
+// distinctResourceMetricSnapshots returns the distinct snapshot times referenced by bucketSnapshots, ignoring buckets
+// without a snapshot. Adjacent buckets often share a snapshot, so this is usually much shorter than the bucket list.
+func distinctResourceMetricSnapshots(bucketSnapshots []int64) []int64 {
+	seen := map[int64]bool{}
+	out := make([]int64, 0)
+	for _, ts := range bucketSnapshots {
+		if ts >= 0 && !seen[ts] {
+			seen[ts] = true
+			out = append(out, ts)
+		}
+	}
+	return out
+}
+
+// buildResourceMetricSeries converts per-snapshot aggregate rows into one series per distinct label set. Each bucket
+// with a selected snapshot gets a point holding that snapshot's count for the group, or zero when the group had no
+// resources in that snapshot. Buckets without a usable snapshot get no point at all, so clients render a gap
+// instead of a false drop to zero. An ungrouped query always yields one series, possibly with no points.
+func buildResourceMetricSeries(query ResourceMetricsQuery, bucketSnapshots []int64, rows []resourceMetricAggregate) []ResourceMetricSeries {
+	countsByGroup := map[string]map[int64]float64{}
 	labelsByKey := map[string]map[string]string{}
 
 	if len(query.GroupBy) == 0 {
 		key := resourceMetricGroupKey(nil)
-		countsByGroup[key] = make([]float64, bucketCount)
+		countsByGroup[key] = map[int64]float64{}
 		labelsByKey[key] = map[string]string{}
 	}
 
 	for _, row := range rows {
-		if row.BucketStartMS < startMS || row.BucketStartMS >= query.End.UnixMilli() {
-			continue
-		}
-		bucketIdx := int((row.BucketStartMS - startMS) / stepMS)
-		if bucketIdx < 0 || bucketIdx >= bucketCount {
-			continue
-		}
 		key := resourceMetricGroupKey(row.Labels)
 		if _, ok := countsByGroup[key]; !ok {
-			countsByGroup[key] = make([]float64, bucketCount)
+			countsByGroup[key] = map[int64]float64{}
 			labelsByKey[key] = row.Labels
 		}
-		// Each (bucket, group) row is already a distinct count, and the database returns at most one per key.
-		countsByGroup[key][bucketIdx] += float64(row.Count)
+		// Each (snapshot, group) row is already a distinct count, and the database returns at most one per key.
+		countsByGroup[key][row.SampledAtMS] += float64(row.Count)
 	}
 
 	keys := make([]string, 0, len(countsByGroup))
@@ -302,12 +395,15 @@ func buildResourceMetricSeries(query ResourceMetricsQuery, rows []resourceMetric
 
 	series := make([]ResourceMetricSeries, 0, len(keys))
 	for _, key := range keys {
-		points := make([]ResourceMetricPoint, bucketCount)
-		for i := range bucketCount {
-			points[i] = ResourceMetricPoint{
-				Timestamp: query.Start.Add(time.Duration(i) * query.Step),
-				Value:     countsByGroup[key][i],
+		points := make([]ResourceMetricPoint, 0, len(bucketSnapshots))
+		for i, snapshot := range bucketSnapshots {
+			if snapshot < 0 {
+				continue
 			}
+			points = append(points, ResourceMetricPoint{
+				Timestamp: query.Start.Add(time.Duration(i) * query.Step),
+				Value:     countsByGroup[key][snapshot],
+			})
 		}
 		series = append(series, ResourceMetricSeries{
 			RefID:  query.RefID,
@@ -335,10 +431,10 @@ func resourceMetricGroupKey(labels map[string]string) string {
 	return out
 }
 
+// resourceMetricsSampleQuery converts a metrics query's resource filters into a sample filter. It carries no time
+// bounds: aggregates are fetched for an explicit list of snapshot times instead.
 func resourceMetricsSampleQuery(query ResourceMetricsQuery) ResourceSampleQuery {
 	return ResourceSampleQuery{
-		Start:             &query.Start,
-		End:               &query.End,
 		NamespaceMatchers: query.NamespaceMatchers,
 		LabelSelector:     query.LabelSelector,
 	}
