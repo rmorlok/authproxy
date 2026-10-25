@@ -89,7 +89,9 @@ func (r *Response) mapTransform(
 			Text: &text,
 		})
 	}
+
 	result.StructuredContent = projected
+
 	return nil, nil
 }
 
@@ -105,27 +107,34 @@ func encodeTransformResponse(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	headers, err := transformHeaders(ctx, input.Headers, limits)
 	if err != nil {
 		return nil, err
 	}
+
 	buffer := transformJSONBuffer{ctx: ctx, maxBytes: limits.MaxInputBytes}
 	buffer.write(`{"status":`)
 	buffer.write(strconv.Itoa(input.StatusCode))
+
 	buffer.write(`,"headers":{`)
+
 	// Normalized names are bounded before collecting or sorting them. Stable
 	// ordering also makes Object.keys(response.headers) independent of Go maps.
 	names := make([]string, 0, len(headers))
 	for name := range headers {
 		names = append(names, name)
 	}
+
 	sort.Strings(names)
 	for i, name := range names {
 		if i > 0 {
 			buffer.write(",")
 		}
+
 		buffer.quoted(name)
 		buffer.write(":[")
+
 		for j, value := range headers[name] {
 			if j > 0 {
 				buffer.write(",")
@@ -135,18 +144,22 @@ func encodeTransformResponse(
 				return nil, buffer.err
 			}
 		}
+
 		buffer.write("]")
 		if buffer.err != nil {
 			return nil, buffer.err
 		}
 	}
+
 	buffer.write(`},"mediaType":`)
 	buffer.quoted(decoded.mediaType)
+
 	if decoded.kind != responseBodyEmpty {
 		buffer.write(`,"body":`)
 		if buffer.err != nil {
 			return nil, buffer.err
 		}
+
 		switch decoded.kind {
 		case responseBodyJSON:
 			// Check capacity before converting bytes to a string for the buffer.
@@ -171,10 +184,12 @@ func encodeTransformResponse(
 			buffer.write(`"}`)
 		}
 	}
+
 	buffer.write("}")
 	if buffer.err != nil {
 		return nil, buffer.err
 	}
+
 	return common.RawJSON(buffer.bytes), nil
 }
 
@@ -182,48 +197,64 @@ func encodeTransformResponse(
 // It returns lowercase names with borrowed value slices, used only during this
 // call. Duplicate names ignoring case are rejected instead of being merged in
 // map iteration order. Repeated values in one entry retain their original order.
-func transformHeaders(ctx context.Context, source http.Header, limits javascript.Limits) (http.Header, error) {
+func transformHeaders(
+	ctx context.Context,
+	source http.Header,
+	limits javascript.Limits,
+) (http.Header, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	// Even an empty value list needs a name, quotes, colon, and array brackets.
 	// Bound width before allocating maps or iterating many zero-byte values.
 	if len(source) > limits.MaxNodes || len(source) > limits.MaxInputBytes/6 {
 		return nil, javascript.ErrLimitExceeded
 	}
+
 	remainingBytes, remainingValues := limits.MaxInputBytes, limits.MaxNodes
+
 	headers := make(http.Header, len(source))
 	for name, values := range source {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+
 		if len(name) > remainingBytes || len(values) > remainingValues {
 			return nil, javascript.ErrLimitExceeded
 		}
+
 		remainingBytes -= len(name)
 		remainingValues -= len(values)
+
 		if !tools.IsHTTPToken(name) {
 			return nil, errTransformHeaders
 		}
+
 		name = strings.ToLower(name)
 		if _, exists := headers[name]; exists {
 			return nil, errTransformHeaders
 		}
+
 		for _, value := range values {
 			if err := ctx.Err(); err != nil {
 				return nil, err
 			}
+
 			// Every value requires at least two JSON quotes, even when empty.
 			if remainingBytes < 2 || len(value) > remainingBytes-2 {
 				return nil, javascript.ErrLimitExceeded
 			}
+
 			remainingBytes -= len(value) + 2
 			if !validRequestHeaderValue(value) {
 				return nil, errTransformHeaders
 			}
 		}
+
 		headers[name] = values
 	}
+
 	return headers, nil
 }
 
