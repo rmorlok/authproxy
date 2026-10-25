@@ -32,6 +32,9 @@ Key settings:
 | `appMetrics.database` | Database for request events and resource sample tables; can be shared with the primary application database for development. |
 | `appMetrics.resourceSnapshotInterval` | Cadence for the worker snapshot job. Defaults to `15m`. |
 | `appMetrics.requestEvents.fullRequestRecording` | `never` (default) or `always`; controls whether full request/response bodies are captured. |
+| `appMetrics.requestEvents.flushInterval` | Request events are buffered in memory and written in batches; this is the maximum time an event waits before being written. Defaults to `5s`. |
+| `appMetrics.requestEvents.flushBatchSize` | Number of buffered events that triggers an immediate write. Defaults to `1000`. |
+| `appMetrics.requestEvents.maxBufferedRecords` | Upper bound on events waiting to be written. If the database falls behind, further events are dropped (and a warning is logged) rather than growing memory. Defaults to `100000`. |
 | `appMetrics.blobStorage` | Stores full request/response payloads when capture is enabled. |
 
 The resource snapshot worker stores live resources at each interval. Deleted resources remain visible in historical time slices where they were sampled, but they are excluded from later snapshots.

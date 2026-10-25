@@ -50,6 +50,7 @@ appMetrics:
   resourceSnapshotInterval: 15m
   requestEvents:
     fullRequestRecording: always
+    maxBufferedRecords: 50000
   database:
     provider: sqlite
     path: "./tmp/app_metrics.db"

@@ -110,6 +110,9 @@ func Serve(cfg config.C) {
 	defer dm.ShutdownDatabase()
 	defer dm.GetEncryptService().Shutdown()
 	defer dm.ShutdownWorkflowRuntime()
+	// Deferred after the shutdowns above so it runs before them (LIFO): buffered request events are flushed
+	// while telemetry is still up.
+	defer dm.ShutdownAppMetrics()
 
 	// The workflow worker has no shutdown method; cancelling the context
 	// passed to Start stops its pollers so WaitForCompletion can drain and

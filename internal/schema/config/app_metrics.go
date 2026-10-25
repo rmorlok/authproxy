@@ -58,6 +58,11 @@ type AppMetricsRequestEvents struct {
 
 	// FlushBatchSize is the number of records that triggers a flush. Defaults to 1000.
 	FlushBatchSize *int `json:"flushBatchSize,omitempty" yaml:"flushBatchSize,omitempty"`
+
+	// MaxBufferedRecords bounds how many request events can wait in memory for a flush. When the database cannot keep
+	// up, additional events are dropped (and a warning logged) instead of growing memory without limit. Defaults to
+	// 100000; values below FlushBatchSize are raised to FlushBatchSize.
+	MaxBufferedRecords *int `json:"maxBufferedRecords,omitempty" yaml:"maxBufferedRecords,omitempty"`
 }
 
 func (d *AppMetrics) Validate(vc *common.ValidationContext) error {
@@ -152,6 +157,15 @@ func (d *AppMetricsRequestEvents) GetFlushBatchSize() int {
 	}
 
 	return *d.FlushBatchSize
+}
+
+// GetMaxBufferedRecords returns the configured request-event buffer bound, defaulting to 100000.
+func (d *AppMetricsRequestEvents) GetMaxBufferedRecords() int {
+	if d == nil || d.MaxBufferedRecords == nil {
+		return 100_000
+	}
+
+	return *d.MaxBufferedRecords
 }
 
 func (d *AppMetricsRequestEvents) GetMaxResponseWait() time.Duration {

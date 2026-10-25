@@ -30,7 +30,10 @@ type Option func(*telemetryOpts)
 // spans + metrics via otelsql. When providers is nil or in no-op mode, or
 // when both trace and metric signals are off in cfg, this is silently inert
 // and a plain sql.DB is returned.
-func WithTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry) Option {
+func WithTelemetry(
+	providers *aptelemetry.Providers,
+	cfg *sconfig.Telemetry,
+) Option {
 	return func(o *telemetryOpts) {
 		o.providers = providers
 		o.cfg = cfg
@@ -44,6 +47,16 @@ func resolveOpts(opts []Option) *telemetryOpts {
 		opt(o)
 	}
 	return o
+}
+
+// TelemetryFromOptions returns the OTel providers and config carried by opts
+// (set via WithTelemetry), so callers that accept sqlh options can instrument
+// their own non-database work with the same settings. Either result may be nil.
+func TelemetryFromOptions(
+	opts ...Option,
+) (*aptelemetry.Providers, *sconfig.Telemetry) {
+	o := resolveOpts(opts)
+	return o.providers, o.cfg
 }
 
 // telemetryEnabled reports whether the resolved telemetry options should
@@ -61,7 +74,10 @@ func (o *telemetryOpts) telemetryEnabled() bool {
 // driverName is the underlying driver registered with database/sql (e.g.
 // "pgx", "sqlite3"); dbSystem is the OTel semconv db.system attribute value
 // (e.g. "postgresql").
-func openInstrumentedDB(driverName, dsn, dbSystem string, opts *telemetryOpts) (*sql.DB, error) {
+func openInstrumentedDB(
+	driverName, dsn, dbSystem string,
+	opts *telemetryOpts,
+) (*sql.DB, error) {
 	if !opts.telemetryEnabled() {
 		return sql.Open(driverName, dsn)
 	}
@@ -84,7 +100,10 @@ func openInstrumentedDB(driverName, dsn, dbSystem string, opts *telemetryOpts) (
 // dbSystem is the semconv db.system value (DBSystemPostgreSQL, DBSystemSQLite,
 // DBSystemClickHouse). opts are forwarded as-is — pass WithTelemetry to
 // instrument; pass nothing for a plain sql.Open fast path.
-func OpenInstrumentedSQL(driverName, dsn, dbSystem string, opts ...Option) (*sql.DB, error) {
+func OpenInstrumentedSQL(
+	driverName, dsn, dbSystem string,
+	opts ...Option,
+) (*sql.DB, error) {
 	return openInstrumentedDB(driverName, dsn, dbSystem, resolveOpts(opts))
 }
 
@@ -93,7 +112,11 @@ func OpenInstrumentedSQL(driverName, dsn, dbSystem string, opts ...Option) (*sql
 // std driver is the in-tree example (clickhouse.Connector(opts) returns a
 // driver.Connector that can be wrapped here). When telemetry is disabled,
 // returns a plain sql.OpenDB(connector) with no overhead.
-func OpenInstrumentedConnector(connector driver.Connector, dbSystem string, opts ...Option) *sql.DB {
+func OpenInstrumentedConnector(
+	connector driver.Connector,
+	dbSystem string,
+	opts ...Option,
+) *sql.DB {
 	resolved := resolveOpts(opts)
 	if !resolved.telemetryEnabled() {
 		return sql.OpenDB(connector)
@@ -118,7 +141,11 @@ func otelOptionsFor(opts *telemetryOpts, dbSystem string) []otelsql.Option {
 // maybeRegisterPoolStats registers the standard go-sql DB connection pool
 // gauges (open / in-use / idle, wait counts) when metrics are enabled.
 // Failures are non-fatal — instrumentation is best effort.
-func maybeRegisterPoolStats(opts *telemetryOpts, db *sql.DB, otelOpts []otelsql.Option) {
+func maybeRegisterPoolStats(
+	opts *telemetryOpts,
+	db *sql.DB,
+	otelOpts []otelsql.Option,
+) {
 	if !opts.cfg.MetricsEnabled() {
 		return
 	}

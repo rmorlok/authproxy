@@ -398,6 +398,10 @@
         },
         "flushBatchSize": {
           "type": "integer"
+        },
+        "maxBufferedRecords": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "additionalProperties": false,
