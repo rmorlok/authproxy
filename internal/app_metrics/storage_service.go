@@ -273,7 +273,7 @@ func NewStorageService(
 	if err != nil {
 		return nil, err
 	}
-	
+
 	eventStore := NewBufferedStore(
 		store,
 		requestEvents.GetFlushBatchSize(),
