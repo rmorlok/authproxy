@@ -12,6 +12,19 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
+// This file deals with taking output from Goja in a safe way. Return values
+// can be Javascript objects (or any arbitrary Javascript value) and this logic
+// handles converting that into a JSON payload that we can ultimately use from
+// go. Prior to the invocation starting we capture helper methods from javascript
+// in Goja which help with the translation. The protects against the javascript
+// itself from changing those helpers to alter the behavior of this translation.
+/ț
+// In the process of translating the data out, we track bytes, object depth, etc
+// to avoid situations where the output from javascript could yield a recursive
+// tree that grows unbounded. Because we are in-process with Goja, we can't
+// protect against the Javascript itself from crashing the process, but we can
+// make sure the output translation doesn't cause problems.
+
 // outputEncoder captures pristine reflection intrinsics before the author's
 // program runs. It accepts JSON data without invoking getters, proxy traps, or
 // toJSON methods, even when the program replaces the corresponding globals.
@@ -19,27 +32,34 @@ type outputEncoder struct {
 	// vm is the evaluation's runtime. Reflection calls and temporary JavaScript
 	// values must use this same runtime; it is accessed only by its owning goroutine.
 	vm *goja.Runtime
+
 	// limits holds the resolved policy used to bound output bytes, nesting, and
 	// traversal work. Each encode call starts fresh counters against these caps.
 	limits Limits
+
 	// ownKeys is the original Reflect.ownKeys function, captured before authored
 	// code runs. It includes symbol and non-enumerable keys so validation can
 	// inspect properties that ordinary JSON serialization would silently omit.
 	ownKeys goja.Callable
+
 	// propertyDescriptor is the original Object.getOwnPropertyDescriptor function.
 	// After an object passes validation, it reads property metadata so accessors
 	// can be rejected and data values read without invoking getters.
 	propertyDescriptor goja.Callable
+
 	// objectPrototype is the original Object.prototype identity. Ordinary objects
 	// must have this direct prototype or a null prototype; custom ones are rejected.
 	objectPrototype *goja.Object
+
 	// arrayPrototype is the original Array.prototype identity. Arrays must have
 	// this direct prototype or a null prototype to use the dense-array encoder.
 	arrayPrototype *goja.Object
+
 	// objectExportType is Goja's Go export type for a fresh ordinary object.
 	// Together with ClassName, it helps reject unsupported object kinds, including
 	// proxies, before reflective access without actually exporting their contents.
 	objectExportType reflect.Type
+
 	// arrayExportType is Goja's Go export type for a fresh native array. Together
 	// with ClassName, it selects array validation and encoding without exporting
 	// the array into an intermediate Go slice.
@@ -82,16 +102,20 @@ type outputState struct {
 	// encoder supplies the runtime, captured reflection functions, object-type
 	// checks, and limits shared throughout this traversal.
 	encoder *outputEncoder
+
 	// ctx carries caller cancellation and the evaluation timeout. Traversal and
 	// string encoding check it cooperatively to stop work after cancellation.
 	ctx context.Context
+
 	// bytes accumulates JSON owned by this traversal, bounded by MaxOutputBytes.
 	// It becomes the returned result on success; partial output is discarded on error.
 	bytes []byte
+
 	// nodes counts visited values and inspected ordinary-object keys against
 	// MaxNodes, including non-enumerable keys. Array indices and length metadata
 	// do not add separate charges beyond the array and its element values.
 	nodes int
+
 	// active contains objects on the current recursion path. Revisiting one is
 	// a cycle; removing it on return allows shared acyclic objects to appear again.
 	active map[*goja.Object]bool
@@ -133,21 +157,27 @@ func (s *outputState) value(value goja.Value, depth int) error {
 	if err := s.node(); err != nil {
 		return err
 	}
+
 	if depth > s.encoder.limits.MaxDepth {
 		return ErrLimitExceeded
 	}
+
 	if value == nil || goja.IsUndefined(value) {
 		return ErrInvalidOutput
 	}
+
 	if goja.IsNull(value) {
 		return s.append("null")
 	}
+
 	if text, ok := value.(goja.String); ok {
 		return s.quoted(text)
 	}
+
 	if object, ok := value.(*goja.Object); ok {
 		return s.object(object, depth)
 	}
+
 	if _, ok := value.(*goja.Symbol); ok {
 		return ErrInvalidOutput
 	}
@@ -179,17 +209,22 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 	e := s.encoder
 	exportType := object.ExportType()
 	isArray := exportType == e.arrayExportType && object.ClassName() == "Array"
-	if !isArray && (exportType != e.objectExportType || object.ClassName() != "Object") {
+
+	if !isArray &&
+		(exportType != e.objectExportType || object.ClassName() != "Object") {
 		return ErrInvalidOutput
 	}
+
 	prototype := object.Prototype()
 	if prototype != nil && ((!isArray && prototype != e.objectPrototype) ||
 		(isArray && prototype != e.arrayPrototype)) {
 		return ErrInvalidOutput
 	}
+
 	if s.active[object] {
 		return ErrInvalidOutput
 	}
+
 	s.active[object] = true
 	defer delete(s.active, object)
 
@@ -198,10 +233,14 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 	// The container has already consumed one node, so only remaining work counts.
 	length := int64(0)
 	if isArray {
-		lengthValue, _, err := s.property(object, e.vm.ToValue("length").(goja.String))
+		lengthValue, _, err := s.property(
+			object,
+			e.vm.ToValue("length").(goja.String),
+		)
 		if err != nil {
 			return err
 		}
+
 		length = lengthValue.ToInteger()
 		if length > int64(e.limits.MaxNodes-s.nodes) {
 			return ErrLimitExceeded
@@ -214,44 +253,58 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 	if err != nil {
 		return outputReflectionError(err)
 	}
+
 	keys := keysValue.(*goja.Object)
 	keyCount := keys.Get("length").ToInteger()
 	metadataCount := int64(0)
+
 	if isArray {
 		metadataCount = 1 // The intrinsic length property is not a JSON value.
 	}
+
 	if keyCount-metadataCount > int64(e.limits.MaxNodes-s.nodes) {
 		return ErrLimitExceeded
 	}
+
 	if isArray {
 		return s.array(object, keys, keyCount, length, depth)
 	}
+
 	return s.properties(object, keys, keyCount, depth)
 }
 
 // properties emits own enumerable string data properties in JavaScript's key
 // order. Hidden data properties are omitted but consume inspection work;
 // accessors and symbol keys are rejected instead of invoking or losing them.
-func (s *outputState) properties(object, keys *goja.Object, keyCount int64, depth int) error {
+func (s *outputState) properties(
+	object, keys *goja.Object,
+	keyCount int64,
+	depth int,
+) error {
 	if err := s.append("{"); err != nil {
 		return err
 	}
-	separator := ""
+	separator := "" // changes to , after first loop
+
 	for i := int64(0); i < keyCount; i++ {
 		if err := s.node(); err != nil {
 			return err
 		}
+
 		key, ok := keys.Get(strconv.FormatInt(i, 10)).(goja.String)
 		if !ok {
 			return ErrInvalidOutput
 		}
+
 		value, enumerable, err := s.property(object, key)
 		if err != nil {
 			return err
 		}
+
 		if !enumerable {
 			continue
 		}
+
 		if err := s.append(separator); err != nil {
 			return err
 		}
@@ -264,8 +317,10 @@ func (s *outputState) properties(object, keys *goja.Object, keyCount int64, dept
 		if err := s.value(value, depth+1); err != nil {
 			return err
 		}
+
 		separator = ","
 	}
+
 	return s.append("}")
 }
 
@@ -274,28 +329,38 @@ func (s *outputState) properties(object, keys *goja.Object, keyCount int64, dept
 // Checking every own key rejects extra properties that JSON would otherwise
 // drop, while checking each descriptor rejects holes even when a prototype
 // supplies an inherited value at the missing index.
-func (s *outputState) array(object, keys *goja.Object, keyCount, length int64, depth int) error {
+func (s *outputState) array(
+	object, keys *goja.Object,
+	keyCount, length int64,
+	depth int,
+) error {
 	if keyCount != length+1 {
 		return ErrInvalidOutput
 	}
+
 	for i := int64(0); i < keyCount; i++ {
 		if err := s.ctx.Err(); err != nil {
 			return err
 		}
+
 		key, ok := keys.Get(strconv.FormatInt(i, 10)).(goja.String)
 		if !ok {
 			return ErrInvalidOutput
 		}
+
 		// Array indices are returned first in numeric order, followed by length.
 		// Comparing primitive keys does not invoke author-defined coercions.
 		expected := "length"
+
 		if i < length {
 			expected = strconv.FormatInt(i, 10)
 		}
+
 		if !key.SameAs(s.encoder.vm.ToValue(expected)) {
 			return ErrInvalidOutput
 		}
 	}
+
 	if err := s.append("["); err != nil {
 		return err
 	}
@@ -305,8 +370,10 @@ func (s *outputState) array(object, keys *goja.Object, keyCount, length int64, d
 				return err
 			}
 		}
+
 		key := s.encoder.vm.ToValue(strconv.FormatInt(i, 10)).(goja.String)
 		value, _, err := s.property(object, key)
+
 		if err != nil {
 			return err
 		}
@@ -314,32 +381,41 @@ func (s *outputState) array(object, keys *goja.Object, keyCount, length int64, d
 			return err
 		}
 	}
+
 	return s.append("]")
 }
 
 // property reads an own property descriptor without invoking accessors. A
 // null prototype on the fresh descriptor prevents poisoned Object.prototype
 // getters from being consulted for absent descriptor fields.
-func (s *outputState) property(object *goja.Object, key goja.String) (goja.Value, bool, error) {
+func (s *outputState) property(
+	object *goja.Object,
+	key goja.String,
+) (goja.Value, bool, error) {
 	if err := s.ctx.Err(); err != nil {
 		return nil, false, err
 	}
+
 	descriptorValue, err := s.encoder.propertyDescriptor(goja.Undefined(), object, key)
 	if err != nil {
 		return nil, false, outputReflectionError(err)
 	}
+
 	descriptor, ok := descriptorValue.(*goja.Object)
 	if !ok {
 		return nil, false, ErrInvalidOutput
 	}
+
 	if err := descriptor.SetPrototype(nil); err != nil {
 		return nil, false, outputReflectionError(err)
 	}
+
 	// Accessor descriptors always have get/set and no writable field, including
 	// accessors whose getter and setter are both undefined.
 	if descriptor.Get("writable") == nil {
 		return nil, false, ErrInvalidOutput
 	}
+
 	return descriptor.Get("value"), descriptor.Get("enumerable").ToBoolean(), nil
 }
 
@@ -347,7 +423,8 @@ func (s *outputState) property(object *goja.Object, key goja.String) (goja.Value
 // wrapper and replaces ordinary exceptions with a value-free public error.
 func outputReflectionError(err error) error {
 	switch err.(type) {
-	case *goja.InterruptedError, *goja.StackOverflowError:
+	case *goja.InterruptedError,
+		*goja.StackOverflowError:
 		panic(err)
 	default:
 		return ErrInvalidOutput
@@ -360,10 +437,13 @@ func (s *outputState) node() error {
 	if err := s.ctx.Err(); err != nil {
 		return err
 	}
+
 	if s.nodes >= s.encoder.limits.MaxNodes {
 		return ErrLimitExceeded
 	}
+
 	s.nodes++
+
 	return nil
 }
 
@@ -372,7 +452,9 @@ func (s *outputState) append(text string) error {
 	if len(text) > s.encoder.limits.MaxOutputBytes-len(s.bytes) {
 		return ErrLimitExceeded
 	}
+
 	s.bytes = append(s.bytes, text...)
+
 	return nil
 }
 
@@ -383,13 +465,16 @@ func (s *outputState) quoted(text goja.String) error {
 	if text.Length() > s.encoder.limits.MaxOutputBytes-len(s.bytes)-2 {
 		return ErrLimitExceeded
 	}
+
 	if err := s.append("\""); err != nil {
 		return err
 	}
+
 	for i := 0; i < text.Length(); i++ {
 		if err := s.ctx.Err(); err != nil {
 			return err
 		}
+
 		unit := text.CharAt(i)
 		var encoded string
 		switch unit {
@@ -424,9 +509,11 @@ func (s *outputState) quoted(text goja.String) error {
 				encoded = string(bytes[:n])
 			}
 		}
+
 		if err := s.append(encoded); err != nil {
 			return err
 		}
 	}
+
 	return s.append("\"")
 }
