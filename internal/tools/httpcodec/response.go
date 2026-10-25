@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"unicode/utf8"
 
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools/javascript"
+	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -20,8 +23,8 @@ var ErrEncodedResultLimit = errors.New("encoded result byte limit cannot hold a 
 // program. Callers apply operator ceilings before compilation. These limits
 // bound data processing; they are not a hard memory-isolation guarantee.
 type ResponseLimits struct {
-	// MaxSourceBytes caps the raw rule messages, codes, and selector data retained
-	// during compilation. It does not count JSON/YAML serialization framing.
+	// MaxSourceBytes caps the combined expression source, rule messages, codes,
+	// and selector data. It does not count JSON/YAML serialization framing.
 	MaxSourceBytes int
 
 	// MaxResponseBytes caps a successful response's decoded body supplied to Map.
@@ -33,12 +36,19 @@ type ResponseLimits struct {
 
 	// MaxOutputBytes caps successful content before base64 or envelope encoding:
 	// raw JSON bytes, UTF-8 text bytes, or decoded binary bytes. Error bodies are
-	// never copied into output, even if they fit this allowance.
+	// never copied into output, even if they fit this allowance. For transforms,
+	// this caps the returned JSON, allowing larger input bodies to be projected down.
 	MaxOutputBytes int
 
 	// MaxEncodedResultBytes caps json.Marshal of the complete ToolResult,
 	// including identities, metadata, JSON escaping, and base64 expansion.
 	MaxEncodedResultBytes int
+
+	// Transform supplies the pure expression runtime's limits, including combined
+	// snapshot/response input bytes and execution timeout. All must be positive
+	// when a transform is configured; otherwise this field is unused. Runtime
+	// limits remain separate from the successful content and envelope caps above.
+	Transform javascript.Limits
 }
 
 // ResponseInput is a buffered upstream response plus captured invocation facts.
@@ -57,6 +67,17 @@ type ResponseInput struct {
 	// example, gzip decompression belongs to the executor/transport, not Map.
 	// Empty bytes mean absent content, distinct from the JSON bytes "null".
 	Body []byte
+
+	// Headers supplies response metadata to transforms as lowercase names with
+	// arrays of values. It is ignored by default passthrough and status errors.
+	// ContentType, not this map, controls body decoding. The caller must not mutate
+	// the map or value slices during Map; no references enter the JavaScript VM.
+	Headers http.Header
+
+	// Context is the immutable params/connection snapshot from admission. It is
+	// required only for a successful response with a configured transform. The
+	// executor must capture it consistently with the result identities below.
+	Context *render.Context
 
 	// ToolID and Revision identify the executable revision captured at admission.
 	ToolID   string
@@ -77,9 +98,9 @@ type ResponseInput struct {
 	ExecutionState api.ToolExecutionState
 }
 
-// Response is an immutable status-mapping and default-content program. It does
-// not perform requests, read response streams, or evaluate JavaScript. Separate
-// invocations may reuse it concurrently without sharing mutable counters.
+// Response is an immutable status-mapping and content program with an optional
+// pure JavaScript projection. It does not perform requests or read response
+// streams. Separate invocations may reuse it concurrently without sharing state.
 type Response struct {
 	// rules holds copied exact, class, and default errors. For example, an exact
 	// 429 rule overrides a class-4 rule regardless of their definition order.
@@ -88,12 +109,16 @@ type Response struct {
 	// limits stores the policy captured at compilation; Map keeps no counters
 	// or mutable invocation state on the reusable program.
 	limits ResponseLimits
+
+	// transform is compiled without running authored code. Each successful
+	// invocation evaluates it in a fresh VM after status and input checks.
+	transform *javascript.Expression
 }
 
-// CompileResponse captures the optional response rules under positive limits.
+// CompileResponse captures optional response rules and a pure expression.
 // A nil definition selects default passthrough for 2xx and UPSTREAM_FAILED for
-// other statuses. Configured JavaScript transforms are rejected until a pure
-// transform runtime is supplied; they are never silently ignored.
+// other statuses. Configured transforms require positive Transform limits;
+// compilation performs no authored execution or I/O.
 func CompileResponse(
 	source *tools.HTTPResponse,
 	limits ResponseLimits,
@@ -110,9 +135,18 @@ func CompileResponse(
 		return nil, err
 	}
 
+	var transform *javascript.Expression
+	if source != nil && source.TransformJavascript != nil {
+		transform, err = javascript.CompileExpression(*source.TransformJavascript, limits.Transform)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Response{
-		rules:  rules,
-		limits: limits,
+		rules:     rules,
+		limits:    limits,
+		transform: transform,
 	}, nil
 }
 
@@ -199,6 +233,15 @@ func (r *Response) Map(
 			failure.Details = []byte(fmt.Sprintf(`{"status":%d}`, input.StatusCode))
 		} else if len(input.Body) > r.limits.MaxResponseBytes || len(input.ContentType) > r.limits.MaxResponseBytes {
 			failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The upstream response exceeds the response byte limit."}
+		} else if r.transform != nil {
+			if input.Context == nil {
+				return nil, errors.New("response transform requires a captured invocation context")
+			}
+			var err error
+			failure, err = r.mapTransform(ctx, input, result)
+			if err != nil {
+				return nil, err
+			}
 		} else if len(input.Body) > r.limits.MaxOutputBytes {
 			failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The response content exceeds the output byte limit."}
 		} else {

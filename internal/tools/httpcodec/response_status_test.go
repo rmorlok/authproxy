@@ -16,8 +16,8 @@ func responseStatusPointer[T any](value T) *T {
 	return &value
 }
 
-// TestResponseRulesDefaults covers absent policies, required limits, and the
-// explicit refusal to ignore an authored JavaScript transform.
+// TestResponseRulesDefaults covers absent policies, required limits, and
+// validation of the transform field without compiling or executing it.
 func TestResponseRulesDefaults(t *testing.T) {
 	for _, source := range []*tools.HTTPResponse{nil, {}} {
 		// An absent or empty definition compiles without introducing any mapping.
@@ -36,13 +36,22 @@ func TestResponseRulesDefaults(t *testing.T) {
 		require.ErrorContains(t, err, "positive")
 		require.Nil(t, rules)
 	}
-	for _, expression := range []string{"", "response.body", "private-expression"} {
-		// Every present transform fails instead of silently returning passthrough data.
+	for _, expression := range []string{"", " \t"} {
+		// Present but blank transforms remain invalid resource definitions.
 		rules, err := compileResponseRules(&tools.HTTPResponse{TransformJavascript: &expression}, 1024)
-		require.ErrorContains(t, err, "transforms are not supported")
-		require.NotContains(t, err.Error(), "private-expression")
+		require.Error(t, err)
 		require.Nil(t, rules)
 	}
+	// Transform source consumes the shared source allowance but does not create
+	// a status mapping. Expression compilation happens at the Response layer.
+	expression := "response.body"
+	rules, err := compileResponseRules(&tools.HTTPResponse{TransformJavascript: &expression}, len(expression))
+	require.NoError(t, err)
+	_, matched := rules.lookup(200)
+	require.False(t, matched)
+	rules, err = compileResponseRules(&tools.HTTPResponse{TransformJavascript: &expression}, len(expression)-1)
+	require.ErrorContains(t, err, "byte limit")
+	require.Nil(t, rules)
 }
 
 // TestResponseRulesPrecedence verifies that selector priority is independent of

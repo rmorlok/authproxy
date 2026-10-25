@@ -419,9 +419,9 @@ func TestResponseEncodedEnvelopeLimit(t *testing.T) {
 	require.Nil(t, result)
 }
 
-// TestResponseCompileRejectsUnsupportedDefinitions leaves transform execution
-// to a future runtime and disallows ambiguous rules or custom platform codes.
-func TestResponseCompileRejectsUnsupportedDefinitions(t *testing.T) {
+// TestResponseCompileRejectsInvalidDefinitions requires transform limits and
+// disallows ambiguous rules or custom platform codes.
+func TestResponseCompileRejectsInvalidDefinitions(t *testing.T) {
 	for _, source := range []*tools.HTTPResponse{
 		{TransformJavascript: util.ToPtr("response.body")},
 		{Errors: []tools.HTTPErrorRule{{Statuses: []int{404}, StatusClass: util.ToPtr(4), Code: "MISSING", Message: "Missing."}}},
