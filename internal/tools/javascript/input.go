@@ -16,7 +16,12 @@ import (
 // into native JavaScript values before any authored expression executes. The
 // globals cannot be replaced, but nested mutations remain local to this VM.
 // It returns fixed classifications rather than parser errors containing input.
-func bindInput(ctx context.Context, vm *goja.Runtime, input Input, limits Limits) error {
+func bindInput(
+	ctx context.Context,
+	vm *goja.Runtime,
+	input Input,
+	limits Limits,
+) error {
 	if ctx == nil || vm == nil || input.Context == nil {
 		return ErrInvalidInput
 	}
@@ -60,25 +65,49 @@ func bindInput(ctx context.Context, vm *goja.Runtime, input Input, limits Limits
 	if !ok {
 		return ErrInvalidInput
 	}
+
 	root, err := parse(goja.Undefined(), vm.ToValue(string(snapshot)))
 	if err != nil {
 		return inputParseError(ctx)
 	}
+
 	responseValue, err := parse(goja.Undefined(), vm.ToValue(string(response)))
 	if err != nil {
 		return inputParseError(ctx)
 	}
+
 	rootObject := root.ToObject(vm)
+
 	// A zero render.Context has no captured scopes. Only snapshots created by
 	// render.NewContext supply every required object, including empty scopes.
-	for _, name := range []string{"params", "cfg", "labels", "annotations", "connection", "tool"} {
+	for _, name := range []string{
+		"params",
+		"cfg",
+		"labels",
+		"annotations",
+		"connection",
+		"tool",
+	} {
 		if _, ok := rootObject.Get(name).(*goja.Object); !ok {
 			return ErrInvalidInput
 		}
 	}
+
 	contextObject := vm.NewObject()
-	for _, name := range []string{"cfg", "labels", "annotations", "connection", "tool"} {
-		if err := contextObject.DefineDataProperty(name, rootObject.Get(name), goja.FLAG_TRUE, goja.FLAG_TRUE, goja.FLAG_TRUE); err != nil {
+	for _, name := range []string{
+		"cfg",
+		"labels",
+		"annotations",
+		"connection",
+		"tool",
+	} {
+		if err := contextObject.DefineDataProperty(
+			name,
+			rootObject.Get(name),
+			goja.FLAG_TRUE,
+			goja.FLAG_TRUE,
+			goja.FLAG_TRUE,
+		); err != nil {
 			return ErrInvalidInput
 		}
 	}
@@ -96,11 +125,19 @@ func bindInput(ctx context.Context, vm *goja.Runtime, input Input, limits Limits
 		{"labels", contextObject.Get("labels")},
 		{"annotations", contextObject.Get("annotations")},
 	}
+
 	for _, global := range globals {
-		if err := vm.GlobalObject().DefineDataProperty(global.name, global.value, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE); err != nil {
+		if err := vm.GlobalObject().DefineDataProperty(
+			global.name,
+			global.value,
+			goja.FLAG_FALSE,
+			goja.FLAG_FALSE,
+			goja.FLAG_TRUE,
+		); err != nil {
 			return ErrInvalidInput
 		}
 	}
+
 	return ctx.Err()
 }
 
@@ -128,17 +165,22 @@ func (b *inputBudget) validateObject(encoded []byte) error {
 	if !utf8.Valid(encoded) {
 		return ErrInvalidInput
 	}
+
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.UseNumber()
+
 	if err := b.value(decoder, 0, true); err != nil {
 		return err
 	}
+
 	if _, err := decoder.Token(); err != io.EOF {
 		return ErrInvalidInput
 	}
+
 	if err := validateInputSurrogates(b.ctx, encoded); err != nil {
 		return err
 	}
+
 	return b.ctx.Err()
 }
 
@@ -203,7 +245,11 @@ func inputHexUnit(digits []byte) uint16 {
 
 // value consumes one JSON value, enforcing work/depth limits before descending.
 // Finite JSON numbers use ordinary JavaScript Number precision when parsed.
-func (b *inputBudget) value(decoder *json.Decoder, depth int, objectRoot bool) error {
+func (b *inputBudget) value(
+	decoder *json.Decoder,
+	depth int,
+	objectRoot bool,
+) error {
 	if err := b.ctx.Err(); err != nil {
 		return err
 	}
