@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 // Input contains the explicitly allowed invocation context. Callers validate
@@ -64,6 +66,31 @@ type Input struct {
 // after construction, so independent renders can safely share the snapshot.
 type Context struct {
 	root map[string]any
+}
+
+// SnapshotJSON serializes the captured invocation values as detached JSON under
+// the supplied byte, depth, and work limits. Strings and directive-shaped
+// objects remain inert data: this operation never evaluates template syntax.
+// Each call owns its result bytes, so callers may decode or modify them without
+// changing the snapshot. Cancellation and limits return no partial output.
+func (c *Context) SnapshotJSON(
+	ctx context.Context,
+	limits Limits,
+) (common.RawJSON, error) {
+	if c == nil || ctx == nil {
+		return nil, errors.New("snapshot and context are required")
+	}
+
+	if err := limits.validate(); err != nil {
+		return nil, err
+	}
+
+	writer := valueWriter{budget: newBudget(ctx, limits)}
+	if err := writer.emit(c.root, 0); err != nil {
+		return nil, err
+	}
+
+	return common.RawJSON(writer.output.Bytes()), nil
 }
 
 // errMissingReference identifies absent lookups without classifying other

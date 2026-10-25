@@ -272,6 +272,11 @@ func (w *valueWriter) emit(value any, depth int) error {
 		}
 		return w.writeQuoted(text)
 	case map[string]any:
+		// Every child needs at least one visit. A snapshot may have been captured
+		// under a larger budget, so reject wide maps before allocating their keys.
+		if len(v) > w.budget.limit.MaxSteps-w.budget.steps {
+			return errors.New("render step limit exceeded")
+		}
 		if err := w.write("{"); err != nil {
 			return err
 		}
@@ -331,8 +336,12 @@ func (w *valueWriter) emit(value any, depth int) error {
 }
 
 // writeQuoted escapes JSON syntax while leaving ordinary HTML characters alone.
-// The input is bounded by source/context/template limits before encoding.
+// Reject the minimum encoded size before allocating an escaped copy. Source
+// context limits can be larger than the current snapshot/render allowance.
 func (w *valueWriter) writeQuoted(text string) error {
+	if len(text) > w.budget.limit.MaxBytes-w.budget.bytes-2 {
+		return errors.New("render byte limit exceeded")
+	}
 	var encoded bytes.Buffer
 
 	encoder := json.NewEncoder(&encoded)

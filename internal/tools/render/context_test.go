@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -56,7 +57,7 @@ func TestContextSnapshot(t *testing.T) {
 		ToolSetGeneration:   &generation,
 		CatalogRevision:     &catalog,
 	}
-	
+
 	data, err := NewContext(input, testLimits())
 	require.NoError(t, err)
 
@@ -231,4 +232,97 @@ func TestContextNilCollections(t *testing.T) {
 	require.Equal(t, "null|null|null", renderText(t, `{{json.params.map}}|{{json.params.labels}}|{{json.params.list}}`, data))
 	require.Equal(t, "empty", renderText(t, `{{^params.map}}empty{{/params.map}}`, data))
 	require.Equal(t, "{}|{}|{}", renderText(t, `{{json.cfg}}|{{json.labels}}|{{json.annotations}}`, data))
+}
+
+func TestContextSnapshotJSON(t *testing.T) {
+	// Template-shaped strings and objects are captured as ordinary data.
+	data, err := NewContext(Input{
+		Params: map[string]any{
+			"template":  "{{cfg.private}}",
+			"directive": map[string]any{"$value": "cfg.private"},
+			"number":    json.Number("9007199254740993.000"),
+			"null":      nil,
+		},
+		Cfg: map[string]any{"private": "captured"},
+	}, testLimits())
+	require.NoError(t, err)
+
+	// Snapshot encoding preserves source data and exact number tokens.
+	encoded, err := data.SnapshotJSON(context.Background(), testLimits())
+	require.NoError(t, err)
+	require.JSONEq(t, `{"params":{"template":"{{cfg.private}}","directive":{"$value":"cfg.private"},"number":9007199254740993.000,"null":null},"cfg":{"private":"captured"},"labels":{},"annotations":{},"connection":{},"tool":{}}`, string(encoded))
+	require.Contains(t, string(encoded), "9007199254740993.000")
+
+	// Mutating one returned encoding cannot alter future snapshots.
+	encoded[0] = '['
+	again, err := data.SnapshotJSON(context.Background(), testLimits())
+	require.NoError(t, err)
+	require.Equal(t, byte('{'), again[0])
+}
+
+func TestContextSnapshotJSONLimits(t *testing.T) {
+	// Encode a small known tree to exercise exact serialized-byte boundaries.
+	data, err := NewContext(Input{Params: map[string]any{"value": []any{"quoted\nvalue"}}}, testLimits())
+	require.NoError(t, err)
+	encoded, err := data.SnapshotJSON(context.Background(), testLimits())
+	require.NoError(t, err)
+	limits := testLimits()
+	limits.MaxBytes = len(encoded)
+	exact, err := data.SnapshotJSON(context.Background(), limits)
+	require.NoError(t, err)
+	require.Equal(t, encoded, exact)
+
+	// Each boundary fails without returning a partial serialized snapshot.
+	for _, limit := range []Limits{
+		{MaxBytes: len(encoded) - 1, MaxDepth: 32, MaxSteps: 10000},
+		{MaxBytes: 1 << 20, MaxDepth: 2, MaxSteps: 10000},
+		{MaxBytes: 1 << 20, MaxDepth: 32, MaxSteps: 8},
+		{},
+	} {
+		partial, err := data.SnapshotJSON(context.Background(), limit)
+		require.Error(t, err)
+		require.Nil(t, partial)
+	}
+
+	// Cancellation and missing required arguments are also ordinary errors.
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	partial, err := data.SnapshotJSON(canceled, testLimits())
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, partial)
+	_, err = data.SnapshotJSON(nil, testLimits())
+	require.Error(t, err)
+	_, err = (*Context)(nil).SnapshotJSON(context.Background(), testLimits())
+	require.Error(t, err)
+}
+
+// TestContextSnapshotJSONSmallerLimits applies a tighter consumer policy to a
+// previously captured snapshot, including large strings and wide objects.
+func TestContextSnapshotJSONSmallerLimits(t *testing.T) {
+	wide := make(map[string]any, 1024)
+	for i := range 1024 {
+		wide[strconv.Itoa(i)] = nil
+	}
+	for _, test := range []struct {
+		name   string
+		params map[string]any
+		limits Limits
+	}{
+		{"large string", map[string]any{"text": strings.Repeat("x", 4096)}, Limits{MaxBytes: 256, MaxDepth: 32, MaxSteps: 10000}},
+		{"wide map", wide, Limits{MaxBytes: 1 << 20, MaxDepth: 32, MaxSteps: 32}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Initial capture succeeds under the broader host policy.
+			data, err := NewContext(Input{Params: test.params}, testLimits())
+			require.NoError(t, err)
+
+			// A tighter caller gets no partial JSON and does not alter the snapshot.
+			result, err := data.SnapshotJSON(context.Background(), test.limits)
+			require.Error(t, err)
+			require.Nil(t, result)
+			result, err = data.SnapshotJSON(context.Background(), testLimits())
+			require.NoError(t, err)
+			require.True(t, json.Valid(result))
+		})
+	}
 }
