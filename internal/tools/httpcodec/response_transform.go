@@ -197,6 +197,12 @@ func encodeTransformResponse(
 // It returns lowercase names with borrowed value slices, used only during this
 // call. Duplicate names ignoring case are rejected instead of being merged in
 // map iteration order. Repeated values in one entry retain their original order.
+//
+// A header whose name is not an HTTP token, or with any value that is not valid
+// UTF-8 or contains prohibited control bytes, is omitted rather than failing
+// the response: headers are optional context for a projection, and one odd
+// provider header (for example obs-text in Content-Disposition) must not break
+// an otherwise successful call. Omitted headers still consume the allowance.
 func transformHeaders(
 	ctx context.Context,
 	source http.Header,
@@ -227,15 +233,9 @@ func transformHeaders(
 		remainingBytes -= len(name)
 		remainingValues -= len(values)
 
-		if !tools.IsHTTPToken(name) {
-			return nil, errTransformHeaders
-		}
-
-		name = strings.ToLower(name)
-		if _, exists := headers[name]; exists {
-			return nil, errTransformHeaders
-		}
-
+		// Charge every value before deciding whether to keep the header, so an
+		// omitted header cannot bypass the byte allowance.
+		valid := tools.IsHTTPToken(name)
 		for _, value := range values {
 			if err := ctx.Err(); err != nil {
 				return nil, err
@@ -247,11 +247,18 @@ func transformHeaders(
 			}
 
 			remainingBytes -= len(value) + 2
-			if !validRequestHeaderValue(value) {
-				return nil, errTransformHeaders
+			if valid && !validRequestHeaderValue(value) {
+				valid = false
 			}
 		}
+		if !valid {
+			continue
+		}
 
+		name = strings.ToLower(name)
+		if _, exists := headers[name]; exists {
+			return nil, errTransformHeaders
+		}
 		headers[name] = values
 	}
 
