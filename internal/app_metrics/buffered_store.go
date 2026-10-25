@@ -186,6 +186,9 @@ func (s *bufferedRecordStore) flush() {
 	s.dropped = 0
 	s.mu.Unlock()
 
+	// The buffer_full metric is already recorded in StoreRecord as each event is rejected, so dashboards see drops
+	// immediately rather than at the next flush. This is only a log summary of those drops; recording the metric
+	// here as well would double-count them.
 	if dropped > 0 {
 		s.logger.Warn(
 			"dropped request event records because the write buffer was full",
