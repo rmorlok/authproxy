@@ -53,6 +53,14 @@ to an existing database actor. Integrations that include a full actor claim
 should treat the signed claim as an authoritative upsert from the host identity
 source.
 
+Only tokens signed with the host JWT signing key (`system_auth.jwt_signing_key`)
+or by AuthProxy itself may include an actor claim. A token verified with an
+actor's own key is rejected with `401` if it carries an actor claim, whether or
+not it sets `actorSigned`. An actor key proves that the caller is that actor; it
+never authorizes the caller to change the actor's stored permissions, labels,
+or annotations. Actor-key tokens may still narrow their own access with
+top-level `permissions`.
+
 When present, the JWT actor is a restricted Actor resource:
 
 ```yaml

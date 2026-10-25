@@ -68,9 +68,11 @@ AuthProxy supports two provisioning patterns:
    management path. Browser handoff JWTs then identify it by `sub` and
    `namespace`. A token that does not contain a full actor claim is rejected if
    that actor does not already exist.
-2. **Just in time.** A trusted JWT may contain the complete actor claim.
-   AuthProxy upserts that actor during authentication. Use this only when the
-   host signing service is authoritative for actor permissions and metadata.
+2. **Just in time.** A JWT signed with the host JWT signing key may contain the
+   complete actor claim. AuthProxy upserts that actor during authentication.
+   Use this only when the host signing service is authoritative for actor
+   permissions and metadata. Tokens signed with an actor's own key cannot carry
+   an actor claim, so an actor can never redefine itself.
 
 Provision-first is easier to audit. Just-in-time provisioning reduces sync work
 but makes the token issuer part of the actor-provisioning control plane.

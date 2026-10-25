@@ -22,6 +22,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/database/mock"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
@@ -1071,6 +1072,204 @@ func TestAuth_TopLevelPermissionsCannotEscalateDatabaseActor(t *testing.T) {
 	require.ErrorIs(t, err, jwt2.ErrInvalidClaims)
 	require.Contains(t, err.Error(), "token permissions exceed actor permissions")
 	require.False(t, ra.IsAuthenticated())
+}
+
+// TestAuth_ActorKeyCannotRedefineActor verifies that a token verified with an actor's own signing key cannot carry
+// an actor definition. Otherwise a low-privilege actor could sign a token with its own key whose actor claim
+// replaces the actor's persisted permissions with an arbitrarily wider set. Tokens signed by the host application
+// (JwtSigningKey) or AuthProxy (GlobalAESKey) remain trusted to define actors.
+func TestAuth_ActorKeyCannotRedefineActor(t *testing.T) {
+	actorKey := &sconfig.Key{
+		InnerVal: &sconfig.KeyPublicPrivate{
+			PublicKey: &sconfig.KeyData{
+				InnerVal: &sconfig.KeyDataFile{
+					Path: pathToTestData("admin_user_keys/bobdole.pub"),
+				},
+			},
+		},
+	}
+
+	// The persisted grant the actor starts with, and the escalated grant an attacker would like to claim.
+	lowPerms := []aschema.Permission{{
+		Namespace: "root",
+		Resources: []string{"connections"},
+		Verbs:     []string{"read"},
+	}}
+	elevatedPerms := []aschema.Permission{{
+		Namespace: "root.**",
+		Resources: []string{"actors"},
+		Verbs:     []string{"create", "delete"},
+	}}
+
+	var raw *service
+	var db database.DB
+
+	// setup creates a fresh database containing a "bobdole" actor that holds lowPerms and has its own asymmetric
+	// signing key stored, plus a host JwtSigningKey distinct from the actor's key.
+	setup := func(t *testing.T) {
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				JwtTokenDurationVal: 12 * time.Hour,
+				JwtIssuerVal:        "example",
+				JwtSigningKey: &sconfig.Key{
+					InnerVal: &sconfig.KeyPublicPrivate{
+						PublicKey: &sconfig.KeyData{
+							InnerVal: &sconfig.KeyDataFile{Path: pathToTestData("system_keys/other-system.pub")},
+						},
+						PrivateKey: &sconfig.KeyData{
+							InnerVal: &sconfig.KeyDataFile{Path: pathToTestData("system_keys/other-system")},
+						},
+					},
+				},
+				GlobalAESKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataBase64Val{
+						Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
+					},
+				},
+			},
+			AdminApi: sconfig.ServiceAdminApi{
+				ServiceHttp: sconfig.ServiceHttp{
+					PortVal: &sconfig.IntegerValue{InnerVal: &sconfig.IntegerValueDirect{Value: 8080}},
+				},
+			},
+		})
+
+		var enc encrypt.E
+		cfg, db = database.MustApplyBlankTestDbConfig(t, cfg)
+		cfg, enc = encrypt.NewTestEncryptService(cfg, db)
+
+		// Store the actor's public key encrypted, as actor sync does for actors with signing keys.
+		keyJson, err := json.Marshal(actorKey)
+		require.NoError(t, err)
+		encryptedKey, err := enc.EncryptStringGlobal(testContext, string(keyJson))
+		require.NoError(t, err)
+
+		require.NoError(t, db.CreateActor(testContext, &database.Actor{
+			Id:           apid.New(apid.PrefixActor),
+			Namespace:    "root",
+			ExternalId:   "bobdole",
+			EncryptedKey: &encryptedKey,
+			Permissions:  lowPerms,
+		}))
+
+		a := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), db, nil, enc, test_utils.NewTestLogger())
+		raw = a.(*service)
+	}
+
+	// elevatedActor is the actor definition an attacker embeds in the token.
+	elevatedActor := &core.Actor{
+		ExternalId:  "bobdole",
+		Namespace:   "root",
+		Permissions: elevatedPerms,
+	}
+
+	// authenticate runs the request auth flow with the given token in the JWT header.
+	authenticate := func(t *testing.T, token string) (*core.RequestAuth, error) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", token))
+		return raw.establishAuthFromRequest(testContext, true, req, httptest.NewRecorder())
+	}
+
+	// storedPerms reads the actor's persisted permissions directly from the database.
+	storedPerms := func(t *testing.T) []aschema.Permission {
+		actor, err := db.GetActorByExternalId(testContext, "root", "bobdole")
+		require.NoError(t, err)
+		return []aschema.Permission(actor.Permissions)
+	}
+
+	for _, tt := range []struct {
+		name        string
+		actorSigned bool
+	}{
+		{name: "actor-signed claim", actorSigned: true},
+		{name: "token without signing claim", actorSigned: false},
+	} {
+		t.Run("actor key with actor claim is rejected/"+tt.name, func(t *testing.T) {
+			setup(t)
+
+			// The actor signs a token with its own key that tries to redefine itself with elevated permissions.
+			builder := jwt2.NewJwtTokenBuilder().
+				WithActor(elevatedActor).
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
+				WithAudience(string(sconfig.ServiceIdAdminApi))
+			if tt.actorSigned {
+				builder = builder.WithActorSigned()
+			}
+			token, err := builder.TokenCtx(testContext)
+			require.NoError(t, err)
+
+			// The request is rejected as unauthenticated with an explanatory public message...
+			ra, err := authenticate(t, token)
+			var httpErr *httperr.Error
+			require.ErrorAs(t, err, &httpErr)
+			require.Equal(t, http.StatusUnauthorized, httpErr.Status)
+			require.Contains(t, httpErr.ResponseMsg, "cannot include an actor definition")
+			require.False(t, ra.IsAuthenticated())
+
+			// ...and the persisted grant is unchanged.
+			require.Equal(t, lowPerms, storedPerms(t))
+		})
+	}
+
+	t.Run("actor key without actor claim authenticates", func(t *testing.T) {
+		setup(t)
+
+		// The normal CLI shape: the actor signs with its own key and only names itself by external id.
+		token, err := jwt2.NewJwtTokenBuilder().
+			WithActorExternalId("bobdole").
+			WithNamespace("root").
+			WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
+			WithActorSigned().
+			WithAudience(string(sconfig.ServiceIdAdminApi)).
+			TokenCtx(testContext)
+		require.NoError(t, err)
+
+		// Authentication succeeds using the stored, unmodified permissions.
+		ra, err := authenticate(t, token)
+		require.NoError(t, err)
+		require.True(t, ra.IsAuthenticated())
+		require.Equal(t, lowPerms, ra.MustGetActor().Permissions)
+	})
+
+	t.Run("host signing key may define actor", func(t *testing.T) {
+		setup(t)
+
+		// The host application signs with JwtSigningKey. The actor's key is tried first and fails, so this
+		// exercises the JwtSigningKey fallback, which must not be treated as actor-key verification.
+		token, err := jwt2.NewJwtTokenBuilder().
+			WithActor(elevatedActor).
+			WithPrivateKeyPath(pathToTestData("system_keys/other-system")).
+			WithAudience(string(sconfig.ServiceIdAdminApi)).
+			TokenCtx(testContext)
+		require.NoError(t, err)
+
+		// The host is trusted to provision the actor, so the stored grant is replaced.
+		ra, err := authenticate(t, token)
+		require.NoError(t, err)
+		require.True(t, ra.IsAuthenticated())
+		require.Equal(t, elevatedPerms, storedPerms(t))
+	})
+
+	t.Run("system-signed token may define actor", func(t *testing.T) {
+		setup(t)
+
+		// AuthProxy itself signs with GlobalAESKey (e.g. OAuth redirect tokens carry the actor).
+		token, err := raw.Token(testContext, &jwt2.AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject:  "bobdole",
+				Audience: []string{string(sconfig.ServiceIdAdminApi)},
+			},
+			Namespace: "root",
+			Actor:     jwt2.NewActorClaim(elevatedActor),
+		})
+		require.NoError(t, err)
+
+		// System-signed tokens are trusted to define the actor.
+		ra, err := authenticate(t, token)
+		require.NoError(t, err)
+		require.True(t, ra.IsAuthenticated())
+		require.Equal(t, elevatedPerms, storedPerms(t))
+	})
 }
 
 func TestAuth_Nonce(t *testing.T) {

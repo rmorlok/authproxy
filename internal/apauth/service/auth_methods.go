@@ -156,8 +156,18 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 
 // Parse token string and verify.
 func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
+	claims, _, err := s.parseVerified(ctx, tokenString)
+	return claims, err
+}
+
+// parseVerified parses and verifies a token string the same way as Parse, and additionally reports whether the
+// signature was verified with a key that belongs to the token's actor (the actor's own EncryptedKey) rather than a
+// key held by AuthProxy (GlobalAESKey) or the host application (JwtSigningKey). Callers use this to decide how much
+// the token is trusted: an actor key proves the caller is that actor, but does not authorize the caller to define
+// the actor's persisted record.
+func (s *service) parseVerified(ctx context.Context, tokenString string) (claims *jwt2.AuthProxyClaims, verifiedWithActorKey bool, err error) {
 	actorKeySelected := false
-	claims, err := jwt2.NewJwtTokenParserBuilder().
+	claims, err = jwt2.NewJwtTokenParserBuilder().
 		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyDataType, isShared bool, err error) {
 			if unverified.SystemSigned {
 				// System-signed tokens are minted internally by services
@@ -200,6 +210,10 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 			return nil, false, errors.New("invalid key type")
 		}).
 		ParseCtx(ctx, tokenString)
+
+	// If the primary parse succeeded using an actor-specific key, the actor's own key signed this token.
+	verifiedWithActorKey = err == nil && actorKeySelected
+
 	if err != nil && actorKeySelected {
 		// An actor-specific key takes precedence, but host applications may also sign tokens for
 		// that actor with the global JWT signing key. Retry only when actor-key selection was the
@@ -208,12 +222,13 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 			WithConfigKey(ctx, s.config.GetRoot().SystemAuth.JwtSigningKey).
 			ParseCtx(ctx, tokenString)
 		if fallbackErr == nil {
+			// Verified with the host application's JwtSigningKey, not the actor's key.
 			claims = fallbackClaims
 			err = nil
 		}
 	}
 	if err != nil {
-		return nil, fmt.Errorf("can't parse token: %w", err)
+		return nil, false, fmt.Errorf("can't parse token: %w", err)
 	}
 
 	found := false
@@ -225,12 +240,12 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 	}
 	if !found {
 		if len(claims.Audience) > 0 {
-			return nil, fmt.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.service.GetId())
+			return nil, false, fmt.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.service.GetId())
 		}
-		return nil, fmt.Errorf("aud not specified for service '%s'", s.service.GetId())
+		return nil, false, fmt.Errorf("aud not specified for service '%s'", s.service.GetId())
 	}
 
-	return claims, s.validate(ctx, claims)
+	return claims, verifiedWithActorKey, s.validate(ctx, claims)
 }
 
 func (s *service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) error {
@@ -333,7 +348,8 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 	}
 
 	if tokenString != "" {
-		claims, err = s.Parse(ctx, tokenString)
+		var verifiedWithActorKey bool
+		claims, verifiedWithActorKey, err = s.parseVerified(ctx, tokenString)
 		if err != nil {
 			if errors.Is(err, jwt2.ErrInvalidClaims) {
 				return core.NewUnauthenticatedRequestAuth(), httperr.Unauthorized(httperr.WithPublicErr(err))
@@ -383,6 +399,17 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
 			// it consistent with the request's definition.
+			//
+			// Only tokens signed by AuthProxy (GlobalAESKey) or the host application (JwtSigningKey) may define an
+			// actor. A token verified with the actor's own key proves the caller is that actor, but must not let the
+			// actor rewrite its own persisted record (e.g. widening its permissions).
+			if verifiedWithActorKey {
+				return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg(
+					"tokens signed with an actor key cannot include an actor definition",
+					httperr.WithInternalErrorf("actor-key-signed token for actor '%s' included an actor claim", claims.Subject),
+				)
+			}
+
 			actor, err = s.db.UpsertActor(ctx, claims.Actor.ToCoreActor())
 			if err != nil {
 				return core.NewUnauthenticatedRequestAuth(), httperr.InternalServerErrorMsg("database error", httperr.WithInternalErrorf("failed to upsert actor: %w", err))
