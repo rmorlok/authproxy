@@ -16,14 +16,34 @@ import (
 // program runs. It accepts JSON data without invoking getters, proxy traps, or
 // toJSON methods, even when the program replaces the corresponding globals.
 type outputEncoder struct {
-	vm                 *goja.Runtime
-	limits             Limits
-	ownKeys            goja.Callable
+	// vm is the evaluation's runtime. Reflection calls and temporary JavaScript
+	// values must use this same runtime; it is accessed only by its owning goroutine.
+	vm *goja.Runtime
+	// limits holds the resolved policy used to bound output bytes, nesting, and
+	// traversal work. Each encode call starts fresh counters against these caps.
+	limits Limits
+	// ownKeys is the original Reflect.ownKeys function, captured before authored
+	// code runs. It includes symbol and non-enumerable keys so validation can
+	// inspect properties that ordinary JSON serialization would silently omit.
+	ownKeys goja.Callable
+	// propertyDescriptor is the original Object.getOwnPropertyDescriptor function.
+	// After an object passes validation, it reads property metadata so accessors
+	// can be rejected and data values read without invoking getters.
 	propertyDescriptor goja.Callable
-	objectPrototype    *goja.Object
-	arrayPrototype     *goja.Object
-	objectExportType   reflect.Type
-	arrayExportType    reflect.Type
+	// objectPrototype is the original Object.prototype identity. Ordinary objects
+	// must have this direct prototype or a null prototype; custom ones are rejected.
+	objectPrototype *goja.Object
+	// arrayPrototype is the original Array.prototype identity. Arrays must have
+	// this direct prototype or a null prototype to use the dense-array encoder.
+	arrayPrototype *goja.Object
+	// objectExportType is Goja's Go export type for a fresh ordinary object.
+	// Together with ClassName, it helps reject unsupported object kinds, including
+	// proxies, before reflective access without actually exporting their contents.
+	objectExportType reflect.Type
+	// arrayExportType is Goja's Go export type for a fresh native array. Together
+	// with ClassName, it selects array validation and encoding without exporting
+	// the array into an intermediate Go slice.
+	arrayExportType reflect.Type
 }
 
 // newOutputEncoder prepares an encoder for a fresh runtime whose standard
@@ -59,11 +79,22 @@ func newOutputEncoder(vm *goja.Runtime, limits Limits) *outputEncoder {
 // Shared acyclic objects may appear repeatedly; only a repeated object on the
 // current path is a cycle. No source object or exported Go graph is retained.
 type outputState struct {
+	// encoder supplies the runtime, captured reflection functions, object-type
+	// checks, and limits shared throughout this traversal.
 	encoder *outputEncoder
-	ctx     context.Context
-	bytes   []byte
-	nodes   int
-	active  map[*goja.Object]bool
+	// ctx carries caller cancellation and the evaluation timeout. Traversal and
+	// string encoding check it cooperatively to stop work after cancellation.
+	ctx context.Context
+	// bytes accumulates JSON owned by this traversal, bounded by MaxOutputBytes.
+	// It becomes the returned result on success; partial output is discarded on error.
+	bytes []byte
+	// nodes counts visited values and inspected ordinary-object keys against
+	// MaxNodes, including non-enumerable keys. Array indices and length metadata
+	// do not add separate charges beyond the array and its element values.
+	nodes int
+	// active contains objects on the current recursion path. Revisiting one is
+	// a cycle; removing it on return allows shared acyclic objects to appear again.
+	active map[*goja.Object]bool
 }
 
 // encode converts a JavaScript value to independently owned JSON. Object keys
