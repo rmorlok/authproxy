@@ -45,7 +45,10 @@ type decodedResponseBody struct {
 // or apply size limits; callers must bound the supplied metadata and body first.
 // Empty bodies still require valid MIME metadata. Failures return no decoded
 // value and contain only fixed, safe code/message fields.
-func decodeResponseBody(mediaType string, body []byte) (decodedResponseBody, *api.ToolResultError) {
+func decodeResponseBody(
+	mediaType string,
+	body []byte,
+) (decodedResponseBody, *api.ToolResultError) {
 	if mediaType == "" {
 		mediaType = "application/octet-stream"
 	}
@@ -55,7 +58,10 @@ func decodeResponseBody(mediaType string, body []byte) (decodedResponseBody, *ap
 
 	if !tools.IsValidMultipartMetadata(mediaType) || baseErr != nil ||
 		(parameterErr != nil && !errors.Is(parameterErr, mime.ErrInvalidMediaParameter)) {
-		return decodedResponseBody{}, &api.ToolResultError{Code: "UPSTREAM_PROTOCOL_ERROR", Message: "Provider response has an invalid content type."}
+		return decodedResponseBody{}, &api.ToolResultError{
+			Code:    "UPSTREAM_PROTOCOL_ERROR",
+			Message: "Provider response has an invalid content type.",
+		}
 	}
 
 	if parameterErr != nil {
@@ -74,8 +80,12 @@ func decodeResponseBody(mediaType string, body []byte) (decodedResponseBody, *ap
 	major, subtype, _ := strings.Cut(base, "/")
 	if subtype == "json" || strings.HasSuffix(subtype, "+json") {
 		if !utf8.Valid(body) || !json.Valid(body) {
-			return decodedResponseBody{}, &api.ToolResultError{Code: "OUTPUT_INVALID", Message: "Provider response body is not valid JSON."}
+			return decodedResponseBody{}, &api.ToolResultError{
+				Code:    "OUTPUT_INVALID",
+				Message: "Provider response body is not valid JSON.",
+			}
 		}
+
 		decoded.kind = responseBodyJSON
 		return decoded, nil
 	}

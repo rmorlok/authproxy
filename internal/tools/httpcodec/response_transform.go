@@ -40,22 +40,37 @@ func (r *Response) mapTransform(
 			Context: input.Context, Response: response,
 		})
 	}
+
 	if ctxErr := ctx.Err(); ctxErr != nil {
 		return nil, ctxErr
 	}
+
 	if err != nil {
 		switch {
 		case errors.Is(err, errTransformHeaders):
-			return &api.ToolResultError{Code: "UPSTREAM_PROTOCOL_ERROR", Message: "Provider response has invalid headers."}, nil
+			return &api.ToolResultError{
+				Code:    "UPSTREAM_PROTOCOL_ERROR",
+				Message: "Provider response has invalid headers.",
+			}, nil
 		case errors.Is(err, javascript.ErrLimitExceeded):
-			return &api.ToolResultError{Code: "EXECUTION_LIMIT_EXCEEDED", Message: "The response transform exceeded an execution limit."}, nil
+			return &api.ToolResultError{
+				Code:    "EXECUTION_LIMIT_EXCEEDED",
+				Message: "The response transform exceeded an execution limit.",
+			}, nil
 		default:
 			// Do not expose source, thrown values, response data, or private context.
-			return &api.ToolResultError{Code: "OUTPUT_INVALID", Message: "The response transform could not produce a valid result."}, nil
+			return &api.ToolResultError{
+				Code:    "OUTPUT_INVALID",
+				Message: "The response transform could not produce a valid result.",
+			}, nil
 		}
 	}
+
 	if len(projected) > r.limits.MaxOutputBytes {
-		return &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The transformed response exceeds the output byte limit."}, nil
+		return &api.ToolResultError{
+			Code:    "OUTPUT_TOO_LARGE",
+			Message: "The transformed response exceeds the output byte limit.",
+		}, nil
 	}
 
 	if projected[0] == '"' {
@@ -64,9 +79,15 @@ func (r *Response) mapTransform(
 		// them, and json.Unmarshal would silently replace them with U+FFFD.
 		text, err := strconv.Unquote(string(projected))
 		if err != nil {
-			return &api.ToolResultError{Code: "OUTPUT_INVALID", Message: "The response transform returned a string that cannot be represented as text."}, nil
+			return &api.ToolResultError{
+				Code:    "OUTPUT_INVALID",
+				Message: "The response transform returned a string that cannot be represented as text.",
+			}, nil
 		}
-		result.Content = append(result.Content, api.ToolContentBlock{Type: api.ToolContentTypeText, Text: &text})
+		result.Content = append(result.Content, api.ToolContentBlock{
+			Type: api.ToolContentTypeText,
+			Text: &text,
+		})
 	}
 	result.StructuredContent = projected
 	return nil, nil
