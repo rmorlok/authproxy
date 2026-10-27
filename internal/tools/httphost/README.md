@@ -2,8 +2,8 @@
 
 A Tool can make several requests to complete one action, such as finding a CRM
 contact and then updating it. `httphost.Session` sends those requests through one
-captured connection. The requests share a timeout, a logical request allowance,
-and an aggregate decoded response allowance.
+captured connection's configured HTTP client. The requests share a timeout, a
+logical request allowance, and an aggregate decoded response allowance.
 
 The existing connection proxy still supplies credentials, credential recovery,
 rate limiting, and request instrumentation. The host receives prepared
@@ -18,13 +18,16 @@ the caller must resolve effective policy before creating a session.
 
 ```go
 func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
-    session, err := httphost.New(ctx, conn, httphost.Limits{
+    client := conn.HTTPClient(iface.HTTPClientOptions{
+        Labels: map[string]string{"operation": "read-account"},
+    }) // An empty RequestType defaults to proxy traffic.
+    session, err := httphost.New(ctx, client, httphost.Limits{
         Timeout:          30 * time.Second,
         MaxRequests:      3,
         MaxResponseBytes: 2 * 1024 * 1024,
         MaxStreamBytes:   2 * 1024 * 1024,
         MaxHeaderBytes:   32 * 1024,
-    }, map[string]string{"operation": "read-account"})
+    })
     if err != nil {
         return nil, err
     }
@@ -58,6 +61,11 @@ The module imports are `internal/core/iface` and `internal/tools/httphost` under
 `github.com/rmorlok/authproxy`; the other imports are from the Go standard library.
 For a multi-request action, keep one session alive around the entire action.
 Creating a session for each page would reset the allowances and timeout.
+
+The client captures request attribution and uses the connection's existing
+streaming proxy for credentials and recovery. `Session` only requires its `Do`
+method. The invocation caller must supply a client configured from the admitted
+connection; the host does not select a connection or configure labels itself.
 
 `Do` takes ownership of the outgoing body immediately, even when a canceled
 context or exhausted budget prevents a proxy call. After handoff, the existing
@@ -93,13 +101,13 @@ All limit fields must be positive:
 | Limit | What it counts |
 | --- | --- |
 | `Timeout` | The entire session lifetime, including rendering and time between requests. |
-| `MaxRequests` | Logical calls to the connection proxy, including calls that fail after handoff. |
+| `MaxRequests` | Logical client calls, including calls that fail after handoff. |
 | `MaxResponseBytes` | Decoded bytes read across all responses, including partial bodies later discarded. |
 | `MaxStreamBytes` | Bytes from each proxy response body before decoding performed by this host. |
 | `MaxHeaderBytes` | Each copied response header map's names, values, and field-line overhead. |
 
 Credential recovery, redirects, and credential refresh can cause extra HTTP
-attempts within a logical proxy call. The host adds no retries. It never refunds
+attempts within a logical client call. The host adds no retries. It never refunds
 consumed requests or response bytes after a failure.
 
 Response reads support identity and gzip encoding, including the legacy `x-gzip`

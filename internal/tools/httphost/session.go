@@ -5,13 +5,11 @@ package httphost
 import (
 	"context"
 	"errors"
-	"maps"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 )
 
@@ -36,7 +34,7 @@ type Limits struct {
 	// Timeout spans the entire invocation, including gaps between requests.
 	Timeout time.Duration
 
-	// MaxRequests counts logical proxy calls. Existing credential recovery,
+	// MaxRequests counts logical client calls. Existing credential recovery,
 	// redirects, and credential refresh may cause additional HTTP attempts.
 	MaxRequests int
 
@@ -54,13 +52,13 @@ type Limits struct {
 	MaxHeaderBytes int
 }
 
-// Session owns the connection and budget for one admitted Tool invocation.
+// Session applies an invocation budget to one configured connection client.
 // Concurrent calls share the same allowances. Close it when the invocation
 // ends, and close every returned response body, even when discarding a status.
 // Its zero value is not usable; create sessions with New.
 type Session struct {
-	// connection is the sole routing capability available to this invocation.
-	connection iface.Connection
+	// client is configured for the admitted connection and request attribution.
+	client iface.HTTPClient
 
 	// parent preserves caller cancellation separately from policy expiration.
 	parent context.Context
@@ -74,9 +72,8 @@ type Session struct {
 	// stopTimer releases the total invocation timer on Close.
 	stopTimer context.CancelFunc
 
-	// limits is immutable effective policy; labels is a detached request snapshot.
+	// limits is immutable effective policy for the entire invocation.
 	limits Limits
-	labels map[string]string
 
 	// mu protects shared consumption across concurrent requests and body reads.
 	mu sync.Mutex
@@ -92,17 +89,17 @@ type Session struct {
 	responseExceeded bool
 }
 
-// New captures a connection and detached labels for an already admitted Tool.
-// It starts the total timeout immediately. Authorization, input validation,
-// connection configuration snapshots, and policy resolution belong to callers.
+// New captures a client for an already admitted Tool and starts its timeout.
+// Callers must configure client from the admitted connection with proxy request
+// attribution. Authorization, input validation, connection configuration
+// snapshots, and policy resolution also belong to callers.
 func New(
 	ctx context.Context,
-	connection iface.Connection,
+	client iface.HTTPClient,
 	limits Limits,
-	labels map[string]string,
 ) (*Session, error) {
 	if ctx == nil ||
-		connection == nil ||
+		client == nil ||
 		limits.Timeout <= 0 ||
 		limits.MaxRequests <= 0 ||
 		limits.MaxResponseBytes <= 0 ||
@@ -118,13 +115,12 @@ func New(
 	run, cancel := context.WithCancelCause(timed)
 
 	return &Session{
-		connection: connection,
-		parent:     ctx,
-		ctx:        run,
-		cancel:     cancel,
-		stopTimer:  stopTimer,
-		limits:     limits,
-		labels:     maps.Clone(labels),
+		client:    client,
+		parent:    ctx,
+		ctx:       run,
+		cancel:    cancel,
+		stopTimer: stopTimer,
+		limits:    limits,
 	}, nil
 }
 
@@ -216,13 +212,7 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 	}
 
 	transferred = true
-	raw, err := s.connection.ProxyRequestStream(
-		ctx,
-		httpf.RequestTypeProxy,
-		&iface.RawProxyRequest{
-			Outbound: req,
-			Labels:   maps.Clone(s.labels),
-		})
+	raw, err := s.client.Do(req.WithContext(ctx))
 	if err != nil {
 		if raw != nil && raw.Body != nil {
 			_ = raw.Body.Close()
@@ -245,7 +235,7 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 	return s.prepareResponse(ctx, raw, req.Method, cleanup)
 }
 
-// beginRequest reserves one logical call immediately before proxy handoff.
+// beginRequest reserves one logical call immediately before client handoff.
 // Reservations are never refunded, including credential or transport failures.
 func (s *Session) beginRequest(ctx context.Context) error {
 	s.mu.Lock()

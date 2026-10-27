@@ -31,18 +31,23 @@ import (
 // httpf transport after the host and proxy have composed request cancellation.
 type integrationContextKey struct{}
 
-// integrationConnection supplies resource metadata while delegating streaming
-// requests to the existing proxy instead of replacing its authentication flow.
-type integrationConnection struct {
-	*coremock.Connection
-	proxy iface.Proxy
-	calls atomic.Int32
+// integrationClient captures request attribution while delegating to the real
+// proxy, keeping authentication and transport behavior in the integration path.
+type integrationClient struct {
+	connection  *coremock.Connection
+	proxy       iface.Proxy
+	requestType httpf.RequestType
+	labels      map[string]string
+	calls       atomic.Int32
 }
 
-// ProxyRequestStream counts logical host handoffs; retries remain inside proxy.
-func (c *integrationConnection) ProxyRequestStream(ctx context.Context, kind httpf.RequestType, request *iface.RawProxyRequest) (*http.Response, error) {
+// Do counts logical host handoffs; retries remain inside the production proxy.
+func (c *integrationClient) Do(request *http.Request) (*http.Response, error) {
 	c.calls.Add(1)
-	return c.proxy.ProxyRequestStream(ctx, kind, request)
+	return c.proxy.ProxyRequestStream(request.Context(), c.requestType, &iface.RawProxyRequest{
+		Outbound: request,
+		Labels:   maps.Clone(c.labels),
+	})
 }
 
 // integrationAuth exposes deterministic credential rotation without external
@@ -128,19 +133,27 @@ func (r integrationRoundTripper) RoundTrip(request *http.Request) (*http.Respons
 	return r.next.RoundTrip(request)
 }
 
-// newIntegrationConnection uses the production factory and proxy while replacing
-// only persistent connection metadata and credential acquisition with fixtures.
-func newIntegrationConnection(auth *integrationAuth) (*integrationConnection, *integrationMiddleware) {
-	connection := &integrationConnection{Connection: &coremock.Connection{
+// newIntegrationClient configures a connection-scoped client using the production
+// factory and proxy, with fixtures for persistent metadata and credentials.
+func newIntegrationClient(auth *integrationAuth, options iface.HTTPClientOptions) (*integrationClient, *integrationMiddleware) {
+	connection := &coremock.Connection{
 		Id: apid.New(apid.PrefixConnection), Namespace: "root.product.owner",
 		ConnectorId: apid.New(apid.PrefixConnector), ConnectorGeneration: 7,
 		Labels: map[string]string{"connection-label": "captured"},
-	}}
+	}
 	middleware := &integrationMiddleware{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	factory := httpf.CreateFactory(nil, nil, middleware, logger)
-	connection.proxy = proxy.New(factory, connection, auth, nil)
-	return connection, middleware
+	requestType := options.RequestType
+	if requestType == "" {
+		requestType = httpf.RequestTypeProxy
+	}
+	return &integrationClient{
+		connection:  connection,
+		proxy:       proxy.New(factory, connection, auth, nil),
+		requestType: requestType,
+		labels:      maps.Clone(options.Labels),
+	}, middleware
 }
 
 // integrationLimits keeps deadlines bounded and leaves room for real HTTP headers.
@@ -182,13 +195,15 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			}))
 			t.Cleanup(server.Close)
 
-			// One captured connection and one logical request permit the proxy's
-			// existing credential-recovery replay, even for a replayable POST.
+			// A client configured for one connection permits the proxy's existing
+			// credential-recovery replay within one logical request, even for POST.
 			auth := &integrationAuth{}
-			connection, transport := newIntegrationConnection(auth)
 			labels := map[string]string{"tool-label": "captured"}
+			client, transport := newIntegrationClient(auth, iface.HTTPClientOptions{
+				RequestType: httpf.RequestTypeProxy, Labels: labels,
+			})
 			ctx := context.WithValue(context.Background(), integrationContextKey{}, "admitted")
-			session, err := httphost.New(ctx, connection, integrationLimits(), labels)
+			session, err := httphost.New(ctx, client, integrationLimits())
 			require.NoError(t, err)
 			t.Cleanup(session.Close)
 			labels["tool-label"] = "changed after capture"
@@ -224,7 +239,7 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			require.Equal(t, int32(2), auth.resolves.Load())
 			require.Equal(t, int32(1), auth.recoveries.Load())
 			require.Equal(t, "v1", auth.rejected.Load())
-			require.Equal(t, int32(1), connection.calls.Load())
+			require.Equal(t, int32(1), client.calls.Load())
 			require.Equal(t, originalURL, request.URL.String())
 			require.Equal(t, originalHeaders, request.Header)
 			require.Equal(t, "tenant.example.test", request.Host)
@@ -237,8 +252,8 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			require.True(t, ok)
 			for _, attempt := range observed {
 				require.Equal(t, httpf.RequestTypeProxy, attempt.info.Type)
-				require.Equal(t, connection.GetId(), attempt.info.ConnectionId)
-				require.Equal(t, connection.GetConnectorId(), attempt.info.ConnectorId)
+				require.Equal(t, client.connection.GetId(), attempt.info.ConnectionId)
+				require.Equal(t, client.connection.GetConnectorId(), attempt.info.ConnectorId)
 				require.Equal(t, uint64(7), attempt.info.ConnectorGeneration)
 				require.Equal(t, "captured", attempt.info.Labels["tool-label"])
 				require.Equal(t, "captured", attempt.info.Labels["connection-label"])
@@ -253,7 +268,7 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			response, err = session.Do(next)
 			require.ErrorIs(t, err, httphost.ErrRequestLimit)
 			require.Nil(t, response)
-			require.Equal(t, int32(1), connection.calls.Load())
+			require.Equal(t, int32(1), client.calls.Load())
 			require.Equal(t, int32(2), attempts.Load())
 		})
 	}
@@ -289,13 +304,13 @@ func TestSessionIntegrationGzipStreams(t *testing.T) {
 				}))
 				t.Cleanup(server.Close)
 				t.Cleanup(unblock)
-				connection, _ := newIntegrationConnection(&integrationAuth{})
+				client, _ := newIntegrationClient(&integrationAuth{}, iface.HTTPClientOptions{})
 				limits := integrationLimits()
 				limits.MaxResponseBytes = int64(len(payload))
 				if tooLarge {
 					limits.MaxResponseBytes--
 				}
-				session, err := httphost.New(context.Background(), connection, limits, nil)
+				session, err := httphost.New(context.Background(), client, limits)
 				require.NoError(t, err)
 				t.Cleanup(session.Close)
 				request, err := http.NewRequest(http.MethodGet, server.URL, nil)
@@ -366,8 +381,8 @@ func TestSessionIntegrationBodylessEncodedResponses(t *testing.T) {
 				w.WriteHeader(tc.status)
 			}))
 			t.Cleanup(server.Close)
-			connection, _ := newIntegrationConnection(&integrationAuth{})
-			session, err := httphost.New(context.Background(), connection, integrationLimits(), nil)
+			client, _ := newIntegrationClient(&integrationAuth{}, iface.HTTPClientOptions{})
+			session, err := httphost.New(context.Background(), client, integrationLimits())
 			require.NoError(t, err)
 			t.Cleanup(session.Close)
 			request, err := http.NewRequest(tc.method, server.URL, nil)
@@ -406,8 +421,8 @@ func TestSessionIntegrationContentTypeSurvivesHeaderFiltering(t *testing.T) {
 		_, _ = io.WriteString(w, payload)
 	}))
 	t.Cleanup(server.Close)
-	connection, _ := newIntegrationConnection(&integrationAuth{})
-	session, err := httphost.New(context.Background(), connection, integrationLimits(), nil)
+	client, _ := newIntegrationClient(&integrationAuth{}, iface.HTTPClientOptions{})
+	session, err := httphost.New(context.Background(), client, integrationLimits())
 	require.NoError(t, err)
 	t.Cleanup(session.Close)
 	request, err := http.NewRequest(http.MethodGet, server.URL, nil)
@@ -435,7 +450,7 @@ func TestSessionIntegrationContentTypeSurvivesHeaderFiltering(t *testing.T) {
 		Headers: response.Header, Body: body,
 		ToolID: apid.New(apid.PrefixTool).String(), Revision: 1,
 		InvocationID:   apid.New(apid.PrefixToolInvocation).String(),
-		Metadata:       api.ToolResultMetadata{ConnectionID: connection.GetId().String()},
+		Metadata:       api.ToolResultMetadata{ConnectionID: client.connection.GetId().String()},
 		ExecutionState: session.ExecutionState(),
 	})
 	require.NoError(t, err)

@@ -13,22 +13,20 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/stretchr/testify/require"
 )
 
-// sessionTestConnection exposes only the captured connection's streaming proxy;
-// any accidental use of another connection capability fails the test.
-type sessionTestConnection struct {
-	iface.Connection
-	proxy func(context.Context, httpf.RequestType, *iface.RawProxyRequest) (*http.Response, error)
+// sessionTestClient exposes the narrow HTTP client capability supplied to an
+// invocation, without coupling session tests to a client's proxy internals.
+type sessionTestClient struct {
+	do func(*http.Request) (*http.Response, error)
 }
 
-// ProxyRequestStream delegates to the scenario's observed transport behavior.
-func (c *sessionTestConnection) ProxyRequestStream(ctx context.Context, kind httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
-	return c.proxy(ctx, kind, req)
+// Do delegates to the scenario's observed client behavior.
+func (c *sessionTestClient) Do(req *http.Request) (*http.Response, error) {
+	return c.do(req)
 }
 
 // sessionTestLimits leaves room for ordinary responses while bounding every policy.
@@ -37,9 +35,9 @@ func sessionTestLimits() httphost.Limits {
 }
 
 // sessionTestNew constructs an invocation and guarantees its timer is released.
-func sessionTestNew(t *testing.T, ctx context.Context, connection iface.Connection, limits httphost.Limits) *httphost.Session {
+func sessionTestNew(t *testing.T, ctx context.Context, client iface.HTTPClient, limits httphost.Limits) *httphost.Session {
 	t.Helper()
-	session, err := httphost.New(ctx, connection, limits, nil)
+	session, err := httphost.New(ctx, client, limits)
 	require.NoError(t, err)
 	t.Cleanup(session.Close)
 	return session
@@ -96,7 +94,7 @@ func sessionTestWait(t *testing.T, done <-chan struct{}, cleanup func()) {
 // TestSessionConstructor requires a complete positive policy before creating an
 // invocation and keeps caller cancellation distinct from invalid arguments.
 func TestSessionConstructor(t *testing.T) {
-	connection := &sessionTestConnection{}
+	client := &sessionTestClient{}
 	for _, test := range []struct {
 		name   string
 		change func(*httphost.Limits)
@@ -112,23 +110,23 @@ func TestSessionConstructor(t *testing.T) {
 			// A zero or negative value cannot silently disable a guard.
 			limits := sessionTestLimits()
 			test.change(&limits)
-			session, err := httphost.New(context.Background(), connection, limits, nil)
+			session, err := httphost.New(context.Background(), client, limits)
 			require.ErrorIs(t, err, httphost.ErrInvalidInput)
 			require.Nil(t, session)
 		})
 	}
-	_, err := httphost.New(nil, connection, sessionTestLimits(), nil)
+	_, err := httphost.New(nil, client, sessionTestLimits())
 	require.ErrorIs(t, err, httphost.ErrInvalidInput)
-	_, err = httphost.New(context.Background(), nil, sessionTestLimits(), nil)
+	_, err = httphost.New(context.Background(), nil, sessionTestLimits())
 	require.ErrorIs(t, err, httphost.ErrInvalidInput)
 
 	// No work starts when the admitted caller was already canceled.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	session, err := httphost.New(ctx, connection, sessionTestLimits(), nil)
+	session, err := httphost.New(ctx, client, sessionTestLimits())
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, session)
-	session = sessionTestNew(t, context.Background(), connection, sessionTestLimits())
+	session = sessionTestNew(t, context.Background(), client, sessionTestLimits())
 	require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
 	require.NoError(t, session.Context().Err())
 	require.NoError(t, session.Err())
@@ -140,14 +138,14 @@ func TestSessionConstructor(t *testing.T) {
 // before proxy handoff and before consuming the invocation's request allowance.
 func TestSessionLocalRejectionOwnsRequestBody(t *testing.T) {
 	var calls atomic.Int32
-	connection := &sessionTestConnection{proxy: func(_ context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+	client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
 		calls.Add(1)
-		_ = req.Outbound.Body.Close()
+		_ = req.Body.Close()
 		return sessionTestResponse(), nil
 	}}
 	limits := sessionTestLimits()
 	limits.MaxRequests = 1
-	session := sessionTestNew(t, context.Background(), connection, limits)
+	session := sessionTestNew(t, context.Background(), client, limits)
 	for _, test := range []struct {
 		name   string
 		change func(*http.Request)
@@ -196,7 +194,7 @@ func TestSessionLocalRejectionOwnsRequestBody(t *testing.T) {
 }
 
 // TestSessionUnusableSessionOwnsRequestBody extends entry ownership to nil,
-// zero-valued, and already closed sessions without invoking the connection.
+// zero-valued, and already closed sessions without invoking the client.
 func TestSessionUnusableSessionOwnsRequestBody(t *testing.T) {
 	for _, session := range []*httphost.Session{nil, {}} {
 		request, body := sessionTestRequest(context.Background())
@@ -205,8 +203,8 @@ func TestSessionUnusableSessionOwnsRequestBody(t *testing.T) {
 		require.Nil(t, response)
 		require.EqualValues(t, 1, body.closes.Load())
 	}
-	connection := &sessionTestConnection{}
-	session := sessionTestNew(t, context.Background(), connection, sessionTestLimits())
+	client := &sessionTestClient{}
+	session := sessionTestNew(t, context.Background(), client, sessionTestLimits())
 	session.Close()
 	session.Close()
 	require.ErrorIs(t, session.Err(), httphost.ErrClosed)
@@ -221,29 +219,26 @@ func TestSessionUnusableSessionOwnsRequestBody(t *testing.T) {
 // sessionTestIdentityKey distinguishes admitted identity from request-local values.
 type sessionTestIdentityKey struct{}
 
-// TestSessionProxyContract preserves proxy features and detached label snapshots
-// while the explicit proxy context retains the admitted caller's identity.
-func TestSessionProxyContract(t *testing.T) {
+// TestSessionClientContract preserves request features while the HTTP client
+// receives the admitted caller's identity through the effective request context.
+func TestSessionClientContract(t *testing.T) {
 	parent := context.WithValue(context.Background(), sessionTestIdentityKey{}, "admitted identity")
 	requestCtx := context.WithValue(context.Background(), sessionTestIdentityKey{}, "request identity")
-	labels := map[string]string{"project": "captured"}
 	var calls, replays int
 	var responseBodies []*sessionTestBody
-	connection := &sessionTestConnection{proxy: func(ctx context.Context, kind httpf.RequestType, raw *iface.RawProxyRequest) (*http.Response, error) {
+	client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+		ctx := req.Context()
 		calls++
-		require.Equal(t, httpf.RequestTypeProxy, kind)
 		require.Equal(t, "admitted identity", ctx.Value(sessionTestIdentityKey{}))
-		require.Equal(t, "https://provider.example/items", raw.Outbound.URL.String())
-		require.Equal(t, "tenant.provider.example", raw.Outbound.Host)
-		require.Equal(t, http.MethodPost, raw.Outbound.Method)
-		require.Equal(t, []string{"first", "second"}, raw.Outbound.Header["X-Custom"])
-		require.Equal(t, map[string]string{"project": "captured"}, raw.Labels)
-		raw.Labels["project"] = "proxy mutation"
-		payload, err := io.ReadAll(raw.Outbound.Body)
+		require.Equal(t, "https://provider.example/items", req.URL.String())
+		require.Equal(t, "tenant.provider.example", req.Host)
+		require.Equal(t, http.MethodPost, req.Method)
+		require.Equal(t, []string{"first", "second"}, req.Header["X-Custom"])
+		payload, err := io.ReadAll(req.Body)
 		require.NoError(t, err)
 		require.Equal(t, "request payload", string(payload))
-		require.NoError(t, raw.Outbound.Body.Close())
-		replay, err := raw.Outbound.GetBody()
+		require.NoError(t, req.Body.Close())
+		replay, err := req.GetBody()
 		require.NoError(t, err)
 		payload, err = io.ReadAll(replay)
 		require.NoError(t, err)
@@ -253,13 +248,12 @@ func TestSessionProxyContract(t *testing.T) {
 		responseBodies = append(responseBodies, body)
 		return &http.Response{StatusCode: 201, Header: http.Header{"X-Upstream": {"first", "second"}}, Body: body}, nil
 	}}
-	session, err := httphost.New(parent, connection, sessionTestLimits(), labels)
+	session, err := httphost.New(parent, client, sessionTestLimits())
 	require.NoError(t, err)
 	t.Cleanup(session.Close)
-	labels["project"] = "caller mutation"
 	require.Equal(t, "admitted identity", session.Context().Value(sessionTestIdentityKey{}))
 
-	// Each call gets its own labels, and replay remains the proxy's capability.
+	// Each request retains its headers, host override, and replay capability.
 	for range 2 {
 		request, body := sessionTestRequest(requestCtx)
 		request.Host = "tenant.provider.example"
@@ -285,9 +279,9 @@ func TestSessionProxyContract(t *testing.T) {
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
 }
 
-// TestSessionProxyDeadlinePrecedence exposes the earliest effective deadline to
+// TestSessionClientDeadlinePrecedence exposes the earliest effective deadline to
 // transport helpers without allowing request-local values to replace identity.
-func TestSessionProxyDeadlinePrecedence(t *testing.T) {
+func TestSessionClientDeadlinePrecedence(t *testing.T) {
 	for _, test := range []struct {
 		name           string
 		requestTimeout time.Duration
@@ -307,17 +301,18 @@ func TestSessionProxyDeadlinePrecedence(t *testing.T) {
 			requestDeadline, ok := requestCtx.Deadline()
 			require.True(t, ok)
 			var wantDeadline time.Time
-			connection := &sessionTestConnection{proxy: func(ctx context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+				ctx := req.Context()
 				deadline, ok := ctx.Deadline()
 				require.True(t, ok)
 				require.Equal(t, wantDeadline, deadline)
 				require.Equal(t, "admitted identity", ctx.Value(sessionTestIdentityKey{}))
-				_ = req.Outbound.Body.Close()
+				_ = req.Body.Close()
 				return sessionTestResponse(), nil
 			}}
 			limits := sessionTestLimits()
 			limits.Timeout = 2 * time.Minute
-			session := sessionTestNew(t, parent, connection, limits)
+			session := sessionTestNew(t, parent, client, limits)
 			sessionDeadline, ok := session.Context().Deadline()
 			require.True(t, ok)
 			wantDeadline = sessionDeadline
@@ -344,14 +339,14 @@ func TestSessionProxyDeadlinePrecedence(t *testing.T) {
 func TestSessionTransportFailureConsumesCall(t *testing.T) {
 	var calls atomic.Int32
 	upstreamBody := &sessionTestBody{reader: strings.NewReader("private-upstream-body")}
-	connection := &sessionTestConnection{proxy: func(_ context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+	client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
 		calls.Add(1)
-		_ = req.Outbound.Body.Close()
+		_ = req.Body.Close()
 		return &http.Response{StatusCode: 502, Body: upstreamBody}, errors.New("private-transport-url-and-credentials")
 	}}
 	limits := sessionTestLimits()
 	limits.MaxRequests = 1
-	session := sessionTestNew(t, context.Background(), connection, limits)
+	session := sessionTestNew(t, context.Background(), client, limits)
 	request, body := sessionTestRequest(context.Background())
 	response, err := session.Do(request)
 	require.ErrorIs(t, err, httphost.ErrTransport)
@@ -377,14 +372,14 @@ func TestSessionTransportFailureConsumesCall(t *testing.T) {
 func TestSessionStatusesDoNotTriggerHostRetries(t *testing.T) {
 	for _, status := range []int{401, 429, 503} {
 		var calls int
-		connection := &sessionTestConnection{proxy: func(_ context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+		client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
 			calls++
-			_ = req.Outbound.Body.Close()
+			_ = req.Body.Close()
 			response := sessionTestResponse()
 			response.StatusCode = status
 			return response, nil
 		}}
-		session := sessionTestNew(t, context.Background(), connection, sessionTestLimits())
+		session := sessionTestNew(t, context.Background(), client, sessionTestLimits())
 		request, _ := sessionTestRequest(context.Background())
 		response, err := session.Do(request)
 		require.NoError(t, err)
@@ -403,9 +398,10 @@ func TestSessionConcurrentRequestLimit(t *testing.T) {
 	var releaseOnce sync.Once
 	unblock := func() { releaseOnce.Do(func() { close(release) }) }
 	var calls atomic.Int32
-	connection := &sessionTestConnection{proxy: func(ctx context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+	client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+		ctx := req.Context()
 		calls.Add(1)
-		_ = req.Outbound.Body.Close()
+		_ = req.Body.Close()
 		entered <- struct{}{}
 		select {
 		case <-release:
@@ -416,7 +412,7 @@ func TestSessionConcurrentRequestLimit(t *testing.T) {
 	}}
 	limits := sessionTestLimits()
 	limits.MaxRequests = allowed
-	session := sessionTestNew(t, context.Background(), connection, limits)
+	session := sessionTestNew(t, context.Background(), client, limits)
 	t.Cleanup(unblock)
 	start := make(chan struct{})
 	results := make(chan error, attempts)
@@ -510,13 +506,14 @@ func TestSessionPendingRequestCancellation(t *testing.T) {
 				want = httphost.ErrClosed
 			}
 			entered := make(chan struct{})
-			connection := &sessionTestConnection{proxy: func(ctx context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
-				_ = req.Outbound.Body.Close()
+			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+				ctx := req.Context()
+				_ = req.Body.Close()
 				close(entered)
 				<-ctx.Done()
 				return nil, errors.New("private-transport-cancellation")
 			}}
-			session := sessionTestNew(t, parent, connection, limits)
+			session := sessionTestNew(t, parent, client, limits)
 			request, body := sessionTestRequest(requestCtx)
 			var response *httphost.Response
 			var err error
@@ -555,7 +552,7 @@ func TestSessionPendingRequestCancellation(t *testing.T) {
 func TestSessionTimeoutIncludesIdleTime(t *testing.T) {
 	limits := sessionTestLimits()
 	limits.Timeout = 100 * time.Millisecond
-	session := sessionTestNew(t, context.Background(), &sessionTestConnection{}, limits)
+	session := sessionTestNew(t, context.Background(), &sessionTestClient{}, limits)
 
 	// Observe the actual policy deadline instead of sleeping for a guessed delay.
 	sessionTestWait(t, session.Context().Done(), session.Close)
@@ -602,11 +599,11 @@ func TestSessionCancellationClosesActiveResponse(t *testing.T) {
 			t.Cleanup(cancelParent)
 			t.Cleanup(cancelRequest)
 			body := &sessionTestBlockingBody{entered: make(chan struct{}), closed: make(chan struct{})}
-			connection := &sessionTestConnection{proxy: func(_ context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
-				_ = req.Outbound.Body.Close()
+			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+				_ = req.Body.Close()
 				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: body}, nil
 			}}
-			session := sessionTestNew(t, parent, connection, sessionTestLimits())
+			session := sessionTestNew(t, parent, client, sessionTestLimits())
 			request, _ := sessionTestRequest(requestCtx)
 			response, err := session.Do(request)
 			require.NoError(t, err)
@@ -645,9 +642,10 @@ func TestSessionCancellationClosesActiveResponse(t *testing.T) {
 func TestSessionRequestCancellationDoesNotPoisonInvocation(t *testing.T) {
 	var calls int
 	entered := make(chan struct{})
-	connection := &sessionTestConnection{proxy: func(ctx context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+	client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+		ctx := req.Context()
 		calls++
-		_ = req.Outbound.Body.Close()
+		_ = req.Body.Close()
 		if calls == 1 {
 			close(entered)
 			<-ctx.Done()
@@ -657,7 +655,7 @@ func TestSessionRequestCancellationDoesNotPoisonInvocation(t *testing.T) {
 	}}
 	limits := sessionTestLimits()
 	limits.MaxRequests = 2
-	session := sessionTestNew(t, context.Background(), connection, limits)
+	session := sessionTestNew(t, context.Background(), client, limits)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	request, _ := sessionTestRequest(ctx)
@@ -690,11 +688,11 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	pendingBody := &sessionTestBlockingBody{entered: make(chan struct{}), closed: make(chan struct{})}
 	overflowBody := &sessionTestBody{reader: strings.NewReader("abc")}
 	var calls atomic.Int32
-	connection := &sessionTestConnection{proxy: func(_ context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+	client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
 		calls.Add(1)
-		_ = req.Outbound.Body.Close()
+		_ = req.Body.Close()
 		var body io.ReadCloser
-		switch req.Outbound.URL.Path {
+		switch req.URL.Path {
 		case "/completed":
 			body = completedBody
 		case "/pending":
@@ -708,7 +706,7 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	}}
 	limits := sessionTestLimits()
 	limits.MaxResponseBytes = 4
-	session := sessionTestNew(t, context.Background(), connection, limits)
+	session := sessionTestNew(t, context.Background(), client, limits)
 
 	// A fully consumed result uses two bytes and remains caller-owned data.
 	request, _ := sessionTestRequest(context.Background())
