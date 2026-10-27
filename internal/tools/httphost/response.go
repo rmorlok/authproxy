@@ -19,9 +19,11 @@ import (
 type Response struct {
 	// StatusCode is the validated upstream status, including unsuccessful ones.
 	StatusCode int
+
 	// Header is a detached, canonicalized map owned by the caller. Known
 	// authentication, cookie, and hop-by-hop fields are removed before exposure.
 	Header http.Header
+
 	// Body is read lazily and must be closed, including when discarding a status.
 	Body io.ReadCloser
 }
@@ -34,28 +36,47 @@ const responseReadSize = 32 * 1024
 // prepareResponse assumes ownership of raw.Body and cleanup on every path. It
 // validates/copies headers without reading content, so status rules can discard
 // a response without initializing gzip or otherwise decoding an error body.
-func (s *Session) prepareResponse(ctx context.Context, raw *http.Response, method string, cleanup func()) (*Response, error) {
-	body := &responseBody{session: s, ctx: ctx, cleanup: cleanup}
+func (s *Session) prepareResponse(
+	ctx context.Context,
+	raw *http.Response,
+	method string,
+	cleanup func(),
+) (*Response, error) {
+	body := &responseBody{
+		session: s,
+		ctx:     ctx,
+		cleanup: cleanup,
+	}
+
 	if raw != nil {
 		body.raw = raw.Body
 	}
+
 	if err := s.contextError(ctx); err != nil {
 		_ = body.Close()
 		return nil, err
 	}
-	if raw == nil || raw.Body == nil || raw.StatusCode < 100 || raw.StatusCode > 599 {
+	if raw == nil ||
+		raw.Body == nil ||
+		raw.StatusCode < 100 ||
+		raw.StatusCode > 599 {
 		_ = body.Close()
 		return nil, ErrInvalidResponse
 	}
+
 	headers, err := copyResponseHeaders(raw.Header, s.limits.MaxHeaderBytes)
 	if err != nil {
 		_ = body.Close()
 		return nil, err
 	}
+
 	// HEAD and statuses that forbid a message body retain representation
 	// metadata without treating it as instructions to decode a missing payload.
-	bodyless := method == http.MethodHead || raw.StatusCode < 200 ||
-		raw.StatusCode == http.StatusNoContent || raw.StatusCode == http.StatusNotModified
+	bodyless := method == http.MethodHead ||
+		raw.StatusCode < 200 ||
+		raw.StatusCode == http.StatusNoContent ||
+		raw.StatusCode == http.StatusNotModified
+
 	if bodyless {
 		body.reader = http.NoBody
 	} else if !raw.Uncompressed {
@@ -66,25 +87,38 @@ func (s *Session) prepareResponse(ctx context.Context, raw *http.Response, metho
 			body.encoding = strings.ToLower(strings.TrimSpace(encodings[0]))
 		}
 	}
+
 	if body.encoding == "gzip" {
 		// These fields describe the encoded stream, not the bytes callers read.
 		headers.Del("Content-Encoding")
 		headers.Del("Content-Length")
 	}
+
 	// Capture decoding instructions first: a Connection nomination can remove
 	// Content-Encoding from the exposed map without changing the actual stream.
 	filterResponseHeaders(headers)
-	body.stream = &responseStream{raw: raw.Body, remaining: s.limits.MaxStreamBytes}
+
+	body.stream = &responseStream{
+		raw:       raw.Body,
+		remaining: s.limits.MaxStreamBytes,
+	}
+
 	// Synchronize installing the stop function with an immediately scheduled
 	// cancellation callback; Close never needs the read mutex to unblock I/O.
 	body.cancelMu.Lock()
 	body.stopCancel = context.AfterFunc(ctx, func() { _ = body.Close() })
 	body.cancelMu.Unlock()
+
 	if err := s.contextError(ctx); err != nil {
 		_ = body.Close()
 		return nil, err
 	}
-	return &Response{StatusCode: raw.StatusCode, Header: headers, Body: body}, nil
+
+	return &Response{
+		StatusCode: raw.StatusCode,
+		Header:     headers,
+		Body:       body,
+	}, nil
 }
 
 // copyResponseHeaders validates and detaches metadata before exposing it.
@@ -95,14 +129,17 @@ func copyResponseHeaders(source http.Header, maxBytes int) (http.Header, error) 
 	if len(source) > remaining/5 {
 		return nil, ErrHeaderLimit
 	}
+
 	headers := make(http.Header, len(source))
 	for name, values := range source {
 		if len(name) > remaining || remaining-len(name) < 4 {
 			return nil, ErrHeaderLimit
 		}
+
 		if !httpguts.ValidHeaderFieldName(name) {
 			return nil, ErrInvalidResponse
 		}
+
 		lineBytes := len(name) + 4
 		if len(values) == 0 {
 			remaining -= lineBytes
@@ -111,19 +148,23 @@ func copyResponseHeaders(source http.Header, maxBytes int) (http.Header, error) 
 			if len(values) > remaining/lineBytes {
 				return nil, ErrHeaderLimit
 			}
+
 			for _, value := range values {
 				if remaining < lineBytes || len(value) > remaining-lineBytes {
 					return nil, ErrHeaderLimit
 				}
+
 				remaining -= lineBytes + len(value)
 				if !httpguts.ValidHeaderFieldValue(value) {
 					return nil, ErrInvalidResponse
 				}
 			}
 		}
+
 		name = http.CanonicalHeaderKey(name)
 		headers[name] = append(headers[name], values...)
 	}
+
 	return headers, nil
 }
 
@@ -141,12 +182,25 @@ func filterResponseHeaders(headers http.Header) {
 			}
 		}
 	}
+
 	for _, name := range []string{
-		"Authorization", "Cookie", "Set-Cookie", "Set-Cookie2",
-		"Www-Authenticate", "Authentication-Info", "Proxy-Authentication-Info",
-		"Connection", "Proxy-Connection", "Keep-Alive",
-		"Proxy-Authenticate", "Proxy-Authorization", "Te", "Trailer", "Trailers",
-		"Transfer-Encoding", "Upgrade",
+		"Authorization",
+		"Cookie",
+		"Set-Cookie",
+		"Set-Cookie2",
+		"Www-Authenticate",
+		"Authentication-Info",
+		"Proxy-Authentication-Info",
+		"Connection",
+		"Proxy-Connection",
+		"Keep-Alive",
+		"Proxy-Authenticate",
+		"Proxy-Authorization",
+		"Te",
+		"Trailer",
+		"Trailers",
+		"Transfer-Encoding",
+		"Upgrade",
 	} {
 		headers.Del(name)
 	}
@@ -158,30 +212,41 @@ func filterResponseHeaders(headers http.Header) {
 type responseBody struct {
 	// session supplies shared decoded-byte accounting and safe context errors.
 	session *Session
+
 	// ctx is the request's invocation-derived cancellation scope.
 	ctx context.Context
+
 	// raw is closed exactly once; stream bounds bytes before host decoding.
 	raw    io.ReadCloser
 	stream *responseStream
+
 	// encoding is captured before returned headers can be changed by the caller.
 	encoding string
+
 	// readMu protects reader initialization and the terminal outcome.
 	readMu sync.Mutex
+
 	// reader is initialized on first nonempty Read, except bodyless responses
 	// use http.NoBody immediately. Status-only callers never initialize gzip.
 	reader io.Reader
+
 	// terminal retains EOF or a safe failure after the underlying stream closes.
 	terminal error
+
 	// closed can be observed without blocking an in-progress Read.
 	closed atomic.Bool
+
 	// explicitlyClosed distinguishes caller Close from a cancellation callback;
 	// request cleanup's own cancellation must not obscure an explicit Close.
 	explicitlyClosed atomic.Bool
+
 	// closeOnce owns raw.Close and cleanup; closeErr is published by sync.Once.
 	closeOnce sync.Once
 	closeErr  error
+
 	// cleanup releases request-context resources exactly once, after raw.Close.
 	cleanup func()
+
 	// cancelMu protects installation of the cancellation callback's stop handle.
 	cancelMu   sync.Mutex
 	stopCancel func() bool
@@ -193,6 +258,7 @@ type responseBody struct {
 func (b *responseBody) Read(p []byte) (int, error) {
 	b.readMu.Lock()
 	defer b.readMu.Unlock()
+
 	if b.terminal != nil {
 		return 0, b.terminal
 	}
@@ -208,6 +274,7 @@ func (b *responseBody) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+
 	if b.reader == nil {
 		switch b.encoding {
 		case "", "identity":
@@ -222,37 +289,47 @@ func (b *responseBody) Read(p []byte) (int, error) {
 			return b.finish(ErrEncoding)
 		}
 	}
+
 	size := min(len(p), responseReadSize)
+
 	if remaining := b.session.remainingResponse(); remaining < int64(size) {
 		size = max(int(remaining), 1)
 	}
+
 	var scratch [responseReadSize]byte
 	n, err := b.reader.Read(scratch[:size])
 	if n < 0 || n > size {
 		return b.finish(ErrTransport)
 	}
+
 	// Charge consumed decoded bytes even if their accompanying error means the
 	// caller cannot use this chunk. No partial response refunds the invocation.
 	chargeErr := b.session.chargeResponse(n)
 	if b.explicitlyClosed.Load() {
 		return b.finish(ErrClosed)
 	}
+
 	if contextErr := b.session.contextError(b.ctx); contextErr != nil {
 		return b.finish(contextErr)
 	}
+
 	if chargeErr != nil {
 		return b.finish(chargeErr)
 	}
 	if b.closed.Load() {
 		return b.finish(ErrClosed)
 	}
+
 	if err != nil && err != io.EOF {
 		return b.finish(b.readError(err))
 	}
+
 	copy(p, scratch[:n])
+
 	if err == io.EOF {
 		_, _ = b.finish(io.EOF)
 	}
+
 	return n, err
 }
 
@@ -262,15 +339,19 @@ func (b *responseBody) readError(err error) error {
 	if b.explicitlyClosed.Load() {
 		return ErrClosed
 	}
+
 	if contextErr := b.session.contextError(b.ctx); contextErr != nil {
 		return contextErr
 	}
+
 	if errors.Is(err, ErrStreamLimit) {
 		return ErrStreamLimit
 	}
+
 	if errors.Is(err, ErrTransport) {
 		return ErrTransport
 	}
+
 	return ErrEncoding
 }
 
@@ -289,21 +370,25 @@ func (b *responseBody) Close() error {
 		if b.session.contextError(b.ctx) == nil {
 			b.explicitlyClosed.Store(true)
 		}
+
 		b.closed.Store(true)
 		b.cancelMu.Lock()
 		if b.stopCancel != nil {
 			b.stopCancel()
 		}
 		b.cancelMu.Unlock()
+
 		if b.raw != nil {
 			if err := b.raw.Close(); err != nil {
 				b.closeErr = ErrTransport
 			}
 		}
+
 		if b.cleanup != nil {
 			b.cleanup()
 		}
 	})
+
 	return b.closeErr
 }
 
@@ -313,6 +398,7 @@ func (b *responseBody) Close() error {
 type responseStream struct {
 	// raw is the original transport body, which responseBody exclusively closes.
 	raw io.Reader
+
 	// remaining counts bytes available before host decoding; zero permits only
 	// a one-byte EOF probe, never additional data passed to the decoder.
 	remaining int64
@@ -324,6 +410,7 @@ func (s *responseStream) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
+
 	if s.remaining == 0 {
 		var probe [1]byte
 		n, err := s.raw.Read(probe[:])
@@ -335,17 +422,22 @@ func (s *responseStream) Read(p []byte) (int, error) {
 		}
 		return 0, err
 	}
+
 	size := min(len(p), responseReadSize)
 	if int64(size) > s.remaining {
 		size = int(s.remaining)
 	}
+
 	n, err := s.raw.Read(p[:size])
 	if n < 0 || n > size {
 		return 0, ErrTransport
 	}
+
 	s.remaining -= int64(n)
+
 	if err != nil && err != io.EOF {
 		return n, ErrTransport
 	}
+
 	return n, err
 }
