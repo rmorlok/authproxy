@@ -37,7 +37,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: authproxy
+                name: authproxy-public
                 port:
                   name: public
     - host: admin.demo.authproxy.net
@@ -47,7 +47,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: authproxy
+                name: authproxy-admin-api
                 port:
                   name: admin-api
 ---

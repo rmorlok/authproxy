@@ -1,0 +1,50 @@
+# API service: the application-facing API and the authenticating proxy hot path.
+#
+# Instantiates the shared AuthProxy workload template as a single-service
+# Deployment so it can be scaled and resource-limited on its own. Resource
+# requests/limits live in ../../resource-limits.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../../../workload/authproxy
+
+nameSuffix: -api
+
+# Replaces the template's "authproxy" component in labels and selectors so each
+# service's Deployment and Service select only their own pods.
+labels:
+  - pairs:
+      app.kubernetes.io/component: api
+    includeSelectors: true
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/args
+        value:
+          - serve
+          - --config=/etc/authproxy/config.yaml
+          - api
+      - op: replace
+        path: /spec/template/spec/containers/0/ports
+        value:
+          - name: api
+            containerPort: 8081
+      - op: replace
+        path: /spec/template/spec/containers/0/livenessProbe/httpGet/port
+        value: api
+      - op: replace
+        path: /spec/template/spec/containers/0/readinessProbe/httpGet/port
+        value: api
+  - target:
+      kind: Service
+    patch: |-
+      - op: replace
+        path: /spec/ports
+        value:
+          - name: api
+            port: 8081
+            targetPort: api

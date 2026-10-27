@@ -248,13 +248,14 @@ storage profile than the persistent demo environment. `Deploy Dev`
 applies `deploy/kustomize/authproxy-demo/overlays/dev`; the regular
 `Deploy Demo` workflow applies `deploy/kustomize/authproxy-demo/overlays/demo`.
 
-| Environment | Main DB | Session/task/rate-limit store | Blob storage | Backing workloads |
-|---|---|---|---|---|
-| `demo.authproxy.net` | Postgres | Redis | SeaweedFS | AuthProxy, demo shell, go-oauth2-server, Postgres, Redis, SeaweedFS, optional Grafana, and manual seed Jobs |
-| per-branch dev | SQLite under `/tmp` in the AuthProxy pod | in-process `miniredis` | filesystem under `/tmp/authproxy-blobs` in the AuthProxy pod | AuthProxy, demo shell, seed Job, go-oauth2-server, and optional Grafana |
+| Environment | Main DB | App metrics | Session/task/rate-limit store | Blob storage | Backing workloads |
+|---|---|---|---|---|---|
+| `demo.authproxy.net` | Postgres | ClickHouse | Redis | SeaweedFS | AuthProxy (separate public, api, admin-api, and worker Deployments), demo shell, go-oauth2-server, Postgres, ClickHouse, Redis, SeaweedFS, optional Grafana, and manual seed Jobs |
+| per-branch dev | SQLite under `/tmp` in the AuthProxy pod | SQLite under `/tmp` in the AuthProxy pod | in-process `miniredis` | filesystem under `/tmp/authproxy-blobs` in the AuthProxy pod | AuthProxy (single all-in-one pod), demo shell, seed Job, go-oauth2-server, and optional Grafana |
 
-This cuts the required stateful backing containers from three to zero
-for PR environments: no Postgres, Redis, or SeaweedFS pods are rendered. The
+This cuts the required stateful backing containers from four to zero
+for PR environments: no Postgres, ClickHouse, Redis, or SeaweedFS pods are
+rendered. The
 tradeoff is durability. A pod restart, reschedule, or redeploy can lose
 SQLite data, miniredis state, queue/session/OAuth round-trip state, and
 filesystem blobs. That is acceptable for PR demos because the next

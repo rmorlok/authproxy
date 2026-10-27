@@ -15,7 +15,8 @@ name: Deploy Demo
 #   - EKS cluster up and bootstrap chart installed.
 #   - `demo` namespace secrets exist: demo-jwt, demo-encryption,
 #     demo-demo-shell-key, demo-actors, demo-db, and demo-redis-creds.
-#     The workflow generates and preserves demo-seaweedfs-creds itself.
+#     The workflow generates and preserves demo-seaweedfs-creds and
+#     demo-clickhouse-creds itself.
 #   - Repo secret AWS_ROLE_ARN.
 #   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
 #   - Optional: repo variable DEMO_GRAFANA_ADMIN_USER and repo secret
@@ -335,6 +336,24 @@ jobs:
             --dry-run=client -o yaml \
             | kubectl apply -f -
 
+      - name: Provision ClickHouse credentials
+        run: |
+          set -euo pipefail
+
+          # ClickHouse holds the demo's app metrics. Its entrypoint creates the
+          # `authproxy` user from CLICKHOUSE_PASSWORD on first start, and
+          # AuthProxy reads the same key, so generate it once and keep it.
+          secret="${RELEASE_NAME}-clickhouse-creds"
+          if kubectl -n "${RELEASE_NS}" get secret "${secret}" >/dev/null 2>&1; then
+            echo "Reusing ${secret}"
+            exit 0
+          fi
+
+          kubectl -n "${RELEASE_NS}" create secret generic "${secret}" \
+            --from-literal=CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
       - name: Render Kustomize overlay
         id: render
         env:
@@ -375,6 +394,12 @@ jobs:
           grep -Fq "bucket: authproxy-request-logs" "${manifest}"
           grep -Fq -- "- -bucket=authproxy-request-logs" "${manifest}"
           grep -Fq "secretName: demo-seaweedfs-creds" "${manifest}"
+          grep -Fq "provider: clickhouse" "${manifest}"
+          grep -Fq -- "- demo-clickhouse:8123" "${manifest}"
+          grep -Fq "name: demo-clickhouse-creds" "${manifest}"
+          for service in public api admin-api worker; do
+            grep -Fq "name: ${RELEASE_NAME}-authproxy-${service}" "${manifest}"
+          done
           if grep -Fq "minio" "${manifest}"; then
             echo "Rendered demo manifest still references MinIO" >&2
             exit 1
@@ -393,11 +418,12 @@ jobs:
           kubectl -n "${RELEASE_NS}" delete job "${RELEASE_NAME}-authproxy-migrate" \
             --ignore-not-found --wait=true
 
-          # Keep the new AuthProxy workload and migration Job out of this
-          # apply. Existing AuthProxy pods continue running until the new
-          # schema has migrated successfully.
+          # Keep the new AuthProxy workloads and migration Job (everything
+          # labelled app.kubernetes.io/name=authproxy) out of this apply.
+          # Existing AuthProxy pods continue running until the new schema has
+          # migrated successfully.
           kubectl -n "${RELEASE_NS}" apply -f "${manifest}" \
-            -l 'app.kubernetes.io/component notin (authproxy,migration)'
+            -l 'app.kubernetes.io/name notin (authproxy)'
 
           deployments=(
             "${RELEASE_NAME}-demo-shell"
@@ -419,6 +445,7 @@ jobs:
             "${RELEASE_NAME}-postgresql" \
             "${RELEASE_NAME}-redis-master" \
             "${RELEASE_NAME}-seaweedfs" \
+            "${RELEASE_NAME}-clickhouse" \
             "${RELEASE_NAME}-otel-lgtm" \
           ; do
             echo "Waiting for $d..."
@@ -457,24 +484,65 @@ jobs:
           set -euo pipefail
           manifest="${{ steps.render.outputs.manifest }}"
 
+          # One Deployment per AuthProxy service (public, api, admin-api,
+          # worker) plus the Services in front of them.
           kubectl -n "${RELEASE_NS}" apply -f "${manifest}" \
-            -l 'app.kubernetes.io/component=authproxy'
-          kubectl -n "${RELEASE_NS}" patch "deployment/${RELEASE_NAME}-authproxy" \
-            --type merge \
-            -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
+            -l 'app.kubernetes.io/name=authproxy,app.kubernetes.io/component!=migration'
+          for service in public api admin-api worker; do
+            kubectl -n "${RELEASE_NS}" patch "deployment/${RELEASE_NAME}-authproxy-${service}" \
+              --type merge \
+              -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
+          done
 
       - name: Wait for workload rollouts
         timeout-minutes: 10
         run: |
           set -euo pipefail
           for d in \
-            "${RELEASE_NAME}-authproxy" \
+            "${RELEASE_NAME}-authproxy-public" \
+            "${RELEASE_NAME}-authproxy-api" \
+            "${RELEASE_NAME}-authproxy-admin-api" \
+            "${RELEASE_NAME}-authproxy-worker" \
             "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \
           ; do
             echo "Waiting for $d..."
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=10m
           done
+
+      - name: Remove legacy all-in-one AuthProxy workload
+        run: |
+          set -euo pipefail
+
+          # AuthProxy previously ran every service in a single
+          # `<env>-authproxy` Deployment behind one Service. The per-service
+          # Deployments are healthy at this point, and kubectl apply does not
+          # prune, so remove the old pair explicitly. Idempotent: later deploys
+          # find nothing to delete.
+          kubectl -n "${RELEASE_NS}" delete \
+            "deployment/${RELEASE_NAME}-authproxy" \
+            "service/${RELEASE_NAME}-authproxy" \
+            --ignore-not-found --wait=true --timeout=5m
+
+      - name: Drop legacy PostgreSQL app-metrics tables
+        run: |
+          set -euo pipefail
+
+          # App metrics previously lived in the main PostgreSQL database. They
+          # now live in ClickHouse and the old rows are intentionally not
+          # migrated, so once no AuthProxy pod is configured to write them,
+          # drop every app_metrics_* table (including the app-metrics
+          # migration bookkeeping table). Idempotent: later deploys find no
+          # matching tables. \gexec runs each generated DROP statement.
+          kubectl -n "${RELEASE_NS}" exec -i "deployment/${RELEASE_NAME}-postgresql" -- \
+            sh -c 'PGPASSWORD="${POSTGRESQL_PASSWORD}" psql -h 127.0.0.1 -U "${POSTGRESQL_USERNAME}" -d "${POSTGRESQL_DATABASE}" -v ON_ERROR_STOP=1 -f -' \
+            <<'SQL'
+          SELECT format('DROP TABLE IF EXISTS %I', tablename)
+          FROM pg_tables
+          WHERE schemaname = current_schema()
+            AND tablename LIKE 'app\_metrics\_%'
+          \gexec
+          SQL
 
       - name: Remove legacy MinIO blob storage
         run: |
@@ -536,7 +604,7 @@ jobs:
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${IMAGE_TAG}" "${manifest}"
           grep -Fq "name: RESOURCE_MANIFEST_PATH" "${manifest}"
           grep -Fq "resources.yaml: |" "${manifest}"
-          grep -Fq "value: http://${RELEASE_NAME}-authproxy:8082" "${manifest}"
+          grep -Fq "value: http://${RELEASE_NAME}-authproxy-admin-api:8082" "${manifest}"
           grep -Fq "namespace: root.demo" "${manifest}"
 
       - name: Apply demo resources and seed test provider
@@ -636,12 +704,16 @@ jobs:
           echo
           echo "## Deployments"
           for d in \
-            "${RELEASE_NAME}-authproxy" \
+            "${RELEASE_NAME}-authproxy-public" \
+            "${RELEASE_NAME}-authproxy-api" \
+            "${RELEASE_NAME}-authproxy-admin-api" \
+            "${RELEASE_NAME}-authproxy-worker" \
             "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \
             "${RELEASE_NAME}-postgresql" \
             "${RELEASE_NAME}-redis-master" \
             "${RELEASE_NAME}-seaweedfs" \
+            "${RELEASE_NAME}-clickhouse" \
             "${RELEASE_NAME}-grafana" \
             "${RELEASE_NAME}-otel-lgtm" \
           ; do
@@ -649,7 +721,7 @@ jobs:
             echo
           done
           echo "## Recent pod logs"
-          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm seaweedfs; do
+          for selector in authproxy demo-shell go-oauth2-server grafana otel-lgtm seaweedfs clickhouse; do
             kubectl -n "${RELEASE_NS}" logs \
               -l "app.kubernetes.io/name=${selector}" \
               --all-containers --tail=120

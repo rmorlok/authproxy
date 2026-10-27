@@ -159,18 +159,27 @@ jobs:
           kubectl kustomize deploy/kustomize/authproxy-demo/overlays/demo >"${demo_manifest}"
           kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev >"${dev_manifest}"
 
-          grep -q "name: demo-authproxy" "${demo_manifest}"
+          for service in public api admin-api worker; do
+            grep -q "name: demo-authproxy-${service}$" "${demo_manifest}"
+          done
+          # Only the shared ServiceAccount keeps the bare name; the all-in-one
+          # AuthProxy Deployment and Service must not come back.
+          if [ "$(grep -c "^  name: demo-authproxy$" "${demo_manifest}")" -ne 1 ]; then
+            echo "Kustomize demo render still includes the all-in-one AuthProxy workload" >&2
+            exit 1
+          fi
           grep -q "host: demo-postgresql" "${demo_manifest}"
           grep -q "address: demo-redis-master:6379" "${demo_manifest}"
           grep -q "secretName: demo-jwt" "${demo_manifest}"
           grep -q "name: demo-authproxy-migrate" "${demo_manifest}"
           grep -q "suspend: true" "${demo_manifest}"
-          test "$(grep -c '^kind: PersistentVolumeClaim$' "${demo_manifest}")" -eq 3
-          test "$(grep -c '^  storageClassName: gp3$' "${demo_manifest}")" -eq 3
-          test "$(grep -c '^    type: Recreate$' "${demo_manifest}")" -eq 3
+          test "$(grep -c '^kind: PersistentVolumeClaim$' "${demo_manifest}")" -eq 4
+          test "$(grep -c '^  storageClassName: gp3$' "${demo_manifest}")" -eq 4
+          test "$(grep -c '^    type: Recreate$' "${demo_manifest}")" -eq 4
           test "$(grep -c '^        fsGroup: 1001$' "${demo_manifest}")" -eq 2
-          test "$(grep -c '^        fsGroupChangePolicy: OnRootMismatch$' "${demo_manifest}")" -eq 2
-          for claim in demo-postgresql-data demo-redis-data demo-seaweedfs-data; do
+          test "$(grep -c '^        fsGroup: 101$' "${demo_manifest}")" -eq 1
+          test "$(grep -c '^        fsGroupChangePolicy: OnRootMismatch$' "${demo_manifest}")" -eq 3
+          for claim in demo-postgresql-data demo-redis-data demo-seaweedfs-data demo-clickhouse-data; do
             grep -q "name: ${claim}" "${demo_manifest}"
             grep -q "claimName: ${claim}" "${demo_manifest}"
           done
@@ -178,6 +187,8 @@ jobs:
           grep -q "mountPath: /bitnami/redis/data" "${demo_manifest}"
           grep -q "mountPath: /data" "${demo_manifest}"
           grep -q "endpoint: http://demo-seaweedfs:8333" "${demo_manifest}"
+          grep -q -- "- demo-clickhouse:8123" "${demo_manifest}"
+          grep -q "mountPath: /var/lib/clickhouse" "${demo_manifest}"
           if grep -q "minio" "${demo_manifest}"; then
             echo "Kustomize demo render still references MinIO" >&2
             exit 1

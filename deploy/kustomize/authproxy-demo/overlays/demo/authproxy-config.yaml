@@ -32,15 +32,17 @@ redis:
 hostApplication:
   initiateSessionUrl: https://demo.authproxy.net/
 appMetrics:
+  # Request events and resource samples live in ClickHouse (clickhouse.yaml)
+  # rather than the main Postgres database, so Postgres growth reflects core
+  # AuthProxy state only.
   database:
-    provider: postgres
-    host: demo-postgresql
-    port: 5432
+    provider: clickhouse
+    addresses:
+      - demo-clickhouse:8123
+    database: authproxy_app_metrics
     user: authproxy
-    database: authproxy
-    sslmode: disable
     password:
-      envVar: AUTHPROXY_DB_PASSWORD
+      envVar: CLICKHOUSE_PASSWORD
   blobStorage:
     provider: s3
     endpoint: http://demo-seaweedfs:8333

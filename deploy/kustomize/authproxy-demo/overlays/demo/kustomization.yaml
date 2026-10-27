@@ -6,6 +6,13 @@ namePrefix: demo-
 
 resources:
   - ../../base
+  # One Deployment per AuthProxy service so each can be scaled, limited, and
+  # observed independently.
+  - services/public
+  - services/api
+  - services/admin-api
+  - services/worker
+  - clickhouse.yaml
   - grafana.yaml
   - ingress.yaml
   - otel-lgtm.yaml
@@ -33,5 +40,11 @@ images:
     newTag: main
 
 patches:
+  # Applied to all four per-service AuthProxy Deployments.
   - path: authproxy-secrets.yaml
+    target:
+      kind: Deployment
+      labelSelector: app.kubernetes.io/name=authproxy
+  - path: authproxy-migrate-secrets.yaml
   - path: demo-shell-env.yaml
+  - path: resource-limits.yaml
