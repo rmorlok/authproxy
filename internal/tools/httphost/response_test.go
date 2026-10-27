@@ -69,7 +69,7 @@ func responseGzip(t *testing.T, payload string) []byte {
 }
 
 func TestResponseHeadersPrecedeBodyDecoding(t *testing.T) {
-	for _, encoding := range []string{"gzip", "br", "gzip, br", "identity"} {
+	for _, encoding := range []string{"gzip", "x-gzip", " \tX-GZiP\t ", "br", "gzip, br", "identity"} {
 		t.Run(encoding, func(t *testing.T) {
 			// Even invalid or unsupported error-body encoding must remain unread
 			// until the status policy decides whether content is needed.
@@ -179,7 +179,7 @@ func TestResponseFiltersAfterRawHeaderValidation(t *testing.T) {
 }
 
 func TestResponseCapturesEncodingBeforeHeaderFiltering(t *testing.T) {
-	for _, encoding := range []string{"gzip", "br"} {
+	for _, encoding := range []string{"gzip", "x-gzip", "br"} {
 		t.Run(encoding, func(t *testing.T) {
 			// Connection can nominate encoding metadata for removal, but the
 			// transport bytes still require that captured decoding policy.
@@ -204,7 +204,7 @@ func TestResponseCapturesEncodingBeforeHeaderFiltering(t *testing.T) {
 			// Gzip still decodes lazily; nominating unsupported coding cannot
 			// make the raw compressed stream appear to be an identity response.
 			actual, err := io.ReadAll(response.Body)
-			if encoding == "gzip" {
+			if encoding != "br" {
 				require.NoError(t, err)
 				require.Equal(t, "decoded payload", string(actual))
 				require.NotContains(t, response.Header, "Content-Length")
@@ -246,14 +246,56 @@ func TestResponseGzipAndTransportDecoding(t *testing.T) {
 	require.EqualValues(t, 1, body.closes.Load())
 
 	// A transport that already decoded the stream must never be decoded twice.
-	s = responseTestSession(t, 100, 100)
-	response, _ = responseTestPrepare(t, s, &http.Response{
-		StatusCode: 200, Uncompressed: true, Header: http.Header{"Content-Encoding": {"gzip"}},
-		Body: io.NopCloser(strings.NewReader("already decoded")),
-	})
-	actual, err = io.ReadAll(response.Body)
-	require.NoError(t, err)
-	require.Equal(t, "already decoded", string(actual))
+	for _, encoding := range []string{"gzip", "x-gzip"} {
+		s = responseTestSession(t, 100, 100)
+		response, _ = responseTestPrepare(t, s, &http.Response{
+			StatusCode: 200, Uncompressed: true, Header: http.Header{"Content-Encoding": {encoding}},
+			Body: io.NopCloser(strings.NewReader("already decoded")),
+		})
+		actual, err = io.ReadAll(response.Body)
+		require.NoError(t, err)
+		require.Equal(t, "already decoded", string(actual))
+	}
+}
+
+// TestResponseXGzipDecoding verifies lazy alias decoding and header normalization
+// while permitting a payload exactly at both byte limits.
+func TestResponseXGzipDecoding(t *testing.T) {
+	for _, encoding := range []string{"x-gzip", " \tX-GZiP\t "} {
+		t.Run(encoding, func(t *testing.T) {
+			// The legacy alias accepts the same case and optional whitespace as
+			// gzip, normalizes exposed metadata, and leaves raw headers untouched.
+			payload := "decoded café"
+			encoded := responseGzip(t, payload)
+			s := responseTestSession(t, int64(len(payload)), int64(len(encoded)))
+			body := &responseObservedBody{reader: bytes.NewReader(encoded)}
+			headers := http.Header{
+				"Content-Encoding": {encoding}, "Content-Length": {strconv.Itoa(len(encoded))},
+				"Content-Type": {"text/plain"},
+			}
+			before := headers.Clone()
+			response, cleanups := responseTestPrepare(t, s, &http.Response{StatusCode: 200, Header: headers, Body: body})
+			require.NotContains(t, response.Header, "Content-Encoding")
+			require.NotContains(t, response.Header, "Content-Length")
+			require.Equal(t, "text/plain", response.Header.Get("Content-Type"))
+			require.Equal(t, before, headers)
+
+			// Neither preparing nor making an empty read starts the decoder.
+			n, err := response.Body.Read(nil)
+			require.NoError(t, err)
+			require.Zero(t, n)
+			require.Empty(t, body.sizes)
+
+			// Exact compressed and decoded limits permit the complete payload,
+			// including its terminating EOF, and release ownership once.
+			actual, err := io.ReadAll(response.Body)
+			require.NoError(t, err)
+			require.Equal(t, payload, string(actual))
+			require.Zero(t, s.remainingResponse())
+			require.EqualValues(t, 1, body.closes.Load())
+			require.EqualValues(t, 1, cleanups.Load())
+		})
+	}
 }
 
 func TestResponseBodylessMetadata(t *testing.T) {
@@ -263,7 +305,7 @@ func TestResponseBodylessMetadata(t *testing.T) {
 	}{
 		{http.MethodHead, 200}, {http.MethodGet, 204}, {http.MethodGet, 304}, {http.MethodGet, 101},
 	} {
-		for _, encoding := range []string{"gzip", "br"} {
+		for _, encoding := range []string{"gzip", "x-gzip", "br"} {
 			t.Run(test.method+strconv.Itoa(test.status)+encoding, func(t *testing.T) {
 				// These responses describe a representation but carry no message
 				// body, so their encoding/length headers must not trigger decoding.
@@ -352,6 +394,10 @@ func TestResponseGzipFailuresAreSafe(t *testing.T) {
 		{"truncated gzip", "gzip", encoded[:len(encoded)-4], 100, ErrEncoding},
 		{"checksum", "gzip", badChecksum, 100, ErrEncoding},
 		{"compressed limit", "gzip", encoded, int64(len(encoded) - 1), ErrStreamLimit},
+		{"invalid x-gzip", "x-gzip", []byte("private malformed gzip"), 100, ErrEncoding},
+		{"truncated x-gzip", "x-gzip", encoded[:len(encoded)-4], 100, ErrEncoding},
+		{"x-gzip checksum", "x-gzip", badChecksum, 100, ErrEncoding},
+		{"x-gzip compressed limit", "x-gzip", encoded, int64(len(encoded) - 1), ErrStreamLimit},
 		{"unsupported", "br", []byte("private body"), 100, ErrEncoding},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -374,6 +420,38 @@ func TestResponseGzipFailuresAreSafe(t *testing.T) {
 			require.Len(t, body.sizes, reads)
 		})
 	}
+}
+
+// TestResponseIdentityReadReusesScratch isolates steady-state reads to detect
+// repeated scratch allocation without measuring setup or terminal cleanup.
+func TestResponseIdentityReadReusesScratch(t *testing.T) {
+	// Keep the source and both byte budgets above the measured reads so this
+	// isolates steady-state copying, excluding setup and terminal cleanup.
+	const runs, readSize = 1000, 64
+	payload := bytes.Repeat([]byte("x"), (runs+3)*readSize)
+	s := responseTestSession(t, int64(len(payload)), int64(len(payload)))
+	response, _ := responseTestPrepare(t, s, &http.Response{
+		StatusCode: 200, Body: io.NopCloser(bytes.NewReader(payload)),
+	})
+	buffer := make([]byte, readSize)
+	n, err := response.Body.Read(buffer)
+	require.NoError(t, err)
+	require.Equal(t, len(buffer), n)
+
+	// After initializing the lazy scratch buffer, even small caller buffers
+	// must not allocate a fresh 32 KiB scratch area on every read.
+	var readErr error
+	var shortRead bool
+	allocations := testing.AllocsPerRun(runs, func() {
+		n, err := response.Body.Read(buffer)
+		if err != nil {
+			readErr = err
+		}
+		shortRead = shortRead || n != len(buffer)
+	})
+	require.NoError(t, readErr)
+	require.False(t, shortRead)
+	require.Zero(t, allocations)
 }
 
 // responsePartialFailure supplies bytes and a private error in the same read.

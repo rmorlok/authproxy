@@ -41,7 +41,8 @@ type Limits struct {
 	MaxRequests int
 
 	// MaxResponseBytes bounds decoded bytes accepted across all response reads,
-	// including partial responses later discarded by the caller.
+	// including partial responses later discarded by the caller. Exceeding it
+	// cancels the entire session, including other requests and pending reads.
 	MaxResponseBytes int64
 
 	// MaxStreamBytes bounds each response before this package decodes it. This

@@ -14,11 +14,16 @@ import (
 	"golang.org/x/net/http/httpguts"
 )
 
-// Response exposes only the bounded upstream status, headers, and body. It
+// Response exposes only bounded upstream metadata and body. It
 // deliberately omits http.Response.Request, which can contain credentials.
 type Response struct {
 	// StatusCode is the validated upstream status, including unsuccessful ones.
 	StatusCode int
+
+	// ContentType captures the media type, including parameters, before header
+	// filtering. Use it for body decoding even if Header omits Content-Type or
+	// the caller changes the map. An absent Content-Type produces an empty value.
+	ContentType string
 
 	// Header is a detached, canonicalized map owned by the caller. Known
 	// authentication, cookie, and hop-by-hop fields are removed before exposure.
@@ -69,6 +74,7 @@ func (s *Session) prepareResponse(
 		_ = body.Close()
 		return nil, err
 	}
+	contentType := headers.Get("Content-Type")
 
 	// HEAD and statuses that forbid a message body retain representation
 	// metadata without treating it as instructions to decode a missing payload.
@@ -85,6 +91,10 @@ func (s *Session) prepareResponse(
 			body.encoding = "unsupported"
 		} else if len(encodings) == 1 {
 			body.encoding = strings.ToLower(strings.TrimSpace(encodings[0]))
+			// RFC 9110 treats the legacy x-gzip coding as equivalent to gzip.
+			if body.encoding == "x-gzip" {
+				body.encoding = "gzip"
+			}
 		}
 	}
 
@@ -95,7 +105,7 @@ func (s *Session) prepareResponse(
 	}
 
 	// Capture decoding instructions first: a Connection nomination can remove
-	// Content-Encoding from the exposed map without changing the actual stream.
+	// Content-Type or Content-Encoding without changing the actual stream.
 	filterResponseHeaders(headers)
 
 	body.stream = &responseStream{
@@ -115,9 +125,10 @@ func (s *Session) prepareResponse(
 	}
 
 	return &Response{
-		StatusCode: raw.StatusCode,
-		Header:     headers,
-		Body:       body,
+		StatusCode:  raw.StatusCode,
+		ContentType: contentType,
+		Header:      headers,
+		Body:        body,
 	}, nil
 }
 
@@ -223,12 +234,16 @@ type responseBody struct {
 	// encoding is captured before returned headers can be changed by the caller.
 	encoding string
 
-	// readMu protects reader initialization and the terminal outcome.
+	// readMu protects reader initialization, scratch, and the terminal outcome.
 	readMu sync.Mutex
 
 	// reader is initialized on first nonempty Read, except bodyless responses
 	// use http.NoBody immediately. Status-only callers never initialize gzip.
 	reader io.Reader
+
+	// scratch is allocated lazily and reused for decoded chunks until a terminal
+	// read. Bytes reach the caller only after charging and cancellation checks.
+	scratch []byte
 
 	// terminal retains EOF or a safe failure after the underlying stream closes.
 	terminal error
@@ -296,8 +311,10 @@ func (b *responseBody) Read(p []byte) (int, error) {
 		size = max(int(remaining), 1)
 	}
 
-	var scratch [responseReadSize]byte
-	n, err := b.reader.Read(scratch[:size])
+	if b.scratch == nil {
+		b.scratch = make([]byte, responseReadSize)
+	}
+	n, err := b.reader.Read(b.scratch[:size])
 	if n < 0 || n > size {
 		return b.finish(ErrTransport)
 	}
@@ -324,7 +341,7 @@ func (b *responseBody) Read(p []byte) (int, error) {
 		return b.finish(b.readError(err))
 	}
 
-	copy(p, scratch[:n])
+	copy(p, b.scratch[:n])
 
 	if err == io.EOF {
 		_, _ = b.finish(io.EOF)
@@ -356,9 +373,11 @@ func (b *responseBody) readError(err error) error {
 }
 
 // finish records a stable terminal outcome before closing the raw stream and
-// releasing the request context. The caller must hold readMu.
+// releasing scratch and the request context. The caller must hold readMu;
+// concurrent Close cannot release scratch while Read may still be using it.
 func (b *responseBody) finish(err error) (int, error) {
 	b.terminal = err
+	b.scratch = nil
 	_ = b.Close()
 	return 0, err
 }

@@ -64,16 +64,23 @@ context or exhausted budget prevents a proxy call. After handoff, the existing
 proxy owns that body, including any fresh replay readers supplied by `GetBody`.
 Caller-provided headers, URL, and host overrides retain existing proxy behavior.
 
-The returned response contains only status, copied headers, and a bounded body.
-It does not expose the proxy's credential-bearing `http.Response.Request`.
+The returned response contains only status, captured content type, copied headers,
+and a bounded body. It does not expose the proxy's credential-bearing
+`http.Response.Request`.
 Known authentication and cookie headers, including `Set-Cookie` and
 `Authentication-Info`, are removed. Hop-by-hop headers and every field nominated
-by `Connection` are also removed. Useful end-to-end metadata such as
-`Content-Type`, `Retry-After`, and rate-limit headers remains available. All raw
-headers count toward the header limit and are validated before filtering;
-decoding instructions are captured before their headers can be removed.
+by `Connection` are also removed. Other end-to-end metadata such as `Retry-After`
+and rate-limit headers remains available. All raw headers count toward the header
+limit and are validated before filtering; decoding instructions are captured
+before their headers can be removed.
 This filter does not identify secrets in arbitrary provider-specific headers or
 bodies. Trusted Tool definitions still control what data reaches the caller.
+
+`Response.ContentType` preserves the original media type and its parameters,
+even if `Connection` names `Content-Type` or the caller changes `Response.Header`.
+Pass this field to `httpcodec.ResponseInput.ContentType` when mapping the body;
+reading the content type from the filtered header map could misclassify JSON as
+binary data.
 
 `Do` does not read the response body, including a gzip header. Callers can inspect
 status and close an unwanted response without draining it. A caller that needs
@@ -95,21 +102,31 @@ Credential recovery, redirects, and credential refresh can cause extra HTTP
 attempts within a logical proxy call. The host adds no retries. It never refunds
 consumed requests or response bytes after a failure.
 
-Response reads support identity and gzip encoding. Go's HTTP transport sometimes
-decompresses gzip itself; the host recognizes that case and does not decode
-twice. When the host decodes gzip, its returned headers omit `Content-Encoding`
-and `Content-Length`. Bodyless responses such as `HEAD`, `204`, and `304` retain
+Response reads support identity and gzip encoding, including the legacy `x-gzip`
+alias defined in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.4.1.3).
+Go's HTTP transport sometimes decompresses gzip itself; the host recognizes that
+case and does not decode twice. When the host decodes gzip, its returned headers
+omit `Content-Encoding` and `Content-Length`. Bodyless responses such as `HEAD`, `204`, and `304` retain
 their representation metadata and return EOF without decoding. Other encodings
 fail when a response body is read. The stream cap
 is not a wire-byte measurement because the transport may already have decoded it.
 
-Concurrent calls share synchronized accounting. A read uses at most 32 KiB of
-scratch space and charges its decoded chunk before returning it. Reads already
+Concurrent calls share synchronized accounting. Each body lazily allocates a
+32 KiB scratch buffer when reading content and reuses it for subsequent reads,
+charging each decoded chunk before returning it. Terminal reads release the
+buffer; inspecting status without reading does not allocate it. Reads already
 in flight can consume an extra chunk each when another read exhausts the budget;
 those excess bytes are never returned. An exact-limit body can require a
 one-byte probe to distinguish EOF from excess. These limits bound host processing
 and exposed data; they are not a hard memory quota for the transport or process.
-Exceeding the aggregate decoded allowance cancels the whole session.
+
+Exceeding the aggregate decoded allowance cancels the whole session. The read
+that detects excess fails with `ErrResponseLimit`, and cancellation interrupts
+other pending requests and reads with that same error. Future requests are
+rejected too. Catching the first error does not restore the invocation's budget.
+Fully returned responses remain usable, but partial bodies
+must not be treated as complete responses. Cancellation does not undo upstream
+side effects.
 
 The session context supplies the admitted actor and other context values.
 Each request's context can cancel that request sooner but cannot replace the

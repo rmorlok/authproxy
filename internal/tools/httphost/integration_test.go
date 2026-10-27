@@ -22,6 +22,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/proxy"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/stretchr/testify/require"
 )
@@ -388,4 +389,58 @@ func TestSessionIntegrationBodylessEncodedResponses(t *testing.T) {
 			require.NoError(t, session.Err())
 		})
 	}
+}
+
+// TestSessionIntegrationContentTypeSurvivesHeaderFiltering verifies that hiding
+// hop-by-hop metadata does not turn a JSON response into a binary Tool result.
+func TestSessionIntegrationContentTypeSurvivesHeaderFiltering(t *testing.T) {
+	// The upstream nominates Content-Type for removal from forwarded headers,
+	// while the original media type still describes how its body must be decoded.
+	const contentType = "application/json; charset=utf-8"
+	const payload = `{"account":{"id":"9007199254740993","active":true}}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// Omit close: net/http consumes that entire Connection field before
+		// httphost sees it, hiding the nomination this regression must exercise.
+		w.Header().Set("Connection", "Content-Type")
+		w.Header().Set("Content-Type", contentType)
+		_, _ = io.WriteString(w, payload)
+	}))
+	t.Cleanup(server.Close)
+	connection, _ := newIntegrationConnection(&integrationAuth{})
+	session, err := httphost.New(context.Background(), connection, integrationLimits(), nil)
+	require.NoError(t, err)
+	t.Cleanup(session.Close)
+	request, err := http.NewRequest(http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+	response, err := session.Do(request)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.NotContains(t, response.Header, "Connection")
+	require.NotContains(t, response.Header, "Content-Type")
+	require.Equal(t, contentType, response.ContentType)
+
+	// The separately captured media type remains stable when a caller edits the
+	// exposed header map, and supplies the mapping input after a complete read.
+	response.Header.Set("Content-Type", "application/octet-stream")
+	require.Equal(t, contentType, response.ContentType)
+	body, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	mapper, err := httpcodec.CompileResponse(nil, httpcodec.ResponseLimits{
+		MaxSourceBytes: 4096, MaxResponseBytes: 4096,
+		MaxOutputBytes: 4096, MaxEncodedResultBytes: 8192,
+	})
+	require.NoError(t, err)
+	result, err := mapper.Map(session.Context(), httpcodec.ResponseInput{
+		StatusCode: response.StatusCode, ContentType: response.ContentType,
+		Headers: response.Header, Body: body,
+		ToolID: apid.New(apid.PrefixTool).String(), Revision: 1,
+		InvocationID:   apid.New(apid.PrefixToolInvocation).String(),
+		Metadata:       api.ToolResultMetadata{ConnectionID: connection.GetId().String()},
+		ExecutionState: session.ExecutionState(),
+	})
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.NoError(t, result.Validate(nil))
+	require.Equal(t, payload, string(result.StructuredContent))
+	require.Empty(t, result.Content)
 }

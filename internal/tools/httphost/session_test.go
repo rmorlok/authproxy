@@ -682,3 +682,88 @@ func TestSessionRequestCancellationDoesNotPoisonInvocation(t *testing.T) {
 	require.EqualValues(t, 1, body.closes.Load())
 	require.Equal(t, 2, calls)
 }
+
+// TestSessionResponseOverflowCancelsOtherReads enforces the decoded-byte limit
+// across the whole invocation, including responses already waiting for content.
+func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
+	completedBody := &sessionTestBody{reader: strings.NewReader("ok")}
+	pendingBody := &sessionTestBlockingBody{entered: make(chan struct{}), closed: make(chan struct{})}
+	overflowBody := &sessionTestBody{reader: strings.NewReader("abc")}
+	var calls atomic.Int32
+	connection := &sessionTestConnection{proxy: func(_ context.Context, _ httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
+		calls.Add(1)
+		_ = req.Outbound.Body.Close()
+		var body io.ReadCloser
+		switch req.Outbound.URL.Path {
+		case "/completed":
+			body = completedBody
+		case "/pending":
+			body = pendingBody
+		case "/overflow":
+			body = overflowBody
+		default:
+			return nil, errors.New("unexpected proxy call after response exhaustion")
+		}
+		return &http.Response{StatusCode: 200, Header: make(http.Header), Body: body}, nil
+	}}
+	limits := sessionTestLimits()
+	limits.MaxResponseBytes = 4
+	session := sessionTestNew(t, context.Background(), connection, limits)
+
+	// A fully consumed result uses two bytes and remains caller-owned data.
+	request, _ := sessionTestRequest(context.Background())
+	request.URL.Path = "/completed"
+	completed, err := session.Do(request)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = completed.Body.Close() })
+	completedData, err := io.ReadAll(completed.Body)
+	require.NoError(t, err)
+	require.Equal(t, "ok", string(completedData))
+
+	// Start another response read and wait until its transport is blocked.
+	request, _ = sessionTestRequest(context.Background())
+	request.URL.Path = "/pending"
+	pending, err := session.Do(request)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = pending.Body.Close() })
+	var pendingBytes int
+	var pendingErr error
+	pendingDone := make(chan struct{})
+	go func() { pendingBytes, pendingErr = pending.Body.Read(make([]byte, 8)); close(pendingDone) }()
+	sessionTestWait(t, pendingBody.entered, session.Close)
+
+	// A third body consumes the remaining allowance and then proves excess.
+	// Its accepted prefix is partial data, accompanied by the aggregate failure.
+	request, _ = sessionTestRequest(context.Background())
+	request.URL.Path = "/overflow"
+	overflow, err := session.Do(request)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = overflow.Body.Close() })
+	partial, err := io.ReadAll(overflow.Body)
+	require.ErrorIs(t, err, httphost.ErrResponseLimit)
+	require.Equal(t, "ab", string(partial))
+	require.ErrorIs(t, session.Err(), httphost.ErrResponseLimit)
+
+	// Exceeding the shared cap closes the other stream and unblocks its read.
+	sessionTestWait(t, pendingDone, session.Close)
+	require.Zero(t, pendingBytes)
+	require.ErrorIs(t, pendingErr, httphost.ErrResponseLimit)
+	require.EqualValues(t, 1, pendingBody.closes.Load())
+	require.EqualValues(t, 1, overflowBody.closes.Load())
+
+	// Further requests are rejected locally, while prior completed bytes and
+	// their terminal EOF remain intact. Upstream effects stay conservatively known.
+	request, rejectedBody := sessionTestRequest(context.Background())
+	request.URL.Path = "/later"
+	response, err := session.Do(request)
+	require.ErrorIs(t, err, httphost.ErrResponseLimit)
+	require.Nil(t, response)
+	require.EqualValues(t, 1, rejectedBody.closes.Load())
+	require.EqualValues(t, 3, calls.Load())
+	require.Equal(t, "ok", string(completedData))
+	n, err := completed.Body.Read(make([]byte, 1))
+	require.Zero(t, n)
+	require.ErrorIs(t, err, io.EOF)
+	require.EqualValues(t, 1, completedBody.closes.Load())
+	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+}
