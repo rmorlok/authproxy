@@ -15,7 +15,7 @@ data:
         access: proxy
         editable: true
         jsonData:
-          baseUrl: http://demo-authproxy:8081
+          baseUrl: http://demo-authproxy-api:8081
         secureJsonData:
           jwt: ${AUTHPROXY_GRAFANA_JWT}
       - name: Prometheus

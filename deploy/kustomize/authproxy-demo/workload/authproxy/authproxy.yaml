@@ -1,8 +1,8 @@
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: authproxy
----
+# AuthProxy server workload template. As written it runs every service in one
+# pod, which the dev overlay uses because its SQLite database cannot be shared
+# across pods. The demo overlay instantiates this template once per service
+# (public, api, admin-api, worker) and narrows the args, ports, and probes so
+# each service scales and is resource-limited independently.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -47,12 +47,16 @@ spec:
             - secretRef:
                 name: redis-creds
                 optional: true
+          # Liveness only checks that the process serves HTTP. /healthz also
+          # pings the database, Redis, and app-metrics stores, so using it for
+          # liveness would restart healthy pods whenever a dependency is slow.
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /ping
               port: public
             initialDelaySeconds: 5
             periodSeconds: 10
+          # Readiness gates traffic on dependency health.
           readinessProbe:
             httpGet:
               path: /healthz

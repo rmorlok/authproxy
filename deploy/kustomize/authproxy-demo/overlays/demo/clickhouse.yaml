@@ -1,0 +1,166 @@
+# ClickHouse stores the demo's app metrics (request events and resource
+# samples). It is kept separate from the main PostgreSQL database so the
+# Postgres footprint reflects only core AuthProxy state, and so app-metrics
+# growth can be observed on the store recommended for production volumes.
+#
+# The `authproxy` user and `authproxy_app_metrics` database are created by the
+# official image's entrypoint from CLICKHOUSE_USER / CLICKHOUSE_DB; AuthProxy's
+# `migrate app-metrics` creates the tables. The password comes from the
+# `demo-clickhouse-creds` Secret that the Deploy Demo workflow generates once
+# and preserves.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clickhouse-config
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+data:
+  # Server overrides for a small, memory-limited single-node deployment.
+  demo.xml: |
+    <clickhouse>
+      <!--
+        ClickHouse derives its memory ceiling from the cgroup limit. Stay below
+        the container limit so page cache and allocator overhead do not push
+        the pod into an OOM kill.
+      -->
+      <max_server_memory_usage_to_ram_ratio>0.75</max_server_memory_usage_to_ram_ratio>
+      <!-- The 5 GiB default mark cache is sized for dedicated hosts. -->
+      <mark_cache_size>268435456</mark_cache_size>
+
+      <!--
+        Keep the system logs that help explain AuthProxy's insert and query
+        load, bounded to a week so they do not dominate disk usage.
+      -->
+      <query_log>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+      </query_log>
+      <part_log>
+        <database>system</database>
+        <table>part_log</table>
+        <flush_interval_milliseconds>7500</flush_interval_milliseconds>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+      </part_log>
+      <metric_log>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+      </metric_log>
+      <asynchronous_metric_log>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+      </asynchronous_metric_log>
+
+      <!-- High-volume diagnostic logs that are not useful for the demo. -->
+      <trace_log remove="1"/>
+      <text_log remove="1"/>
+      <processors_profile_log remove="1"/>
+      <latency_log remove="1"/>
+      <error_log remove="1"/>
+      <query_metric_log remove="1"/>
+    </clickhouse>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+spec:
+  replicas: 1
+  # The EBS volume is ReadWriteOnce, so the old pod must release it before the
+  # replacement starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clickhouse
+      app.kubernetes.io/component: app-metrics
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: clickhouse
+        app.kubernetes.io/component: app-metrics
+    spec:
+      # The official image runs ClickHouse as UID/GID 101. EBS volumes are
+      # initially root-owned, so kubelet must make the data directory
+      # group-writable.
+      securityContext:
+        fsGroup: 101
+        fsGroupChangePolicy: OnRootMismatch
+      containers:
+        - name: clickhouse
+          image: docker.io/clickhouse/clickhouse-server:26.8
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8123
+            - name: native
+              containerPort: 9000
+          env:
+            - name: CLICKHOUSE_DB
+              value: authproxy_app_metrics
+            - name: CLICKHOUSE_USER
+              value: authproxy
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: demo-clickhouse-creds
+                  key: CLICKHOUSE_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 6
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/clickhouse
+            - name: config
+              mountPath: /etc/clickhouse-server/config.d/demo.xml
+              subPath: demo.xml
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: clickhouse-data
+        - name: config
+          configMap:
+            name: clickhouse-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clickhouse
+  labels:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: clickhouse
+    app.kubernetes.io/component: app-metrics
+  ports:
+    - name: http
+      port: 8123
+      targetPort: http
+    - name: native
+      port: 9000
+      targetPort: native
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clickhouse-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gp3
+  resources:
+    requests:
+      storage: 20Gi

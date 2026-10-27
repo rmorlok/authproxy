@@ -6,6 +6,9 @@ namePrefix: dev-
 
 resources:
   - ../../base
+  # Dev runs every AuthProxy service in one pod so --auto-migrate can manage
+  # its pod-local SQLite database.
+  - ../../workload/authproxy
   - ingress.yaml
 
 configMapGenerator:

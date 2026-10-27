@@ -4,17 +4,33 @@ This tree is the Kustomize replacement scaffold for the demo/dev deployment
 path. The customer-facing Helm chart remains in `deploy/charts/authproxy`;
 these manifests are only for hosted demo environments.
 
-The base contains the shared AuthProxy, demo-shell, and go-oauth2-server
-workloads. Overlays choose backing services and public hostnames:
+The base contains the shared migration Job, demo-shell, and go-oauth2-server
+workloads. `workload/authproxy` is the AuthProxy server Deployment + Service
+template; each overlay decides how to instantiate it. Overlays choose backing
+services and public hostnames:
 
-- `overlays/demo` targets `demo.authproxy.net` and includes Postgres, Redis,
-  and SeaweedFS (S3-compatible blob storage) backing workloads. Each stateful
-  backing workload uses an encrypted `gp3` persistent volume so data survives
-  pod rescheduling and node replacement.
+- `overlays/demo` targets `demo.authproxy.net`. It runs AuthProxy as four
+  Deployments, one per service (`services/public`, `services/api`,
+  `services/admin-api`, `services/worker`), so each can be scaled,
+  resource-limited, and observed independently. It includes Postgres (main
+  database), ClickHouse (app metrics: request events and resource samples),
+  Redis, and SeaweedFS (S3-compatible blob storage) backing workloads. Each
+  stateful backing workload uses an encrypted `gp3` persistent volume so data
+  survives pod rescheduling and node replacement.
 - `overlays/dev` targets an example per-branch namespace and keeps the slim
-  dev profile: SQLite, embedded miniredis, and filesystem blob storage. Its
-  disposable pod-local database uses `serve --auto-migrate`; it removes the
-  dedicated Job because a separate pod cannot migrate that SQLite file.
+  dev profile: a single all-in-one AuthProxy pod with SQLite, embedded
+  miniredis, and filesystem blob storage. Its disposable pod-local database
+  uses `serve --auto-migrate`; it removes the dedicated Job because a separate
+  pod cannot migrate that SQLite file.
+
+Every demo container has CPU and memory requests and limits, kept together in
+`overlays/demo/resource-limits.yaml`. The limits are intentional ceilings
+(CPU included) so CPU throttling and memory pressure under sustained load show
+up in metrics instead of being absorbed by the node. AuthProxy services set
+`GOMEMLIMIT` to roughly 85% of their memory limit; Go sizes `GOMAXPROCS` from
+the CPU limit automatically. Liveness probes use `/ping` and readiness probes
+use `/healthz`, so a slow database removes pods from rotation rather than
+restarting them.
 
 Render locally:
 
@@ -34,10 +50,20 @@ OTLP/gRPC telemetry to `demo-otel-lgtm:4317`.
 
 The demo manifest also includes `<env>-authproxy-migrate`. Deployment workflows
 delete the completed Job from the previous release, apply only the release
-prerequisites, wait for PostgreSQL and Redis, apply and unsuspend the migration
-Job, then require it to complete before applying the new AuthProxy workload.
-When applying the rendered demo manifest manually, patch `spec.suspend=false` on
-`<env>-authproxy-migrate` only after those dependencies are ready.
+prerequisites, wait for PostgreSQL, ClickHouse, and Redis, apply and unsuspend
+the migration Job, then require it to complete before applying the new
+AuthProxy workloads. Resources labelled `app.kubernetes.io/name=authproxy`
+(the per-service Deployments, their Services, and the migration Job) are held
+back from the prerequisites apply. When applying the rendered demo manifest
+manually, patch `spec.suspend=false` on `<env>-authproxy-migrate` only after
+those dependencies are ready.
+
+Two cutover steps in `Deploy Demo` are idempotent no-ops after their first
+run: once the per-service Deployments are healthy it deletes the legacy
+all-in-one `<env>-authproxy` Deployment and Service (`kubectl apply` does not
+prune), and it drops every `app_metrics_*` table from PostgreSQL because app
+metrics now live in ClickHouse. Historical request events and resource samples
+from the Postgres era are intentionally not migrated.
 
 During the Helm-to-Kustomize cutover, `Deploy Demo` preserves the operator
 Secrets listed below, uninstalls any legacy `demo` / `authproxy-demo` Helm
@@ -54,6 +80,8 @@ that match the existing release convention after `namePrefix` is applied:
 - `<env>-actors`
 - `<env>-demo-shell-key`
 - `<env>-db` and `<env>-redis-creds` for the demo overlay
+- `<env>-clickhouse-creds` for the demo overlay (generated and preserved by
+  `Deploy Demo`; holds `CLICKHOUSE_PASSWORD`)
 
 The demo Grafana deployment keeps anonymous viewer access enabled, but also
 allows username/password login for admin exploration. `Deploy Demo` creates or

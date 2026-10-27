@@ -23,7 +23,7 @@ spec:
             - name: RESOURCE_MANIFEST_PATH
               value: "/etc/authproxy/seed/resources.yaml"
             - name: ADMIN_API_URL
-              value: "http://demo-authproxy:8082"
+              value: "http://demo-authproxy-admin-api:8082"
             - name: ADMIN_USERNAME
               value: "demo-admin"
             - name: ADMIN_PRIVATE_KEY_PATH

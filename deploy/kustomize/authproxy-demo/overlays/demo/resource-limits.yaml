@@ -1,0 +1,267 @@
+# Resource requests and limits for every demo workload, kept in one place so
+# the demo's capacity budget can be read and tuned together.
+#
+# Sizing intent:
+# - Requests reflect steady-state demo usage so the scheduler packs the
+#   environment onto the small EKS node group (2x t3.medium by default).
+# - Limits are deliberately real ceilings, CPU included. The demo is used to
+#   observe how AuthProxy and its stores behave under sustained load, so CPU
+#   throttling and memory pressure should show up in metrics rather than being
+#   absorbed by an unbounded node.
+# - AuthProxy is Go 1.25+, which sizes GOMAXPROCS from the CPU limit
+#   automatically. GOMEMLIMIT is set to ~85% of the memory limit so the GC
+#   works harder before the kernel OOM-kills the container.
+#
+# AuthProxy service Deployments are named after their per-service suffix
+# (see services/*/kustomization.yaml); the overlay namePrefix is applied after
+# these patches.
+
+# --- AuthProxy services -----------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authproxy-public
+spec:
+  template:
+    spec:
+      containers:
+        - name: authproxy
+          env:
+            - name: GOMEMLIMIT
+              value: 216MiB
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+# The proxy hot path; expected to be the first service to need more capacity.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authproxy-api
+spec:
+  template:
+    spec:
+      containers:
+        - name: authproxy
+          env:
+            - name: GOMEMLIMIT
+              value: 432MiB
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authproxy-admin-api
+spec:
+  template:
+    spec:
+      containers:
+        - name: authproxy
+          env:
+            - name: GOMEMLIMIT
+              value: 216MiB
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+# Background tasks: OAuth refresh sweeps, probes, resource snapshots, cleanup.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authproxy-worker
+spec:
+  template:
+    spec:
+      containers:
+        - name: authproxy
+          env:
+            - name: GOMEMLIMIT
+              value: 432MiB
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: authproxy-migrate
+spec:
+  template:
+    spec:
+      containers:
+        - name: migrate
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+# --- Data stores --------------------------------------------------------------
+
+---
+# Main AuthProxy database. The memory limit includes page cache, which the
+# kernel reclaims before OOM-killing PostgreSQL.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+spec:
+  template:
+    spec:
+      containers:
+        - name: postgresql
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+---
+# App-metrics store. clickhouse.yaml caps ClickHouse's own memory accounting
+# at 75% of this limit.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clickhouse
+spec:
+  template:
+    spec:
+      containers:
+        - name: clickhouse
+          resources:
+            requests:
+              cpu: 200m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-master
+spec:
+  template:
+    spec:
+      containers:
+        - name: redis
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs
+spec:
+  template:
+    spec:
+      containers:
+        - name: seaweedfs
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+# --- Observability and demo support -------------------------------------------
+
+---
+# Prometheus, Tempo, Loki, and the OTel Collector in one container. Trace
+# volume scales with request rate at the configured sampling ratio.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-lgtm
+spec:
+  template:
+    spec:
+      containers:
+        - name: otel-lgtm
+          resources:
+            requests:
+              cpu: 100m
+              memory: 768Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  template:
+    spec:
+      containers:
+        - name: grafana
+          resources:
+            requests:
+              cpu: 25m
+              memory: 96Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-shell
+spec:
+  template:
+    spec:
+      containers:
+        - name: demo-shell
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+# Fake OAuth provider used by demo connectors and smoke tests.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-oauth2-server
+spec:
+  template:
+    spec:
+      containers:
+        - name: go-oauth2-server
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi

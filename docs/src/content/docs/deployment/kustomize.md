@@ -11,16 +11,24 @@ installations.
 
 ```text
 deploy/kustomize/authproxy-demo/
-├── base/              # AuthProxy, Demo Shell, and fake OAuth provider
+├── base/              # Migration Job, Demo Shell, and fake OAuth provider
+├── workload/
+│   └── authproxy/     # AuthProxy server Deployment + Service template
 └── overlays/
     ├── demo/          # Persistent demo.authproxy.net environment
+    │   └── services/  # One AuthProxy Deployment per service
     └── dev/           # Disposable per-branch environment
 ```
 
-The persistent demo adds PostgreSQL, Redis, SeaweedFS (S3-compatible blob
-storage), Grafana, Prometheus, Tempo,
-Loki, and an OpenTelemetry Collector. The dev overlay uses SQLite, in-process
-miniredis, and filesystem blob storage so it can be recreated cheaply.
+The persistent demo runs AuthProxy as separate `public`, `api`, `admin-api`,
+and `worker` Deployments and adds PostgreSQL (main database), ClickHouse (app
+metrics), Redis, SeaweedFS (S3-compatible blob storage), Grafana, Prometheus,
+Tempo, Loki, and an OpenTelemetry Collector. Every demo container has CPU and
+memory requests and limits, defined together in
+`overlays/demo/resource-limits.yaml`; the limits are deliberate ceilings so the
+demo shows how AuthProxy behaves when constrained. The dev overlay runs one
+all-in-one AuthProxy pod with SQLite, in-process miniredis, and filesystem blob
+storage so it can be recreated cheaply.
 
 Never use the dev storage profile where connections, sessions, queues, request
 events, or blobs must survive a pod replacement.
@@ -47,7 +55,8 @@ the overlay's `namePrefix`, it expects names for:
 - database and Redis credentials in the persistent demo.
 
 The `Deploy Demo` workflow generates the SeaweedFS S3 credentials
-(`demo-seaweedfs-creds`) on first deploy and reuses them afterwards.
+(`demo-seaweedfs-creds`) and the ClickHouse password (`demo-clickhouse-creds`)
+on first deploy and reuses them afterwards.
 
 Both deployment workflows run the overlay's `seed` Job after rollout and
 before smoke tests. The job configures the disposable OAuth provider, then
