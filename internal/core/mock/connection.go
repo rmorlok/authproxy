@@ -35,6 +35,8 @@ type Connection struct {
 	SetupError          *string
 	Configuration       map[string]any
 	JavascriptLibrary   *apjs.Library
+	// HTTPClientValue supplies the configured HTTP client used by a scenario.
+	HTTPClientValue iface.HTTPClient
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -175,6 +177,11 @@ func (m *Connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error
 
 func (m *Connection) GetAnnotations() map[string]string {
 	return m.Annotations
+}
+
+// HTTPClient returns the scenario's client without sending a request.
+func (m *Connection) HTTPClient(options iface.HTTPClientOptions) iface.HTTPClient {
+	return m.HTTPClientValue
 }
 
 func (m *Connection) ProxyRequest(
