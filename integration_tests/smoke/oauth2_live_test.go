@@ -84,11 +84,6 @@ func smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace 
 func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
 	return []aschema.Permission{
 		{
-			Namespace: demoConnectorNamespace,
-			Resources: []string{"connectors"},
-			Verbs:     []string{"list"},
-		},
-		{
 			Namespace: smokeConnectorNamespace,
 			Resources: []string{"connectors"},
 			Verbs:     []string{"list"},
@@ -118,11 +113,6 @@ func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
 			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
 			permissions: smokeUserPermissions(connectionNamespace),
 		},
-		{
-			name:        "user with demo connector",
-			actor:       &apauthcore.Actor{Namespace: config.RootNamespace},
-			permissions: smokeUserPermissions(demoConnectorNamespace + ".smoke-user"),
-		},
 	}
 
 	for _, tt := range tests {
@@ -139,12 +129,17 @@ func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
 	}
 }
 
-func newRemoteSmokeRig(t *testing.T, connectionParentNamespace string) *helpers.RemoteAuthProxy {
+// newRemoteSmokeRig provisions per-run smoke admin and user actors whose
+// connections live in a per-run namespace under root.smoke. Smoke runs never
+// create namespaces, actors, or connections under root.demo, which holds the
+// interactive demo's data; tests that exercise a seeded root.demo connector
+// connect through a root.smoke copy of it instead.
+func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 	t.Helper()
 
 	adminExternalID := newSmokeActorExternalID(t, "smoke-admin")
 	userExternalID := newSmokeActorExternalID(t, "smoke-user")
-	connectionNamespace := connectionParentNamespace + "." + userExternalID
+	connectionNamespace := smokeConnectorNamespace + "." + userExternalID
 	adminPermissions := smokeAdminPermissions(adminExternalID, userExternalID, connectionNamespace)
 	userPermissions := smokeUserPermissions(connectionNamespace)
 	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
@@ -181,21 +176,40 @@ func newRemoteSmokeRig(t *testing.T, connectionParentNamespace string) *helpers.
 	return rig
 }
 
-// Deployments populate root.demo with ap apply before this suite runs. Keep
-// per-run copies API-created: each needs isolated provider credentials and an
-// independent lifecycle, and the smoke test should exercise provisioning too.
-// No connector in this suite is loaded from AuthProxy server configuration.
+// smokeOAuthClient is a per-run OAuth client that replaces the seeded client
+// on the demo-oauth-simple copy, isolating its provider credentials.
+type smokeOAuthClient struct {
+	provider     *helpers.OAuth2TestProvider
+	clientID     string
+	clientSecret string
+}
+
+// Deployments populate root.demo with ap apply before this suite runs. Smoke
+// runs read those seeded definitions but connect only through per-run copies
+// in root.smoke, so no smoke actor, namespace, or connection is created under
+// root.demo. Copies are API-created to exercise provisioning and get an
+// independent lifecycle; they are archived on cleanup. No connector in this
+// suite is loaded from AuthProxy server configuration.
+//
+// cloneSeededConnectorsIntoSmokeNamespace copies the seeded connectors that
+// match sourceSelector (in addition to demo=true) and returns a label selector
+// matching this run's copies. With a nil oauthOverride every definition is
+// copied unchanged, so the demo-oauth-simple copy still uses the seeded
+// provider client; otherwise that copy uses oauthOverride's client.
 func cloneSeededConnectorsIntoSmokeNamespace(
 	t *testing.T,
 	rig *helpers.RemoteAuthProxy,
-	provider *helpers.OAuth2TestProvider,
-	oauthClientID string,
-	oauthClientSecret string,
+	sourceSelector string,
+	oauthOverride *smokeOAuthClient,
 ) string {
 	t.Helper()
 
-	sources := rig.ListConnectorsAsAdmin(t, demoConnectorNamespace, "demo=true")
-	require.NotEmpty(t, sources, "the demo seed job did not create any root.demo connectors")
+	selector := "demo=true"
+	if sourceSelector != "" {
+		selector += "," + sourceSelector
+	}
+	sources := rig.ListConnectorsAsAdmin(t, demoConnectorNamespace, selector)
+	require.NotEmptyf(t, sources, "the demo seed job did not create any root.demo connectors matching %q", selector)
 	suffix := time.Now().UnixNano()
 	runID := fmt.Sprintf("%d", suffix)
 	const runLabel = "smoke.authproxy.net/run-id"
@@ -204,10 +218,10 @@ func cloneSeededConnectorsIntoSmokeNamespace(
 		resource := cschema.NewConnector()
 		resource.Metadata.Name = common.ResourceName(fmt.Sprintf("%s-smoke-%d-%d", source.Metadata.Name, suffix, i))
 		resource.Spec.Definition = detailed.Spec.Definition
-		if source.Metadata.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
-			replacement := helpers.NewOAuth2Connector(apid.New(apid.PrefixConnector), string(resource.Metadata.Name), provider, helpers.OAuth2ConnectorOptions{
-				ClientID:     oauthClientID,
-				ClientSecret: oauthClientSecret,
+		if oauthOverride != nil && source.Metadata.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
+			replacement := helpers.NewOAuth2Connector(apid.New(apid.PrefixConnector), string(resource.Metadata.Name), oauthOverride.provider, helpers.OAuth2ConnectorOptions{
+				ClientID:     oauthOverride.clientID,
+				ClientSecret: oauthOverride.clientSecret,
 				Scopes:       []string{"read", "profile"},
 			})
 			resource.Spec.Definition.Auth = replacement.Spec.Definition.Auth
@@ -238,7 +252,7 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t, smokeConnectorNamespace)
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
 	startedAt := time.Now().Add(-1 * time.Second)
@@ -331,9 +345,17 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t, demoConnectorNamespace)
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
-	connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
+
+	// Copy the seeded connector unchanged into root.smoke, keeping the seeded
+	// provider client, so the seeded definition is exercised without creating
+	// any smoke connection under root.demo.
+	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, "demo.authproxy.net/seed-key=demo-oauth-simple", nil)
+	copies := rig.ListConnectors(t, runSelector)
+	require.Len(t, copies, 1, "expected one root.smoke copy of the seeded demo-oauth-simple connector")
+	connector := copies[0]
+	require.Equal(t, smokeConnectorNamespace, connector.Metadata.Namespace)
 
 	startedAt := time.Now().Add(-1 * time.Second)
 	connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.GetId(), rig.PublicURL+"/connections")
@@ -378,7 +400,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 		t.Skip("set SMOKE_GLOBAL_KEY or pass -global-key")
 	}
 
-	rig := newRemoteSmokeRig(t, smokeConnectorNamespace)
+	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	oauthClientID := "seeded-smoke-client-" + suffix
@@ -392,7 +414,11 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 	})
 	require.Equal(t, oauthClientID, client.Key)
 
-	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, provider, oauthClientID, oauthClientSecret)
+	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, "", &smokeOAuthClient{
+		provider:     provider,
+		clientID:     oauthClientID,
+		clientSecret: oauthClientSecret,
+	})
 	items := rig.ListConnectors(t, runSelector)
 	bySeedKey := map[string]cschema.Connector{}
 	for _, item := range items {
