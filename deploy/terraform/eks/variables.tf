@@ -29,13 +29,13 @@ variable "az_count" {
 }
 
 variable "node_instance_types" {
-  # t3.large: 2 vCPU / 8 GiB and a 35-pod VPC CNI limit. The demo runs one
-  # Deployment per AuthProxy service plus Postgres, ClickHouse, Redis,
-  # SeaweedFS, and otel-lgtm; on t3.medium (4 GiB, 17 pods) both nodes hit the
-  # pod cap and the data-store node ran out of memory.
+  # t3.medium: 2 vCPU / 4 GiB and a 17-pod VPC CNI limit per node, of which
+  # roughly 5-7 go to per-node and cluster system pods. Capacity scales with
+  # node_group_min_size; move to t3.large (8 GiB, 35 pods) when the demo needs
+  # more memory per node, e.g. for sustained load testing.
   description = "Instance types for the managed node group."
   type        = list(string)
-  default     = ["t3.large"]
+  default     = ["t3.medium"]
 }
 
 variable "node_group_min_size" {

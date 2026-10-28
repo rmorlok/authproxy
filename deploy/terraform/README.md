@@ -23,20 +23,21 @@ deploys, cost monitoring), see the
 
 ## Steady-state cost
 
-Targeting **~$290/mo** with the defaults:
+Targeting **~$200/mo** with the defaults:
 
 | Item                             | Approx /mo |
 |----------------------------------|------------|
 | EKS control plane                | $73        |
-| 3× t3.large on-demand            | $182       |
+| 3× t3.medium on-demand           | $91        |
 | Single NAT gateway               | $32        |
 | Route53 hosted zone              | $0.50      |
 | S3 + DynamoDB (state)            | <$1        |
-| **Total**                        | **~$290**  |
+| **Total**                        | **~$200**  |
 
 Keep `node_group_min_size` at or above the AZ count: the demo's EBS volumes are
-zonal, and an AZ without a node strands its volumes. Smaller instance types
-(t3.medium: 17 pods, 4 GiB) do not fit the split demo.
+zonal, and an AZ without a node strands its volumes. Each t3.medium runs at
+most 17 pods; scale the group or move to t3.large (35 pods, 8 GiB) when the
+demo outgrows three nodes.
 
 ## Apply (first time)
 
