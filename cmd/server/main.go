@@ -147,7 +147,38 @@ func prepareServe(ctx context.Context, autoMigrate bool, warningOutput io.Writer
 		}
 		return nil
 	}
-	return dm.VerifyMigrations(ctx)
+	return verifyMigrationsWithRetry(ctx, dm, warningOutput)
+}
+
+// startupSchemaWaitTimeout bounds how long serve keeps retrying schema
+// verification while a schema database is unreachable. Container
+// orchestrators restart the process if it still fails afterwards.
+var startupSchemaWaitTimeout = 2 * time.Minute
+
+// startupSchemaRetryInterval is the delay between verification attempts.
+var startupSchemaRetryInterval = 2 * time.Second
+
+// verifyMigrationsWithRetry verifies that every schema is compatible with this
+// binary before services start. When the only failures are unreachable
+// databases (for example ClickHouse briefly rejecting queries, or Postgres
+// still starting), it retries every startupSchemaRetryInterval for up to
+// startupSchemaWaitTimeout, writing a warning per attempt. Stale, ahead, or
+// dirty schemas fail immediately because only a migration can fix them.
+func verifyMigrationsWithRetry(ctx context.Context, dm migrationManager, warningOutput io.Writer) error {
+	deadline := time.Now().Add(startupSchemaWaitTimeout)
+	for {
+		err := dm.VerifyMigrations(ctx)
+		if err == nil || !migration.OnlyUnavailable(err) || !time.Now().Before(deadline) {
+			return err
+		}
+
+		fmt.Fprintf(warningOutput, "WARNING: %v; retrying in %s\n", err, startupSchemaRetryInterval)
+		select {
+		case <-ctx.Done():
+			return errors.Join(err, ctx.Err())
+		case <-time.After(startupSchemaRetryInterval):
+		}
+	}
 }
 
 func cmdMigrate() *cobra.Command {

@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/migration"
@@ -94,6 +96,55 @@ func TestServeDoesNotStartServicesWhenVerificationFails(t *testing.T) {
 	}
 }
 
+func TestPrepareServeRetriesUnavailableSchemas(t *testing.T) {
+	shortenStartupSchemaWait(t, time.Second)
+	unavailable := &migration.UnavailableError{Target: migration.TargetAppMetrics, Err: errors.New("memory limit exceeded")}
+
+	// The app-metrics store rejects the first two checks, then recovers.
+	fake := &fakeMigrationManager{verifyErrs: []error{unavailable, unavailable}}
+	restoreMigrationManager(t, fake)
+	var warnings bytes.Buffer
+
+	// Serve preparation waits it out instead of failing startup.
+	require.NoError(t, prepareServe(context.Background(), false, &warnings))
+	require.Equal(t, 3, fake.verifyCalls)
+	require.Equal(t, 2, strings.Count(warnings.String(), "retrying"))
+}
+
+func TestPrepareServeGivesUpOnPersistentlyUnavailableSchemas(t *testing.T) {
+	shortenStartupSchemaWait(t, 20*time.Millisecond)
+	unavailable := &migration.UnavailableError{Target: migration.TargetMainDatabase, Err: errors.New("connection refused")}
+
+	// A store that never comes back fails once the wait timeout elapses.
+	fake := &fakeMigrationManager{verifyErr: unavailable}
+	restoreMigrationManager(t, fake)
+
+	err := prepareServe(context.Background(), false, &bytes.Buffer{})
+	require.ErrorIs(t, err, unavailable)
+	require.Greater(t, fake.verifyCalls, 1)
+}
+
+func TestPrepareServeDoesNotRetryIncompatibleSchemas(t *testing.T) {
+	shortenStartupSchemaWait(t, time.Second)
+
+	// A stale schema needs a migration, so it fails on the first check.
+	fake := &fakeMigrationManager{verifyErr: errors.New("app-metrics schema is behind")}
+	restoreMigrationManager(t, fake)
+
+	require.Error(t, prepareServe(context.Background(), false, &bytes.Buffer{}))
+	require.Equal(t, 1, fake.verifyCalls)
+}
+
+// shortenStartupSchemaWait makes startup verification retries fast for tests.
+func shortenStartupSchemaWait(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	originalTimeout, originalInterval := startupSchemaWaitTimeout, startupSchemaRetryInterval
+	startupSchemaWaitTimeout, startupSchemaRetryInterval = timeout, time.Millisecond
+	t.Cleanup(func() {
+		startupSchemaWaitTimeout, startupSchemaRetryInterval = originalTimeout, originalInterval
+	})
+}
+
 func restoreMigrationManager(t *testing.T, fake migrationManager) {
 	t.Helper()
 	original := newMigrationManager
@@ -108,6 +159,9 @@ type fakeMigrationManager struct {
 	verifyCalls      int
 	shutdownCalls    int
 	verifyErr        error
+	// verifyErrs, when set, is returned one entry per VerifyMigrations call;
+	// once exhausted, verifyErr is returned.
+	verifyErrs []error
 }
 
 func (f *fakeMigrationManager) RunDevelopmentMigration(context.Context) error {
@@ -117,6 +171,11 @@ func (f *fakeMigrationManager) RunDevelopmentMigration(context.Context) error {
 
 func (f *fakeMigrationManager) VerifyMigrations(context.Context) error {
 	f.verifyCalls++
+	if len(f.verifyErrs) > 0 {
+		err := f.verifyErrs[0]
+		f.verifyErrs = f.verifyErrs[1:]
+		return err
+	}
 	return f.verifyErr
 }
 
