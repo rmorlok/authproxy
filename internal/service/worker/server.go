@@ -62,19 +62,8 @@ func Serve(cfg config.C) {
 		})
 	})
 
-	asyncHasError := false
-	asyncRunning := false
-	asyncIsScheduler := false
-	workflowHasError := false
-	workflowRunning := false
-	asyncHealthChecker := func(err error) {
-		asyncHasError = asyncHasError || err != nil
-	}
-
-	asyncSchedulerHealthChecker := func(isScheduler bool, err error) {
-		asyncHasError = asyncHasError || err != nil
-		asyncIsScheduler = isScheduler
-	}
+	// Readiness state for the background subsystems started below.
+	health := &workerHealth{}
 
 	dm.GetAsyncClient().Ping()
 
@@ -84,10 +73,10 @@ func Serve(cfg config.C) {
 	dm.RegisterAppMetricsPing()
 	dm.RegisterWorkflowRuntimePing()
 	dm.RegisterPing("asynqServer", func(ctx context.Context) bool {
-		return asyncRunning && !asyncHasError
+		return health.asyncHealthy()
 	})
 	dm.RegisterPing("workflowWorker", func(ctx context.Context) bool {
-		return workflowRunning && !workflowHasError
+		return health.workflowHealthy()
 	})
 
 	router.GET("/healthz", func(c *gin.Context) {
@@ -100,7 +89,7 @@ func Serve(cfg config.C) {
 			status = http.StatusServiceUnavailable
 		}
 
-		response := gin.H{"service": "worker", "ok": allOk, "asyncIsScheduler": asyncIsScheduler}
+		response := gin.H{"service": "worker", "ok": allOk, "asyncIsScheduler": health.asyncIsScheduler.Load()}
 		for k, v := range results {
 			response[k] = v
 		}
@@ -133,7 +122,7 @@ func Serve(cfg config.C) {
 	srv := asynq.NewServerFromRedisClient(
 		dm.GetRedisClient(),
 		asynq.Config{
-			HealthCheckFunc: asyncHealthChecker,
+			HealthCheckFunc: health.onAsyncHealthCheck,
 			Concurrency:     workerConfig.GetConcurrency(context.Background()),
 			BaseContext: func() context2.Context {
 				return ctx
@@ -225,29 +214,32 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		workflowRunning = true
+		health.workflowRunning.Store(true)
 		if err := runWorkflowWorker(workflowCtx, workflowWorker); err != nil {
-			workflowHasError = true
+			health.workflowFailed.Store(true)
 			log.Fatalf("workflow worker failed: %v", err)
 		}
-		workflowRunning = false
+		health.workflowRunning.Store(false)
 		logger.Info("Workflow worker shutdown complete")
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		// srv.Run blocks for the server's lifetime and returns an error right
+		// away if the server cannot start, so mark it running first.
+		health.asyncRunning.Store(true)
 		if err := srv.Run(mux); err != nil {
-			asyncHasError = true
+			health.asyncFailed.Store(true)
 			log.Fatalf("could not run async server: %v", err)
 		}
-		asyncRunning = false
+		health.asyncRunning.Store(false)
 		logger.Info("Async worker shutdown complete")
 	}()
 
 	scheduler := newScheduler(
 		dm.GetRedisClient(),
-		asyncSchedulerHealthChecker,
+		health.onSchedulerHealthCheck,
 		dm.GetLogBuilder().WithComponent("scheduler").Build(),
 		workerConfig.GetCronSyncInterval(),
 		asynqTel,
@@ -263,10 +255,10 @@ func Serve(cfg config.C) {
 	go func() {
 		defer wg.Done()
 		if err := scheduler.Run(); err != nil {
-			asyncHasError = true
+			health.asyncFailed.Store(true)
 			log.Fatalf("could not run scheduler: %v", err)
 		}
-		asyncIsScheduler = false
+		health.asyncIsScheduler.Store(false)
 		logger.Info("Async scheduler shutdown complete")
 	}()
 
