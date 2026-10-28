@@ -33,6 +33,9 @@ type proxyHTTPClient struct {
 // client's lifetime. It performs no I/O: credentials are resolved per Do. The
 // returned client is safe for concurrent use.
 func (p *proxy) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, error) {
+	// Normalize captures the actor's id here, immediately before ForActor
+	// snapshots the same actor, so Do's agreement check compares against the
+	// identity the middleware attributes even if the actor object later changes.
 	options, err := options.Normalize()
 	if err != nil {
 		return nil, err

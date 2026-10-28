@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -58,6 +59,12 @@ type HTTPClientActor struct {
 	kind httpClientActorKind
 	// actor is the attributed actor for ActingAs; always nil for WithoutActor.
 	actor authcore.IActorData
+	// id is the actor's id captured by HTTPClientOptions.Normalize, immediately
+	// before the client's middleware snapshots the actor. Agrees compares
+	// against this copy rather than re-reading actor, so mutating the actor
+	// object after construction cannot make the agreement check disagree with
+	// the attribution the middleware already recorded. Empty until normalized.
+	id apid.ID
 }
 
 // httpClientActorKind tags the HTTPClientActor union. The zero value is unset.
@@ -122,16 +129,17 @@ func (a HTTPClientActor) Validate() error {
 
 // Agrees reports whether a request context's actor is consistent with this
 // choice. A context without an actor always agrees. Otherwise ActingAs
-// requires matching ids, and WithoutActor never agrees with a context actor.
-// The caller must have validated the choice first.
+// requires the context actor's id to match the id captured by Normalize, and
+// WithoutActor never agrees with a context actor. A choice that has not been
+// normalized has no captured id and never agrees with a context actor.
 func (a HTTPClientActor) Agrees(contextActor authcore.IActorData) bool {
 	if contextActor == nil {
 		return true
 	}
-	if a.kind != httpClientActorAs {
+	if a.kind != httpClientActorAs || a.id.IsNil() {
 		return false
 	}
-	return a.actor.GetId() == contextActor.GetId()
+	return a.id == contextActor.GetId()
 }
 
 // HTTPClientOptions configures one reusable connection HTTP client. Options are
@@ -153,11 +161,16 @@ type HTTPClientOptions struct {
 }
 
 // Normalize validates the options and returns a detached copy with the
-// default request type applied and labels cloned, so later caller edits
-// cannot reconfigure a client built from them.
+// default request type applied, labels cloned, and the actor's id captured, so
+// later caller edits cannot reconfigure a client built from them. Implementations
+// that build middleware call Normalize immediately before snapshotting the actor
+// so the captured id matches the attributed one.
 func (o HTTPClientOptions) Normalize() (HTTPClientOptions, error) {
 	if err := o.Actor.Validate(); err != nil {
 		return HTTPClientOptions{}, err
+	}
+	if o.Actor.kind == httpClientActorAs {
+		o.Actor.id = o.Actor.actor.GetId()
 	}
 	if o.RequestType == "" {
 		o.RequestType = httpf.RequestTypeProxy

@@ -164,6 +164,60 @@ func TestProxyHTTPClient_ActorAgreement(t *testing.T) {
 	}
 }
 
+// TestProxyHTTPClient_ActorMutationAfterConstruction keeps the agreement check
+// pinned to the actor id the middleware captured, so mutating the actor object
+// later cannot admit a request attributed to the original actor's identity.
+func TestProxyHTTPClient_ActorMutationAfterConstruction(t *testing.T) {
+	factory := mockHttpf.NewMockF(gomock.NewController(t))
+	conn := &mockCore.Connection{Id: apid.New(apid.PrefixConnection), Namespace: "root"}
+	actor, _ := httpClientTestActor()
+	originalID := actor.Id
+	// A separate object carrying A's id, unaffected by the mutation below.
+	originalCtx := apauthcore.NewAuthenticatedRequestAuth(&apauthcore.Actor{Id: originalID, Namespace: "root"}).ContextWith(context.Background())
+	auth := &fakeAuth{}
+	var sends atomic.Int32
+	client := &http.Client{Transport: streamRoundTripper(func(*http.Request) (*http.Response, error) {
+		sends.Add(1)
+		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+	})}
+
+	// The middleware snapshots actor A once, at construction.
+	factory.EXPECT().ForRequestType(httpf.RequestTypeProxy).Return(factory)
+	factory.EXPECT().ForConnection(conn).Return(factory)
+	factory.EXPECT().ForActor(gomock.Any()).DoAndReturn(func(a httpf.Actor) httpf.F {
+		require.Equal(t, originalID, a.GetId())
+		return factory
+	})
+	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory)
+	factory.EXPECT().NewHTTPClient().Return(client)
+	p := New(factory, conn, auth, nil)
+	httpClient, err := p.HTTPClient(iface.HTTPClientOptions{Actor: iface.ActingAs(actor)})
+	require.NoError(t, err)
+
+	// The caller then rewrites the same actor object's id to B.
+	actor.Id = apid.New(apid.PrefixActor)
+	mutatedCtx := apauthcore.NewAuthenticatedRequestAuth(&apauthcore.Actor{Id: actor.Id, Namespace: "root"}).ContextWith(context.Background())
+
+	// A request acting as B is refused before credentials or the transport.
+	body := &streamBody{Reader: strings.NewReader("payload")}
+	request, err := http.NewRequestWithContext(mutatedCtx, http.MethodPost, "https://example.test", body)
+	require.NoError(t, err)
+	resp, err := httpClient.Do(request)
+	require.ErrorIs(t, err, iface.ErrHTTPClientActorMismatch)
+	assert.Nil(t, resp)
+	assert.True(t, body.closed.Load())
+	assert.Zero(t, atomic.LoadInt32(&auth.resolveN))
+	assert.Zero(t, sends.Load())
+
+	// A request acting as the captured actor A still succeeds.
+	request, err = http.NewRequestWithContext(originalCtx, http.MethodGet, "https://example.test", nil)
+	require.NoError(t, err)
+	resp, err = httpClient.Do(request)
+	require.NoError(t, err)
+	require.NoError(t, resp.Body.Close())
+	assert.EqualValues(t, 1, sends.Load())
+}
+
 // TestProxyHTTPClient_SharesStreamRecovery runs the same once-only 401
 // recovery as ProxyRequestStream, because both delegate to one implementation.
 func TestProxyHTTPClient_SharesStreamRecovery(t *testing.T) {

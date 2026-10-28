@@ -35,22 +35,50 @@ func TestHTTPClientActorValidate(t *testing.T) {
 	}
 }
 
+// normalizedActor runs choice through Normalize, as client construction does,
+// so the actor id is captured for Agrees.
+func normalizedActor(t *testing.T, choice HTTPClientActor) HTTPClientActor {
+	t.Helper()
+	options, err := HTTPClientOptions{Actor: choice}.Normalize()
+	require.NoError(t, err)
+	return options.Actor
+}
+
 // TestHTTPClientActorAgrees compares context actors by identity and treats an
 // actor-free context as consistent with either choice.
 func TestHTTPClientActorAgrees(t *testing.T) {
 	id := apid.New(apid.PrefixActor)
-	configured := ActingAs(&authcore.Actor{Id: id})
+	configured := normalizedActor(t, ActingAs(&authcore.Actor{Id: id}))
+	withoutActor := normalizedActor(t, WithoutActor())
 
 	// An absent context actor never conflicts.
 	require.True(t, configured.Agrees(nil))
-	require.True(t, WithoutActor().Agrees(nil))
+	require.True(t, withoutActor.Agrees(nil))
 
 	// Identity, not object identity, decides agreement for ActingAs.
 	require.True(t, configured.Agrees(&authcore.Actor{Id: id}))
 	require.False(t, configured.Agrees(&authcore.Actor{Id: apid.New(apid.PrefixActor)}))
 
 	// The opt-out conflicts with any context actor.
-	require.False(t, WithoutActor().Agrees(&authcore.Actor{Id: id}))
+	require.False(t, withoutActor.Agrees(&authcore.Actor{Id: id}))
+
+	// An un-normalized ActingAs has no captured id and refuses context actors.
+	require.False(t, ActingAs(&authcore.Actor{Id: id}).Agrees(&authcore.Actor{Id: id}))
+}
+
+// TestHTTPClientActorAgreesUsesCapturedID pins agreement to the id captured at
+// normalization, so mutating the actor object afterwards changes nothing.
+func TestHTTPClientActorAgreesUsesCapturedID(t *testing.T) {
+	originalID := apid.New(apid.PrefixActor)
+	actor := &authcore.Actor{Id: originalID}
+	configured := normalizedActor(t, ActingAs(actor))
+
+	// Rewrite the shared actor's id after the choice was normalized.
+	actor.Id = apid.New(apid.PrefixActor)
+
+	// The new id is rejected and the captured original id still agrees.
+	require.False(t, configured.Agrees(&authcore.Actor{Id: actor.Id}))
+	require.True(t, configured.Agrees(&authcore.Actor{Id: originalID}))
 }
 
 // TestHTTPClientOptionsNormalize requires an actor, applies defaults, and
