@@ -34,6 +34,9 @@ patches:
           - name: admin-api
             containerPort: 8082
       - op: replace
+        path: /spec/template/spec/containers/0/startupProbe/httpGet/port
+        value: admin-api
+      - op: replace
         path: /spec/template/spec/containers/0/livenessProbe/httpGet/port
         value: admin-api
       - op: replace

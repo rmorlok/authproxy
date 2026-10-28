@@ -25,6 +25,20 @@ data:
         the pod into an OOM kill.
       -->
       <max_server_memory_usage_to_ram_ratio>0.75</max_server_memory_usage_to_ram_ratio>
+      <!--
+        Apply that ratio once, to the cgroup limit, instead of letting the
+        memory worker recompute the hard limit at runtime from host-wide
+        available memory. On a busy node the dynamic limit shrank to roughly
+        ClickHouse's current usage and it rejected tiny queries with
+        MEMORY_LIMIT_EXCEEDED (code 241) while using ~350 MiB of 1.5 GiB.
+      -->
+      <memory_worker_dynamic_hard_limit>0</memory_worker_dynamic_hard_limit>
+      <!--
+        Track actual resident memory rather than resident memory plus a
+        speculative growth reserve, which inflated tracked usage several-fold
+        during background merges on this small instance.
+      -->
+      <memory_worker_rss_speculative_reserve_ratio>0</memory_worker_rss_speculative_reserve_ratio>
       <!-- The 5 GiB default mark cache is sized for dedicated hosts. -->
       <mark_cache_size>268435456</mark_cache_size>
 

@@ -34,6 +34,9 @@ patches:
           - name: api
             containerPort: 8081
       - op: replace
+        path: /spec/template/spec/containers/0/startupProbe/httpGet/port
+        value: api
+      - op: replace
         path: /spec/template/spec/containers/0/livenessProbe/httpGet/port
         value: api
       - op: replace

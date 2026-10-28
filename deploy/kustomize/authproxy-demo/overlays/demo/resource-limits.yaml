@@ -195,8 +195,10 @@ spec:
 # --- Observability and demo support -------------------------------------------
 
 ---
-# Prometheus, Tempo, Loki, and the OTel Collector in one container. Trace
-# volume scales with request rate at the configured sampling ratio.
+# Prometheus, Tempo, Loki, Pyroscope, and the OTel Collector in one container.
+# Trace volume scales with request rate at the configured sampling ratio. With
+# four AuthProxy services exporting telemetry it settles above 1.5 GiB and was
+# OOM-killed repeatedly at that limit.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -209,10 +211,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 768Mi
+              memory: 1Gi
             limits:
               cpu: "1"
-              memory: 1536Mi
+              memory: 2Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
