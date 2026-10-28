@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -36,7 +37,28 @@ type Connection struct {
 	Configuration       map[string]any
 	JavascriptLibrary   *apjs.Library
 	// HTTPClientValue supplies the configured HTTP client used by a scenario.
+	// When nil, HTTPClient returns a client whose Do fails with
+	// ErrMockHTTPClientNotConfigured instead of a nil interface that panics.
 	HTTPClientValue iface.HTTPClient
+	// HTTPClientOptions records the normalized options from the most recent
+	// successful HTTPClient call, so scenarios can assert attribution. It is
+	// not synchronized; avoid concurrent HTTPClient calls when asserting it.
+	HTTPClientOptions *iface.HTTPClientOptions
+}
+
+// ErrMockHTTPClientNotConfigured is returned by the default mock HTTP client
+// when a scenario did not set Connection.HTTPClientValue.
+var ErrMockHTTPClientNotConfigured = errors.New("mock connection HTTPClientValue is not configured")
+
+// unconfiguredHTTPClient fails every request clearly and releases its body.
+type unconfiguredHTTPClient struct{}
+
+// Do closes any request body and reports the missing scenario configuration.
+func (unconfiguredHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	if req != nil && req.Body != nil {
+		_ = req.Body.Close()
+	}
+	return nil, ErrMockHTTPClientNotConfigured
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -179,9 +201,18 @@ func (m *Connection) GetAnnotations() map[string]string {
 	return m.Annotations
 }
 
-// HTTPClient returns the scenario's client without sending a request.
-func (m *Connection) HTTPClient(options iface.HTTPClientOptions) iface.HTTPClient {
-	return m.HTTPClientValue
+// HTTPClient applies the real option validation, records the normalized
+// options, and returns the scenario's client without sending a request.
+func (m *Connection) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, error) {
+	normalized, err := options.Normalize()
+	if err != nil {
+		return nil, err
+	}
+	m.HTTPClientOptions = &normalized
+	if m.HTTPClientValue == nil {
+		return unconfiguredHTTPClient{}, nil
+	}
+	return m.HTTPClientValue, nil
 }
 
 func (m *Connection) ProxyRequest(

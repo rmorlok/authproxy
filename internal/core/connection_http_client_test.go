@@ -11,22 +11,37 @@ import (
 	"sync/atomic"
 	"testing"
 
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/require"
 )
 
-// connectionHTTPClientTestProxy implements only the streaming path exercised by
-// the client; unexpected use of another proxy capability cannot silently pass.
+// connectionHTTPClientTestProxy implements only the client-building path used
+// by the connection wrapper; unexpected use of another proxy capability panics.
 type connectionHTTPClientTestProxy struct {
 	iface.Proxy
-	stream func(context.Context, httpf.RequestType, *iface.RawProxyRequest) (*http.Response, error)
+	// builds counts proxy-level clients, which own the middleware stack.
+	builds atomic.Int32
+	// options records the most recent options passed to HTTPClient.
+	options iface.HTTPClientOptions
+	// do handles each request sent through a built client.
+	do func(*http.Request) (*http.Response, error)
 }
 
-// ProxyRequestStream exposes each handoff to the test's programmable proxy.
-func (p *connectionHTTPClientTestProxy) ProxyRequestStream(ctx context.Context, kind httpf.RequestType, request *iface.RawProxyRequest) (*http.Response, error) {
-	return p.stream(ctx, kind, request)
+// HTTPClient records the options and returns a client delegating to do.
+func (p *connectionHTTPClientTestProxy) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, error) {
+	p.builds.Add(1)
+	p.options = options
+	return connectionHTTPClientTestDoer(p.do), nil
 }
+
+// connectionHTTPClientTestDoer adapts a function to iface.HTTPClient.
+type connectionHTTPClientTestDoer func(*http.Request) (*http.Response, error)
+
+// Do delegates to the fixture function.
+func (f connectionHTTPClientTestDoer) Do(r *http.Request) (*http.Response, error) { return f(r) }
 
 // connectionHTTPClientTestBody tracks ownership and eager consumption without
 // involving authentication, network transport, or response buffering fixtures.
@@ -46,47 +61,64 @@ func (b *connectionHTTPClientTestBody) Read(p []byte) (int, error) {
 func (b *connectionHTTPClientTestBody) Close() error { b.closes.Add(1); return nil }
 
 // connectionHTTPClientTestConnection supplies a resolved proxy without setting
-// up auth factories; existing proxy tests own actual credential/recovery behavior.
+// up auth factories; proxy tests own actual credential and recovery behavior.
 func connectionHTTPClientTestConnection(proxy iface.Proxy) *connection {
 	conn := &connection{proxyImpl: proxy}
 	conn.proxyImplOnce.Do(func() {})
 	return conn
 }
 
+// TestConnectionHTTPClientRequiresActorChoice rejects options without an
+// explicit ActingAs or WithoutActor before any proxy work happens.
+func TestConnectionHTTPClientRequiresActorChoice(t *testing.T) {
+	conn := &connection{}
+	for _, actor := range []iface.HTTPClientActor{{}, iface.ActingAs(nil), iface.ActingAs(&apauthcore.Actor{})} {
+		client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: actor})
+		require.ErrorIs(t, err, iface.ErrHTTPClientActorRequired)
+		require.Nil(t, client)
+	}
+
+	// Rejection never initializes the connection proxy.
+	untouched := false
+	conn.proxyImplOnce.Do(func() { untouched = true })
+	require.True(t, untouched)
+}
+
 // TestConnectionHTTPClientConstructionIsLazy creates a client without resolving
-// credentials or calling a proxy, then initializes its connection only for Do.
+// credentials, then builds the proxy-level client once on the first Do and
+// reuses it for every later call.
 func TestConnectionHTTPClientConstructionIsLazy(t *testing.T) {
 	// Unwired credential dependencies would panic if construction consulted them.
 	conn := &connection{}
-	client := conn.HTTPClient(iface.HTTPClientOptions{})
-	require.NotNil(t, client)
+	client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
+	require.NoError(t, err)
 	var calls int
-	proxy := &connectionHTTPClientTestProxy{stream: func(_ context.Context, kind httpf.RequestType, _ *iface.RawProxyRequest) (*http.Response, error) {
+	proxy := &connectionHTTPClientTestProxy{do: func(*http.Request) (*http.Response, error) {
 		calls++
-		require.Equal(t, httpf.RequestTypeProxy, kind)
 		return &http.Response{StatusCode: 204, Body: http.NoBody}, nil
 	}}
 	initialized := false
 	conn.proxyImplOnce.Do(func() { initialized = true; conn.proxyImpl = proxy })
 	require.True(t, initialized, "constructing a client must not initialize the connection proxy")
-	require.Zero(t, calls)
+	require.Zero(t, proxy.builds.Load())
 
-	// The later handoff uses the captured connection's now-resolved proxy.
-	request, err := http.NewRequest(http.MethodGet, "https://provider.example/items", nil)
-	require.NoError(t, err)
-	response, err := client.Do(request)
-	require.NoError(t, err)
-	require.Equal(t, 204, response.StatusCode)
-	require.Equal(t, 1, calls)
-	require.NoError(t, response.Body.Close())
+	// Two calls share one middleware stack built on first use.
+	for range 2 {
+		request, err := http.NewRequest(http.MethodGet, "https://provider.example/items", nil)
+		require.NoError(t, err)
+		response, err := client.Do(request)
+		require.NoError(t, err)
+		require.Equal(t, 204, response.StatusCode)
+		require.NoError(t, response.Body.Close())
+	}
+	require.Equal(t, 2, calls)
+	require.EqualValues(t, 1, proxy.builds.Load())
 }
 
-// connectionHTTPClientTestContextKey identifies per-request context values.
-type connectionHTTPClientTestContextKey struct{}
-
-// TestConnectionHTTPClientOptionsAndContexts snapshots policy once, isolates
-// labels on every handoff, and forwards each request's own context and features.
-func TestConnectionHTTPClientOptionsAndContexts(t *testing.T) {
+// TestConnectionHTTPClientOptionsAreDetached normalizes options at
+// construction so later caller edits cannot change the built client.
+func TestConnectionHTTPClientOptionsAreDetached(t *testing.T) {
+	actor := &apauthcore.Actor{Id: apid.New(apid.PrefixActor)}
 	for _, test := range []struct {
 		name             string
 		configured, want httpf.RequestType
@@ -96,47 +128,24 @@ func TestConnectionHTTPClientOptionsAndContexts(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			labels := map[string]string{"team": "captured"}
-			options := iface.HTTPClientOptions{RequestType: test.configured, Labels: labels}
-			var calls int
-			proxy := &connectionHTTPClientTestProxy{stream: func(ctx context.Context, kind httpf.RequestType, raw *iface.RawProxyRequest) (*http.Response, error) {
-				calls++
-				require.Equal(t, test.want, kind)
-				require.Equal(t, calls, ctx.Value(connectionHTTPClientTestContextKey{}))
-				require.Equal(t, raw.Outbound.Context(), ctx)
-				require.Equal(t, map[string]string{"team": "captured"}, raw.Labels)
-				raw.Labels["team"] = "proxy mutation"
-				require.Equal(t, "tenant.provider.example", raw.Outbound.Host)
-				require.Equal(t, []string{"first", "second"}, raw.Outbound.Header["X-Values"])
-				defer raw.Outbound.Body.Close()
-				payload, err := io.ReadAll(raw.Outbound.Body)
-				require.NoError(t, err)
-				require.Equal(t, "request data", string(payload))
-				replay, err := raw.Outbound.GetBody()
-				require.NoError(t, err)
-				defer replay.Close()
-				payload, err = io.ReadAll(replay)
-				require.NoError(t, err)
-				require.Equal(t, "request data", string(payload))
+			options := iface.HTTPClientOptions{RequestType: test.configured, Labels: labels, Actor: iface.ActingAs(actor)}
+			proxy := &connectionHTTPClientTestProxy{do: func(*http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 200, Body: http.NoBody}, nil
 			}}
-			client := connectionHTTPClientTestConnection(proxy).HTTPClient(options)
+			client, err := connectionHTTPClientTestConnection(proxy).HTTPClient(options)
+			require.NoError(t, err)
 
-			// Caller edits after construction and proxy edits after a handoff cannot
-			// change the request type or labels observed by a later request.
+			// Edits after construction are invisible to the lazily built client.
 			labels["team"] = "caller mutation"
 			options.RequestType = httpf.RequestTypeGlobal
-			for i := 1; i <= 2; i++ {
-				ctx := context.WithValue(context.Background(), connectionHTTPClientTestContextKey{}, i)
-				request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://provider.example/items", strings.NewReader("request data"))
-				require.NoError(t, err)
-				request.Host = "tenant.provider.example"
-				request.Header["X-Values"] = []string{"first", "second"}
-				response, err := client.Do(request)
-				require.NoError(t, err)
-				require.NoError(t, response.Body.Close())
-			}
-			require.Equal(t, 2, calls)
-			require.Equal(t, "caller mutation", labels["team"])
+			request, err := http.NewRequest(http.MethodGet, "https://provider.example/items", nil)
+			require.NoError(t, err)
+			response, err := client.Do(request)
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			require.Equal(t, test.want, proxy.options.RequestType)
+			require.Equal(t, map[string]string{"team": "captured"}, proxy.options.Labels)
+			require.Same(t, actor, proxy.options.Actor.Actor())
 		})
 	}
 }
@@ -147,13 +156,14 @@ func TestConnectionHTTPClientResponseIsLazy(t *testing.T) {
 	requestBody := &connectionHTTPClientTestBody{reader: strings.NewReader("request data")}
 	responseBody := &connectionHTTPClientTestBody{reader: strings.NewReader("response data")}
 	upstream := &http.Response{StatusCode: 201, Header: http.Header{"X-Upstream": {"value"}}, Body: responseBody}
-	proxy := &connectionHTTPClientTestProxy{stream: func(_ context.Context, _ httpf.RequestType, raw *iface.RawProxyRequest) (*http.Response, error) {
+	proxy := &connectionHTTPClientTestProxy{do: func(r *http.Request) (*http.Response, error) {
 		// Proxy ownership starts at handoff, including unread request bodies.
-		require.Same(t, requestBody, raw.Outbound.Body)
-		require.NoError(t, raw.Outbound.Body.Close())
+		require.Same(t, requestBody, r.Body)
+		require.NoError(t, r.Body.Close())
 		return upstream, nil
 	}}
-	client := connectionHTTPClientTestConnection(proxy).HTTPClient(iface.HTTPClientOptions{})
+	client, err := connectionHTTPClientTestConnection(proxy).HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
+	require.NoError(t, err)
 	request, err := http.NewRequest(http.MethodPost, "https://provider.example/items", requestBody)
 	require.NoError(t, err)
 	response, err := client.Do(request)
@@ -171,30 +181,34 @@ func TestConnectionHTTPClientResponseIsLazy(t *testing.T) {
 	require.EqualValues(t, 1, responseBody.closes.Load())
 }
 
-// TestConnectionHTTPClientInitializationFailure retains the streaming proxy's
-// ownership guarantee even when credentials cannot be initialized before I/O.
+// TestConnectionHTTPClientInitializationFailure closes every unsent body and
+// keeps returning the same initialization error on later calls.
 func TestConnectionHTTPClientInitializationFailure(t *testing.T) {
 	initializationError := errors.New("proxy initialization failed")
 	conn := &connection{proxyImplErr: initializationError}
 	conn.proxyImplOnce.Do(func() {})
-	client := conn.HTTPClient(iface.HTTPClientOptions{})
-	body := &connectionHTTPClientTestBody{reader: strings.NewReader("request data")}
-	request, err := http.NewRequest(http.MethodPost, "https://provider.example/items", body)
+	client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
 	require.NoError(t, err)
 
-	// Failure still closes exactly once through the existing connection path.
-	response, err := client.Do(request)
-	require.ErrorIs(t, err, initializationError)
-	require.Nil(t, response)
-	require.Zero(t, body.reads.Load())
-	require.EqualValues(t, 1, body.closes.Load())
+	// Each failed call closes its own body exactly once without reading it.
+	for range 2 {
+		body := &connectionHTTPClientTestBody{reader: strings.NewReader("request data")}
+		request, err := http.NewRequest(http.MethodPost, "https://provider.example/items", body)
+		require.NoError(t, err)
+		response, err := client.Do(request)
+		require.ErrorIs(t, err, initializationError)
+		require.Nil(t, response)
+		require.Zero(t, body.reads.Load())
+		require.EqualValues(t, 1, body.closes.Load())
+	}
 }
 
-// TestConnectionHTTPClientNilRequest rejects a missing request before accessing
-// its context or attempting to resolve connection authentication.
+// TestConnectionHTTPClientNilRequest rejects a missing request before
+// attempting to resolve connection authentication.
 func TestConnectionHTTPClientNilRequest(t *testing.T) {
 	conn := &connection{}
-	client := conn.HTTPClient(iface.HTTPClientOptions{})
+	client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
+	require.NoError(t, err)
 	response, err := client.Do(nil)
 	require.Error(t, err)
 	require.Nil(t, response)
@@ -203,19 +217,19 @@ func TestConnectionHTTPClientNilRequest(t *testing.T) {
 	require.True(t, untouched)
 }
 
-// TestConnectionHTTPClientConcurrentCalls reuses one client without sharing
-// mutable per-request labels or capturing any request's context for another.
+// connectionHTTPClientTestContextKey identifies per-request context values.
+type connectionHTTPClientTestContextKey struct{}
+
+// TestConnectionHTTPClientConcurrentCalls builds the proxy client once under
+// concurrent first use while each request keeps its own context.
 func TestConnectionHTTPClientConcurrentCalls(t *testing.T) {
 	const count = 16
-	proxy := &connectionHTTPClientTestProxy{stream: func(ctx context.Context, _ httpf.RequestType, raw *iface.RawProxyRequest) (*http.Response, error) {
-		if raw.Labels["team"] != "captured" {
-			return nil, errors.New("another request mutated the labels")
-		}
-		value := fmt.Sprint(ctx.Value(connectionHTTPClientTestContextKey{}))
-		raw.Labels["team"] = value
+	proxy := &connectionHTTPClientTestProxy{do: func(r *http.Request) (*http.Response, error) {
+		value := fmt.Sprint(r.Context().Value(connectionHTTPClientTestContextKey{}))
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(value))}, nil
 	}}
-	client := connectionHTTPClientTestConnection(proxy).HTTPClient(iface.HTTPClientOptions{Labels: map[string]string{"team": "captured"}})
+	client, err := connectionHTTPClientTestConnection(proxy).HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
+	require.NoError(t, err)
 	results := make(chan error, count)
 	var workers sync.WaitGroup
 	for i := range count {
@@ -238,8 +252,9 @@ func TestConnectionHTTPClientConcurrentCalls(t *testing.T) {
 	workers.Wait()
 	close(results)
 
-	// All calls retain their own context and isolated label map under the race detector.
+	// All calls keep their own context, and the stack was built only once.
 	for err := range results {
 		require.NoError(t, err)
 	}
+	require.EqualValues(t, 1, proxy.builds.Load())
 }

@@ -154,12 +154,27 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 		ForLabels(req.Labels).
 		NewHTTPClient()
 
-	resp, app, err := p.sendRaw(ctx, client, req.Outbound)
+	return p.streamWithClient(ctx, reqType, client, req.Outbound)
+}
+
+// streamWithClient runs one logical streaming call through an already built
+// middleware client: credential resolution, the send, one replayable 401
+// recovery, probe acceleration, and final-status logging. It owns outbound's
+// body on every path, and the caller owns the returned response body. Both
+// ProxyRequestStream (a client per call) and proxyHTTPClient (a client per
+// HTTPClient) delegate here so their semantics cannot drift.
+func (p *proxy) streamWithClient(
+	ctx context.Context,
+	reqType httpf.RequestType,
+	client *http.Client,
+	outbound *http.Request,
+) (*http.Response, error) {
+	resp, app, err := p.sendRaw(ctx, client, outbound)
 	if err != nil {
 		return nil, err
 	}
 
-	if resp.StatusCode == http.StatusUnauthorized && canRetryRawAfter401(req.Outbound) {
+	if resp.StatusCode == http.StatusUnauthorized && canRetryRawAfter401(outbound) {
 		if err := ctx.Err(); err != nil {
 			_ = resp.Body.Close()
 			return nil, err
@@ -176,7 +191,7 @@ func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestTyp
 			// The discarded response could itself be an open-ended stream.
 			// Close it directly rather than waiting to drain it before retrying.
 			_ = resp.Body.Close()
-			retry, err := rawRequestForRetry(ctx, req.Outbound)
+			retry, err := rawRequestForRetry(ctx, outbound)
 			if err != nil {
 				return nil, err
 			}

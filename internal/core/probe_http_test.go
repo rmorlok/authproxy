@@ -40,6 +40,10 @@ func (s *stubProxy) ProxyRequestStream(ctx context.Context, _ httpf.RequestType,
 	panic("ProxyRequestStream should not be invoked by probe_http")
 }
 
+func (s *stubProxy) HTTPClient(iface.HTTPClientOptions) (iface.HTTPClient, error) {
+	panic("HTTPClient should not be invoked by probe_http")
+}
+
 // newProbeTestConnection builds a connection wired to a stubProxy so the
 // probe code under test exercises the real iface.Proxy contract without
 // going through resolveAuthenticator (which would require a fully wired

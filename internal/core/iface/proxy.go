@@ -161,4 +161,9 @@ type Proxy interface {
 	// ownership of the outgoing request body, including failure paths.
 	ProxyRequestStream(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest) (*http.Response, error)
 	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest, w http.ResponseWriter) error
+	// HTTPClient builds the connection's middleware stack once for the given
+	// request type, labels, and actor, and returns a client whose Do shares the
+	// ProxyRequestStream semantics. It fails with ErrHTTPClientActorRequired for
+	// invalid options and performs no I/O.
+	HTTPClient(options HTTPClientOptions) (HTTPClient, error)
 }

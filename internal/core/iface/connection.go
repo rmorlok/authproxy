@@ -63,10 +63,11 @@ type Connection interface {
 	GetProbes() []Probe
 	GetEnabledProbe(ctx context.Context, probeId string) (Probe, error)
 	GetEnabledProbes(ctx context.Context) ([]Probe, error)
-	// HTTPClient captures request attribution for a reusable authenticated client.
-	// Construction performs no I/O; proxy initialization and credential errors
-	// are returned by Do. Concurrent calls use each request's own context.
-	HTTPClient(options HTTPClientOptions) HTTPClient
+	// HTTPClient captures request type, labels, and an explicit actor choice for
+	// a short-lived authenticated client. It fails only for invalid options
+	// (ErrHTTPClientActorRequired) and performs no I/O; proxy initialization and
+	// credential errors are returned by Do. Concurrent calls are safe.
+	HTTPClient(options HTTPClientOptions) (HTTPClient, error)
 	ProxyRequest(
 		ctx context.Context,
 		reqType httpf.RequestType,
