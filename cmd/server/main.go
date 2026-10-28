@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/migration"
@@ -150,13 +151,15 @@ func prepareServe(ctx context.Context, autoMigrate bool, warningOutput io.Writer
 	return verifyMigrationsWithRetry(ctx, dm, warningOutput)
 }
 
-// startupSchemaWaitTimeout bounds how long serve keeps retrying schema
-// verification while a schema database is unreachable. Container
-// orchestrators restart the process if it still fails afterwards.
-var startupSchemaWaitTimeout = 2 * time.Minute
+const (
+	// startupSchemaWaitTimeout bounds how long serve keeps retrying schema
+	// verification while a schema database is unreachable. Container
+	// orchestrators restart the process if it still fails afterwards.
+	startupSchemaWaitTimeout = 2 * time.Minute
 
-// startupSchemaRetryInterval is the delay between verification attempts.
-var startupSchemaRetryInterval = 2 * time.Second
+	// startupSchemaRetryInterval is the delay between verification attempts.
+	startupSchemaRetryInterval = 2 * time.Second
+)
 
 // verifyMigrationsWithRetry verifies that every schema is compatible with this
 // binary before services start. When the only failures are unreachable
@@ -164,11 +167,13 @@ var startupSchemaRetryInterval = 2 * time.Second
 // still starting), it retries every startupSchemaRetryInterval for up to
 // startupSchemaWaitTimeout, writing a warning per attempt. Stale, ahead, or
 // dirty schemas fail immediately because only a migration can fix them.
+// Timing comes from apctx.GetClock(ctx) so tests can drive it with a fake clock.
 func verifyMigrationsWithRetry(ctx context.Context, dm migrationManager, warningOutput io.Writer) error {
-	deadline := time.Now().Add(startupSchemaWaitTimeout)
+	clk := apctx.GetClock(ctx)
+	deadline := clk.Now().Add(startupSchemaWaitTimeout)
 	for {
 		err := dm.VerifyMigrations(ctx)
-		if err == nil || !migration.OnlyUnavailable(err) || !time.Now().Before(deadline) {
+		if err == nil || !migration.OnlyUnavailable(err) || !clk.Now().Before(deadline) {
 			return err
 		}
 
@@ -176,7 +181,7 @@ func verifyMigrationsWithRetry(ctx context.Context, dm migrationManager, warning
 		select {
 		case <-ctx.Done():
 			return errors.Join(err, ctx.Err())
-		case <-time.After(startupSchemaRetryInterval):
+		case <-clk.After(startupSchemaRetryInterval):
 		}
 	}
 }

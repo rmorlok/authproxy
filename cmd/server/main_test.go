@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/migration"
 	"github.com/stretchr/testify/require"
+	clocktesting "k8s.io/utils/clock/testing"
 )
 
 func TestParseMigrateArgs(t *testing.T) {
@@ -87,7 +89,9 @@ func TestServeDoesNotStartServicesWhenVerificationFails(t *testing.T) {
 			}
 			t.Cleanup(func() { startServices = originalStartServices })
 
+			// Execute would supply a background context; RunE is called directly here.
 			cmd := cmdServe()
+			cmd.SetContext(context.Background())
 			cmd.SetErr(&bytes.Buffer{})
 			err := cmd.RunE(cmd, []string{"all"})
 			require.ErrorContains(t, err, failure)
@@ -97,7 +101,6 @@ func TestServeDoesNotStartServicesWhenVerificationFails(t *testing.T) {
 }
 
 func TestPrepareServeRetriesUnavailableSchemas(t *testing.T) {
-	shortenStartupSchemaWait(t, time.Second)
 	unavailable := &migration.UnavailableError{Target: migration.TargetAppMetrics, Err: errors.New("memory limit exceeded")}
 
 	// The app-metrics store rejects the first two checks, then recovers.
@@ -105,44 +108,68 @@ func TestPrepareServeRetriesUnavailableSchemas(t *testing.T) {
 	restoreMigrationManager(t, fake)
 	var warnings bytes.Buffer
 
-	// Serve preparation waits it out instead of failing startup.
-	require.NoError(t, prepareServe(context.Background(), false, &warnings))
+	// Serve preparation waits it out instead of failing startup, retrying once
+	// per interval on the fake clock.
+	ctx, fakeClock := fakeClockContext()
+	err := runStepping(t, fakeClock, func() error { return prepareServe(ctx, false, &warnings) })
+	require.NoError(t, err)
 	require.Equal(t, 3, fake.verifyCalls)
 	require.Equal(t, 2, strings.Count(warnings.String(), "retrying"))
 }
 
 func TestPrepareServeGivesUpOnPersistentlyUnavailableSchemas(t *testing.T) {
-	shortenStartupSchemaWait(t, 20*time.Millisecond)
 	unavailable := &migration.UnavailableError{Target: migration.TargetMainDatabase, Err: errors.New("connection refused")}
 
-	// A store that never comes back fails once the wait timeout elapses.
+	// A store that never comes back is checked once per interval until the
+	// wait timeout elapses on the fake clock, then startup fails.
 	fake := &fakeMigrationManager{verifyErr: unavailable}
 	restoreMigrationManager(t, fake)
 
-	err := prepareServe(context.Background(), false, &bytes.Buffer{})
+	ctx, fakeClock := fakeClockContext()
+	err := runStepping(t, fakeClock, func() error { return prepareServe(ctx, false, &bytes.Buffer{}) })
 	require.ErrorIs(t, err, unavailable)
-	require.Greater(t, fake.verifyCalls, 1)
+	require.Equal(t, int(startupSchemaWaitTimeout/startupSchemaRetryInterval)+1, fake.verifyCalls)
 }
 
 func TestPrepareServeDoesNotRetryIncompatibleSchemas(t *testing.T) {
-	shortenStartupSchemaWait(t, time.Second)
-
-	// A stale schema needs a migration, so it fails on the first check.
+	// A stale schema needs a migration, so it fails on the first check without
+	// waiting on the clock.
 	fake := &fakeMigrationManager{verifyErr: errors.New("app-metrics schema is behind")}
 	restoreMigrationManager(t, fake)
 
-	require.Error(t, prepareServe(context.Background(), false, &bytes.Buffer{}))
+	ctx, _ := fakeClockContext()
+	require.Error(t, prepareServe(ctx, false, &bytes.Buffer{}))
 	require.Equal(t, 1, fake.verifyCalls)
 }
 
-// shortenStartupSchemaWait makes startup verification retries fast for tests.
-func shortenStartupSchemaWait(t *testing.T, timeout time.Duration) {
+// fakeClockContext returns a context carrying a fake clock for apctx.GetClock.
+func fakeClockContext() (context.Context, *clocktesting.FakeClock) {
+	fakeClock := clocktesting.NewFakeClock(time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	return apctx.WithClock(context.Background(), fakeClock), fakeClock
+}
+
+// runStepping runs fn in a goroutine and advances fakeClock by one retry
+// interval whenever fn is blocked waiting on it, returning fn's result.
+func runStepping(t *testing.T, fakeClock *clocktesting.FakeClock, fn func() error) error {
 	t.Helper()
-	originalTimeout, originalInterval := startupSchemaWaitTimeout, startupSchemaRetryInterval
-	startupSchemaWaitTimeout, startupSchemaRetryInterval = timeout, time.Millisecond
-	t.Cleanup(func() {
-		startupSchemaWaitTimeout, startupSchemaRetryInterval = originalTimeout, originalInterval
-	})
+	done := make(chan error, 1)
+	go func() { done <- fn() }()
+
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-timeout:
+			t.Fatal("timed out waiting for startup schema verification")
+		default:
+		}
+		if fakeClock.HasWaiters() {
+			fakeClock.Step(startupSchemaRetryInterval)
+		} else {
+			time.Sleep(time.Millisecond)
+		}
+	}
 }
 
 func restoreMigrationManager(t *testing.T, fake migrationManager) {
