@@ -28,9 +28,15 @@ Every demo container has CPU and memory requests and limits, kept together in
 (CPU included) so CPU throttling and memory pressure under sustained load show
 up in metrics instead of being absorbed by the node. AuthProxy services set
 `GOMEMLIMIT` to roughly 85% of their memory limit; Go sizes `GOMAXPROCS` from
-the CPU limit automatically. Liveness probes use `/ping` and readiness probes
-use `/healthz`, so a slow database removes pods from rotation rather than
-restarting them.
+the CPU limit automatically. A startup probe on `/ping` gives each AuthProxy
+pod three minutes to verify schemas and start listening; after that liveness
+probes use `/ping` and readiness probes use `/healthz`, so a slow database
+removes pods from rotation rather than restarting them.
+
+ClickHouse's memory limit is fixed at 75% of its container limit
+(`memory_worker_dynamic_hard_limit` is disabled). The 26.x default recomputes
+the limit from host-wide available memory, which on a busy node made
+ClickHouse reject small queries while far below its container limit.
 
 Render locally:
 
