@@ -47,22 +47,35 @@ spec:
             - secretRef:
                 name: redis-creds
                 optional: true
+          # AuthProxy verifies schemas before it starts listening and retries
+          # for up to two minutes while a schema store is unreachable. Allow
+          # three minutes to start before liveness checks begin.
+          startupProbe:
+            httpGet:
+              path: /ping
+              port: public
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
           # Liveness only checks that the process serves HTTP. /healthz also
           # pings the database, Redis, and app-metrics stores, so using it for
           # liveness would restart healthy pods whenever a dependency is slow.
+          # The 3s timeout and threshold tolerate a briefly overloaded node.
           livenessProbe:
             httpGet:
               path: /ping
               port: public
-            initialDelaySeconds: 5
             periodSeconds: 10
-          # Readiness gates traffic on dependency health.
+            timeoutSeconds: 3
+            failureThreshold: 6
+          # Readiness gates traffic on dependency health. /healthz bounds its
+          # dependency pings to 1s, so 3s leaves room for scheduling delays.
           readinessProbe:
             httpGet:
               path: /healthz
               port: public
-            initialDelaySeconds: 5
             periodSeconds: 10
+            timeoutSeconds: 3
           volumeMounts:
             - name: config
               mountPath: /etc/authproxy/config.yaml

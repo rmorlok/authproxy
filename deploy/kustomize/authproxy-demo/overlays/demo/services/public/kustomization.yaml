@@ -34,6 +34,9 @@ patches:
           - name: public
             containerPort: 8080
       - op: replace
+        path: /spec/template/spec/containers/0/startupProbe/httpGet/port
+        value: public
+      - op: replace
         path: /spec/template/spec/containers/0/livenessProbe/httpGet/port
         value: public
       - op: replace

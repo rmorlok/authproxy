@@ -516,11 +516,58 @@ func ValidateRequest(status Status, direction Direction, version *uint) error {
 	return nil
 }
 
+// UnavailableError reports that a schema target's migration state could not
+// be read, typically because its database was unreachable or rejected the
+// query. Unlike a stale or dirty schema, it can resolve without operator
+// action, so callers may retry it.
+type UnavailableError struct {
+	// Target is the schema target whose status could not be read.
+	Target Target
+	// Err is the underlying failure.
+	Err error
+}
+
+// Error implements error, preserving the historical message format.
+func (e *UnavailableError) Error() string {
+	return fmt.Sprintf("%s schema is unavailable: %v", e.Target, e.Err)
+}
+
+// Unwrap exposes the underlying failure to errors.Is / errors.As.
+func (e *UnavailableError) Unwrap() error {
+	return e.Err
+}
+
+// OnlyUnavailable reports whether err consists solely of UnavailableError
+// values, looking through fmt.Errorf wrapping and errors.Join trees. It is
+// false for nil and for any tree containing another kind of error, such as a
+// stale or dirty schema, which retrying cannot fix.
+func OnlyUnavailable(err error) bool {
+	switch e := err.(type) {
+	case nil:
+		return false
+	case *UnavailableError:
+		return true
+	case interface{ Unwrap() []error }:
+		children := e.Unwrap()
+		for _, child := range children {
+			if !OnlyUnavailable(child) {
+				return false
+			}
+		}
+		return len(children) > 0
+	case interface{ Unwrap() error }:
+		return OnlyUnavailable(e.Unwrap())
+	default:
+		return false
+	}
+}
+
+// IncompatibleError returns nil when status is compatible with this binary.
+// Otherwise it describes the problem: an *UnavailableError when the status
+// could not be read, or a plain error for stale, ahead, or dirty schemas.
 func IncompatibleError(status Status) error {
 	if status.Err != nil {
-		return fmt.Errorf(
-			"%s schema is unavailable: %w",
-			status.Target, status.Err)
+		return &UnavailableError{Target: status.Target, Err: status.Err}
 	}
 
 	if status.Compatible() {
