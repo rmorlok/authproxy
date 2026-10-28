@@ -18,10 +18,13 @@ import (
 type proxyHTTPClient struct {
 	// proxy supplies credentials, 401 recovery, probe acceleration, and logging.
 	proxy *proxy
+
 	// requestType classifies every request for middleware and probe acceleration.
 	requestType httpf.RequestType
+
 	// actor is the validated attribution choice used to check request contexts.
 	actor iface.HTTPClientActor
+
 	// client wraps the connection's middleware stack, built once at construction.
 	client *http.Client
 }
