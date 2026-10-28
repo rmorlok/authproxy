@@ -711,12 +711,13 @@ capacity changes with the intended Terraform configuration after recovery.
 
 ### 5.1 Steady-state target
 
-~$150-165/mo with the defaults in `deploy/terraform/eks/variables.tf`:
+~$200/mo with the defaults in `deploy/terraform/eks/variables.tf`, plus t3
+unlimited-mode CPU surplus charges under sustained load:
 
 | Item                         | /mo  |
 |------------------------------|------|
 | EKS control plane            | $73  |
-| 2× t3.medium (on-demand)     | $60  |
+| 3× t3.medium (on-demand)     | $91  |
 | Single NAT gateway           | $32  |
 | Route53 hosted zone          | $0.50|
 | S3 + DynamoDB (state)        | <$1  |

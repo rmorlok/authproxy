@@ -3,7 +3,7 @@
 #
 # Sizing intent:
 # - Requests reflect steady-state demo usage so the scheduler packs the
-#   environment onto the small EKS node group (2x t3.medium by default).
+#   environment onto the small EKS node group (3x t3.medium by default).
 # - Limits are deliberately real ceilings, CPU included. The demo is used to
 #   observe how AuthProxy and its stores behave under sustained load, so CPU
 #   throttling and memory pressure should show up in metrics rather than being

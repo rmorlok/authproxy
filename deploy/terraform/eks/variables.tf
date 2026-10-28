@@ -29,27 +29,35 @@ variable "az_count" {
 }
 
 variable "node_instance_types" {
+  # t3.medium: 2 vCPU / 4 GiB and a 17-pod VPC CNI limit per node, of which
+  # roughly 5-7 go to per-node and cluster system pods. Capacity scales with
+  # node_group_min_size; move to t3.large (8 GiB, 35 pods) when the demo needs
+  # more memory per node, e.g. for sustained load testing.
   description = "Instance types for the managed node group."
   type        = list(string)
   default     = ["t3.medium"]
 }
 
 variable "node_group_min_size" {
-  description = "Min node count for the managed node group."
+  # The demo's EBS volumes are zonal and the node group spans az_count AZs.
+  # Keeping one node per AZ guarantees a node can always mount each volume,
+  # even after node replacement. The EKS module ignores desired_size changes
+  # after creation, so the minimum is what actually raises the node count.
+  description = "Min node count for the managed node group. Keep at least az_count so every AZ (and its EBS volumes) has a node."
   type        = number
-  default     = 1
+  default     = 3
 }
 
 variable "node_group_desired_size" {
-  description = "Desired node count for the managed node group at bootstrap time."
+  description = "Desired node count for the managed node group at bootstrap time. Ignored by the EKS module after creation; raise node_group_min_size to scale an existing group."
   type        = number
-  default     = 2
+  default     = 3
 }
 
 variable "node_group_max_size" {
   description = "Max node count for the managed node group (caps autoscaling)."
   type        = number
-  default     = 4
+  default     = 6
 }
 
 variable "domain_name" {
