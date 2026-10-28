@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -31,23 +32,18 @@ import (
 // httpf transport after the host and proxy have composed request cancellation.
 type integrationContextKey struct{}
 
-// integrationClient captures request attribution while delegating to the real
-// proxy, keeping authentication and transport behavior in the integration path.
+// integrationClient counts host handoffs to a production configured client,
+// keeping authentication, attribution, and transport behavior in the test path.
 type integrationClient struct {
-	connection  *coremock.Connection
-	proxy       iface.Proxy
-	requestType httpf.RequestType
-	labels      map[string]string
-	calls       atomic.Int32
+	connection *coremock.Connection
+	client     iface.HTTPClient
+	calls      atomic.Int32
 }
 
 // Do counts logical host handoffs; retries remain inside the production proxy.
 func (c *integrationClient) Do(request *http.Request) (*http.Response, error) {
 	c.calls.Add(1)
-	return c.proxy.ProxyRequestStream(request.Context(), c.requestType, &iface.RawProxyRequest{
-		Outbound: request,
-		Labels:   maps.Clone(c.labels),
-	})
+	return c.client.Do(request)
 }
 
 // integrationAuth exposes deterministic credential rotation without external
@@ -88,6 +84,7 @@ func (*integrationAuth) Revoke(context.Context) error { return nil }
 // integrationAttempt captures transport attribution without consuming bodies.
 type integrationAttempt struct {
 	info         httpf.RequestInfo
+	actorID      apid.ID
 	contextValue any
 	deadline     time.Time
 	hasDeadline  bool
@@ -123,10 +120,14 @@ type integrationRoundTripper struct {
 func (r integrationRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
 	info := r.info
 	info.Labels = maps.Clone(info.Labels)
+	var actorID apid.ID
+	if actor := apauthcore.ActorFromContext(request.Context()); actor != nil {
+		actorID = actor.GetId()
+	}
 	deadline, hasDeadline := request.Context().Deadline()
 	r.middleware.mu.Lock()
 	r.middleware.attempts = append(r.middleware.attempts, integrationAttempt{
-		info: info, contextValue: request.Context().Value(integrationContextKey{}),
+		info: info, actorID: actorID, contextValue: request.Context().Value(integrationContextKey{}),
 		deadline: deadline, hasDeadline: hasDeadline,
 	})
 	r.middleware.mu.Unlock()
@@ -135,7 +136,8 @@ func (r integrationRoundTripper) RoundTrip(request *http.Request) (*http.Respons
 
 // newIntegrationClient configures a connection-scoped client using the production
 // factory and proxy, with fixtures for persistent metadata and credentials.
-func newIntegrationClient(auth *integrationAuth, options iface.HTTPClientOptions) (*integrationClient, *integrationMiddleware) {
+func newIntegrationClient(t *testing.T, auth *integrationAuth, options iface.HTTPClientOptions) (*integrationClient, *integrationMiddleware) {
+	t.Helper()
 	connection := &coremock.Connection{
 		Id: apid.New(apid.PrefixConnection), Namespace: "root.product.owner",
 		ConnectorId: apid.New(apid.PrefixConnector), ConnectorGeneration: 7,
@@ -144,15 +146,11 @@ func newIntegrationClient(auth *integrationAuth, options iface.HTTPClientOptions
 	middleware := &integrationMiddleware{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	factory := httpf.CreateFactory(nil, nil, middleware, logger)
-	requestType := options.RequestType
-	if requestType == "" {
-		requestType = httpf.RequestTypeProxy
-	}
+	client, err := proxy.New(factory, connection, auth, nil).HTTPClient(options)
+	require.NoError(t, err)
 	return &integrationClient{
-		connection:  connection,
-		proxy:       proxy.New(factory, connection, auth, nil),
-		requestType: requestType,
-		labels:      maps.Clone(options.Labels),
+		connection: connection,
+		client:     client,
 	}, middleware
 }
 
@@ -199,15 +197,24 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			// credential-recovery replay within one logical request, even for POST.
 			auth := &integrationAuth{}
 			labels := map[string]string{"tool-label": "captured"}
-			client, transport := newIntegrationClient(auth, iface.HTTPClientOptions{
-				RequestType: httpf.RequestTypeProxy, Labels: labels,
+			actor := &apauthcore.Actor{
+				Id: apid.New(apid.PrefixActor), Namespace: "root.product.owner",
+				Labels: map[string]string{"actor-label": "captured"},
+			}
+			client, transport := newIntegrationClient(t, auth, iface.HTTPClientOptions{
+				RequestType: httpf.RequestTypeProxy, Labels: labels, Actor: iface.ActingAs(actor),
 			})
-			ctx := context.WithValue(context.Background(), integrationContextKey{}, "admitted")
+			ctx := apauthcore.NewAuthenticatedRequestAuth(actor).ContextWith(context.Background())
+			ctx = context.WithValue(ctx, integrationContextKey{}, "admitted")
 			session, err := httphost.New(ctx, client, integrationLimits())
 			require.NoError(t, err)
 			t.Cleanup(session.Close)
 			labels["tool-label"] = "changed after capture"
-			request, err := http.NewRequest(http.MethodPost, server.URL+"/record?api_key=caller&keep=a%2Fb", strings.NewReader(`{"name":"Alice"}`))
+			actor.Labels["actor-label"] = "changed after capture"
+			// A prepared request cannot replace the admitted session identity.
+			otherActor := &apauthcore.Actor{Id: apid.New(apid.PrefixActor), Namespace: actor.Namespace}
+			requestCtx := apauthcore.NewAuthenticatedRequestAuth(otherActor).ContextWith(context.Background())
+			request, err := http.NewRequestWithContext(requestCtx, http.MethodPost, server.URL+"/record?api_key=caller&keep=a%2Fb", strings.NewReader(`{"name":"Alice"}`))
 			require.NoError(t, err)
 			request.Host = "tenant.example.test"
 			request.Header.Set("Authorization", "Bearer caller")
@@ -244,8 +251,8 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			require.Equal(t, originalHeaders, request.Header)
 			require.Equal(t, "tenant.example.test", request.Host)
 
-			// The real httpf chain receives the connection, captured request labels,
-			// admitted context value, and the shared invocation deadline.
+			// Both attempts use captured actor attribution and the session identity,
+			// alongside the connection, labels, and shared invocation deadline.
 			observed := transport.snapshot()
 			require.Len(t, observed, 2)
 			deadline, ok := session.Context().Deadline()
@@ -257,6 +264,9 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 				require.Equal(t, uint64(7), attempt.info.ConnectorGeneration)
 				require.Equal(t, "captured", attempt.info.Labels["tool-label"])
 				require.Equal(t, "captured", attempt.info.Labels["connection-label"])
+				require.Equal(t, "captured", attempt.info.Labels["apxy/act/actor-label"])
+				require.Equal(t, actor.Id.String(), attempt.info.Labels["apxy/act/-/id"])
+				require.Equal(t, actor.Id, attempt.actorID)
 				require.Equal(t, "admitted", attempt.contextValue)
 				require.True(t, attempt.hasDeadline)
 				require.Equal(t, deadline, attempt.deadline)
@@ -270,6 +280,52 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			require.Nil(t, response)
 			require.Equal(t, int32(1), client.calls.Load())
 			require.Equal(t, int32(2), attempts.Load())
+		})
+	}
+}
+
+// TestSessionIntegrationActorMismatch verifies a client configured for another
+// actor, or for background work, rejects an actor-initiated session before I/O.
+func TestSessionIntegrationActorMismatch(t *testing.T) {
+	actor := &apauthcore.Actor{Id: apid.New(apid.PrefixActor), Namespace: "root.product.owner"}
+	otherActor := &apauthcore.Actor{Id: apid.New(apid.PrefixActor), Namespace: actor.Namespace}
+	ctx := apauthcore.NewAuthenticatedRequestAuth(actor).ContextWith(context.Background())
+	for _, tc := range []struct {
+		name  string
+		actor iface.HTTPClientActor
+	}{
+		{"different actor", iface.ActingAs(otherActor)},
+		{"without actor", iface.WithoutActor()},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Track the real proxy and transport so rejection must precede both
+			// credential resolution and any attempt to contact the provider.
+			var sends atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				sends.Add(1)
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			t.Cleanup(server.Close)
+			auth := &integrationAuth{}
+			client, transport := newIntegrationClient(t, auth, iface.HTTPClientOptions{Actor: tc.actor})
+			session := sessionTestNew(t, ctx, client, integrationLimits())
+			body := &sessionTestBody{reader: strings.NewReader("payload")}
+			request, err := http.NewRequest(http.MethodPost, server.URL, body)
+			require.NoError(t, err)
+
+			// The host preserves its safe error boundary and body ownership even
+			// when the configured client rejects the session's admitted identity.
+			response, err := session.Do(request)
+			require.ErrorIs(t, err, httphost.ErrTransport)
+			require.Nil(t, response)
+			require.Equal(t, int32(1), body.closes.Load())
+			require.Zero(t, body.reads.Load())
+			require.Zero(t, auth.resolves.Load())
+			require.Zero(t, sends.Load())
+			require.Empty(t, transport.snapshot())
+			require.Equal(t, int32(1), client.calls.Load())
+			// Handoff remains conservative until the proxy exposes send evidence.
+			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
 		})
 	}
 }
@@ -304,7 +360,7 @@ func TestSessionIntegrationGzipStreams(t *testing.T) {
 				}))
 				t.Cleanup(server.Close)
 				t.Cleanup(unblock)
-				client, _ := newIntegrationClient(&integrationAuth{}, iface.HTTPClientOptions{})
+				client, _ := newIntegrationClient(t, &integrationAuth{}, iface.HTTPClientOptions{Actor: iface.WithoutActor()})
 				limits := integrationLimits()
 				limits.MaxResponseBytes = int64(len(payload))
 				if tooLarge {
@@ -381,7 +437,7 @@ func TestSessionIntegrationBodylessEncodedResponses(t *testing.T) {
 				w.WriteHeader(tc.status)
 			}))
 			t.Cleanup(server.Close)
-			client, _ := newIntegrationClient(&integrationAuth{}, iface.HTTPClientOptions{})
+			client, _ := newIntegrationClient(t, &integrationAuth{}, iface.HTTPClientOptions{Actor: iface.WithoutActor()})
 			session, err := httphost.New(context.Background(), client, integrationLimits())
 			require.NoError(t, err)
 			t.Cleanup(session.Close)
@@ -421,7 +477,7 @@ func TestSessionIntegrationContentTypeSurvivesHeaderFiltering(t *testing.T) {
 		_, _ = io.WriteString(w, payload)
 	}))
 	t.Cleanup(server.Close)
-	client, _ := newIntegrationClient(&integrationAuth{}, iface.HTTPClientOptions{})
+	client, _ := newIntegrationClient(t, &integrationAuth{}, iface.HTTPClientOptions{Actor: iface.WithoutActor()})
 	session, err := httphost.New(context.Background(), client, integrationLimits())
 	require.NoError(t, err)
 	t.Cleanup(session.Close)

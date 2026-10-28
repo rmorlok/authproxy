@@ -91,8 +91,9 @@ type Session struct {
 
 // New captures a client for an already admitted Tool and starts its timeout.
 // Callers must configure client from the admitted connection with proxy request
-// attribution. Authorization, input validation, connection configuration
-// snapshots, and policy resolution also belong to callers.
+// attribution and an explicit actor choice matching any actor carried by ctx.
+// Authorization, input validation, connection configuration snapshots, and
+// policy resolution also belong to callers.
 func New(
 	ctx context.Context,
 	client iface.HTTPClient,

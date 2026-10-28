@@ -14,13 +14,18 @@ Tool templates and map their responses to rich results.
 
 The following helper reads an account response. `conn` is the connection already
 selected and authorized by the invocation caller. The limits below are examples;
-the caller must resolve effective policy before creating a session.
+the caller must resolve effective policy before creating a session. `ctx` carries
+the actor admitted for this invocation.
 
 ```go
 func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
-    client := conn.HTTPClient(iface.HTTPClientOptions{
+    client, err := conn.HTTPClient(iface.HTTPClientOptions{
+        Actor:  iface.ActingAs(authcore.ActorFromContext(ctx)),
         Labels: map[string]string{"operation": "read-account"},
     }) // An empty RequestType defaults to proxy traffic.
+    if err != nil {
+        return nil, err
+    }
     session, err := httphost.New(ctx, client, httphost.Limits{
         Timeout:          30 * time.Second,
         MaxRequests:      3,
@@ -57,15 +62,21 @@ func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
 }
 ```
 
-The module imports are `internal/core/iface` and `internal/tools/httphost` under
+The module imports are `internal/apauth/core` (aliased as `authcore`),
+`internal/core/iface`, and `internal/tools/httphost` under
 `github.com/rmorlok/authproxy`; the other imports are from the Go standard library.
 For a multi-request action, keep one session alive around the entire action.
 Creating a session for each page would reset the allowances and timeout.
 
-The client captures request attribution and uses the connection's existing
-streaming proxy for credentials and recovery. `Session` only requires its `Do`
-method. The invocation caller must supply a client configured from the admitted
-connection; the host does not select a connection or configure labels itself.
+The client captures actor attribution, request type, and labels and uses the
+connection's existing streaming proxy for credentials and recovery. Every client
+requires an explicit actor choice. Construction fails if `ActingAs` has no valid
+actor; background work with no initiating actor can choose `iface.WithoutActor()`.
+A session context carrying an actor must match the client's configured actor.
+Create a client per invocation so its captured labels and rate-limit configuration
+are current. `Session` only requires its `Do` method. The invocation caller must
+supply a client configured from the admitted connection; the host does not select
+a connection or configure attribution itself.
 
 `Do` takes ownership of the outgoing body immediately, even when a canceled
 context or exhausted budget prevents a proxy call. After handoff, the existing
@@ -136,7 +147,8 @@ Fully returned responses remain usable, but partial bodies
 must not be treated as complete responses. Cancellation does not undo upstream
 side effects.
 
-The session context supplies the admitted actor and other context values.
+The session context preserves the admitted actor and other context values;
+the configured client fixes request attribution and rejects a conflicting actor.
 Each request's context can cancel that request sooner but cannot replace the
 session's identity. Caller cancellation returns `context.Canceled` or
 `context.DeadlineExceeded`; the configured session timeout returns `ErrTimeout`.
