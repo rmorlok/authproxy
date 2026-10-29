@@ -201,6 +201,13 @@ type DB interface {
 	// and limit. Callers must still authorize each returned candidate.
 	ListToolCandidatesFromCursor(ctx context.Context, cursor string) (ToolCandidatePage, error)
 
+	// ListTools pages live Tool identities for management, independent of
+	// connection liveness. Callers must still check per-resource permissions.
+	ListTools(ctx context.Context, query ToolListQuery) (ToolListPage, error)
+
+	// ListToolsFromCursor resumes a management listing with its saved filters.
+	ListToolsFromCursor(ctx context.Context, cursor string) (ToolListPage, error)
+
 	// UpdateStandaloneTool appends a revision and switches the pointer only if the observed revision is current.
 	UpdateStandaloneTool(ctx context.Context, tool *Tool, expectedRevision uint64, definition encfield.EncryptedField, digest string) (*ToolRevision, error)
 

@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
@@ -686,6 +687,34 @@ type C interface {
 		ctx context.Context,
 		req DryRunRateLimitRequest,
 	) (DryRunRateLimitResult, error)
+
+	/*
+	 *
+	 * Tools
+	 *
+	 */
+
+	// GetTool returns the management view of a live standalone or generated Tool.
+	GetTool(ctx context.Context, id apid.ID) (Tool, error)
+
+	// CreateTool resolves the connection, compiles the definition, and publishes
+	// revision 1 of a new standalone Tool. Generated ownership cannot be created.
+	CreateTool(ctx context.Context, resource *toolschema.Tool) (Tool, error)
+
+	// UpdateTool compiles a complete replacement and atomically publishes it as
+	// the next revision, provided expectedRevision is still active. Generated
+	// Tools return ErrToolManaged; stale revisions return ErrToolRevisionConflict.
+	UpdateTool(ctx context.Context, id apid.ID, expectedRevision uint64, resource *toolschema.Tool) (Tool, error)
+
+	// DeleteTool soft-deletes a standalone Tool if expectedRevision is still
+	// active, retaining its revision history. Generated Tools return ErrToolManaged.
+	DeleteTool(ctx context.Context, id apid.ID, expectedRevision uint64) error
+
+	// ListTools returns one page of management Tool resources.
+	ListTools(ctx context.Context, req ListToolsRequest) (ToolPage, error)
+
+	// ListToolsFromCursor continues a ListTools page with its original filters.
+	ListToolsFromCursor(ctx context.Context, cursor string) (ToolPage, error)
 
 	/*
 	 *

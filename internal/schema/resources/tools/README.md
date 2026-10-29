@@ -15,10 +15,13 @@ zero or omission means no revision has been observed yet. Generated Tools carry
 an exact `sourceKey`. These contracts currently describe authored executors,
 including explicit templates materialized by a future ToolSet controller.
 
-This is a contract foundation. ToolSet resources, compiler-produced OpenAPI/MCP
-plans, management routes, registry/apply support, persistence, and execution are
-introduced in later changes. The package does not import API DTOs or register a
-usable resource prematurely.
+Standalone Tools are managed through `/api/v1/tools` (create, get, list,
+patch, delete). The service compiles `proxyHttp` request templates, response
+rules, and response transforms before publishing a revision, and rejects
+`javascript` executors until the JavaScript Tool host can compile an entry
+point. Compiler-produced OpenAPI/MCP plans, registry/apply support, and
+invocation are introduced in later changes. The package does not import API
+DTOs or register an apply resource prematurely.
 
 Call `Tool.ValidateFor` with the relevant lifecycle mode. Authored resources
 accept a connection ID or namespace/name; stored and response resources require

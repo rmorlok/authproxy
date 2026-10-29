@@ -46,6 +46,7 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	_ = loadSchema(t, c, "../resources/connection/schema.json")
 	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	_ = loadSchema(t, c, "../resources/tools/schema.json")
+	_ = loadSchema(t, c, "../resources/tools/schema-resource.json")
 	_ = loadSchema(t, c, "../resources/toolsets/schema.json")
 	_ = loadSchema(t, c, "./v1alpha1/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
@@ -116,6 +117,8 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "update rate limit", ref: "./schema.json#/$defs/UpdateRateLimitRequest", file: "valid-update-rate-limit.json"},
 		{name: "dry-run request", ref: "./schema.json#/$defs/RateLimitDryRunAction", file: "valid-dry-run-request.json"},
 		{name: "dry-run response", ref: "./schema.json#/$defs/RateLimitDryRunAction", file: "valid-dry-run-response.json"},
+		{name: "tool", ref: "./schema.json#/$defs/Tool", file: "valid-tool.json"},
+		{name: "list tools", ref: "./schema.json#/$defs/ListToolsResponse", file: "valid-list-tools.json"},
 		{name: "key", ref: "./schema.json#/$defs/Key", file: "valid-key.json"},
 		{name: "list keys", ref: "./schema.json#/$defs/ListKeysResponse", file: "valid-list-keys.json"},
 		{name: "create key", ref: "./schema.json#/$defs/CreateKeyRequest", file: "valid-create-key.json"},

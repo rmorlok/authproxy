@@ -1,0 +1,28 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "Tool",
+  "metadata": {
+    "id": "tol_test550e8400abcde",
+    "name": "list-calendars",
+    "namespace": "root.acme",
+    "labels": {"capability": "calendars"},
+    "createdAt": "2026-01-02T03:04:05Z",
+    "updatedAt": "2026-01-02T03:05:06Z"
+  },
+  "spec": {
+    "connectionRef": {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "Connection",
+      "id": "cxn_test550e8400abcde"
+    },
+    "description": "List calendars available to this account.",
+    "verbs": ["tool:calendar.list", "tool:readonly"],
+    "inputSchema": {"type": "object", "properties": {}, "additionalProperties": false},
+    "hints": {"readOnly": true},
+    "proxyHttp": {
+      "method": "GET",
+      "url": "https://{{cfg.apiHost}}/v1/calendars"
+    }
+  },
+  "status": {"revision": 2}
+}
