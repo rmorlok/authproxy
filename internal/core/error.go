@@ -11,3 +11,5 @@ var ErrDraftAlreadyExists = iface.ErrDraftAlreadyExists
 var ErrNotDraft = iface.ErrNotDraft
 var ErrKeyDataNotConfigured = iface.ErrKeyDataNotConfigured
 var ErrInvalidArgument = iface.ErrInvalidArgument
+var ErrToolManaged = iface.ErrToolManaged
+var ErrToolRevisionConflict = iface.ErrToolRevisionConflict

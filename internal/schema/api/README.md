@@ -27,6 +27,15 @@ runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
 or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
 contract ownership stays clear.
 
+## Tool management lists
+
+`ListToolsResponseJson` is the `ToolList` envelope returned by `GET /tools`.
+Its items are complete management `Tool` resources, including executor
+definitions, so it requires the management `tools:list` grant. Agents use the
+discovery descriptors below instead; an invocation grant never reveals this
+list. `CreateToolRequest` and `UpdateToolRequest` in `schema.json` are the
+canonical Tool resource and `ToolPatch`, not separate DTOs.
+
 ## Tool discovery
 
 `ToolDescriptor` is the usage information an agent can read through a tool grant.

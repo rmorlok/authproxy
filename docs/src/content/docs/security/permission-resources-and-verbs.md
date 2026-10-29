@@ -24,6 +24,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `rate_limits` | `create`, `delete`, `get`, `list`, `update` | Rate-limit rules, overrides, and related evaluation endpoints |
 | `request-events` | `get`, `list` | Individual and listed proxy request events |
 | `secrets` | `replay` | Unredacted replay of secret-tagged fields in an otherwise authorized API response |
+| `tools` | `create`, `delete`, `get`, `list`, `update` | Standalone Tool definitions under `/tools`; generated Tools are readable but changed only through their ToolSet. These verbs do not authorize Tool invocation |
 | `task_monitoring` | `get`, `list`, `manage` | Asynq queue, server, scheduler, and task inspection or mutation |
 | `workflow_monitoring` | `get`, `list`, `manage` | Workflow instance inspection, cancellation, and removal |
 
@@ -49,6 +50,12 @@ The `secrets:replay` grant does not authorize a route by itself. It only
 disables response redaction after the caller passes that route's normal
 permission check, so grant it sparingly. The namespace dimension is not
 evaluated for `secrets:replay`, `task_monitoring`, or `workflow_monitoring`.
+
+Tool management verbs are separate from Tool invocation. Creating or updating
+a Tool needs only `tools:create` or `tools:update` in the Tool's namespace; the
+bound connection must be in that same namespace, and no `connections` verb is
+checked. Granting `tools:update` lets an actor change what an executable Tool
+does, so treat it as trusted administration.
 
 See [Authentication and Authorization](/security/authentication-and-authorization/)
 for namespace matching, resource ID restrictions, actor permissions, and JWT

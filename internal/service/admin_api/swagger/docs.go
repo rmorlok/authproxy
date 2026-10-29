@@ -4430,6 +4430,366 @@ const docTemplateadmin_api = `{
                     }
                 }
             }
+        },
+        "/tools": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List Tool management resources visible to the caller",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tools"
+                ],
+                "summary": "List tools",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by namespace matcher",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by exact name",
+                        "name": "name",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by bound connection ID",
+                        "name": "connectionId",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by label selector",
+                        "name": "labelSelector",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ListToolsResponseJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a standalone Tool bound to a connection in the same namespace. The definition is compiled before revision 1 is published.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tools"
+                ],
+                "summary": "Create tool",
+                "parameters": [
+                    {
+                        "description": "Tool to create",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ToolJson"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ToolJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/tools/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a Tool's management resource, including its active definition and revision",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tools"
+                ],
+                "summary": "Get tool",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ToolJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Soft delete a standalone Tool, retaining its revision history. Generated Tools return 409.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tools"
+                ],
+                "summary": "Delete tool",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Patch a standalone Tool. The complete merged definition is compiled and published atomically as the next revision; later invocations use it immediately. Generated Tools return 409.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "tools"
+                ],
+                "summary": "Update tool",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Tool ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Update request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ToolPatchJson"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ToolJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -5519,6 +5879,37 @@ const docTemplateadmin_api = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/openapi.RateLimitJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
+                }
+            }
+        },
+        "openapi.ListToolsResponseJson": {
+            "description": "Paginated list of Tools",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.ToolJson"
                     }
                 },
                 "kind": {
@@ -6675,6 +7066,207 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "openapi.ToolConditionJson": {
+            "type": "object",
+            "required": [
+                "lastTransitionTime",
+                "status",
+                "type"
+            ],
+            "properties": {
+                "lastTransitionTime": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "observedRevision": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                    ]
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "openapi.ToolJson": {
+            "description": "Kubernetes-style connection-bound Tool resource",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Tool"
+                    ],
+                    "example": "Tool"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ToolSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ToolStatusJson"
+                }
+            }
+        },
+        "openapi.ToolPatchJson": {
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "Tool"
+                    ],
+                    "example": "Tool"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMetaPatch"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ToolSpecPatchJson"
+                }
+            }
+        },
+        "openapi.ToolSpecJson": {
+            "type": "object",
+            "required": [
+                "connectionRef",
+                "description",
+                "inputSchema",
+                "verbs"
+            ],
+            "properties": {
+                "connectionRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "List calendars available to this account."
+                },
+                "hints": {
+                    "$ref": "#/definitions/tools.BehavioralHints"
+                },
+                "inputSchema": {
+                    "type": "object"
+                },
+                "javascript": {
+                    "type": "string"
+                },
+                "limits": {
+                    "$ref": "#/definitions/tools.ExecutionLimits"
+                },
+                "outputSchema": {
+                    "type": "object"
+                },
+                "proxyHttp": {
+                    "type": "object"
+                },
+                "verbs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "tool:calendar.list"
+                    ]
+                }
+            }
+        },
+        "openapi.ToolSpecPatchJson": {
+            "type": "object",
+            "properties": {
+                "connectionRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "hints": {
+                    "$ref": "#/definitions/tools.BehavioralHints"
+                },
+                "inputSchema": {
+                    "type": "object"
+                },
+                "javascript": {
+                    "type": "string"
+                },
+                "limits": {
+                    "$ref": "#/definitions/tools.ExecutionLimits"
+                },
+                "outputSchema": {
+                    "type": "object"
+                },
+                "proxyHttp": {
+                    "type": "object"
+                },
+                "verbs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "openapi.ToolStatusJson": {
+            "type": "object",
+            "required": [
+                "revision"
+            ],
+            "properties": {
+                "conditions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.ToolConditionJson"
+                    }
+                },
+                "managedBy": {
+                    "$ref": "#/definitions/tools.ToolManagedBy"
+                },
+                "revision": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
         "routes.ErrorResponse": {
             "description": "Standardized error response",
             "type": "object",
@@ -7641,6 +8233,59 @@ const docTemplateadmin_api = `{
                 "actorId": {
                     "type": "string",
                     "example": "act_test550e8400abcde"
+                }
+            }
+        },
+        "tools.BehavioralHints": {
+            "type": "object",
+            "properties": {
+                "destructive": {
+                    "type": "boolean"
+                },
+                "idempotent": {
+                    "type": "boolean"
+                },
+                "readOnly": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "tools.ExecutionLimits": {
+            "type": "object",
+            "properties": {
+                "maxEncodedResultBytes": {
+                    "description": "MaxEncodedResultBytes separately bounds the serialized result envelope,\nincluding expansion caused by base64-encoded rich content.",
+                    "type": "integer"
+                },
+                "maxInputBytes": {
+                    "type": "integer"
+                },
+                "maxOutputBytes": {
+                    "description": "MaxOutputBytes caps decoded result content; MaxResponseBytes caps the\naggregate decoded upstream responses. The runtime may also impose a\nshared aggregate budget across both categories.",
+                    "type": "integer"
+                },
+                "maxRequests": {
+                    "type": "integer"
+                },
+                "maxResponseBytes": {
+                    "type": "integer"
+                },
+                "maxStackDepth": {
+                    "type": "integer"
+                },
+                "timeoutMillis": {
+                    "type": "integer"
+                }
+            }
+        },
+        "tools.ToolManagedBy": {
+            "type": "object",
+            "properties": {
+                "sourceKey": {
+                    "type": "string"
+                },
+                "toolSetRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
                 }
             }
         },

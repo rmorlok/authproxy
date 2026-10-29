@@ -1842,6 +1842,32 @@
     "RateLimit": {
       "$ref": "../resources/rate_limit/schema.json"
     },
+    "Tool": {
+      "$ref": "../resources/tools/schema-resource.json"
+    },
+    "ListToolsResponse": {
+      "description": "A Kubernetes-style list of management Tool resources.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "../resources/tools/schema-resource.json" }
+            }
+          }
+        }
+      ]
+    },
+    "CreateToolRequest": {
+      "$ref": "../resources/tools/schema-resource.json"
+    },
+    "UpdateToolRequest": {
+      "$ref": "../resources/tools/schema-resource.json#/$defs/ToolPatch"
+    },
     "ListRateLimitsResponse": {
       "description": "A Kubernetes-style list of rate limits.",
       "allOf": [
