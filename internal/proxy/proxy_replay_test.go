@@ -131,6 +131,7 @@ func TestProxyRequestStream_ReplayFailuresCloseOwnedBodies(t *testing.T) {
 		t.Run(stage, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			ctx, observation := httpf.ObserveSends(ctx)
 			wantErr := errors.New(stage)
 			outbound, original := newReplayRequest(t)
 			fresh := &streamBody{Reader: strings.NewReader("payload")}
@@ -189,6 +190,9 @@ func TestProxyRequestStream_ReplayFailuresCloseOwnedBodies(t *testing.T) {
 				return nil, wantErr
 			})
 			resp, err := p.ProxyRequestStream(ctx, httpf.RequestTypeProxy, &iface.RawProxyRequest{Outbound: outbound})
+			// Every recovery failure follows a target 401. Even a GetBody error
+			// before the retry cannot erase that first possible target send.
+			assert.True(t, observation.MayHaveSent())
 			if stage == "recover unavailable" || stage == "recover error" {
 				require.NoError(t, err)
 				require.NotNil(t, resp)

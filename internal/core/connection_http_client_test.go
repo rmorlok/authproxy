@@ -26,6 +26,8 @@ type connectionHTTPClientTestProxy struct {
 	builds atomic.Int32
 	// options records the most recent options passed to HTTPClient.
 	options iface.HTTPClientOptions
+	// err rejects client construction before do can handle a request.
+	err error
 	// do handles each request sent through a built client.
 	do func(*http.Request) (*http.Response, error)
 }
@@ -34,7 +36,7 @@ type connectionHTTPClientTestProxy struct {
 func (p *connectionHTTPClientTestProxy) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, error) {
 	p.builds.Add(1)
 	p.options = options
-	return connectionHTTPClientTestDoer(p.do), nil
+	return connectionHTTPClientTestDoer(p.do), p.err
 }
 
 // connectionHTTPClientTestDoer adapts a function to iface.HTTPClient.
@@ -181,25 +183,55 @@ func TestConnectionHTTPClientResponseIsLazy(t *testing.T) {
 	require.EqualValues(t, 1, responseBody.closes.Load())
 }
 
-// TestConnectionHTTPClientInitializationFailure closes every unsent body and
-// keeps returning the same initialization error on later calls.
+// TestConnectionHTTPClientInitializationFailure reports no target send, closes
+// every unsent body, and keeps returning the cached error on later calls.
 func TestConnectionHTTPClientInitializationFailure(t *testing.T) {
-	initializationError := errors.New("proxy initialization failed")
-	conn := &connection{proxyImplErr: initializationError}
-	conn.proxyImplOnce.Do(func() {})
-	client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
-	require.NoError(t, err)
+	for _, stage := range []string{"proxy resolution", "client construction"} {
+		t.Run(stage, func(t *testing.T) {
+			// Either initialization stage can fail before a target call is made.
+			initializationError := errors.New("proxy initialization failed")
+			proxy := &connectionHTTPClientTestProxy{err: initializationError, do: func(*http.Request) (*http.Response, error) {
+				t.Fatal("initialization failure must prevent proxy client calls")
+				return nil, nil
+			}}
+			conn := connectionHTTPClientTestConnection(proxy)
+			if stage == "proxy resolution" {
+				conn.proxyImplErr = initializationError
+			}
+			client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
+			require.NoError(t, err)
 
-	// Each failed call closes its own body exactly once without reading it.
-	for range 2 {
-		body := &connectionHTTPClientTestBody{reader: strings.NewReader("request data")}
-		request, err := http.NewRequest(http.MethodPost, "https://provider.example/items", body)
-		require.NoError(t, err)
-		response, err := client.Do(request)
-		require.ErrorIs(t, err, initializationError)
-		require.Nil(t, response)
-		require.Zero(t, body.reads.Load())
-		require.EqualValues(t, 1, body.closes.Load())
+			// Initial and cached failures each report no send and release their
+			// own request body exactly once without consuming it.
+			for range 2 {
+				ctx, observation := httpf.ObserveSends(context.Background())
+				body := &connectionHTTPClientTestBody{reader: strings.NewReader("request data")}
+				request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://provider.example/items", body)
+				require.NoError(t, err)
+				response, err := client.Do(request)
+				require.ErrorIs(t, err, initializationError)
+				require.Nil(t, response)
+				require.False(t, observation.MayHaveSent())
+				require.Zero(t, body.reads.Load())
+				require.EqualValues(t, 1, body.closes.Load())
+			}
+
+			// A cached local failure cannot erase an earlier possible send in
+			// the same observation, and a bodyless request needs no cleanup.
+			ctx, observation := httpf.ObserveSends(context.Background())
+			httpf.ReportSendEvidence(ctx, true)
+			request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://provider.example/items", nil)
+			require.NoError(t, err)
+			response, err := client.Do(request)
+			require.ErrorIs(t, err, initializationError)
+			require.Nil(t, response)
+			require.True(t, observation.MayHaveSent())
+			if stage == "client construction" {
+				require.EqualValues(t, 1, proxy.builds.Load(), "failed initialization is not retried")
+			} else {
+				require.Zero(t, proxy.builds.Load(), "proxy resolution fails before client construction")
+			}
+		})
 	}
 }
 

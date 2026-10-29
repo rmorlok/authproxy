@@ -155,6 +155,13 @@ func (s *Session) Close() {
 // remain uncertain. Completed calls proven unsent do not imply execution, even
 // though they consumed the request allowance. HTTP success alone does not
 // establish that the complete Tool action finished.
+//
+// While Do calls are outstanding, the answer is provisional: mayHaveExecuted
+// can become notStarted when all calls return with proof they were unsent.
+// Canceling or closing the session does not wait for those calls to finish.
+// Callers must stop starting requests and wait for every Do to return before
+// treating this as the settled invocation state. A result already reported
+// while work was outstanding must retain its conservative execution state.
 func (s *Session) ExecutionState() api.ToolExecutionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -222,6 +229,10 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 	if err := s.beginRequest(ctx); err != nil {
 		return nil, err
 	}
+	// Always balance the in-flight count, including when caller code recovers
+	// a client or middleware panic. Until Do returns, its evidence is unknown.
+	mayHaveSent := true
+	defer func() { s.finishRequest(mayHaveSent) }()
 
 	transferred = true
 	// Each logical call gets its own observation. Unknown clients remain
@@ -229,7 +240,7 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 	// transport handoff without changing the standard Do signature.
 	observedCtx, observation := httpf.ObserveSends(ctx)
 	raw, err := s.client.Do(req.WithContext(observedCtx))
-	s.finishRequest(observation.MayHaveSent())
+	mayHaveSent = observation.MayHaveSent()
 	if err != nil {
 		if raw != nil && raw.Body != nil {
 			_ = raw.Body.Close()

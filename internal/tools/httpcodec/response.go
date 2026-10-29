@@ -51,7 +51,8 @@ type ResponseLimits struct {
 	Transform javascript.Limits
 }
 
-// ResponseInput is a buffered upstream response plus captured invocation facts.
+// ResponseInput is a buffered HTTP response plus captured invocation facts.
+// The response may come from the upstream or local connection middleware.
 // It is an internal mapping input, not a serialized API contract. Map borrows
 // its data only during the call and returns independently owned output.
 type ResponseInput struct {
@@ -98,9 +99,10 @@ type ResponseInput struct {
 	Metadata api.ToolResultMetadata
 
 	// ExecutionState is the executor's knowledge of upstream execution, used
-	// verbatim on mapping failures. It must be mayHaveExecuted or completed;
-	// receipt of an HTTP response cannot establish notStarted. Map does not
-	// infer side effects or retry safety from an HTTP status.
+	// verbatim on mapping failures. notStarted requires evidence that no target
+	// request was sent, such as a local rate-limit rejection before any send.
+	// An HTTP status alone establishes neither notStarted nor retry safety.
+	// Missing and unknown states are invalid; Map does not infer a state.
 	ExecutionState api.ToolExecutionState
 }
 
@@ -177,9 +179,10 @@ func (r *Response) Map(
 		return nil, err
 	}
 
-	if input.ExecutionState != api.ToolExecutionStateMayHaveExecuted &&
-		input.ExecutionState != api.ToolExecutionStateCompleted {
-		return nil, errors.New("response execution state must be mayHaveExecuted or completed")
+	switch input.ExecutionState {
+	case api.ToolExecutionStateNotStarted, api.ToolExecutionStateMayHaveExecuted, api.ToolExecutionStateCompleted:
+	default:
+		return nil, errors.New("response execution state must be notStarted, mayHaveExecuted, or completed")
 	}
 
 	// ID validators check resource prefixes, not storage size or UTF-8. Bound

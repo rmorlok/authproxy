@@ -168,11 +168,19 @@ must be added at their source before an executor can reliably recommend
 reconnecting. Local rate-limit rejections are 429 responses, not Go errors, and
 remain available to status rules.
 
-`ExecutionState()` starts as `notStarted`. Each client call is uncertain while
-in flight. Once it returns, the session uses the proxy's send evidence:
+`ExecutionState()` starts as `notStarted`. While any `Do` call is outstanding,
+the answer is provisional and reports `mayHaveExecuted`. It can return to
+`notStarted` once all outstanding calls finish with proof they were unsent.
+Canceling or closing the session does not wait for calls to return. To capture
+the settled invocation state, stop starting requests and wait for every `Do`
+to return. A timeout result emitted before then must keep its conservative
+state; a later observation does not revise that already-emitted result.
+
+Once calls return, the session uses the proxy's send evidence:
 
 | What happened | State after the call |
 | --- | --- |
+| Connection client initialization failed before any proxy request. | `notStarted` |
 | Credentials could not be resolved before any target attempt. | `notStarted` |
 | A local rate limiter returned 429 before any target attempt. | `notStarted` |
 | The target transport was entered, even if DNS, TLS, or the request later failed. | `mayHaveExecuted` |
@@ -188,8 +196,8 @@ pre-send rejection; execution state does not refund the allowance.
 This evidence records entry into the target transport, not proof that the
 provider received or completed a request. A successful HTTP response also does
 not establish completion of the whole logical action. A higher-level executor
-decides when the Tool action is complete. Unknown clients remain conservative,
-including core client initialization failures that do not yet report evidence.
+decides when the Tool action is complete. Unknown clients and recovered client
+panics remain conservative.
 
 This package does not load Tool revisions, check permissions, validate input or
 output schemas, render requests, or build Tool results. The invocation layer must

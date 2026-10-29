@@ -80,6 +80,13 @@ type targetSendEvidence struct {
 // targetSendEvidenceKey can only be installed by DoWithSendEvidence.
 type targetSendEvidenceKey struct{}
 
+// targetEvidenceFrom returns the private transport tracker, when this request
+// was prepared by DoWithSendEvidence. Ordinary HTTP calls have no tracker.
+func targetEvidenceFrom(ctx context.Context) *targetSendEvidence {
+	evidence, _ := ctx.Value(targetSendEvidenceKey{}).(*targetSendEvidence)
+	return evidence
+}
+
 // DoWithSendEvidence sends req and reports whether any target attempt may have
 // reached the underlying transport. The client and request must be non-nil;
 // response/body ownership and errors retain client.Do semantics. The caller's
@@ -124,7 +131,7 @@ type sendCoverageTransport struct {
 
 // RoundTrip records coverage without reading or modifying caller observations.
 func (t *sendCoverageTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if evidence, _ := req.Context().Value(targetSendEvidenceKey{}).(*targetSendEvidence); evidence != nil {
+	if evidence := targetEvidenceFrom(req.Context()); evidence != nil {
 		evidence.covered.Store(true)
 	}
 
@@ -144,7 +151,7 @@ type sendHandoffTransport struct {
 func (t *sendHandoffTransport) RoundTrip(
 	req *http.Request,
 ) (*http.Response, error) {
-	if evidence, _ := req.Context().Value(targetSendEvidenceKey{}).(*targetSendEvidence); evidence != nil {
+	if evidence := targetEvidenceFrom(req.Context()); evidence != nil {
 		evidence.handedOff.Store(true)
 	}
 
