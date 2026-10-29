@@ -13,3 +13,4 @@ var ErrKeyDataNotConfigured = iface.ErrKeyDataNotConfigured
 var ErrInvalidArgument = iface.ErrInvalidArgument
 var ErrToolManaged = iface.ErrToolManaged
 var ErrToolRevisionConflict = iface.ErrToolRevisionConflict
+var ErrToolSetConflict = iface.ErrToolSetConflict

@@ -35,8 +35,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// toolsTestSetup wires the Tool routes to a real core service, SQLite database,
-// and encryption service so tests exercise compilation and persistence.
+// toolsTestSetup wires the Tool and ToolSet routes to a real core service,
+// database, and encryption service so tests exercise compilation and persistence.
 type toolsTestSetup struct {
 	Gin      *gin.Engine
 	AuthUtil *auth2.AuthTestUtil
@@ -63,6 +63,7 @@ func newToolsTestSetup(t *testing.T) (*toolsTestSetup, map[string]*database.Conn
 
 	r := apgin.ForTest(nil)
 	NewToolsRoutes(cfg, auth, c).Register(r)
+	NewToolSetsRoutes(cfg, auth, c).Register(r)
 
 	ctx := context.Background()
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: "root.acme"}))

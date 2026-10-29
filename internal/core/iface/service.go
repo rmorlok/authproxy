@@ -18,6 +18,7 @@ import (
 	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
@@ -715,6 +716,55 @@ type C interface {
 
 	// ListToolsFromCursor continues a ListTools page with its original filters.
 	ListToolsFromCursor(ctx context.Context, cursor string) (ToolPage, error)
+
+	/*
+	 *
+	 * ToolSets
+	 *
+	 */
+
+	// GetToolSet returns a ToolSet's default projection: its primary generation,
+	// otherwise its draft, otherwise its newest live generation.
+	GetToolSet(ctx context.Context, id apid.ID) (ToolSet, error)
+
+	// GetToolSetGeneration returns one live generation projected with the current
+	// logical selector.
+	GetToolSetGeneration(ctx context.Context, id apid.ID, generation uint64) (ToolSet, error)
+
+	// CreateToolSet creates the logical ToolSet and its first generation, and
+	// publishes that generation when primary is requested.
+	CreateToolSet(ctx context.Context, resource *toolsetschema.ToolSet) (ToolSet, error)
+
+	// UpdateToolSet applies a patch through the logical endpoint. Metadata and
+	// selector changes never create a generation; definition or release changes
+	// edit the draft, cloning the default generation into one when needed.
+	UpdateToolSet(ctx context.Context, id apid.ID, patch *toolsetschema.ToolSetPatch) (ToolSet, error)
+
+	// CreateToolSetGeneration creates a new draft cloned from the newest
+	// generation, then applies an optional generation patch, which may replace
+	// the definition or request publication. An existing draft returns
+	// ErrDraftAlreadyExists.
+	CreateToolSetGeneration(ctx context.Context, id apid.ID, patch *toolsetschema.ToolSetPatch) (ToolSet, error)
+
+	// UpdateToolSetGeneration patches one explicit draft generation. Selector and
+	// logical metadata changes are rejected; published generations return
+	// ErrNotDraft.
+	UpdateToolSetGeneration(ctx context.Context, id apid.ID, generation uint64, patch *toolsetschema.ToolSetPatch) (ToolSet, error)
+
+	// DeleteToolSet soft-deletes the logical ToolSet, which hides every generation.
+	DeleteToolSet(ctx context.Context, id apid.ID) error
+
+	// ListToolSets returns one page of logical ToolSets in their default projection.
+	ListToolSets(ctx context.Context, req ListToolSetsRequest) (ToolSetPage, error)
+
+	// ListToolSetsFromCursor continues a ListToolSets page with its original filters.
+	ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetPage, error)
+
+	// ListToolSetGenerations returns one page of a ToolSet's generations, newest first.
+	ListToolSetGenerations(ctx context.Context, id apid.ID, limit int32) (ToolSetPage, error)
+
+	// ListToolSetGenerationsFromCursor continues a ListToolSetGenerations page.
+	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ToolSetPage, error)
 
 	/*
 	 *

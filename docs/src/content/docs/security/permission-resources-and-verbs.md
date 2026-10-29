@@ -25,6 +25,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `request-events` | `get`, `list` | Individual and listed proxy request events |
 | `secrets` | `replay` | Unredacted replay of secret-tagged fields in an otherwise authorized API response |
 | `tools` | `create`, `delete`, `get`, `list`, `update` | Standalone Tool definitions under `/tools`; generated Tools are readable but changed only through their ToolSet. These verbs do not authorize Tool invocation |
+| `toolsets` | `create`, `delete`, `get`, `list`, `list/generations`, `update` | ToolSet definitions and generations under `/toolsets`. `create` also gates new draft generations; `update` gates logical metadata and selector changes, draft edits, and publication. These verbs do not install, migrate, or invoke generated Tools |
 | `task_monitoring` | `get`, `list`, `manage` | Asynq queue, server, scheduler, and task inspection or mutation |
 | `workflow_monitoring` | `get`, `list`, `manage` | Workflow instance inspection, cancellation, and removal |
 
@@ -39,7 +40,7 @@ Most resources use the conventional `create`, `get`, `list`, `update`, and
 | `disconnect` | Disconnect one connection. |
 | `disconnect_all` | Disconnect all connections for a connector. |
 | `force_state` | Force a connector or connection into a lifecycle state. |
-| `list/generations` | Read or list connector-generation data. |
+| `list/generations` | Read or list connector or ToolSet generation data. |
 | `manage` | Mutate task-queue or workflow-monitoring state. |
 | `proxy` | Send a request through a connection with its credentials injected. |
 | `query` | Run an aggregate application-metrics query. |
@@ -56,6 +57,13 @@ a Tool needs only `tools:create` or `tools:update` in the Tool's namespace; the
 bound connection must be in that same namespace, and no `connections` verb is
 checked. Granting `tools:update` lets an actor change what an executable Tool
 does, so treat it as trusted administration.
+
+ToolSet management follows the same rule. `toolsets` verbs are checked in the
+ToolSet's namespace, and a connection selector may only select that namespace
+or its descendants. Selecting a connection grants no permission to invoke its
+generated Tools, and no `tools` or `connections` verb authorizes ToolSet
+management. Publishing with `toolsets:update` changes what new matching
+connections install, so treat it as trusted administration as well.
 
 See [Authentication and Authorization](/security/authentication-and-authorization/)
 for namespace matching, resource ID restrictions, actor permissions, and JWT

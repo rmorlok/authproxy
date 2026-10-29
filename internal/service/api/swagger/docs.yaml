@@ -748,6 +748,28 @@ definitions:
     - kind
     - metadata
     type: object
+  openapi.ListToolSetsResponseJson:
+    description: Paginated list of ToolSets or of one ToolSet's generations
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/openapi.ToolSetJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
   openapi.ListToolsResponseJson:
     description: Paginated list of Tools
     properties:
@@ -1643,6 +1665,114 @@ definitions:
     - kind
     - metadata
     - spec
+    type: object
+  openapi.ToolSetConnectionSelectorJson:
+    properties:
+      matchLabels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        example: root.acme.**
+        type: string
+    required:
+    - matchLabels
+    type: object
+  openapi.ToolSetJson:
+    description: Kubernetes-style ToolSet resource projected at one generation
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ToolSet
+        example: ToolSet
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ToolSetSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ToolSetStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ToolSetPatchJson:
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ToolSet
+        example: ToolSet
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMetaPatch'
+      spec:
+        $ref: '#/definitions/openapi.ToolSetSpecPatchJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    type: object
+  openapi.ToolSetReleaseJson:
+    properties:
+      desiredState:
+        enum:
+        - draft
+        - primary
+        example: draft
+        type: string
+    type: object
+  openapi.ToolSetReleaseStatusJson:
+    properties:
+      state:
+        enum:
+        - draft
+        - primary
+        - active
+        - archived
+        type: string
+    required:
+    - state
+    type: object
+  openapi.ToolSetSpecJson:
+    properties:
+      connectionSelector:
+        $ref: '#/definitions/openapi.ToolSetConnectionSelectorJson'
+      definition:
+        type: object
+      release:
+        $ref: '#/definitions/openapi.ToolSetReleaseJson'
+    required:
+    - connectionSelector
+    - definition
+    type: object
+  openapi.ToolSetSpecPatchJson:
+    properties:
+      connectionSelector:
+        $ref: '#/definitions/openapi.ToolSetConnectionSelectorJson'
+      definition:
+        type: object
+      release:
+        $ref: '#/definitions/openapi.ToolSetReleaseJson'
+    type: object
+  openapi.ToolSetStatusJson:
+    properties:
+      release:
+        $ref: '#/definitions/openapi.ToolSetReleaseStatusJson'
+    required:
+    - release
     type: object
   openapi.ToolSpecJson:
     properties:
@@ -5575,6 +5705,455 @@ paths:
       summary: Update tool
       tags:
       - tools
+  /toolsets:
+    get:
+      consumes:
+      - application/json
+      description: List ToolSets visible to the caller, each in its default projection
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return (default 50, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by namespace matcher
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by exact name
+        in: query
+        name: name
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: labelSelector
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ListToolSetsResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List toolsets
+      tags:
+      - toolsets
+    post:
+      consumes:
+      - application/json
+      description: Create a ToolSet and its first generation. Every explicit template
+        is compiled first. The generation is a draft unless spec.release.desiredState
+        is primary, which publishes it. Only explicit sources are supported.
+      parameters:
+      - description: ToolSet to create
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/openapi.ToolSetJson'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/openapi.ToolSetJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create toolset
+      tags:
+      - toolsets
+  /toolsets/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a ToolSet. All of its generations become unreadable
+        immediately.
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete toolset
+      tags:
+      - toolsets
+    get:
+      consumes:
+      - application/json
+      description: 'Get a ToolSet''s default projection: its primary generation, otherwise
+        its draft. The connection selector is always the current shared selector.'
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ToolSetJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get toolset
+      tags:
+      - toolsets
+    patch:
+      consumes:
+      - application/json
+      description: Patch a ToolSet through its logical endpoint. Metadata and spec.connectionSelector
+        change the logical ToolSet without creating a generation or migrating connections.
+        spec.definition and spec.release edit the draft, cloning the newest generation
+        into one if needed. A definition sent with desiredState primary is published;
+        desiredState primary alone is already satisfied by an existing primary, so
+        publish a pending draft through its generation endpoint.
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/openapi.ToolSetPatchJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ToolSetJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update toolset
+      tags:
+      - toolsets
+  /toolsets/{id}/generations:
+    get:
+      consumes:
+      - application/json
+      description: List a ToolSet's generations, newest first. Each projects the current
+        shared connection selector.
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return (default 50, max 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ListToolSetsResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List toolset generations
+      tags:
+      - toolsets
+    post:
+      consumes:
+      - application/json
+      description: Create a draft generation cloned from the newest generation. An
+        optional patch may replace spec.definition or request desiredState primary
+        to publish it. Metadata and connection selector changes are rejected here.
+        Returns 409 if a draft already exists.
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Optional generation patch
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/openapi.ToolSetPatchJson'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/openapi.ToolSetJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create toolset generation
+      tags:
+      - toolsets
+  /toolsets/{id}/generations/{generation}:
+    get:
+      consumes:
+      - application/json
+      description: Get one ToolSet generation projected with the current shared connection
+        selector
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Generation number
+        in: path
+        name: generation
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ToolSetJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get toolset generation
+      tags:
+      - toolsets
+    patch:
+      consumes:
+      - application/json
+      description: Patch one draft generation's spec.definition or publish it with
+        desiredState primary, which demotes the previous primary to active without
+        migrating connections. Metadata and connection selector changes are rejected
+        here. Published generations are immutable; an empty or primary-only patch
+        on one is a no-op.
+      parameters:
+      - description: ToolSet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Generation number
+        in: path
+        name: generation
+        required: true
+        type: integer
+      - description: Generation patch
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/openapi.ToolSetPatchJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ToolSetJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update toolset generation
+      tags:
+      - toolsets
 securityDefinitions:
   BearerAuth:
     description: 'JWT Bearer token (format: Bearer <token>)'

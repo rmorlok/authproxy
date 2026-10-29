@@ -142,6 +142,18 @@ type DB interface {
 	UpdateToolSetConnectionSelector(ctx context.Context, id apid.ID, expectedRevision uint64, selector toolsetschema.ConnectionSelector) (*ToolSet, error)
 	DeleteToolSet(ctx context.Context, id apid.ID) error
 
+	// UpdateToolSetMetadata replaces the logical name, user labels, and
+	// annotations without touching the selector or any generation.
+	UpdateToolSetMetadata(ctx context.Context, id apid.ID, name scommon.ResourceName, userLabels map[string]string, annotations map[string]string) (*ToolSet, error)
+
+	// ListToolSets pages through live logical ToolSets within a namespace scope.
+	ListToolSets(ctx context.Context, query ToolSetListQuery) (ToolSetListPage, error)
+	ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetListPage, error)
+
+	// ListToolSetGenerations pages through one live ToolSet's generations, newest first.
+	ListToolSetGenerations(ctx context.Context, query ToolSetGenerationListQuery) (ToolSetGenerationListPage, error)
+	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ToolSetGenerationListPage, error)
+
 	// CreateToolSetGeneration allocates a new draft under a live parent. Only one
 	// live draft may exist, and historical generation numbers are never reused.
 	CreateToolSetGeneration(ctx context.Context, id apid.ID, definition encfield.EncryptedField) (*ToolSetGeneration, error)
