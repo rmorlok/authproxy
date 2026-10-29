@@ -21,20 +21,29 @@ import (
 const defaultToolSetListLimit = 50
 
 // GetToolSet returns the default projection of a live ToolSet.
-func (s *service) GetToolSet(ctx context.Context, id apid.ID) (iface.ToolSet, error) {
+func (s *service) GetToolSet(
+	ctx context.Context,
+	id apid.ID,
+) (iface.ToolSet, error) {
 	logical, err := s.db.GetToolSet(ctx, id)
 	if err != nil {
 		return nil, mapToolSetDatabaseError(err)
 	}
+
 	return s.defaultToolSetView(ctx, logical)
 }
 
 // GetToolSetGeneration returns one live generation with the current selector.
-func (s *service) GetToolSetGeneration(ctx context.Context, id apid.ID, generation uint64) (iface.ToolSet, error) {
+func (s *service) GetToolSetGeneration(
+	ctx context.Context,
+	id apid.ID,
+	generation uint64,
+) (iface.ToolSet, error) {
 	logical, row, err := s.loadToolSetGeneration(ctx, id, generation)
 	if err != nil {
 		return nil, err
 	}
+
 	return s.hydrateToolSet(ctx, logical, row)
 }
 
@@ -190,7 +199,11 @@ func (s *service) UpdateToolSet(ctx context.Context, id apid.ID, patch *toolsets
 // an optional generation patch that may replace the definition and request
 // publication. Metadata and selector changes are rejected because they belong
 // to the logical endpoint.
-func (s *service) CreateToolSetGeneration(ctx context.Context, id apid.ID, patch *toolsetschema.ToolSetPatch) (iface.ToolSet, error) {
+func (s *service) CreateToolSetGeneration(
+	ctx context.Context,
+	id apid.ID,
+	patch *toolsetschema.ToolSetPatch,
+) (iface.ToolSet, error) {
 	if err := validateGenerationPatch(patch); err != nil {
 		return nil, err
 	}
@@ -199,7 +212,12 @@ func (s *service) CreateToolSetGeneration(ctx context.Context, id apid.ID, patch
 	if err != nil {
 		return nil, mapToolSetDatabaseError(err)
 	}
-	if _, err := s.db.GetToolSetGenerationByState(ctx, id, toolsetschema.ToolSetReleaseStateDraft); err == nil {
+
+	if _, err := s.db.GetToolSetGenerationByState(
+		ctx,
+		id,
+		toolsetschema.ToolSetReleaseStateDraft,
+	); err == nil {
 		return nil, ErrDraftAlreadyExists
 	} else if !errors.Is(err, database.ErrNotFound) {
 		return nil, mapToolSetDatabaseError(err)
@@ -222,7 +240,12 @@ func (s *service) CreateToolSetGeneration(ctx context.Context, id apid.ID, patch
 		}
 	}
 
-	return s.createToolSetDraft(ctx, logical, &desired.Spec.Definition, desired.Spec.Release.DesiredState)
+	return s.createToolSetDraft(
+		ctx,
+		logical,
+		&desired.Spec.Definition,
+		desired.Spec.Release.DesiredState,
+	)
 }
 
 // UpdateToolSetGeneration patches one explicitly addressed generation. Only a
@@ -303,22 +326,36 @@ func (s *service) ListToolSetsFromCursor(ctx context.Context, cursor string) (if
 }
 
 // ListToolSetGenerations lists one ToolSet's generations, newest first.
-func (s *service) ListToolSetGenerations(ctx context.Context, id apid.ID, limit int32) (iface.ToolSetPage, error) {
+func (s *service) ListToolSetGenerations(
+	ctx context.Context,
+	id apid.ID,
+	limit int32,
+) (iface.ToolSetPage, error) {
 	pageLimit := int(limit)
 	if pageLimit <= 0 {
 		pageLimit = defaultToolSetListLimit
 	}
 	pageLimit = min(pageLimit, database.MaxToolSetListLimit)
 
-	page, err := s.db.ListToolSetGenerations(ctx, database.ToolSetGenerationListQuery{ToolSetId: id, Limit: pageLimit})
+	page, err := s.db.ListToolSetGenerations(
+		ctx,
+		database.ToolSetGenerationListQuery{
+			ToolSetId: id,
+			Limit:     pageLimit,
+		},
+	)
 	if err != nil {
 		return iface.ToolSetPage{}, mapToolSetDatabaseError(err)
 	}
+
 	return s.hydrateToolSetGenerationPage(ctx, id, page)
 }
 
 // ListToolSetGenerationsFromCursor continues a generation listing.
-func (s *service) ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (iface.ToolSetPage, error) {
+func (s *service) ListToolSetGenerationsFromCursor(
+	ctx context.Context,
+	cursor string,
+) (iface.ToolSetPage, error) {
 	page, err := s.db.ListToolSetGenerationsFromCursor(ctx, cursor)
 	if errors.Is(err, database.ErrNotFound) {
 		return iface.ToolSetPage{}, ErrNotFound
@@ -329,13 +366,21 @@ func (s *service) ListToolSetGenerationsFromCursor(ctx context.Context, cursor s
 	if len(page.Items) == 0 {
 		return iface.ToolSetPage{Items: []iface.ToolSet{}}, nil
 	}
+
 	return s.hydrateToolSetGenerationPage(ctx, page.Items[0].ToolSetId, page)
 }
 
 // hydrateToolSetListPage renders each logical ToolSet's default projection.
 // This reads each ToolSet's generations separately; pages are bounded.
-func (s *service) hydrateToolSetListPage(ctx context.Context, page database.ToolSetListPage) (iface.ToolSetPage, error) {
-	result := iface.ToolSetPage{Items: make([]iface.ToolSet, 0, len(page.Items)), Cursor: page.Cursor}
+func (s *service) hydrateToolSetListPage(
+	ctx context.Context,
+	page database.ToolSetListPage,
+) (iface.ToolSetPage, error) {
+	result := iface.ToolSetPage{
+		Items:  make([]iface.ToolSet, 0, len(page.Items)),
+		Cursor: page.Cursor,
+	}
+
 	for i := range page.Items {
 		view, err := s.defaultToolSetView(ctx, &page.Items[i])
 		if errors.Is(err, ErrNotFound) {
@@ -345,8 +390,10 @@ func (s *service) hydrateToolSetListPage(ctx context.Context, page database.Tool
 		if err != nil {
 			return iface.ToolSetPage{}, err
 		}
+
 		result.Items = append(result.Items, view)
 	}
+
 	return result, nil
 }
 
@@ -362,14 +409,20 @@ func (s *service) hydrateToolSetGenerationPage(
 		return iface.ToolSetPage{}, mapToolSetDatabaseError(err)
 	}
 
-	result := iface.ToolSetPage{Items: make([]iface.ToolSet, 0, len(page.Items)), Cursor: page.Cursor}
+	result := iface.ToolSetPage{
+		Items:  make([]iface.ToolSet, 0, len(page.Items)),
+		Cursor: page.Cursor,
+	}
+
 	for i := range page.Items {
 		view, err := s.hydrateToolSet(ctx, logical, &page.Items[i])
 		if err != nil {
 			return iface.ToolSetPage{}, err
 		}
+
 		result.Items = append(result.Items, view)
 	}
+
 	return result, nil
 }
 
@@ -383,16 +436,21 @@ func (s *service) loadToolSetGeneration(
 	if err != nil {
 		return nil, nil, mapToolSetDatabaseError(err)
 	}
+
 	row, err := s.db.GetToolSetGeneration(ctx, id, generation)
 	if err != nil {
 		return nil, nil, mapToolSetDatabaseError(err)
 	}
+
 	return logical, row, nil
 }
 
 // defaultToolSetView selects the generation a logical read shows: the primary,
 // which new connections install, otherwise the draft, otherwise the newest.
-func (s *service) defaultToolSetView(ctx context.Context, logical *database.ToolSet) (*ToolSet, error) {
+func (s *service) defaultToolSetView(
+	ctx context.Context,
+	logical *database.ToolSet,
+) (*ToolSet, error) {
 	for _, state := range []toolsetschema.ToolSetReleaseState{
 		toolsetschema.ToolSetReleaseStatePrimary,
 		toolsetschema.ToolSetReleaseStateDraft,
@@ -405,19 +463,31 @@ func (s *service) defaultToolSetView(ctx context.Context, logical *database.Tool
 			return nil, mapToolSetDatabaseError(err)
 		}
 	}
+
 	return s.newestToolSetView(ctx, logical)
 }
 
 // newestToolSetView returns the highest-numbered live generation, the source a
 // new draft is cloned from.
-func (s *service) newestToolSetView(ctx context.Context, logical *database.ToolSet) (*ToolSet, error) {
-	page, err := s.db.ListToolSetGenerations(ctx, database.ToolSetGenerationListQuery{ToolSetId: logical.Id, Limit: 1})
+func (s *service) newestToolSetView(
+	ctx context.Context,
+	logical *database.ToolSet,
+) (*ToolSet, error) {
+	page, err := s.db.ListToolSetGenerations(
+		ctx,
+		database.ToolSetGenerationListQuery{
+			ToolSetId: logical.Id,
+			Limit:     1,
+		},
+	)
 	if err != nil {
 		return nil, mapToolSetDatabaseError(err)
 	}
+
 	if len(page.Items) == 0 {
 		return nil, ErrNotFound
 	}
+
 	return s.hydrateToolSet(ctx, logical, &page.Items[0])
 }
 
@@ -551,11 +621,16 @@ func generationPatch(patch *toolsetschema.ToolSetPatch) *toolsetschema.ToolSetPa
 
 // defaultToolSetSelector fills an omitted selector namespace with the owner
 // subtree, matching create defaults, so stored selectors are always explicit.
-func defaultToolSetSelector(selector toolsetschema.ConnectionSelector, ns string) toolsetschema.ConnectionSelector {
+func defaultToolSetSelector(
+	selector toolsetschema.ConnectionSelector,
+	ns string,
+) toolsetschema.ConnectionSelector {
 	result := *selector.Clone()
+
 	if result.Namespace == "" {
 		result.Namespace = ns + namespace.WildcardSuffix
 	}
+
 	return result
 }
 
