@@ -140,10 +140,12 @@ func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req
 // can provide an independent copy. Bodies are never buffered or rewound here.
 func (p *proxy) ProxyRequestStream(ctx context.Context, reqType httpf.RequestType, req *iface.RawProxyRequest) (*http.Response, error) {
 	if req == nil || req.Outbound == nil {
+		httpf.ReportSendEvidence(ctx, false)
 		return nil, errors.New("raw proxy request requires an outbound *http.Request")
 	}
 	if req.Outbound.URL == nil {
 		closeRawRequestBody(req.Outbound)
+		httpf.ReportSendEvidence(ctx, false)
 		return nil, errors.New("raw proxy request requires an outbound URL")
 	}
 
@@ -341,15 +343,18 @@ func (p *proxy) sendRaw(
 	outbound = outbound.Clone(ctx)
 	if err := ctx.Err(); err != nil {
 		closeRawRequestBody(outbound)
+		httpf.ReportSendEvidence(ctx, false)
 		return nil, auth_methods.AuthApplication{}, err
 	}
 	app, err := p.auth.Resolve(ctx)
 	if contextErr := ctx.Err(); contextErr != nil {
 		closeRawRequestBody(outbound)
+		httpf.ReportSendEvidence(ctx, false)
 		return nil, auth_methods.AuthApplication{}, contextErr
 	}
 	if err != nil {
 		closeRawRequestBody(outbound)
+		httpf.ReportSendEvidence(ctx, false)
 		return nil, auth_methods.AuthApplication{}, err
 	}
 	if outbound.Header == nil {
@@ -370,7 +375,11 @@ func (p *proxy) sendRaw(
 		outbound.URL.RawQuery = q.Encode()
 	}
 
-	resp, err := client.Do(outbound)
+	// Only the target request gets a transport tracker. Resolve and 401
+	// recovery use the original context, so OAuth token requests cannot be
+	// mistaken for target execution. Reports accumulate across every attempt.
+	resp, mayHaveSent, err := httpf.DoWithSendEvidence(client, outbound)
+	httpf.ReportSendEvidence(ctx, mayHaveSent)
 	return resp, app, err
 }
 

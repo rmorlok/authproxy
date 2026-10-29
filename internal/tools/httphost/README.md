@@ -168,19 +168,28 @@ must be added at their source before an executor can reliably recommend
 reconnecting. Local rate-limit rejections are 429 responses, not Go errors, and
 remain available to status rules.
 
-`ExecutionState()` is `notStarted` until the first proxy handoff. After that it
-remains `mayHaveExecuted`, including when a later call is rejected or a transport
-error occurs. The proxy cannot always determine whether the upstream received a
-failed request, and a successful HTTP response does not establish completion of
-the whole logical action. A higher-level executor decides when the Tool action
-is complete.
+`ExecutionState()` starts as `notStarted`. Each client call is uncertain while
+in flight. Once it returns, the session uses the proxy's send evidence:
 
-This is deliberately conservative even for failures that happened before the
-first send: the current proxy interface does not report that fact. An error
-category or final local 429 alone would not prove it either; an earlier attempt
-may already have reached the provider during credential recovery or redirects.
-More precise `notStarted` reporting needs trusted, cumulative send information
-from the proxy, independently of the logical request allowance.
+| What happened | State after the call |
+| --- | --- |
+| Credentials could not be resolved before any target attempt. | `notStarted` |
+| A local rate limiter returned 429 before any target attempt. | `notStarted` |
+| The target transport was entered, even if DNS, TLS, or the request later failed. | `mayHaveExecuted` |
+| The client or transport did not supply reliable evidence. | `mayHaveExecuted` |
+
+These examples assume no earlier call may have executed. A possible send stays
+recorded for the rest of the session. For example, a target 401 followed by a
+local 429 during the credential retry remains `mayHaveExecuted`. Redirects also
+retain earlier attempts. OAuth token requests do not count as target requests.
+Every client handoff still consumes a logical request, including a proven
+pre-send rejection; execution state does not refund the allowance.
+
+This evidence records entry into the target transport, not proof that the
+provider received or completed a request. A successful HTTP response also does
+not establish completion of the whole logical action. A higher-level executor
+decides when the Tool action is complete. Unknown clients remain conservative,
+including core client initialization failures that do not yet report evidence.
 
 This package does not load Tool revisions, check permissions, validate input or
 output schemas, render requests, or build Tool results. The invocation layer must

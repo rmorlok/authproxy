@@ -324,8 +324,8 @@ func TestSessionIntegrationActorMismatch(t *testing.T) {
 			require.Zero(t, sends.Load())
 			require.Empty(t, transport.snapshot())
 			require.Equal(t, int32(1), client.calls.Load())
-			// Handoff remains conservative until the proxy exposes send evidence.
-			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+			// This supported client proves the rejection happened before target I/O.
+			require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
 		})
 	}
 }
