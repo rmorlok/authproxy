@@ -50,14 +50,17 @@ func ReportSendEvidence(ctx context.Context, mayHaveSent bool) {
 	if ctx == nil {
 		return
 	}
+
 	observation, _ := ctx.Value(sendObservationKey{}).(*SendObservation)
 	if observation == nil {
 		return
 	}
+
 	if mayHaveSent {
 		observation.state.Store(sendMayHaveOccurred)
 		return
 	}
+
 	observation.state.CompareAndSwap(sendUnreported, sendNotAttempted)
 }
 
@@ -68,6 +71,7 @@ type targetSendEvidence struct {
 	// covered means the factory's complete middleware stack observed the call.
 	// Without this acknowledgement, an absent handoff marker proves nothing.
 	covered atomic.Bool
+
 	// handedOff remains true after any attempt enters the underlying transport.
 	// It deliberately includes failures before actual network writes.
 	handedOff atomic.Bool
@@ -88,12 +92,26 @@ type targetSendEvidenceKey struct{}
 // follows redirects but is not installed in the original context, so callers
 // can resolve credentials with that context without counting token requests.
 // This helper returns evidence without reporting to a SendObservation.
-func DoWithSendEvidence(client *http.Client, req *http.Request) (*http.Response, bool, error) {
+func DoWithSendEvidence(
+	client *http.Client,
+	req *http.Request,
+) (resp *http.Response, mayHaveReached bool, err error) {
+	// Check if we have the coverage transport to record what we need
 	_, supported := client.Transport.(*sendCoverageTransport)
+
+	// Attach the evidence to the context for tracking
 	evidence := &targetSendEvidence{}
 	ctx := context.WithValue(req.Context(), targetSendEvidenceKey{}, evidence)
-	resp, err := client.Do(req.WithContext(ctx))
-	return resp, !supported || !evidence.covered.Load() || evidence.handedOff.Load(), err
+
+	// Execute the request
+	resp, err = client.Do(req.WithContext(ctx))
+
+	// Evaluate if we may have reached transport
+	mayHaveReached = !supported ||
+		!evidence.covered.Load() ||
+		evidence.handedOff.Load()
+
+	return resp, mayHaveReached, err
 }
 
 // sendCoverageTransport acknowledges that the complete factory middleware
@@ -109,6 +127,7 @@ func (t *sendCoverageTransport) RoundTrip(req *http.Request) (*http.Response, er
 	if evidence, _ := req.Context().Value(targetSendEvidenceKey{}).(*targetSendEvidence); evidence != nil {
 		evidence.covered.Store(true)
 	}
+
 	return t.transport.RoundTrip(req)
 }
 
@@ -122,9 +141,12 @@ type sendHandoffTransport struct {
 
 // RoundTrip records the handoff before calling the underlying transport, so
 // transport failures and retries cannot erase evidence of a possible send.
-func (t *sendHandoffTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *sendHandoffTransport) RoundTrip(
+	req *http.Request,
+) (*http.Response, error) {
 	if evidence, _ := req.Context().Value(targetSendEvidenceKey{}).(*targetSendEvidence); evidence != nil {
 		evidence.handedOff.Store(true)
 	}
+
 	return t.transport.RoundTrip(req)
 }
