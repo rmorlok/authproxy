@@ -177,7 +177,9 @@ func newRemoteSmokeRig(t *testing.T) *helpers.RemoteAuthProxy {
 }
 
 // smokeOAuthClient is a per-run OAuth client that replaces the seeded client
-// on the demo-oauth-simple copy, isolating its provider credentials.
+// on the demo-oauth-simple copy. The admin API returns the seeded client
+// secret redacted, so a copy cannot reuse the seeded client and must point at
+// a provider client registered by the test.
 type smokeOAuthClient struct {
 	provider     *helpers.OAuth2TestProvider
 	clientID     string
@@ -193,14 +195,14 @@ type smokeOAuthClient struct {
 //
 // cloneSeededConnectorsIntoSmokeNamespace copies the seeded connectors that
 // match sourceSelector (in addition to demo=true) and returns a label selector
-// matching this run's copies. With a nil oauthOverride every definition is
-// copied unchanged, so the demo-oauth-simple copy still uses the seeded
-// provider client; otherwise that copy uses oauthOverride's client.
+// matching this run's copies. Definitions are copied unchanged except that the
+// demo-oauth-simple copy authenticates with oauthClient, since the seeded
+// client secret is redacted on read and the API rejects redacted placeholders.
 func cloneSeededConnectorsIntoSmokeNamespace(
 	t *testing.T,
 	rig *helpers.RemoteAuthProxy,
 	sourceSelector string,
-	oauthOverride *smokeOAuthClient,
+	oauthClient smokeOAuthClient,
 ) string {
 	t.Helper()
 
@@ -218,10 +220,10 @@ func cloneSeededConnectorsIntoSmokeNamespace(
 		resource := cschema.NewConnector()
 		resource.Metadata.Name = common.ResourceName(fmt.Sprintf("%s-smoke-%d-%d", source.Metadata.Name, suffix, i))
 		resource.Spec.Definition = detailed.Spec.Definition
-		if oauthOverride != nil && source.Metadata.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
-			replacement := helpers.NewOAuth2Connector(apid.New(apid.PrefixConnector), string(resource.Metadata.Name), oauthOverride.provider, helpers.OAuth2ConnectorOptions{
-				ClientID:     oauthOverride.clientID,
-				ClientSecret: oauthOverride.clientSecret,
+		if source.Metadata.Labels["demo.authproxy.net/seed-key"] == "demo-oauth-simple" {
+			replacement := helpers.NewOAuth2Connector(apid.New(apid.PrefixConnector), string(resource.Metadata.Name), oauthClient.provider, helpers.OAuth2ConnectorOptions{
+				ClientID:     oauthClient.clientID,
+				ClientSecret: oauthClient.clientSecret,
 				Scopes:       []string{"read", "profile"},
 			})
 			resource.Spec.Definition.Auth = replacement.Spec.Definition.Auth
@@ -348,10 +350,28 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 	rig := newRemoteSmokeRig(t)
 	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
 
-	// Copy the seeded connector unchanged into root.smoke, keeping the seeded
-	// provider client, so the seeded definition is exercised without creating
-	// any smoke connection under root.demo.
-	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, "demo.authproxy.net/seed-key=demo-oauth-simple", nil)
+	// Register a per-run provider client; the seeded client's secret is not
+	// readable through the admin API, so the copy cannot reuse it.
+	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
+	oauthClientID := "seeded-oauth-smoke-client-" + suffix
+	oauthClientSecret := "seeded-oauth-smoke-secret-" + suffix
+	client := provider.CreateClient(helpers.CreateClientRequest{
+		Key:                     oauthClientID,
+		Secret:                  oauthClientSecret,
+		RedirectURI:             rig.PublicURL + "/oauth2/callback",
+		TokenEndpointAuthMethod: helpers.TokenEndpointAuthPost,
+		Scope:                   "read profile",
+	})
+	require.Equal(t, oauthClientID, client.Key)
+
+	// Copy the seeded connector into root.smoke with that client, so the
+	// seeded definition is exercised without creating any smoke connection
+	// under root.demo.
+	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, "demo.authproxy.net/seed-key=demo-oauth-simple", smokeOAuthClient{
+		provider:     provider,
+		clientID:     oauthClientID,
+		clientSecret: oauthClientSecret,
+	})
 	copies := rig.ListConnectors(t, runSelector)
 	require.Len(t, copies, 1, "expected one root.smoke copy of the seeded demo-oauth-simple connector")
 	connector := copies[0]
@@ -362,7 +382,7 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 	authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
 	authorizeParams := parseQuery(t, authorizeURL)
 	clientID := authorizeParams.Get("client_id")
-	require.NotEmpty(t, clientID)
+	require.Equal(t, oauthClientID, clientID)
 	require.Equal(t, rig.PublicURL+"/oauth2/callback", authorizeParams.Get("redirect_uri"))
 	require.NotEmpty(t, authorizeParams.Get("state"))
 
@@ -389,7 +409,7 @@ func TestRemoteSeededOAuthConnectorSmoke(t *testing.T) {
 		ClientID: clientID,
 		Since:    startedAt,
 	})
-	require.NotEmpty(t, tokenReqs, "provider should record the seeded client token exchange")
+	require.NotEmpty(t, tokenReqs, "provider should record the copied connector's token exchange")
 }
 
 func TestRemoteSeededConnectorsSmoke(t *testing.T) {
@@ -414,7 +434,7 @@ func TestRemoteSeededConnectorsSmoke(t *testing.T) {
 	})
 	require.Equal(t, oauthClientID, client.Key)
 
-	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, "", &smokeOAuthClient{
+	runSelector := cloneSeededConnectorsIntoSmokeNamespace(t, rig, "", smokeOAuthClient{
 		provider:     provider,
 		clientID:     oauthClientID,
 		clientSecret: oauthClientSecret,
