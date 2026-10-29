@@ -51,6 +51,7 @@ type toolListCursor struct {
 // management metadata only; definitions stay in the encrypted revision table.
 type ToolListPage struct {
 	Items []Tool
+
 	// Cursor resumes through ListToolsFromCursor and is empty at the end.
 	Cursor string
 }
@@ -85,14 +86,24 @@ func (q ToolListQuery) validate() (LabelSelector, error) {
 // ListTools starts an ID-ordered management listing. Results include standalone
 // and generated Tools in live namespaces, whether or not their connection is
 // still live; callers must still apply per-resource permission checks.
-func (s *service) ListTools(ctx context.Context, query ToolListQuery) (ToolListPage, error) {
+func (s *service) ListTools(
+	ctx context.Context,
+	query ToolListQuery,
+) (ToolListPage, error) {
 	return s.listTools(ctx, query, apid.Nil)
 }
 
 // ListToolsFromCursor resumes a management listing with its saved filters and
 // limit. Invalid cursors, including candidate-scan cursors, return an error.
-func (s *service) ListToolsFromCursor(ctx context.Context, cursor string) (ToolListPage, error) {
-	parsed, err := pagination.ParseCursor[toolListCursor](ctx, s.cursorEncryptor, cursor)
+func (s *service) ListToolsFromCursor(
+	ctx context.Context,
+	cursor string,
+) (ToolListPage, error) {
+	parsed, err := pagination.ParseCursor[toolListCursor](
+		ctx,
+		s.cursorEncryptor,
+		cursor,
+	)
 	if err != nil {
 		return ToolListPage{}, err
 	}
@@ -107,19 +118,26 @@ func (s *service) ListToolsFromCursor(ctx context.Context, cursor string) (ToolL
 
 // listTools reads one bounded page after the supplied position. A lookahead row
 // produces a cursor carrying the original query and the last returned ID.
-func (s *service) listTools(ctx context.Context, params ToolListQuery, afterID apid.ID) (ToolListPage, error) {
+func (s *service) listTools(
+	ctx context.Context,
+	params ToolListQuery,
+	afterID apid.ID,
+) (ToolListPage, error) {
 	selector, err := params.validate()
 	if err != nil {
 		return ToolListPage{}, err
 	}
 
-	page := ToolListPage{Items: []Tool{}}
+	page := ToolListPage{
+		Items: []Tool{},
+	}
 	if len(params.NamespaceMatchers) == 0 {
 		return page, nil
 	}
 
 	var row Tool
-	q := s.sq.Select(util.PrependStringToAll("t.", row.cols())...).
+	q := s.sq.
+		Select(util.PrependStringToAll("t.", row.cols())...).
 		From(ToolsTable + " t").
 		Join(NamespacesTable + " n ON n.path = t.namespace").
 		Where(sq.Eq{
