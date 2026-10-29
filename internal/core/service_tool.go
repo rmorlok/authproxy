@@ -296,17 +296,26 @@ func (s *service) prepareToolDefinition(ctx context.Context, tool *toolschema.To
 // without running authored code or making requests. field prefixes error paths,
 // such as "spec" for a standalone Tool or a ToolSet template's spec path.
 // Failures wrap ErrInvalidArgument.
-func compileToolDefinition(definition *toolschema.ToolDefinition, field string) error {
+func compileToolDefinition(
+	definition *toolschema.ToolDefinition,
+	field string,
+) error {
 	if err := definition.Validate(nil); err != nil {
 		return fmt.Errorf("%w: %s: %w", ErrInvalidArgument, field, err)
 	}
 
 	switch {
 	case definition.ProxyHTTP != nil:
-		if _, err := httpcodec.CompileRequest(definition.ProxyHTTP, toolPublishRenderLimits); err != nil {
+		if _, err := httpcodec.CompileRequest(
+			definition.ProxyHTTP,
+			toolPublishRenderLimits,
+		); err != nil {
 			return fmt.Errorf("%w: %s.proxyHttp: %w", ErrInvalidArgument, field, err)
 		}
-		if _, err := httpcodec.CompileResponse(definition.ProxyHTTP.Response, toolPublishResponseLimits); err != nil {
+		if _, err := httpcodec.CompileResponse(
+			definition.ProxyHTTP.Response,
+			toolPublishResponseLimits,
+		); err != nil {
 			return fmt.Errorf("%w: %s.proxyHttp.response: %w", ErrInvalidArgument, field, err)
 		}
 	case definition.Javascript != nil:
