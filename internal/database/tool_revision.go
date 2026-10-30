@@ -10,7 +10,6 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -158,7 +157,7 @@ func newToolRevision(
 	definition encfield.EncryptedField,
 	digest string,
 ) *ToolRevision {
-	now := apctx.GetClock(ctx).Now()
+	now := toolStorageTime(ctx)
 	return &ToolRevision{
 		ToolId:              tool.Id,
 		Revision:            tool.ActiveRevision,

@@ -198,7 +198,7 @@ func (s *service) CreateToolSetGeneration(
 	id apid.ID,
 	definition encfield.EncryptedField,
 ) (*ToolSetGeneration, error) {
-	now := apctx.GetClock(ctx).Now()
+	now := toolStorageTime(ctx)
 
 	result := ToolSetGeneration{
 		ToolSetId:           id,

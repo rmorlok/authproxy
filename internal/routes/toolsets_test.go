@@ -1,15 +1,19 @@
 package routes
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
+	"github.com/rmorlok/authproxy/internal/apctx"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/stretchr/testify/require"
@@ -373,6 +377,40 @@ func TestToolSets(t *testing.T) {
 
 		w := s.do(t, http.MethodGet, "/toolsets?limit=0", nil, all)
 		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+	})
+
+	t.Run("write responses match stored timestamps", func(t *testing.T) {
+		s, _ := newToolsTestSetup(t)
+
+		// A nanosecond clock exposes sub-microsecond values PostgreSQL cannot store.
+		ctx := apctx.WithFixedClock(context.Background(), time.Date(2026, 10, 30, 12, 0, 0, 123456789, time.UTC))
+
+		// The create response carries the same timestamps as a later read.
+		var body toolsetschema.ToolSet
+		encoded, err := json.Marshal(toolSetBody("root.acme", "precise", "primary"))
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(encoded, &body))
+		created, err := s.Core.CreateToolSet(ctx, &body)
+		require.NoError(t, err)
+		stored, err := s.Core.GetToolSet(ctx, created.GetId())
+		require.NoError(t, err)
+		require.Equal(t, stored.GetResource().Metadata, created.GetResource().Metadata)
+
+		// A metadata update and a new draft do too.
+		patch := toolsetschema.NewToolSetPatch()
+		name := scommon.ResourceName("renamed")
+		patch.Metadata.Name = &name
+		updated, err := s.Core.UpdateToolSet(ctx, created.GetId(), patch)
+		require.NoError(t, err)
+		stored, err = s.Core.GetToolSet(ctx, created.GetId())
+		require.NoError(t, err)
+		require.Equal(t, stored.GetResource().Metadata, updated.GetResource().Metadata)
+
+		draft, err := s.Core.CreateToolSetGeneration(ctx, created.GetId(), nil)
+		require.NoError(t, err)
+		stored, err = s.Core.GetToolSetGeneration(ctx, created.GetId(), draft.GetGeneration())
+		require.NoError(t, err)
+		require.Equal(t, stored.GetResource().Metadata, draft.GetResource().Metadata)
 	})
 
 	t.Run("delete is idempotent and frees the name", func(t *testing.T) {

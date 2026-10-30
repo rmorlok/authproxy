@@ -189,7 +189,7 @@ func (s *service) CreateToolSet(ctx context.Context, toolSet *ToolSet) error {
 
 	candidate.SelectorRevision = 1
 	candidate.DeletedAt = nil
-	candidate.CreatedAt = apctx.GetClock(ctx).Now()
+	candidate.CreatedAt = toolStorageTime(ctx)
 	candidate.UpdatedAt = candidate.CreatedAt
 
 	if err := candidate.Validate(); err != nil {
@@ -421,7 +421,7 @@ func (s *service) UpdateToolSetMetadata(
 		updated.Name = name
 		updated.Labels = labels
 		updated.Annotations = Annotations(annotations)
-		updated.UpdatedAt = apctx.GetClock(ctx).Now()
+		updated.UpdatedAt = toolStorageTime(ctx)
 
 		_, err := s.sq.
 			Update(ToolSetsTable).
