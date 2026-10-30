@@ -171,7 +171,7 @@ Schema ownership lives under `internal/schema`; read `internal/schema/AGENTS.md`
 
 ### Other packages worth knowing
 
-- `internal/apctx` — request context with correlation ids, an injectable clock, and value-applier helpers. Use `apctx.GetClock(ctx)` instead of `time.Now()` in any code under test.
+- `internal/apctx` — request context with correlation ids, an injectable clock, and value-applier helpers. Use `apctx.GetClock(ctx)` instead of `time.Now()` in any code under test. Tests that compare a write's result with stored timestamps need a sub-microsecond fixed clock; see "Timestamp Precision" in [`internal/database/AGENTS.md`](internal/database/AGENTS.md).
 - `internal/encrypt` + `internal/encfield` — AES-GCM encryption for `EncryptedField` columns. The re-encryption registry (`internal/database/reencrypt_registry.go`) drives key-rotation jobs over registered encrypted columns.
 - `internal/request_log` — structured HTTP request/response logging with sensitive-data redaction.
 - `internal/httpf` — HTTP client factory with mock support and OpenTelemetry instrumentation.

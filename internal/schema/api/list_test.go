@@ -22,6 +22,7 @@ func TestListConstructorsUseV1Alpha1Envelope(t *testing.T) {
 		{name: "keys", expectedKind: "KeyList", value: NewListKeysResponseJson(nil, "next")},
 		{name: "rate limits", expectedKind: "RateLimitList", value: NewListRateLimitsResponseJson(nil, "next")},
 		{name: "tools", expectedKind: "ToolList", value: NewListToolsResponseJson(nil, "next")},
+		{name: "toolsets", expectedKind: "ToolSetList", value: NewListToolSetsResponseJson(nil, "next")},
 		{name: "notifications", expectedKind: "NotificationList", value: NewListNotificationsResponseJson(nil, "next")},
 		{name: "request events", expectedKind: "RequestEventList", value: NewListRequestEventsResponseJson(nil, "next", nil)},
 	}

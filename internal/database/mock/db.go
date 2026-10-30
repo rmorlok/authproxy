@@ -1634,6 +1634,66 @@ func (mr *MockDBMockRecorder) ListToolCandidatesFromCursor(ctx, cursor interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolCandidatesFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolCandidatesFromCursor), ctx, cursor)
 }
 
+// ListToolSetGenerations mocks base method.
+func (m *MockDB) ListToolSetGenerations(ctx context.Context, query database.ToolSetGenerationListQuery) (database.ToolSetGenerationListPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetGenerations", ctx, query)
+	ret0, _ := ret[0].(database.ToolSetGenerationListPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListToolSetGenerations indicates an expected call of ListToolSetGenerations.
+func (mr *MockDBMockRecorder) ListToolSetGenerations(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetGenerations", reflect.TypeOf((*MockDB)(nil).ListToolSetGenerations), ctx, query)
+}
+
+// ListToolSetGenerationsFromCursor mocks base method.
+func (m *MockDB) ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (database.ToolSetGenerationListPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetGenerationsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ToolSetGenerationListPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListToolSetGenerationsFromCursor indicates an expected call of ListToolSetGenerationsFromCursor.
+func (mr *MockDBMockRecorder) ListToolSetGenerationsFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetGenerationsFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolSetGenerationsFromCursor), ctx, cursor)
+}
+
+// ListToolSets mocks base method.
+func (m *MockDB) ListToolSets(ctx context.Context, query database.ToolSetListQuery) (database.ToolSetListPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSets", ctx, query)
+	ret0, _ := ret[0].(database.ToolSetListPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListToolSets indicates an expected call of ListToolSets.
+func (mr *MockDBMockRecorder) ListToolSets(ctx, query interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSets", reflect.TypeOf((*MockDB)(nil).ListToolSets), ctx, query)
+}
+
+// ListToolSetsFromCursor mocks base method.
+func (m *MockDB) ListToolSetsFromCursor(ctx context.Context, cursor string) (database.ToolSetListPage, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ToolSetListPage)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListToolSetsFromCursor indicates an expected call of ListToolSetsFromCursor.
+func (mr *MockDBMockRecorder) ListToolSetsFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetsFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolSetsFromCursor), ctx, cursor)
+}
+
 // ListTools mocks base method.
 func (m *MockDB) ListTools(ctx context.Context, query database.ToolListQuery) (database.ToolListPage, error) {
 	m.ctrl.T.Helper()
@@ -2616,6 +2676,21 @@ func (m *MockDB) UpdateToolSetGenerationDraft(ctx context.Context, id apid.ID, g
 func (mr *MockDBMockRecorder) UpdateToolSetGenerationDraft(ctx, id, generation, expectedRevision, definition interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateToolSetGenerationDraft", reflect.TypeOf((*MockDB)(nil).UpdateToolSetGenerationDraft), ctx, id, generation, expectedRevision, definition)
+}
+
+// UpdateToolSetMetadata mocks base method.
+func (m *MockDB) UpdateToolSetMetadata(ctx context.Context, id apid.ID, name common.ResourceName, userLabels, annotations map[string]string) (*database.ToolSet, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateToolSetMetadata", ctx, id, name, userLabels, annotations)
+	ret0, _ := ret[0].(*database.ToolSet)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateToolSetMetadata indicates an expected call of UpdateToolSetMetadata.
+func (mr *MockDBMockRecorder) UpdateToolSetMetadata(ctx, id, name, userLabels, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateToolSetMetadata", reflect.TypeOf((*MockDB)(nil).UpdateToolSetMetadata), ctx, id, name, userLabels, annotations)
 }
 
 // UpsertActor mocks base method.

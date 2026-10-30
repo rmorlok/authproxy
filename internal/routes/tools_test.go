@@ -9,10 +9,12 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -35,8 +37,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// toolsTestSetup wires the Tool routes to a real core service, SQLite database,
-// and encryption service so tests exercise compilation and persistence.
+// toolsTestSetup wires the Tool and ToolSet routes to a real core service,
+// database, and encryption service so tests exercise compilation and persistence.
 type toolsTestSetup struct {
 	Gin      *gin.Engine
 	AuthUtil *auth2.AuthTestUtil
@@ -63,6 +65,7 @@ func newToolsTestSetup(t *testing.T) (*toolsTestSetup, map[string]*database.Conn
 
 	r := apgin.ForTest(nil)
 	NewToolsRoutes(cfg, auth, c).Register(r)
+	NewToolSetsRoutes(cfg, auth, c).Register(r)
 
 	ctx := context.Background()
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: "root.acme"}))
@@ -434,6 +437,34 @@ func TestTools(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), got.GetActiveRevision())
 		require.Equal(t, "first writer", got.GetResource().Spec.Description)
+	})
+
+	t.Run("write responses match stored timestamps", func(t *testing.T) {
+		s, cxns := newToolsTestSetup(t)
+
+		// A nanosecond clock exposes sub-microsecond values PostgreSQL cannot store.
+		ctx := apctx.WithFixedClock(context.Background(), time.Date(2026, 10, 30, 12, 0, 0, 123456789, time.UTC))
+
+		// The create response carries the same timestamps as a later read.
+		var body toolschema.Tool
+		encoded, err := json.Marshal(toolBody("root.acme", "precise", cxns["calendar"].Id, nil))
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(encoded, &body))
+		created, err := s.Core.CreateTool(ctx, &body)
+		require.NoError(t, err)
+		stored, err := s.Core.GetTool(ctx, created.GetId())
+		require.NoError(t, err)
+		require.Equal(t, stored.GetResource().Metadata, created.GetResource().Metadata)
+
+		// An update built from the create response passes the immutability check
+		// and returns the stored timestamps too.
+		candidate := created.GetResource()
+		candidate.Spec.Description = "changed"
+		updated, err := s.Core.UpdateTool(ctx, created.GetId(), created.GetActiveRevision(), candidate)
+		require.NoError(t, err)
+		stored, err = s.Core.GetTool(ctx, created.GetId())
+		require.NoError(t, err)
+		require.Equal(t, stored.GetResource().Metadata, updated.GetResource().Metadata)
 	})
 
 	t.Run("list filters by scope, connection, name, and labels with pagination", func(t *testing.T) {

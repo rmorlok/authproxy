@@ -378,6 +378,14 @@ func (s *service) lockToolForWrite(
 	return nil
 }
 
+// toolStorageTime returns the injected clock's time at microsecond precision,
+// the finest both PostgreSQL and SQLite preserve. Tool and ToolSet writes return
+// records built in memory, so a finer value would make those responses disagree
+// with later reads and fail createdAt immutability checks on PostgreSQL.
+func toolStorageTime(ctx context.Context) time.Time {
+	return apctx.GetClock(ctx).Now().Truncate(time.Microsecond)
+}
+
 // CreateStandaloneTool stores a new identity and its active revision together.
 // The caller supplies a validated, compiled, encrypted definition and its digest;
 // this layer does not decrypt or compile it. Names default to the allocated ID.
@@ -410,7 +418,7 @@ func (s *service) CreateStandaloneTool(
 		candidate.Name = common.ResourceName(candidate.Id.String())
 	}
 	candidate.ActiveRevision = 1
-	candidate.CreatedAt = apctx.GetClock(ctx).Now()
+	candidate.CreatedAt = toolStorageTime(ctx)
 	candidate.UpdatedAt = candidate.CreatedAt
 	candidate.DeletedAt = nil
 

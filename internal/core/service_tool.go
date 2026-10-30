@@ -271,25 +271,8 @@ func (s *service) resolveToolConnection(ctx context.Context, tool *toolschema.To
 // stable across randomized encryption and later key rotation.
 func (s *service) prepareToolDefinition(ctx context.Context, tool *toolschema.Tool) (*preparedToolDefinition, error) {
 	definition := &tool.Spec.ToolDefinition
-	if err := definition.Validate(nil); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
-	}
-
-	switch {
-	case definition.ProxyHTTP != nil:
-		if _, err := httpcodec.CompileRequest(definition.ProxyHTTP, toolPublishRenderLimits); err != nil {
-			return nil, fmt.Errorf("%w: spec.proxyHttp: %w", ErrInvalidArgument, err)
-		}
-		if _, err := httpcodec.CompileResponse(definition.ProxyHTTP.Response, toolPublishResponseLimits); err != nil {
-			return nil, fmt.Errorf("%w: spec.proxyHttp.response: %w", ErrInvalidArgument, err)
-		}
-	case definition.Javascript != nil:
-		// The execute(params, context) host is not implemented yet, so there is
-		// no compiler that can validate an entry point. Refuse rather than store
-		// a definition that has never been compiled.
-		return nil, fmt.Errorf("%w: spec.javascript tools are not supported yet; use spec.proxyHttp", ErrInvalidArgument)
-	default:
-		return nil, fmt.Errorf("%w: spec must declare an executor", ErrInvalidArgument)
+	if err := compileToolDefinition(definition, "spec"); err != nil {
+		return nil, err
 	}
 
 	plaintext, err := json.Marshal(definition)
@@ -307,6 +290,44 @@ func (s *service) prepareToolDefinition(ctx context.Context, tool *toolschema.To
 		encrypted: encrypted,
 		digest:    hex.EncodeToString(digest[:]),
 	}, nil
+}
+
+// compileToolDefinition validates a Tool definition and compiles its executor
+// without running authored code or making requests. field prefixes error paths,
+// such as "spec" for a standalone Tool or a ToolSet template's spec path.
+// Failures wrap ErrInvalidArgument.
+func compileToolDefinition(
+	definition *toolschema.ToolDefinition,
+	field string,
+) error {
+	if err := definition.Validate(nil); err != nil {
+		return fmt.Errorf("%w: %s: %w", ErrInvalidArgument, field, err)
+	}
+
+	switch {
+	case definition.ProxyHTTP != nil:
+		if _, err := httpcodec.CompileRequest(
+			definition.ProxyHTTP,
+			toolPublishRenderLimits,
+		); err != nil {
+			return fmt.Errorf("%w: %s.proxyHttp: %w", ErrInvalidArgument, field, err)
+		}
+		if _, err := httpcodec.CompileResponse(
+			definition.ProxyHTTP.Response,
+			toolPublishResponseLimits,
+		); err != nil {
+			return fmt.Errorf("%w: %s.proxyHttp.response: %w", ErrInvalidArgument, field, err)
+		}
+	case definition.Javascript != nil:
+		// The execute(params, context) host is not implemented yet, so there is
+		// no compiler that can validate an entry point. Refuse rather than store
+		// a definition that has never been compiled.
+		return fmt.Errorf("%w: %s.javascript tools are not supported yet; use %s.proxyHttp", ErrInvalidArgument, field, field)
+	default:
+		return fmt.Errorf("%w: %s must declare an executor", ErrInvalidArgument, field)
+	}
+
+	return nil
 }
 
 // toolManagedError identifies the owning ToolSet so callers know where to make

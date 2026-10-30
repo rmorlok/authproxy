@@ -147,6 +147,19 @@ require.Equal(t, expectedTime, actualTime)
 require.True(t, expectedTime.Equal(actualTime))
 ```
 
+### Timestamp Precision
+
+PostgreSQL stores microseconds, while Go's clock has nanosecond precision on Linux. A value that was written and then read back can therefore differ from the one held in memory. macOS clocks tick in microseconds, so this kind of bug passes locally and fails only on Linux CI with PostgreSQL.
+
+- **Writes that return a record built in memory** must use a timestamp the database stores exactly. Tool and ToolSet writes use `toolStorageTime(ctx)`. A `RETURNING` clause or a re-read also gives the stored value.
+- **Tests must not rely on the machine's clock to show this.** Use a fixed clock with sub-microsecond digits, so the mismatch reproduces on every platform and in both providers:
+
+```go
+ctx := apctx.WithFixedClock(context.Background(), time.Date(2026, 10, 30, 12, 0, 0, 123456789, time.UTC))
+```
+
+- **Compare a write's result with a later read**, not only with the input. Immutability checks such as `metadata.createdAt` compare these values too, so a mismatch can surface as a validation error far from the write.
+
 ### Enumerate Pattern
 
 Pagination in enumerate methods uses a consistent pattern:
@@ -166,3 +179,4 @@ After making changes to this package:
 5. Package builds: `go build ./internal/database/...`
 6. Tests pass on SQLite: `go test ./internal/database/...`
 7. Tests pass on PostgreSQL: `set -a && source .env && set +a && go test ./internal/database/...`
+8. Writes returning in-memory timestamps are covered by a test using a sub-microsecond fixed clock

@@ -1868,6 +1868,32 @@
     "UpdateToolRequest": {
       "$ref": "../resources/tools/schema-resource.json#/$defs/ToolPatch"
     },
+    "ToolSet": {
+      "$ref": "../resources/toolsets/schema.json"
+    },
+    "ListToolSetsResponse": {
+      "description": "A Kubernetes-style list of ToolSet resources: one default projection per ToolSet, or one item per generation of a single ToolSet.",
+      "allOf": [
+        { "$ref": "./v1alpha1/schema.json#/$defs/ResourceList" },
+        {
+          "type": "object",
+          "properties": {
+            "apiVersion": { "const": "authproxy.net/v1alpha1" },
+            "kind": { "const": "ToolSetList" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "../resources/toolsets/schema.json" }
+            }
+          }
+        }
+      ]
+    },
+    "CreateToolSetRequest": {
+      "$ref": "../resources/toolsets/schema.json"
+    },
+    "UpdateToolSetRequest": {
+      "$ref": "../resources/toolsets/schema.json#/$defs/ToolSetPatch"
+    },
     "ListRateLimitsResponse": {
       "description": "A Kubernetes-style list of rate limits.",
       "allOf": [

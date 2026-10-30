@@ -1,0 +1,180 @@
+{
+  "apiVersion": "authproxy.net/v1alpha1",
+  "kind": "ToolSetList",
+  "metadata": {
+    "continue": "next"
+  },
+  "items": [
+    {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "ToolSet",
+      "metadata": {
+        "id": "tls_test550e8400abcde",
+        "name": "calendar-tools",
+        "namespace": "root.acme",
+        "generation": 3,
+        "labels": {
+          "capability": "calendars"
+        },
+        "createdAt": "2026-01-02T03:04:05Z",
+        "updatedAt": "2026-01-02T03:05:06Z"
+      },
+      "spec": {
+        "connectionSelector": {
+          "namespace": "root.acme.**",
+          "matchLabels": {
+            "provider": "google-calendar"
+          }
+        },
+        "release": {
+          "desiredState": "draft"
+        },
+        "definition": {
+          "source": {
+            "explicit": {
+              "tools": [
+                {
+                  "key": "list-calendars",
+                  "spec": {
+                    "description": "List calendars available to this account.",
+                    "verbs": [
+                      "tool:calendar.list"
+                    ],
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "proxyHttp": {
+                      "method": "GET",
+                      "url": "https://{{cfg.apiHost}}/v1/calendars"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "status": {
+        "release": {
+          "state": "draft"
+        }
+      }
+    },
+    {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "ToolSet",
+      "metadata": {
+        "id": "tls_test550e8400abcde",
+        "name": "calendar-tools",
+        "namespace": "root.acme",
+        "generation": 2,
+        "labels": {
+          "capability": "calendars"
+        },
+        "createdAt": "2026-01-02T03:04:05Z",
+        "updatedAt": "2026-01-02T03:05:06Z"
+      },
+      "spec": {
+        "connectionSelector": {
+          "namespace": "root.acme.**",
+          "matchLabels": {
+            "provider": "google-calendar"
+          }
+        },
+        "release": {
+          "desiredState": "primary"
+        },
+        "definition": {
+          "source": {
+            "explicit": {
+              "tools": [
+                {
+                  "key": "list-calendars",
+                  "spec": {
+                    "description": "List calendars available to this account.",
+                    "verbs": [
+                      "tool:calendar.list"
+                    ],
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "proxyHttp": {
+                      "method": "GET",
+                      "url": "https://{{cfg.apiHost}}/v1/calendars"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "status": {
+        "release": {
+          "state": "primary"
+        }
+      }
+    },
+    {
+      "apiVersion": "authproxy.net/v1alpha1",
+      "kind": "ToolSet",
+      "metadata": {
+        "id": "tls_test550e8400abcde",
+        "name": "calendar-tools",
+        "namespace": "root.acme",
+        "generation": 1,
+        "labels": {
+          "capability": "calendars"
+        },
+        "createdAt": "2026-01-02T03:04:05Z",
+        "updatedAt": "2026-01-02T03:05:06Z"
+      },
+      "spec": {
+        "connectionSelector": {
+          "namespace": "root.acme.**",
+          "matchLabels": {
+            "provider": "google-calendar"
+          }
+        },
+        "release": {
+          "desiredState": "primary"
+        },
+        "definition": {
+          "source": {
+            "explicit": {
+              "tools": [
+                {
+                  "key": "list-calendars",
+                  "spec": {
+                    "description": "List calendars available to this account.",
+                    "verbs": [
+                      "tool:calendar.list"
+                    ],
+                    "inputSchema": {
+                      "type": "object",
+                      "properties": {},
+                      "additionalProperties": false
+                    },
+                    "proxyHttp": {
+                      "method": "GET",
+                      "url": "https://{{cfg.apiHost}}/v1/calendars"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "status": {
+        "release": {
+          "state": "active"
+        }
+      }
+    }
+  ]
+}

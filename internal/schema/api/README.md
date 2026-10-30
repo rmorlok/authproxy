@@ -36,6 +36,14 @@ discovery descriptors below instead; an invocation grant never reveals this
 list. `CreateToolRequest` and `UpdateToolRequest` in `schema.json` are the
 canonical Tool resource and `ToolPatch`, not separate DTOs.
 
+`ListToolSetsResponseJson` is the `ToolSetList` envelope for both
+`GET /toolsets`, which returns each ToolSet's default projection (its primary
+generation, otherwise its draft), and `GET /toolsets/{id}/generations`, which
+returns one item per generation, newest first. Every item projects the current
+shared connection selector. `CreateToolSetRequest` and `UpdateToolSetRequest`
+are the canonical ToolSet resource and `ToolSetPatch`; generation PATCH and
+POST bodies use `ToolSetPatch` too and reject metadata and selector fields.
+
 ## Tool discovery
 
 `ToolDescriptor` is the usage information an agent can read through a tool grant.

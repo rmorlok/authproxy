@@ -119,6 +119,8 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "dry-run response", ref: "./schema.json#/$defs/RateLimitDryRunAction", file: "valid-dry-run-response.json"},
 		{name: "tool", ref: "./schema.json#/$defs/Tool", file: "valid-tool.json"},
 		{name: "list tools", ref: "./schema.json#/$defs/ListToolsResponse", file: "valid-list-tools.json"},
+		{name: "toolset", ref: "./schema.json#/$defs/ToolSet", file: "valid-toolset.json"},
+		{name: "list toolsets", ref: "./schema.json#/$defs/ListToolSetsResponse", file: "valid-list-toolsets.json"},
 		{name: "key", ref: "./schema.json#/$defs/Key", file: "valid-key.json"},
 		{name: "list keys", ref: "./schema.json#/$defs/ListKeysResponse", file: "valid-list-keys.json"},
 		{name: "create key", ref: "./schema.json#/$defs/CreateKeyRequest", file: "valid-create-key.json"},

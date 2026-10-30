@@ -15,6 +15,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	smeta "github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 )
@@ -187,7 +189,7 @@ func (s *service) CreateToolSet(ctx context.Context, toolSet *ToolSet) error {
 
 	candidate.SelectorRevision = 1
 	candidate.DeletedAt = nil
-	candidate.CreatedAt = apctx.GetClock(ctx).Now()
+	candidate.CreatedAt = toolStorageTime(ctx)
 	candidate.UpdatedAt = candidate.CreatedAt
 
 	if err := candidate.Validate(); err != nil {
@@ -360,6 +362,88 @@ func (s *service) UpdateToolSetConnectionSelector(
 	}
 
 	return &result, nil
+}
+
+// UpdateToolSetMetadata replaces a live ToolSet's name, user labels, and
+// annotations in one transaction. userLabels must not contain apxy/ keys; the
+// existing system labels are retained and the self-implicit identity labels are
+// re-derived for the new name. It never touches the selector, its revision, or
+// any generation. A name already used in the namespace returns ErrDuplicate.
+func (s *service) UpdateToolSetMetadata(
+	ctx context.Context,
+	id apid.ID,
+	name common.ResourceName,
+	userLabels map[string]string,
+	annotations map[string]string,
+) (*ToolSet, error) {
+	if err := validateToolSetID(id); err != nil {
+		return nil, err
+	}
+	if err := name.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid toolset name: %w", err)
+	}
+	if err := smeta.ValidateUserLabels(userLabels); err != nil {
+		return nil, fmt.Errorf("invalid toolset labels: %w", err)
+	}
+	if err := smeta.ValidateAnnotations(annotations); err != nil {
+		return nil, fmt.Errorf("invalid toolset annotations: %w", err)
+	}
+
+	var result *ToolSet
+	err := s.transaction(func(tx *sql.Tx) error {
+		// PostgreSQL locks the row so a concurrent system-label refresh between
+		// this read and the write cannot be lost; SQLite serializes writers.
+		query := s.sq.
+			Select(new(ToolSet).cols()...).
+			From(ToolSetsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil})
+		if s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+			query = query.Suffix("FOR UPDATE")
+		}
+
+		var current ToolSet
+		if err := query.RunWith(tx).QueryRowContext(ctx).Scan(current.fields()...); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		_, apxy := SplitUserAndApxyLabels(current.Labels)
+		labels := InjectSelfImplicitLabels(
+			id,
+			name,
+			current.Namespace,
+			MergeApxyAndUserLabels(Labels(userLabels), apxy),
+		)
+
+		updated := current
+		updated.Name = name
+		updated.Labels = labels
+		updated.Annotations = Annotations(annotations)
+		updated.UpdatedAt = toolStorageTime(ctx)
+
+		_, err := s.sq.
+			Update(ToolSetsTable).
+			Set("name", updated.Name).
+			Set("labels", updated.Labels).
+			Set("annotations", updated.Annotations).
+			Set("updated_at", updated.UpdatedAt).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			ExecContext(ctx)
+		if err != nil {
+			return wrapDatabaseMutationError("failed to update toolset metadata", err)
+		}
+
+		result = &updated
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // DeleteToolSet soft-deletes one live logical record, releasing its name while

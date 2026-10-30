@@ -3,9 +3,12 @@
 This package owns the `ToolSet` resource envelope, generation release fields,
 connection selectors, explicit templates, OpenAPI and MCP source settings,
 imported defaults and permission mappings, source diagnostics, patches, and
-generation selection policy. It is a contract foundation: management routes,
-registry/apply integration, publication transactions, persistence, and
-reconciliation are implemented in later slices.
+generation selection policy. Management routes under `/toolsets` (in
+`internal/routes/toolsets.go`, backed by `internal/core/service_toolset.go`)
+create, read, list, update, and delete ToolSets and their generations, and
+publish drafts. They currently accept only explicit sources; every template is
+compiled before a draft is stored or published. OpenAPI and MCP sources,
+registry/apply integration, and binding reconciliation are later slices.
 Other OpenAPI import settings are deferred. Strict input decoding and the JSON
 schema reject those fields until their contracts are implemented. Source
 validation does not fetch documents, resolve references, negotiate protocols,
@@ -199,7 +202,7 @@ values, connection configuration, and raw upstream error bodies from messages
 and locations; validation checks shape and syntax, not redaction.
 
 This slice defines the report and its validation/cloning behavior. Importers,
-binding reports, source artifact storage, and management routes follow later.
+binding reports, and source artifact storage follow later.
 
 ## OpenAPI sources
 
