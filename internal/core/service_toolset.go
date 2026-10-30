@@ -297,7 +297,10 @@ func (s *service) DeleteToolSet(ctx context.Context, id apid.ID) error {
 }
 
 // ListToolSets lists logical ToolSets, each in its default projection.
-func (s *service) ListToolSets(ctx context.Context, req iface.ListToolSetsRequest) (iface.ToolSetPage, error) {
+func (s *service) ListToolSets(
+	ctx context.Context,
+	req iface.ListToolSetsRequest,
+) (iface.ToolSetPage, error) {
 	limit := int(req.Limit)
 	if limit <= 0 {
 		limit = defaultToolSetListLimit
@@ -313,11 +316,15 @@ func (s *service) ListToolSets(ctx context.Context, req iface.ListToolSetsReques
 	if err != nil {
 		return iface.ToolSetPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
 	}
+
 	return s.hydrateToolSetListPage(ctx, page)
 }
 
 // ListToolSetsFromCursor continues a logical listing with its saved filters.
-func (s *service) ListToolSetsFromCursor(ctx context.Context, cursor string) (iface.ToolSetPage, error) {
+func (s *service) ListToolSetsFromCursor(
+	ctx context.Context,
+	cursor string,
+) (iface.ToolSetPage, error) {
 	page, err := s.db.ListToolSetsFromCursor(ctx, cursor)
 	if err != nil {
 		return iface.ToolSetPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
@@ -514,7 +521,12 @@ func (s *service) createToolSetDraft(
 	}
 
 	if desiredState == toolsetschema.ToolSetReleaseStatePrimary {
-		if row, err = s.db.PublishToolSetGeneration(ctx, logical.Id, row.Generation, row.Revision); err != nil {
+		if row, err = s.db.PublishToolSetGeneration(
+			ctx,
+			logical.Id,
+			row.Generation,
+			row.Revision,
+		); err != nil {
 			return nil, mapToolSetDatabaseError(err)
 		}
 	}
@@ -540,7 +552,13 @@ func (s *service) writeToolSetDraft(
 			return nil, err
 		}
 		if replace {
-			if row, err = s.db.UpdateToolSetGenerationDraft(ctx, logical.Id, row.Generation, row.Revision, encrypted); err != nil {
+			if row, err = s.db.UpdateToolSetGenerationDraft(
+				ctx,
+				logical.Id,
+				row.Generation,
+				row.Revision,
+				encrypted,
+			); err != nil {
 				return nil, mapToolSetDatabaseError(err)
 			}
 		}
@@ -548,7 +566,12 @@ func (s *service) writeToolSetDraft(
 
 	if publish {
 		var err error
-		if row, err = s.db.PublishToolSetGeneration(ctx, logical.Id, row.Generation, row.Revision); err != nil {
+		if row, err = s.db.PublishToolSetGeneration(
+			ctx,
+			logical.Id,
+			row.Generation,
+			row.Revision,
+		); err != nil {
 			return nil, mapToolSetDatabaseError(err)
 		}
 	}
@@ -573,7 +596,10 @@ func (s *service) prepareToolSetDefinition(
 
 	for i := range definition.Source.Explicit.Tools {
 		field := fmt.Sprintf("spec.definition.source.explicit.tools[%d].spec", i)
-		if err := compileToolDefinition(&definition.Source.Explicit.Tools[i].Spec, field); err != nil {
+		if err := compileToolDefinition(
+			&definition.Source.Explicit.Tools[i].Spec,
+			field,
+		); err != nil {
 			return encfield.EncryptedField{}, err
 		}
 	}
