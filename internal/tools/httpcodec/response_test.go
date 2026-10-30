@@ -247,7 +247,7 @@ func TestResponseResourceURIEscapesInvocationID(t *testing.T) {
 // retaining the caller's knowledge of execution for every failure category.
 func TestResponseInvalidOutput(t *testing.T) {
 	program := compileResponse(t, nil, responseLimits())
-	for _, state := range []api.ToolExecutionState{api.ToolExecutionStateMayHaveExecuted, api.ToolExecutionStateCompleted} {
+	for _, state := range []api.ToolExecutionState{api.ToolExecutionStateNotStarted, api.ToolExecutionStateMayHaveExecuted, api.ToolExecutionStateCompleted} {
 		for _, test := range []struct {
 			name, mediaType, payload, code string
 		}{
@@ -310,6 +310,37 @@ func TestResponseDecodedByteLimits(t *testing.T) {
 	input.Body, input.ContentType = nil, strings.Repeat("x", limits.MaxResponseBytes+1)
 	result := mapResponse(t, compileResponse(t, nil, limits), input)
 	require.Equal(t, "OUTPUT_TOO_LARGE", result.Error.Code)
+}
+
+// TestResponseNotStartedMappingFailures preserves evidence that no request was
+// sent when a local response fails content limits or its configured transform.
+func TestResponseNotStartedMappingFailures(t *testing.T) {
+	for _, scenario := range []string{"response limit", "output limit", "encoded limit", "transform failure"} {
+		t.Run(scenario, func(t *testing.T) {
+			// A local response can be mapped normally, even when no target ran.
+			input := transformResponseInput(t)
+			input.ExecutionState = api.ToolExecutionStateNotStarted
+			input.Body = []byte(`"` + strings.Repeat("x", 1024) + `"`)
+			limits := transformResponseLimits()
+			var source *tools.HTTPResponse
+			wantCode := "OUTPUT_TOO_LARGE"
+			switch scenario {
+			case "response limit":
+				limits.MaxResponseBytes = len(input.Body) - 1
+			case "output limit":
+				limits.MaxOutputBytes = len(input.Body) - 1
+			case "encoded limit":
+				limits.MaxEncodedResultBytes = 512
+			case "transform failure":
+				source = &tools.HTTPResponse{TransformJavascript: util.ToPtr(`(() => { throw new Error("private-transform"); })()`)}
+				wantCode = "OUTPUT_INVALID"
+			}
+
+			// Mapping errors describe the failure without fabricating a send.
+			result := mapResponse(t, compileResponse(t, source, limits), input)
+			requireTransformFailure(t, result, wantCode, api.ToolExecutionStateNotStarted)
+		})
+	}
 }
 
 // TestResponseStatusErrorsIgnoreUnusedContentLimits preserves status policy
@@ -445,7 +476,7 @@ func TestResponseCompileRejectsInvalidDefinitions(t *testing.T) {
 }
 
 // TestResponseRejectsInvalidInvocationContext cannot produce a public result
-// without valid correlation data or knowledge that an upstream request occurred.
+// without valid correlation data or an explicit, recognized execution state.
 func TestResponseRejectsInvalidInvocationContext(t *testing.T) {
 	program := compileResponse(t, nil, responseLimits())
 	for _, test := range []struct {
@@ -458,7 +489,7 @@ func TestResponseRejectsInvalidInvocationContext(t *testing.T) {
 		{"connection ID", func(i *httpcodec.ResponseInput) { i.Metadata.ConnectionID = i.ToolID }},
 		{"catalog provenance", func(i *httpcodec.ResponseInput) { i.Metadata.CatalogRevision = util.ToPtr(uint64(9)) }},
 		{"missing state", func(i *httpcodec.ResponseInput) { i.ExecutionState = "" }},
-		{"not started", func(i *httpcodec.ResponseInput) { i.ExecutionState = api.ToolExecutionStateNotStarted }},
+		{"unknown state", func(i *httpcodec.ResponseInput) { i.ExecutionState = "unknown" }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input := responseInput()

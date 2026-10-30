@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/stretchr/testify/require"
@@ -764,4 +765,85 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	require.ErrorIs(t, err, io.EOF)
 	require.EqualValues(t, 1, completedBody.closes.Load())
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+}
+
+// TestSessionConcurrentSendEvidence keeps outstanding calls uncertain and only
+// returns to notStarted when every completed call is explicitly proven unsent.
+func TestSessionConcurrentSendEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		report bool
+		sent   bool
+		want   api.ToolExecutionState
+	}{
+		{"all unsent", true, false, api.ToolExecutionStateNotStarted},
+		{"possible send", true, true, api.ToolExecutionStateMayHaveExecuted},
+		{"unknown client", false, false, api.ToolExecutionStateMayHaveExecuted},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Hold one call in flight while another finishes with no target send.
+			entered, release := make(chan struct{}), make(chan struct{})
+			unblock := sync.OnceFunc(func() { close(release) })
+			t.Cleanup(unblock)
+			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+				_ = req.Body.Close()
+				if req.URL.Path == "/slow" {
+					close(entered)
+					select {
+					case <-release:
+					case <-req.Context().Done():
+						return nil, req.Context().Err()
+					}
+					if tc.report {
+						httpf.ReportSendEvidence(req.Context(), tc.sent)
+					}
+				} else {
+					httpf.ReportSendEvidence(req.Context(), false)
+				}
+				return &http.Response{StatusCode: http.StatusTooManyRequests, Body: http.NoBody}, nil
+			}}
+			limits := sessionTestLimits()
+			limits.MaxRequests = 3
+			session := sessionTestNew(t, context.Background(), client, limits)
+			request, _ := sessionTestRequest(context.Background())
+			request.URL.Path = "/slow"
+			var slowErr error
+			done := make(chan struct{})
+			go func() {
+				response, err := session.Do(request)
+				slowErr = err
+				if response != nil {
+					_ = response.Body.Close()
+				}
+				close(done)
+			}()
+			sessionTestWait(t, entered, session.Close)
+			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+
+			// One completed local rejection cannot hide the still-running call.
+			fast, _ := sessionTestRequest(context.Background())
+			response, err := session.Do(fast)
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+			unblock()
+			sessionTestWait(t, done, session.Close)
+			require.NoError(t, slowErr)
+			require.Equal(t, tc.want, session.ExecutionState())
+
+			// Later known-unsent calls cannot erase an earlier possible send or
+			// unknown outcome. Every handoff still spends its request allowance.
+			fast, _ = sessionTestRequest(context.Background())
+			response, err = session.Do(fast)
+			require.NoError(t, err)
+			require.NoError(t, response.Body.Close())
+			require.Equal(t, tc.want, session.ExecutionState())
+			rejected, body := sessionTestRequest(context.Background())
+			response, err = session.Do(rejected)
+			require.ErrorIs(t, err, httphost.ErrRequestLimit)
+			require.Nil(t, response)
+			require.EqualValues(t, 1, body.closes.Load())
+			require.Equal(t, tc.want, session.ExecutionState())
+		})
+	}
 }

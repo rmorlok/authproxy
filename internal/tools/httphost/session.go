@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 )
 
@@ -81,6 +82,14 @@ type Session struct {
 	// requests counts handoffs, including those whose transport later fails.
 	requests int
 
+	// inFlight counts calls whose send evidence has not settled. They remain
+	// uncertain even if every completed call was rejected before target I/O.
+	inFlight int
+
+	// mayHaveExecuted stays true after any completed call reports a possible
+	// target send or provides no evidence. Later local rejections cannot undo it.
+	mayHaveExecuted bool
+
 	// responseBytes counts accepted decoded bytes; excess marks the session
 	// exhausted without overflowing this counter or returning excess bytes.
 	responseBytes int64
@@ -141,14 +150,23 @@ func (s *Session) Close() {
 	s.stopTimer()
 }
 
-// ExecutionState reports cumulative uncertainty about upstream effects. Once a
-// request reaches the proxy, even a transport failure cannot prove it was unsent.
-// HTTP success alone does not establish that the complete Tool action finished.
+// ExecutionState reports cumulative uncertainty about upstream effects. Calls
+// still in flight, possible target sends, and clients without send evidence
+// remain uncertain. Completed calls proven unsent do not imply execution, even
+// though they consumed the request allowance. HTTP success alone does not
+// establish that the complete Tool action finished.
+//
+// While Do calls are outstanding, the answer is provisional: mayHaveExecuted
+// can become notStarted when all calls return with proof they were unsent.
+// Canceling or closing the session does not wait for those calls to finish.
+// Callers must stop starting requests and wait for every Do to return before
+// treating this as the settled invocation state. A result already reported
+// while work was outstanding must retain its conservative execution state.
 func (s *Session) ExecutionState() api.ToolExecutionState {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.requests == 0 {
+	if s.inFlight == 0 && !s.mayHaveExecuted {
 		return api.ToolExecutionStateNotStarted
 	}
 
@@ -211,9 +229,18 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 	if err := s.beginRequest(ctx); err != nil {
 		return nil, err
 	}
+	// Always balance the in-flight count, including when caller code recovers
+	// a client or middleware panic. Until Do returns, its evidence is unknown.
+	mayHaveSent := true
+	defer func() { s.finishRequest(mayHaveSent) }()
 
 	transferred = true
-	raw, err := s.client.Do(req.WithContext(ctx))
+	// Each logical call gets its own observation. Unknown clients remain
+	// conservative; supported clients distinguish local rejection from target
+	// transport handoff without changing the standard Do signature.
+	observedCtx, observation := httpf.ObserveSends(ctx)
+	raw, err := s.client.Do(req.WithContext(observedCtx))
+	mayHaveSent = observation.MayHaveSent()
 	if err != nil {
 		if raw != nil && raw.Body != nil {
 			_ = raw.Body.Close()
@@ -223,9 +250,9 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 			return nil, contextErr
 		}
 
-		// The proxy does not yet report stable failure categories or cumulative
-		// send evidence across recovery attempts. Do not infer reconnect advice
-		// or safe replay from generic error text or an HTTP-aware error's status.
+		// The proxy does not yet report stable failure categories. Do not infer
+		// reconnect advice or safe replay from generic error text or an
+		// HTTP-aware error's status; send evidence is accounted for separately.
 		return nil, ErrTransport
 	}
 
@@ -248,7 +275,17 @@ func (s *Session) beginRequest(ctx context.Context) error {
 		return ErrRequestLimit
 	}
 	s.requests++
+	s.inFlight++
 	return nil
+}
+
+// finishRequest settles one client's evidence while preserving possible sends
+// from every earlier call. Response-body failures cannot reverse this state.
+func (s *Session) finishRequest(mayHaveSent bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inFlight--
+	s.mayHaveExecuted = s.mayHaveExecuted || mayHaveSent
 }
 
 // remainingResponse returns a read-size hint, not a reservation. Concurrent

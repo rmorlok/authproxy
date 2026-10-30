@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
 // connectionHTTPClient defers resolving the connection's proxy until the first
@@ -57,6 +58,9 @@ func (c *connectionHTTPClient) Do(req *http.Request) (*http.Response, error) {
 		c.client, c.err = proxy.HTTPClient(c.options)
 	})
 	if c.err != nil {
+		// Initialization failed before any target request could reach the proxy
+		// client, including when this error was cached by an earlier call.
+		httpf.ReportSendEvidence(req.Context(), false)
 		if req.Body != nil {
 			_ = req.Body.Close()
 		}

@@ -228,14 +228,20 @@ func (f *clientFactory) NewHTTPClient() *http.Client {
 // allocate per-request-info state inside the middleware) happens once.
 func (f *clientFactory) buildWrappedTransport() http.RoundTripper {
 	f.wrappedTransportOnce.Do(func() {
-		parent := http.DefaultTransport
+		// Keep the handoff marker inside every middleware so local rejection
+		// cannot look like target I/O. Coverage surrounds the whole stack and
+		// distinguishes its known-unsent results from unknown transports.
+		var parent http.RoundTripper = &sendHandoffTransport{
+			transport: http.DefaultTransport,
+		}
+
 		for _, m := range f.middlewares {
 			result := m.NewRoundTripper(f.requestInfo, parent)
 			if result != nil {
 				parent = result
 			}
 		}
-		f.wrappedTransport = parent
+		f.wrappedTransport = &sendCoverageTransport{transport: parent}
 	})
 	return f.wrappedTransport
 }

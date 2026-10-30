@@ -72,6 +72,7 @@ func (c *proxyHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	}
 	if req.URL == nil {
 		closeRawRequestBody(req)
+		httpf.ReportSendEvidence(req.Context(), false)
 		return nil, errors.New("connection HTTP client requires a request URL")
 	}
 
@@ -80,6 +81,7 @@ func (c *proxyHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	// rather than silently attributing the request to someone else.
 	if !c.actor.Agrees(apauthcore.ActorFromContext(req.Context())) {
 		closeRawRequestBody(req)
+		httpf.ReportSendEvidence(req.Context(), false)
 		return nil, iface.ErrHTTPClientActorMismatch
 	}
 

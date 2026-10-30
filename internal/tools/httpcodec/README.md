@@ -457,9 +457,14 @@ result, err := program.Map(ctx, httpcodec.ResponseInput{
 
 Here `api` is `internal/schema/api`. Identities and source revisions come from
 the captured invocation. The executor supplies its known execution state:
-`mayHaveExecuted` or `completed`. Every mapped error preserves that state;
-HTTP status alone cannot establish whether upstream side effects occurred.
-`notStarted` is invalid when mapping an already-received response.
+`notStarted`, `mayHaveExecuted`, or `completed`. Every mapped error preserves
+that state. Use `notStarted` only when the executor has evidence that no target
+request was sent. For example, a local rate limiter can produce a 429 response
+before any upstream request, and the mapper preserves `notStarted` on the
+resulting error. An upstream 429, or a local rejection after an earlier send,
+cannot establish `notStarted`; the executor must retain its existing execution
+knowledge. HTTP status alone cannot establish whether upstream side effects
+occurred; missing and unknown states are rejected.
 
 Successful responses without a transform use these representations:
 
