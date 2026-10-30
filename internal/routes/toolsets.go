@@ -102,7 +102,10 @@ func parseToolSetGeneration(gctx *gin.Context, val *auth.ResourcePermissionValid
 // the caller's permission on its namespace. Every generation shares the logical
 // namespace, so this also authorizes generation routes. It writes the error
 // response and returns nil on failure.
-func (r *ToolSetsRoutes) loadToolSet(gctx *gin.Context, val *auth.ResourcePermissionValidator) coreIface.ToolSet {
+func (r *ToolSetsRoutes) loadToolSet(
+	gctx *gin.Context,
+	val *auth.ResourcePermissionValidator,
+) coreIface.ToolSet {
 	id := parseToolSetID(gctx, val)
 	if id.IsNil() {
 		return nil
@@ -123,7 +126,12 @@ func (r *ToolSetsRoutes) loadToolSet(gctx *gin.Context, val *auth.ResourcePermis
 }
 
 // renderToolSet writes a canonical ToolSet resource response.
-func renderToolSet(gctx *gin.Context, val *auth.ResourcePermissionValidator, status int, toolSet coreIface.ToolSet) {
+func renderToolSet(
+	gctx *gin.Context,
+	val *auth.ResourcePermissionValidator,
+	status int,
+	toolSet coreIface.ToolSet,
+) {
 	if err := apgin.RenderResourceJSON(gctx, status, toolSet.GetResource()); err != nil {
 		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
@@ -131,7 +139,11 @@ func renderToolSet(gctx *gin.Context, val *auth.ResourcePermissionValidator, sta
 }
 
 // renderToolSetPage writes a ToolSetList of the permitted items.
-func renderToolSetPage(gctx *gin.Context, val *auth.ResourcePermissionValidator, page coreIface.ToolSetPage) {
+func renderToolSetPage(
+	gctx *gin.Context,
+	val *auth.ResourcePermissionValidator,
+	page coreIface.ToolSetPage,
+) {
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListToolSetsResponseJson(
 		util.Map(auth.FilterForValidatedResources(val, page.Items), func(toolSet coreIface.ToolSet) toolsetschema.ToolSet {
 			return *toolSet.GetResource()
@@ -306,7 +318,12 @@ func (r *ToolSetsRoutes) update(gctx *gin.Context) {
 	updated, err := r.core.UpdateToolSet(ctx, toolSet.GetId(), &req)
 	if err != nil {
 		if req.Metadata != nil && req.Metadata.Name != nil {
-			if conflictErr := resourceNameConflictError(err, "toolset", *req.Metadata.Name, toolSet.GetNamespace()); conflictErr != nil {
+			if conflictErr := resourceNameConflictError(
+				err,
+				"toolset",
+				*req.Metadata.Name,
+				toolSet.GetNamespace(),
+			); conflictErr != nil {
 				apgin.WriteError(gctx, nil, conflictErr)
 				val.MarkErrorReturn()
 				return

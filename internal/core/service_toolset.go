@@ -50,7 +50,10 @@ func (s *service) GetToolSetGeneration(
 // CreateToolSet validates and compiles the first generation before creating
 // anything, then creates the logical ToolSet and its generation-1 draft, and
 // publishes it when primary is requested. Server-owned status is rejected.
-func (s *service) CreateToolSet(ctx context.Context, resource *toolsetschema.ToolSet) (iface.ToolSet, error) {
+func (s *service) CreateToolSet(
+	ctx context.Context,
+	resource *toolsetschema.ToolSet,
+) (iface.ToolSet, error) {
 	if resource == nil {
 		return nil, fmt.Errorf("%w: toolset is required", ErrInvalidArgument)
 	}
@@ -105,7 +108,11 @@ func (s *service) CreateToolSet(ctx context.Context, resource *toolsetschema.Too
 // intent without a definition is a no-op while a primary exists, matching the
 // ToolSet generation policy; pending drafts publish through the generation
 // endpoint, or by resending their definition with primary intent.
-func (s *service) UpdateToolSet(ctx context.Context, id apid.ID, patch *toolsetschema.ToolSetPatch) (iface.ToolSet, error) {
+func (s *service) UpdateToolSet(
+	ctx context.Context,
+	id apid.ID,
+	patch *toolsetschema.ToolSetPatch,
+) (iface.ToolSet, error) {
 	if patch == nil {
 		return nil, fmt.Errorf("%w: toolset patch is required", ErrInvalidArgument)
 	}

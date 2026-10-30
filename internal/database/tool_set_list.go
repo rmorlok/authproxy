@@ -75,12 +75,18 @@ func (q ToolSetListQuery) validate() (LabelSelector, error) {
 
 // ListToolSets starts an ID-ordered listing of live ToolSets in live
 // namespaces. Callers must still apply per-resource permission checks.
-func (s *service) ListToolSets(ctx context.Context, query ToolSetListQuery) (ToolSetListPage, error) {
+func (s *service) ListToolSets(
+	ctx context.Context,
+	query ToolSetListQuery,
+) (ToolSetListPage, error) {
 	return s.listToolSets(ctx, query, apid.Nil)
 }
 
 // ListToolSetsFromCursor resumes a listing with its saved filters and limit.
-func (s *service) ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetListPage, error) {
+func (s *service) ListToolSetsFromCursor(
+	ctx context.Context,
+	cursor string,
+) (ToolSetListPage, error) {
 	parsed, err := pagination.ParseCursor[toolSetListCursor](ctx, s.cursorEncryptor, cursor)
 	if err != nil {
 		return ToolSetListPage{}, err
