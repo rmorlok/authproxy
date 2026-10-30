@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 
+	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -36,10 +38,17 @@ func (o *oAuth2Connection) resolveClientCredentials(ctx context.Context) (string
 	return clientId, clientSecret, nil
 }
 
+// resolveStoredClientCredentials loads the connection-owned client grant.
+// A missing row is unavailable credentials; malformed or undecryptable stored
+// data remains an internal failure rather than implying a need to reconnect.
 func (o *oAuth2Connection) resolveStoredClientCredentials(ctx context.Context) (string, string, error) {
 	cred, err := o.db.GetActiveApiKeyCredential(ctx, o.connection.GetId())
 	if err != nil {
-		return "", "", fmt.Errorf("failed to load OAuth2 client credentials: %w", err)
+		err = fmt.Errorf("failed to load OAuth2 client credentials: %w", err)
+		if errors.Is(err, database.ErrNotFound) {
+			err = iface.MarkCredentialsUnavailable(err)
+		}
+		return "", "", err
 	}
 
 	plaintextJSON, err := o.encrypt.DecryptString(ctx, cred.EncryptedCredentials)

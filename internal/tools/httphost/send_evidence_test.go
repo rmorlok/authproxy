@@ -3,10 +3,12 @@ package httphost_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	coremock "github.com/rmorlok/authproxy/internal/core/mock"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/proxy"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
@@ -29,6 +32,7 @@ import (
 type evidenceAuth struct {
 	integrationAuth
 	beforeResolve func(context.Context) error
+	recoverError  error
 }
 
 // Resolve invokes the test's credential step before producing usable credentials.
@@ -39,6 +43,13 @@ func (a *evidenceAuth) Resolve(ctx context.Context) (auth_methods.AuthApplicatio
 		}
 	}
 	return a.integrationAuth.Resolve(ctx)
+}
+
+// RecoverFrom401 records the rejected credential before returning the scripted
+// failure or permitting the proxy's ordinary single retry.
+func (a *evidenceAuth) RecoverFrom401(ctx context.Context, rejected auth_methods.AuthApplication) error {
+	_ = a.integrationAuth.RecoverFrom401(ctx, rejected)
+	return a.recoverError
 }
 
 // evidenceFixture supplies a real connection proxy, middleware factory, and
@@ -103,12 +114,21 @@ func evidenceRequest(t *testing.T, target string) *http.Request {
 // TestSessionSendEvidenceCredentialFailure separates OAuth credential traffic
 // from target execution and keeps request-budget accounting independent.
 func TestSessionSendEvidenceCredentialFailure(t *testing.T) {
-	for _, oauth := range []bool{false, true} {
-		name := "local credential error"
-		if oauth {
-			name = "OAuth request then credential error"
-		}
-		t.Run(name, func(t *testing.T) {
+	private := errors.New("private credential failure")
+	unavailable := fmt.Errorf("private wrapper: %w", iface.MarkCredentialsUnavailable(private))
+	for _, test := range []struct {
+		name  string
+		oauth bool
+		cause error
+		want  error
+	}{
+		{"local operational error", false, private, httphost.ErrTransport},
+		{"OAuth operational error", true, private, httphost.ErrTransport},
+		{"missing credentials", false, unavailable, httphost.ErrCredentialsUnavailable},
+		{"OAuth unusable credentials", true, unavailable, httphost.ErrCredentialsUnavailable},
+		{"HTTP status alone", false, httperr.New(401, "private credentials unavailable"), httphost.ErrTransport},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			// The OAuth endpoint is reachable; the target must never be called.
 			var oauthCalls, targetCalls atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -122,7 +142,7 @@ func TestSessionSendEvidenceCredentialFailure(t *testing.T) {
 			t.Cleanup(server.Close)
 			fixture := newEvidenceFixture(t)
 			auth := &evidenceAuth{beforeResolve: func(ctx context.Context) error {
-				if oauth {
+				if test.oauth {
 					// Preserve the resolver's context exactly, as a token request
 					// may inherit it without being a target-operation send.
 					req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL+"/oauth", nil)
@@ -135,16 +155,23 @@ func TestSessionSendEvidenceCredentialFailure(t *testing.T) {
 					}
 					_ = resp.Body.Close()
 				}
-				return errors.New("credential resolution failed")
+				return test.cause
 			}}
 			session, client := fixture.session(t, auth, 1)
 
 			// Failure before the target send leaves execution unstarted.
-			_, err := session.Do(evidenceRequest(t, server.URL+"/target"))
-			require.ErrorIs(t, err, httphost.ErrTransport)
+			request := evidenceRequest(t, server.URL+"/target")
+			body := &sessionTestBody{reader: strings.NewReader("private upload")}
+			request.Body = body
+			_, err := session.Do(request)
+			require.ErrorIs(t, err, test.want)
+			require.NotContains(t, err.Error(), "private")
+			require.NotErrorIs(t, err, private, "Tool errors must not retain private causes")
+			require.Zero(t, body.reads.Load())
+			require.EqualValues(t, 1, body.closes.Load())
 			require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
 			require.Zero(t, targetCalls.Load())
-			if oauth {
+			if test.oauth {
 				require.Equal(t, int32(1), oauthCalls.Load())
 			}
 
@@ -235,7 +262,7 @@ func TestSessionSendEvidenceReplayAndRedirect(t *testing.T) {
 			if scenario == "401 then resolve failure" {
 				auth.beforeResolve = func(context.Context) error {
 					if auth.resolves.Load() > 0 {
-						return errors.New("replacement credentials unavailable")
+						return iface.MarkCredentialsUnavailable(errors.New("replacement credentials unavailable"))
 					}
 					return nil
 				}
@@ -246,7 +273,7 @@ func TestSessionSendEvidenceReplayAndRedirect(t *testing.T) {
 			// turn that already possible upstream effect into notStarted.
 			response, err := session.Do(evidenceRequest(t, server.URL))
 			if scenario == "401 then resolve failure" {
-				require.ErrorIs(t, err, httphost.ErrTransport)
+				require.ErrorIs(t, err, httphost.ErrCredentialsUnavailable)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, http.StatusTooManyRequests, response.StatusCode)
@@ -255,6 +282,98 @@ func TestSessionSendEvidenceReplayAndRedirect(t *testing.T) {
 			}
 			require.Equal(t, int32(1), targetCalls.Load())
 			require.Equal(t, int32(1), client.calls.Load())
+			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+		})
+	}
+}
+
+// TestSessionCredentialRecoveryFailure preserves the original 401 response when
+// recovery cannot restore credentials; the host must not infer reconnect advice
+// from that status or replace its authored status-mapping behavior.
+func TestSessionCredentialRecoveryFailure(t *testing.T) {
+	// Even a typed recovery failure follows a real target request.
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte("original provider response"))
+	}))
+	t.Cleanup(server.Close)
+	auth := &evidenceAuth{recoverError: iface.MarkCredentialsUnavailable(errors.New("private refresh failure"))}
+	session, _ := newEvidenceFixture(t).session(t, auth, 1)
+
+	// The proxy still returns a readable response with no Go error or retry.
+	response, err := session.Do(evidenceRequest(t, server.URL))
+	require.NoError(t, err)
+	defer response.Body.Close()
+	data, err := io.ReadAll(response.Body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
+	require.Equal(t, "original provider response", string(data))
+	require.EqualValues(t, 1, calls.Load())
+	require.EqualValues(t, 1, auth.recoveries.Load())
+	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+}
+
+// TestSessionCredentialsUnavailableAfterSuccess preserves effects from an
+// earlier Tool request when credentials disappear before a subsequent request.
+func TestSessionCredentialsUnavailableAfterSuccess(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(server.Close)
+	auth := &evidenceAuth{}
+	session, _ := newEvidenceFixture(t).session(t, auth, 2)
+
+	// First complete a request, then simulate removal of its credential row.
+	response, err := session.Do(evidenceRequest(t, server.URL))
+	require.NoError(t, err)
+	require.NoError(t, response.Body.Close())
+	auth.beforeResolve = func(context.Context) error {
+		return iface.MarkCredentialsUnavailable(errors.New("private missing credential"))
+	}
+	response, err = session.Do(evidenceRequest(t, server.URL))
+	require.ErrorIs(t, err, httphost.ErrCredentialsUnavailable)
+	require.Nil(t, response)
+	require.EqualValues(t, 1, calls.Load())
+	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+}
+
+// TestSessionCredentialFailureFromUnknownClient requires independent send
+// evidence and lets cancellation take precedence over credential classification.
+func TestSessionCredentialFailureFromUnknownClient(t *testing.T) {
+	for _, canceled := range []bool{false, true} {
+		t.Run(fmt.Sprint(canceled), func(t *testing.T) {
+			// This client supplies a category but no proof that it was unsent.
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			cause := errors.New("private provider URL and credentials")
+			upstream := &sessionTestBody{reader: strings.NewReader("private body")}
+			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+				_ = req.Body.Close()
+				if canceled {
+					cancel()
+				}
+				return &http.Response{Body: upstream}, iface.MarkCredentialsUnavailable(cause)
+			}}
+			session := sessionTestNew(t, ctx, client, sessionTestLimits())
+			request, body := sessionTestRequest(context.Background())
+			response, err := session.Do(request)
+
+			// Error cleanup releases both bodies without exposing their data.
+			want := httphost.ErrCredentialsUnavailable
+			if canceled {
+				want = context.Canceled
+			}
+			require.ErrorIs(t, err, want)
+			require.NotErrorIs(t, err, cause)
+			require.NotContains(t, err.Error(), "private")
+			require.Nil(t, response)
+			require.EqualValues(t, 1, body.closes.Load())
+			require.EqualValues(t, 1, upstream.closes.Load())
+			require.Zero(t, upstream.reads.Load())
 			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
 		})
 	}

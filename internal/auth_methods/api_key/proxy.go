@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
@@ -21,7 +22,13 @@ import (
 func (a *apiKeyConnection) resolveAuth(ctx context.Context) (authApplication, error) {
 	cred, err := a.db.GetActiveApiKeyCredential(ctx, a.connection.GetId())
 	if err != nil {
-		return authApplication{}, fmt.Errorf("failed to load api-key credential: %w", err)
+		err = fmt.Errorf("failed to load api-key credential: %w", err)
+		// Only this lookup's not-found result proves the connection lacks
+		// credentials. Storage, decryption, and configuration errors do not.
+		if errors.Is(err, database.ErrNotFound) {
+			err = iface.MarkCredentialsUnavailable(err)
+		}
+		return authApplication{}, err
 	}
 
 	if cred.PlacementSnapshot == nil {

@@ -25,8 +25,11 @@ var (
 	ErrEncoding        = errors.New("unsupported or invalid Tool HTTP response encoding")
 	ErrInvalidResponse = errors.New("invalid Tool HTTP response")
 	ErrTransport       = errors.New("Tool HTTP request or response failed")
-	ErrClosed          = errors.New("Tool HTTP session closed")
-	ErrTimeout         = errors.New("Tool HTTP invocation timeout exceeded")
+	// ErrCredentialsUnavailable reflects a trusted source classification. It
+	// excludes underlying diagnostics and does not imply that no request ran.
+	ErrCredentialsUnavailable = errors.New("Tool HTTP credentials unavailable")
+	ErrClosed                 = errors.New("Tool HTTP session closed")
+	ErrTimeout                = errors.New("Tool HTTP invocation timeout exceeded")
 )
 
 // Limits contains resolved, positive execution policy. The caller combines
@@ -250,9 +253,12 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 			return nil, contextErr
 		}
 
-		// The proxy does not yet report stable failure categories. Do not infer
-		// reconnect advice or safe replay from generic error text or an
-		// HTTP-aware error's status; send evidence is accounted for separately.
+		// Trust only the source's explicit classification, never an error's
+		// text or HTTP status. Keep private causes out of the Tool boundary;
+		// cumulative send evidence independently describes possible effects.
+		if errors.Is(err, iface.ErrCredentialsUnavailable) {
+			return nil, ErrCredentialsUnavailable
+		}
 		return nil, ErrTransport
 	}
 

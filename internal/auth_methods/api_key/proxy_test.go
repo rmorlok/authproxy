@@ -3,16 +3,20 @@ package api_key
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/core/iface"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,21 +86,43 @@ func TestResolveAuth_FailsWhenPlacementSnapshotMissing(t *testing.T) {
 	_, err := conn.resolveAuth(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "placement snapshot")
+	assert.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
 }
 
-func TestResolveAuth_PropagatesDBError(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+// TestResolveAuth_ClassifiesCredentialLookupErrors recognizes a missing row
+// without treating unrelated failures or HTTP status codes as credential loss.
+func TestResolveAuth_ClassifiesCredentialLookupErrors(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		cause       error
+		unavailable bool
+	}{
+		{"missing row", database.ErrNotFound, true},
+		{"wrapped missing row", fmt.Errorf("no active credential: %w", database.ErrNotFound), true},
+		{"HTTP-wrapped missing row", httperr.NotFound("credential absent", httperr.WithInternalErr(database.ErrNotFound)), true},
+		{"database failure", errors.New("db boom"), false},
+		{"HTTP not found without missing row", httperr.NotFound("database service absent"), false},
+		{"canceled lookup", context.Canceled, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Fail the active-credential query before any decryption or injection.
+			ctrl := gomock.NewController(t)
+			connectionId := apid.New(apid.PrefixConnection)
+			conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{Id: connectionId})
+			db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).Return(nil, test.cause)
+			_, err := conn.Resolve(context.Background())
 
-	connectionId := apid.New(apid.PrefixConnection)
-	conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{Id: connectionId})
-
-	db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).
-		Return(nil, errors.New("db boom"))
-
-	_, err := conn.resolveAuth(context.Background())
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "db boom")
+			// The authenticator adds only the marker; callers retain the cause,
+			// diagnostic text, and public HTTP response they received before.
+			wantErr := fmt.Errorf("failed to load api-key credential: %w", test.cause)
+			require.EqualError(t, err, wantErr.Error())
+			require.ErrorIs(t, err, test.cause)
+			require.Equal(t, test.unavailable, errors.Is(err, iface.ErrCredentialsUnavailable))
+			wantHTTP, gotHTTP := httperr.FromError(wantErr), httperr.FromError(err)
+			require.Equal(t, wantHTTP.Status, gotHTTP.Status)
+			require.Equal(t, wantHTTP.ResponseMsgOrDefault(), gotHTTP.ResponseMsgOrDefault())
+		})
+	}
 }
 
 func TestResolveAuth_FailsOnMalformedPlaintext(t *testing.T) {
@@ -120,6 +146,65 @@ func TestResolveAuth_FailsOnMalformedPlaintext(t *testing.T) {
 	_, err := conn.resolveAuth(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshal")
+	assert.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+}
+
+// TestResolveAuth_DecryptNotFoundIsNotCredentialLoss keeps missing encryption
+// infrastructure distinct from an absent active credential row.
+func TestResolveAuth_DecryptNotFoundIsNotCredentialLoss(t *testing.T) {
+	// The active credential exists, but its referenced encryption key does not.
+	ctrl := gomock.NewController(t)
+	connectionId := apid.New(apid.PrefixConnection)
+	conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{Id: connectionId})
+	cred := &database.ApiKeyCredential{
+		ConnectionId:         connectionId,
+		EncryptedCredentials: encfield.EncryptedField{ID: "dek_missing", Data: "private-ciphertext"},
+		PlacementSnapshot:    &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
+	}
+	db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).Return(cred, nil)
+	encryption := mockEncrypt.NewMockE(ctrl)
+	encryption.EXPECT().DecryptString(gomock.Any(), cred.EncryptedCredentials).Return("", database.ErrNotFound)
+	conn.encrypt = encryption
+	_, err := conn.Resolve(context.Background())
+
+	// A missing decryption dependency preserves its cause without advising
+	// credential replacement, which would not fix the underlying problem.
+	require.ErrorContains(t, err, "failed to decrypt")
+	require.ErrorIs(t, err, database.ErrNotFound)
+	require.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+}
+
+// TestResolveAuth_InvalidStoredCredentialIsNotMissing leaves corrupt plaintext
+// and placement configuration unclassified instead of inferring credential loss.
+func TestResolveAuth_InvalidStoredCredentialIsNotMissing(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		plaintext string
+		placement cschema.ApiKeyPlacement
+	}{
+		{"empty key", `{}`, cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer}},
+		{"missing basic username", `{"apiKey":"key"}`, cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBasic}},
+		{"missing header name", `{"apiKey":"key"}`, cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementHeader}},
+		{"missing query name", `{"apiKey":"key"}`, cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementQuery}},
+		{"unknown placement", `{"apiKey":"key"}`, cschema.ApiKeyPlacement{Type: "unknown"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Return an existing row whose stored fields violate setup invariants.
+			ctrl := gomock.NewController(t)
+			connectionId := apid.New(apid.PrefixConnection)
+			conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{Id: connectionId})
+			db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).Return(&database.ApiKeyCredential{
+				ConnectionId:         connectionId,
+				EncryptedCredentials: encfield.EncryptedField{ID: "dek_fake", Data: test.plaintext},
+				PlacementSnapshot:    &test.placement,
+			}, nil)
+			_, err := conn.Resolve(context.Background())
+
+			// Invalid existing data is not evidence that the credential is absent.
+			require.Error(t, err)
+			require.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+		})
+	}
 }
 
 func TestResolveAuth_BasicPlacementResolvesUsername(t *testing.T) {
