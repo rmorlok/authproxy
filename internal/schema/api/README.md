@@ -44,6 +44,13 @@ shared connection selector. `CreateToolSetRequest` and `UpdateToolSetRequest`
 are the canonical ToolSet resource and `ToolSetPatch`; generation PATCH and
 POST bodies use `ToolSetPatch` too and reject metadata and selector fields.
 
+These lists accept `orderBy=<field> [asc|desc]`, like other resource lists.
+`GET /tools` and `GET /toolsets` sort by `id`, `namespace`, `name`,
+`created_at`, or `updated_at`, defaulting to `id`. Generation lists sort by
+`generation`, `state`, `created_at`, or `updated_at`, defaulting to newest
+first. `name` and `state` use each database's text collation. Cursors keep the
+original filters and ordering, so `orderBy` is ignored on a continuation.
+
 ## Tool discovery
 
 `ToolDescriptor` is the usage information an agent can read through a tool grant.

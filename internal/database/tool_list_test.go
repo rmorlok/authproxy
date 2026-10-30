@@ -2,9 +2,12 @@ package database
 
 import (
 	"testing"
+	"time"
 
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 )
 
@@ -123,4 +126,65 @@ func mapToolIDsForTest(tools []Tool) []apid.ID {
 		result = append(result, tool.Id)
 	}
 	return result
+}
+
+// TestListToolsOrdering sorts management Tools, breaks ties by ID, keeps the
+// ordering across cursor pages, and rejects unknown columns.
+func TestListToolsOrdering(t *testing.T) {
+	ctx, db, base, definition := standaloneToolForTest(t)
+
+	// Create Tools whose names sort differently from their creation order.
+	create := func(name common.ResourceName, offset time.Duration) *Tool {
+		tool := &Tool{
+			Id:           apid.New(apid.PrefixTool),
+			Namespace:    base.Namespace,
+			Name:         name,
+			ConnectionId: base.ConnectionId,
+			Description:  base.Description,
+			Verbs:        base.Verbs,
+		}
+		at := apctx.WithFixedClock(ctx, apctx.GetClock(ctx).Now().Add(offset))
+		_, err := db.CreateStandaloneTool(at, tool, definition.EncryptedDefinition, definition.DefinitionDigest)
+		require.NoError(t, err)
+		return tool
+	}
+	zulu := create("zulu", time.Hour)
+	alpha := create("alpha", 2*time.Hour)
+
+	list := func(field ToolOrderByField, order pagination.OrderBy, limit int) ToolListPage {
+		page, err := db.ListTools(ctx, ToolListQuery{
+			NamespaceMatchers: []string{base.Namespace},
+			Limit:             limit,
+			OrderByField:      field,
+			OrderBy:           order,
+		})
+		require.NoError(t, err)
+		return page
+	}
+
+	// created_at sorts in both directions; the base Tool is oldest.
+	require.Equal(t, []apid.ID{base.Id, zulu.Id, alpha.Id}, mapToolIDsForTest(list(ToolOrderByCreatedAt, pagination.OrderByAsc, 10).Items))
+	require.Equal(t, []apid.ID{alpha.Id, zulu.Id, base.Id}, mapToolIDsForTest(list(ToolOrderByCreatedAt, pagination.OrderByDesc, 10).Items))
+
+	// A descending name sort continues correctly through the cursor.
+	page := list(ToolOrderByName, pagination.OrderByDesc, 1)
+	require.Equal(t, []apid.ID{zulu.Id}, mapToolIDsForTest(page.Items))
+	next, err := db.ListToolsFromCursor(ctx, page.Cursor)
+	require.NoError(t, err)
+	require.NotContains(t, mapToolIDsForTest(next.Items), zulu.Id)
+
+	// Equal namespaces tie-break in the database's own ID order, which follows
+	// its collation rather than Go's byte order.
+	require.Equal(t,
+		mapToolIDsForTest(list(ToolOrderById, pagination.OrderByAsc, 10).Items),
+		mapToolIDsForTest(list(ToolOrderByNamespace, pagination.OrderByAsc, 10).Items),
+	)
+
+	// Unknown columns never reach SQL.
+	_, err = db.ListTools(ctx, ToolListQuery{
+		NamespaceMatchers: []string{base.Namespace},
+		Limit:             1,
+		OrderByField:      "name; DROP TABLE tools",
+	})
+	require.Error(t, err)
 }

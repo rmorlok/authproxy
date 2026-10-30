@@ -379,6 +379,52 @@ func TestToolSets(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
 	})
 
+	t.Run("lists order results and reject invalid ordering", func(t *testing.T) {
+		s, _ := newToolsTestSetup(t)
+
+		// Create ToolSets out of alphabetical order.
+		var path string
+		for _, name := range []string{"bravo", "alpha", "charlie"} {
+			w := s.do(t, http.MethodPost, "/toolsets", toolSetBody("root.acme", name, "primary"), all)
+			require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+			path = "/toolsets/" + decodeToolSet(t, w).Metadata.ID
+		}
+
+		// Give the last ToolSet a second generation for the generation list.
+		require.Equal(t, http.StatusCreated, s.do(t, http.MethodPost, path+"/generations", nil, all).Code)
+
+		names := func(listPath string) []string {
+			w := s.do(t, http.MethodGet, listPath, nil, all)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			list := decodeToolSetList(t, w)
+			result := make([]string, 0, len(list.Items))
+			for _, item := range list.Items {
+				result = append(result, string(item.Metadata.Name))
+			}
+			return result
+		}
+
+		// The logical list sorts by name in both directions.
+		require.Equal(t, []string{"alpha", "bravo", "charlie"}, names("/toolsets?orderBy=name"))
+		require.Equal(t, []string{"charlie", "bravo", "alpha"}, names("/toolsets?orderBy="+url.QueryEscape("name desc")))
+
+		// A cursor keeps the requested order on the next page.
+		page := decodeToolSetList(t, s.do(t, http.MethodGet, "/toolsets?limit=2&orderBy="+url.QueryEscape("name desc"), nil, all))
+		require.NotEmpty(t, page.Metadata.Continue)
+		require.Equal(t, []string{"alpha"}, names("/toolsets?cursor="+url.QueryEscape(page.Metadata.Continue)))
+
+		// Generations default to newest first, and orderBy overrides that.
+		generations := decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations", nil, all))
+		require.Equal(t, []string{"2:draft", "1:primary"}, generationStates(generations))
+		generations = decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations?orderBy=generation", nil, all))
+		require.Equal(t, []string{"1:primary", "2:draft"}, generationStates(generations))
+
+		// Unknown fields and directions are client errors on both lists.
+		require.Equal(t, http.StatusBadRequest, s.do(t, http.MethodGet, "/toolsets?orderBy=bogus", nil, all).Code)
+		require.Equal(t, http.StatusBadRequest, s.do(t, http.MethodGet, "/toolsets?orderBy="+url.QueryEscape("name sideways"), nil, all).Code)
+		require.Equal(t, http.StatusBadRequest, s.do(t, http.MethodGet, path+"/generations?orderBy=name", nil, all).Code)
+	})
+
 	t.Run("write responses match stored timestamps", func(t *testing.T) {
 		s, _ := newToolsTestSetup(t)
 

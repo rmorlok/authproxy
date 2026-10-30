@@ -760,8 +760,9 @@ type C interface {
 	// ListToolSetsFromCursor continues a ListToolSets page with its original filters.
 	ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetPage, error)
 
-	// ListToolSetGenerations returns one page of a ToolSet's generations, newest first.
-	ListToolSetGenerations(ctx context.Context, id apid.ID, limit int32) (ToolSetPage, error)
+	// ListToolSetGenerations returns one page of a ToolSet's generations, newest
+	// first unless the request selects another order.
+	ListToolSetGenerations(ctx context.Context, id apid.ID, req ListToolSetGenerationsRequest) (ToolSetPage, error)
 
 	// ListToolSetGenerationsFromCursor continues a ListToolSetGenerations page.
 	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ToolSetPage, error)

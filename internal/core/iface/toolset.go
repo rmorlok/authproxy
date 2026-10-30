@@ -4,8 +4,10 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // ErrToolSetConflict means a ToolSet write lost a race with another writer: a
@@ -43,6 +45,25 @@ type ListToolSetsRequest struct {
 	// Limit is the requested page size. Zero selects the default page size;
 	// larger values are capped at the database maximum.
 	Limit int32
+
+	// OrderByField optionally selects the sort column; empty sorts by ID.
+	OrderByField database.ToolSetOrderByField
+
+	// OrderBy is the OrderByField direction, ascending unless descending is set.
+	OrderBy pagination.OrderBy
+}
+
+// ListToolSetGenerationsRequest pages one ToolSet's generations.
+type ListToolSetGenerationsRequest struct {
+	// Limit is the requested page size. Zero selects the default page size;
+	// larger values are capped at the database maximum.
+	Limit int32
+
+	// OrderByField optionally selects the sort column; empty is newest first.
+	OrderByField database.ToolSetGenerationOrderByField
+
+	// OrderBy is the OrderByField direction, ascending unless descending is set.
+	OrderBy pagination.OrderBy
 }
 
 // ToolSetPage is one page of ToolSet resources plus an opaque cursor that is

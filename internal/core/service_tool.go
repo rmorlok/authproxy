@@ -205,6 +205,8 @@ func (s *service) ListTools(ctx context.Context, req iface.ListToolsRequest) (if
 		ConnectionId:      req.ConnectionId,
 		LabelSelector:     req.LabelSelector,
 		Limit:             limit,
+		OrderByField:      req.OrderByField,
+		OrderBy:           req.OrderBy,
 	})
 	if err != nil {
 		return iface.ToolPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)

@@ -14,8 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
-	"github.com/rmorlok/authproxy/internal/apctx"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -465,6 +465,36 @@ func TestTools(t *testing.T) {
 		stored, err = s.Core.GetTool(ctx, created.GetId())
 		require.NoError(t, err)
 		require.Equal(t, stored.GetResource().Metadata, updated.GetResource().Metadata)
+	})
+
+	t.Run("list orders results and rejects invalid ordering", func(t *testing.T) {
+		s, cxns := newToolsTestSetup(t)
+
+		// Create Tools out of alphabetical order.
+		for _, name := range []string{"bravo", "alpha", "charlie"} {
+			w := s.do(t, http.MethodPost, "/tools", toolBody("root.acme", name, cxns["calendar"].Id, nil), all)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		}
+
+		names := func(path string) []string {
+			w := s.do(t, http.MethodGet, path, nil, all)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			var resp schemaapi.ListToolsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			result := make([]string, 0, len(resp.Items))
+			for _, item := range resp.Items {
+				result = append(result, string(item.Metadata.Name))
+			}
+			return result
+		}
+
+		// The field defaults to ascending, and an explicit direction is honored.
+		require.Equal(t, []string{"alpha", "bravo", "charlie"}, names("/tools?orderBy=name"))
+		require.Equal(t, []string{"charlie", "bravo", "alpha"}, names("/tools?orderBy="+url.QueryEscape("name desc")))
+
+		// Unknown fields and directions are client errors.
+		require.Equal(t, http.StatusBadRequest, s.do(t, http.MethodGet, "/tools?orderBy=bogus", nil, all).Code)
+		require.Equal(t, http.StatusBadRequest, s.do(t, http.MethodGet, "/tools?orderBy="+url.QueryEscape("name sideways"), nil, all).Code)
 	})
 
 	t.Run("list filters by scope, connection, name, and labels with pagination", func(t *testing.T) {

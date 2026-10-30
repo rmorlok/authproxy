@@ -319,6 +319,8 @@ func (s *service) ListToolSets(
 		Name:              req.Name,
 		LabelSelector:     req.LabelSelector,
 		Limit:             limit,
+		OrderByField:      req.OrderByField,
+		OrderBy:           req.OrderBy,
 	})
 	if err != nil {
 		return iface.ToolSetPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
@@ -339,13 +341,14 @@ func (s *service) ListToolSetsFromCursor(
 	return s.hydrateToolSetListPage(ctx, page)
 }
 
-// ListToolSetGenerations lists one ToolSet's generations, newest first.
+// ListToolSetGenerations lists one ToolSet's generations, newest first unless
+// the request selects another order.
 func (s *service) ListToolSetGenerations(
 	ctx context.Context,
 	id apid.ID,
-	limit int32,
+	req iface.ListToolSetGenerationsRequest,
 ) (iface.ToolSetPage, error) {
-	pageLimit := int(limit)
+	pageLimit := int(req.Limit)
 	if pageLimit <= 0 {
 		pageLimit = defaultToolSetListLimit
 	}
@@ -354,8 +357,10 @@ func (s *service) ListToolSetGenerations(
 	page, err := s.db.ListToolSetGenerations(
 		ctx,
 		database.ToolSetGenerationListQuery{
-			ToolSetId: id,
-			Limit:     pageLimit,
+			ToolSetId:    id,
+			Limit:        pageLimit,
+			OrderByField: req.OrderByField,
+			OrderBy:      req.OrderBy,
 		},
 	)
 	if err != nil {
