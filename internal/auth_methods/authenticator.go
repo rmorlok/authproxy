@@ -41,6 +41,12 @@ type AuthApplication struct {
 // credential, send it, and if the upstream rejects it with 401, recover
 // (refresh) and retry exactly once. Refresh exposes the maintenance refresh
 // operation directly for callers that are not responding to a request failure.
+//
+// Known absent or unusable credentials are marked with
+// MarkCredentialsUnavailable so callers can match ErrCredentialsUnavailable.
+// Database, decryption, configuration, or transient refresh failures do not
+// establish credential loss. This classification is independent of whether
+// an earlier target request may already have executed.
 type Authenticator interface {
 	// Resolve loads the active credential (refreshing automatically if
 	// it is locally known to be expired) and returns the application to

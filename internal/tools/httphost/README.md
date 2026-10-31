@@ -161,7 +161,7 @@ response releases its request without canceling other calls in the session.
 Proxy and body failures return fixed error classifications, without URLs,
 credential text, response bodies, or upstream error messages. Callers can use
 `errors.Is` and map them to Tool error results. A returned proxy error explicitly
-marked with `iface.ErrCredentialsUnavailable` becomes
+marked with `auth_methods.ErrCredentialsUnavailable` becomes
 `httphost.ErrCredentialsUnavailable`. The marker identifies credentials known to
 be missing or unusable; see the [authentication failure contract](../../auth_methods/README.md#credential-failures).
 The host discards the underlying private cause. Cancellation takes precedence,

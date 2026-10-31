@@ -115,7 +115,7 @@ func evidenceRequest(t *testing.T, target string) *http.Request {
 // from target execution and keeps request-budget accounting independent.
 func TestSessionSendEvidenceCredentialFailure(t *testing.T) {
 	private := errors.New("private credential failure")
-	unavailable := fmt.Errorf("private wrapper: %w", iface.MarkCredentialsUnavailable(private))
+	unavailable := fmt.Errorf("private wrapper: %w", auth_methods.MarkCredentialsUnavailable(private))
 	for _, test := range []struct {
 		name  string
 		oauth bool
@@ -262,7 +262,7 @@ func TestSessionSendEvidenceReplayAndRedirect(t *testing.T) {
 			if scenario == "401 then resolve failure" {
 				auth.beforeResolve = func(context.Context) error {
 					if auth.resolves.Load() > 0 {
-						return iface.MarkCredentialsUnavailable(errors.New("replacement credentials unavailable"))
+						return auth_methods.MarkCredentialsUnavailable(errors.New("replacement credentials unavailable"))
 					}
 					return nil
 				}
@@ -299,7 +299,7 @@ func TestSessionCredentialRecoveryFailure(t *testing.T) {
 		_, _ = w.Write([]byte("original provider response"))
 	}))
 	t.Cleanup(server.Close)
-	auth := &evidenceAuth{recoverError: iface.MarkCredentialsUnavailable(errors.New("private refresh failure"))}
+	auth := &evidenceAuth{recoverError: auth_methods.MarkCredentialsUnavailable(errors.New("private refresh failure"))}
 	session, _ := newEvidenceFixture(t).session(t, auth, 1)
 
 	// The proxy still returns a readable response with no Go error or retry.
@@ -332,7 +332,7 @@ func TestSessionCredentialsUnavailableAfterSuccess(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())
 	auth.beforeResolve = func(context.Context) error {
-		return iface.MarkCredentialsUnavailable(errors.New("private missing credential"))
+		return auth_methods.MarkCredentialsUnavailable(errors.New("private missing credential"))
 	}
 	response, err = session.Do(evidenceRequest(t, server.URL))
 	require.ErrorIs(t, err, httphost.ErrCredentialsUnavailable)
@@ -356,7 +356,7 @@ func TestSessionCredentialFailureFromUnknownClient(t *testing.T) {
 				if canceled {
 					cancel()
 				}
-				return &http.Response{Body: upstream}, iface.MarkCredentialsUnavailable(cause)
+				return &http.Response{Body: upstream}, auth_methods.MarkCredentialsUnavailable(cause)
 			}}
 			session := sessionTestNew(t, ctx, client, sessionTestLimits())
 			request, body := sessionTestRequest(context.Background())

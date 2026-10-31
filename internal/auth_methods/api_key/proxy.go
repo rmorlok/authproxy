@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
@@ -26,7 +26,7 @@ func (a *apiKeyConnection) resolveAuth(ctx context.Context) (authApplication, er
 		// Only this lookup's not-found result proves the connection lacks
 		// credentials. Storage, decryption, and configuration errors do not.
 		if errors.Is(err, database.ErrNotFound) {
-			err = iface.MarkCredentialsUnavailable(err)
+			err = auth_methods.MarkCredentialsUnavailable(err)
 		}
 		return authApplication{}, err
 	}

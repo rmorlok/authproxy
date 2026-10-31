@@ -9,7 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
@@ -86,7 +86,7 @@ func TestResolveAuth_FailsWhenPlacementSnapshotMissing(t *testing.T) {
 	_, err := conn.resolveAuth(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "placement snapshot")
-	assert.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+	assert.NotErrorIs(t, err, auth_methods.ErrCredentialsUnavailable)
 }
 
 // TestResolveAuth_ClassifiesCredentialLookupErrors recognizes a missing row
@@ -117,7 +117,7 @@ func TestResolveAuth_ClassifiesCredentialLookupErrors(t *testing.T) {
 			wantErr := fmt.Errorf("failed to load api-key credential: %w", test.cause)
 			require.EqualError(t, err, wantErr.Error())
 			require.ErrorIs(t, err, test.cause)
-			require.Equal(t, test.unavailable, errors.Is(err, iface.ErrCredentialsUnavailable))
+			require.Equal(t, test.unavailable, errors.Is(err, auth_methods.ErrCredentialsUnavailable))
 			wantHTTP, gotHTTP := httperr.FromError(wantErr), httperr.FromError(err)
 			require.Equal(t, wantHTTP.Status, gotHTTP.Status)
 			require.Equal(t, wantHTTP.ResponseMsgOrDefault(), gotHTTP.ResponseMsgOrDefault())
@@ -146,7 +146,7 @@ func TestResolveAuth_FailsOnMalformedPlaintext(t *testing.T) {
 	_, err := conn.resolveAuth(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unmarshal")
-	assert.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+	assert.NotErrorIs(t, err, auth_methods.ErrCredentialsUnavailable)
 }
 
 // TestResolveAuth_DecryptNotFoundIsNotCredentialLoss keeps missing encryption
@@ -171,7 +171,7 @@ func TestResolveAuth_DecryptNotFoundIsNotCredentialLoss(t *testing.T) {
 	// credential replacement, which would not fix the underlying problem.
 	require.ErrorContains(t, err, "failed to decrypt")
 	require.ErrorIs(t, err, database.ErrNotFound)
-	require.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+	require.NotErrorIs(t, err, auth_methods.ErrCredentialsUnavailable)
 }
 
 // TestResolveAuth_InvalidStoredCredentialIsNotMissing leaves corrupt plaintext
@@ -202,7 +202,7 @@ func TestResolveAuth_InvalidStoredCredentialIsNotMissing(t *testing.T) {
 
 			// Invalid existing data is not evidence that the credential is absent.
 			require.Error(t, err)
-			require.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+			require.NotErrorIs(t, err, auth_methods.ErrCredentialsUnavailable)
 		})
 	}
 }

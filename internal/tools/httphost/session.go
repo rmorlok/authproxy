@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
@@ -256,7 +257,7 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 		// Trust only the source's explicit classification, never an error's
 		// text or HTTP status. Keep private causes out of the Tool boundary;
 		// cumulative send evidence independently describes possible effects.
-		if errors.Is(err, iface.ErrCredentialsUnavailable) {
+		if errors.Is(err, auth_methods.ErrCredentialsUnavailable) {
 			return nil, ErrCredentialsUnavailable
 		}
 		return nil, ErrTransport

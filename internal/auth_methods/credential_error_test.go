@@ -1,4 +1,4 @@
-package iface_test
+package auth_methods_test
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/stretchr/testify/require"
 )
@@ -21,12 +21,12 @@ func TestMarkCredentialsUnavailable(t *testing.T) {
 		fmt.Errorf("failed to load credential: %w", cause),
 		httperr.New(http.StatusUnprocessableEntity, "no valid oauth token found", httperr.WithInternalErr(cause)),
 	} {
-		marked := iface.MarkCredentialsUnavailable(original)
+		marked := auth_methods.MarkCredentialsUnavailable(original)
 		require.EqualError(t, marked, original.Error())
 		require.ErrorIs(t, marked, cause)
 		require.ErrorIs(t, marked, original)
-		require.ErrorIs(t, fmt.Errorf("additional context: %w", marked), iface.ErrCredentialsUnavailable)
-		require.Same(t, marked, iface.MarkCredentialsUnavailable(marked))
+		require.ErrorIs(t, fmt.Errorf("additional context: %w", marked), auth_methods.ErrCredentialsUnavailable)
+		require.Same(t, marked, auth_methods.MarkCredentialsUnavailable(marked))
 
 		// Public proxy status/body mapping is identical, and errors.As still
 		// returns the original HTTP-aware error when one was present.
@@ -37,7 +37,7 @@ func TestMarkCredentialsUnavailable(t *testing.T) {
 	}
 
 	// No category is inferred from a generic HTTP status or matching text.
-	require.Nil(t, iface.MarkCredentialsUnavailable(nil))
-	require.NotErrorIs(t, httperr.New(http.StatusUnauthorized, "credentials unavailable"), iface.ErrCredentialsUnavailable)
-	require.NotErrorIs(t, errors.New(iface.ErrCredentialsUnavailable.Error()), iface.ErrCredentialsUnavailable)
+	require.Nil(t, auth_methods.MarkCredentialsUnavailable(nil))
+	require.NotErrorIs(t, httperr.New(http.StatusUnauthorized, "credentials unavailable"), auth_methods.ErrCredentialsUnavailable)
+	require.NotErrorIs(t, errors.New(auth_methods.ErrCredentialsUnavailable.Error()), auth_methods.ErrCredentialsUnavailable)
 }

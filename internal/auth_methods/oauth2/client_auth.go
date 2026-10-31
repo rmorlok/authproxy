@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -46,7 +46,7 @@ func (o *oAuth2Connection) resolveStoredClientCredentials(ctx context.Context) (
 	if err != nil {
 		err = fmt.Errorf("failed to load OAuth2 client credentials: %w", err)
 		if errors.Is(err, database.ErrNotFound) {
-			err = iface.MarkCredentialsUnavailable(err)
+			err = auth_methods.MarkCredentialsUnavailable(err)
 		}
 		return "", "", err
 	}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
-	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
@@ -45,7 +44,7 @@ func (o *oAuth2Connection) Refresh(ctx context.Context) error {
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return iface.MarkCredentialsUnavailable(err)
+			return auth_methods.MarkCredentialsUnavailable(err)
 		}
 		return err
 	}

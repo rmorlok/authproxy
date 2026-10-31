@@ -1,4 +1,4 @@
-package iface
+package auth_methods
 
 import "errors"
 

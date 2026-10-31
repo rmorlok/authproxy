@@ -7,9 +7,9 @@ after an upstream 401. Methods may also persist credentials and refresh tokens.
 
 ## Credential failures
 
-Authentication implementations use `iface.MarkCredentialsUnavailable(err)`
+Authentication implementations use `auth_methods.MarkCredentialsUnavailable(err)`
 when they know a connection's credentials are absent or unusable. Internal
-callers can check `errors.Is(err, iface.ErrCredentialsUnavailable)` without
+callers can check `errors.Is(err, auth_methods.ErrCredentialsUnavailable)` without
 parsing diagnostic text or guessing from an HTTP status.
 
 For example, a missing row from `GetActiveApiKeyCredential` is marked. A

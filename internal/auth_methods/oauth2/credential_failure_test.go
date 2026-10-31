@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
@@ -66,7 +66,7 @@ func TestCredentialFailureTokenLookup(t *testing.T) {
 				// Internal classification preserves both the original cause and
 				// the legacy direct-sentinel versus wrapped-error HTTP behavior.
 				require.ErrorIs(t, err, test.cause)
-				require.Equal(t, test.unavailable, errors.Is(err, iface.ErrCredentialsUnavailable))
+				require.Equal(t, test.unavailable, errors.Is(err, auth_methods.ErrCredentialsUnavailable))
 				require.Equal(t, test.cause.Error(), err.Error())
 				public := httperr.FromError(err)
 				if origin == "resolve" && test.cause == database.ErrNotFound {
@@ -106,7 +106,7 @@ func TestCredentialFailureRefreshClassification(t *testing.T) {
 			err := o.classifyAndRecordRefreshFailure(context.Background(), test.category, 400, "", 1, cause)
 			require.ErrorIs(t, err, cause)
 			require.Equal(t, cause.Error(), err.Error())
-			require.Equal(t, test.unavailable, errors.Is(err, iface.ErrCredentialsUnavailable))
+			require.Equal(t, test.unavailable, errors.Is(err, auth_methods.ErrCredentialsUnavailable))
 		})
 	}
 }
@@ -124,7 +124,7 @@ func TestCredentialFailureResolveDecryption(t *testing.T) {
 			encrypt.EXPECT().DecryptString(gomock.Any(), token.EncryptedAccessToken).Return("", cause)
 			_, err := o.Resolve(context.Background())
 			require.ErrorIs(t, err, cause)
-			require.NotErrorIs(t, err, iface.ErrCredentialsUnavailable)
+			require.NotErrorIs(t, err, auth_methods.ErrCredentialsUnavailable)
 		})
 	}
 }
@@ -145,7 +145,7 @@ func TestCredentialFailureRefreshBeforeRequest(t *testing.T) {
 			db.EXPECT().GetOAuth2Token(gomock.Any(), o.connection.GetId()).Return(token, nil)
 			_, err := o.refreshAccessTokenLocked(context.Background(), nil, refreshModeAlways)
 			require.Error(t, err)
-			require.Equal(t, missingRefresh, errors.Is(err, iface.ErrCredentialsUnavailable))
+			require.Equal(t, missingRefresh, errors.Is(err, auth_methods.ErrCredentialsUnavailable))
 			if missingRefresh {
 				require.ErrorIs(t, err, errNoRefreshToken)
 				require.Equal(t, errNoRefreshToken.Error(), err.Error())
@@ -186,7 +186,7 @@ func TestCredentialFailureStoredClientCredentials(t *testing.T) {
 			}
 			_, _, err := o.resolveClientCredentials(context.Background())
 			require.Error(t, err)
-			require.Equal(t, test.unavailable, errors.Is(err, iface.ErrCredentialsUnavailable))
+			require.Equal(t, test.unavailable, errors.Is(err, auth_methods.ErrCredentialsUnavailable))
 			if test.loadErr != nil {
 				require.ErrorIs(t, err, test.loadErr)
 				require.Equal(t, "failed to load OAuth2 client credentials: "+test.loadErr.Error(), err.Error())

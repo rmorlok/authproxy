@@ -14,7 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -255,7 +255,7 @@ func (o *oAuth2Connection) refreshAccessTokenLocked(
 		// A token can disappear between initial resolution and the locked
 		// refresh. Only a missing row proves the credential is unavailable.
 		if errors.Is(err, database.ErrNotFound) {
-			err = iface.MarkCredentialsUnavailable(err)
+			err = auth_methods.MarkCredentialsUnavailable(err)
 		}
 		return nil, o.classifyAndRecordRefreshFailure(
 			ctx,
@@ -442,7 +442,7 @@ func (o *oAuth2Connection) classifyAndRecordRefreshFailure(
 
 	switch category {
 	case tokenRefreshNoRefreshToken, tokenRefreshInvalidGrant, tokenRefreshInvalidGrantAfterAmbiguousAttempt:
-		return iface.MarkCredentialsUnavailable(err)
+		return auth_methods.MarkCredentialsUnavailable(err)
 	}
 
 	return err
@@ -456,10 +456,10 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 		// Preserve the legacy HTTP distinction: a direct sentinel yields 422,
 		// while a wrapped missing-row error retains its original HTTP handling.
 		if err == database.ErrNotFound {
-			return nil, iface.MarkCredentialsUnavailable(httperr.New(422, "no valid oauth token found", httperr.WithInternalErr(err)))
+			return nil, auth_methods.MarkCredentialsUnavailable(httperr.New(422, "no valid oauth token found", httperr.WithInternalErr(err)))
 		}
 		if errors.Is(err, database.ErrNotFound) {
-			return nil, iface.MarkCredentialsUnavailable(err)
+			return nil, auth_methods.MarkCredentialsUnavailable(err)
 		}
 
 		return nil, err
