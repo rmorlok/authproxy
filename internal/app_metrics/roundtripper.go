@@ -13,6 +13,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
+// RoundTripper records request/response metadata and optionally captures bodies
+// without delaying response headers while a request upload is still in flight.
 type RoundTripper struct {
 	store         RecordStore
 	fullStore     FullStore
@@ -22,7 +24,9 @@ type RoundTripper struct {
 	logger        *slog.Logger
 }
 
-// RoundTrip implements the http.RoundTripper interface
+// RoundTrip returns upstream headers as soon as the transport supplies them.
+// Body capture and final byte counts are persisted asynchronously after reads
+// settle, including when response headers arrive before an upload finishes.
 func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 	// Install an Attribution on the request context so inner middlewares
@@ -98,11 +102,6 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Execute the request
 	resp, err := t.transport.RoundTrip(req)
 
-	reqContentLength := req.ContentLength
-	if reqContentLength == -1 {
-		reqContentLength = requestBodyTrackingReader.BytesRead()
-	}
-
 	// Create a log full_log
 	full_log := &FullLog{
 		Id:            id,
@@ -115,7 +114,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			HttpVersion:   req.Proto,
 			Method:        req.Method,
 			Headers:       req.Header,
-			ContentLength: reqContentLength,
+			ContentLength: req.ContentLength,
 			BodySkipped:   requestBodySkipped,
 		},
 		MillisecondDuration: MillisecondDuration(clock.Since(startTime)),
@@ -129,19 +128,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		// Store the full_log in Redis asynchronously
 		go func() {
-			if cc.recordFullRequest {
-				if requestBodyBuf != nil {
-					requestData, err := io.ReadAll(requestBodyBuf)
-					if err != nil {
-						t.logger.Error("error reading full request body", "error", err, "entry_id", full_log.Id.String())
-						full_log.Request.Body = []byte(err.Error())
-					} else {
-						full_log.Request.Body = requestData
-					}
-				}
-
-				// Because we are in an error case, the body cannot be assumed to be populated.
-			}
+			t.finishRequestCapture(full_log, requestBodyTrackingReader, requestBodyBuf)
 
 			record := full_log.ToRecord()
 			SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
@@ -217,16 +204,8 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Store the full_log in Redis asynchronously
 	go func() {
 		if cc.recordFullRequest {
-			if requestBodyBuf != nil {
-				requestData, err := io.ReadAll(requestBodyBuf)
-				if err != nil {
-					t.logger.Error("error reading full request body", "error", err, "entry_id", full_log.Id.String())
-					full_log.Request.Body = []byte(err.Error())
-				} else {
-					full_log.Request.Body = requestData
-				}
-			}
-
+			// Drain the response tee before waiting for upload completion. A
+			// full-duplex caller may need these bytes before sending more data.
 			if responseBodyReader != nil {
 				responseData, err := io.ReadAll(responseBodyReader)
 				if err != nil {
@@ -252,6 +231,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			full_log.InternalTimeout = true
 			t.logger.Error("timed out waiting for response body to be read; full_log will not have accurate size", "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID, "max_wait", cc.maxResponseWait.String())
 		}
+		t.finishRequestCapture(full_log, requestBodyTrackingReader, requestBodyBuf)
 
 		record := full_log.ToRecord()
 		SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
@@ -269,4 +249,43 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	}()
 
 	return resp, nil
+}
+
+// finishRequestCapture runs only in the asynchronous logging worker. A transport
+// may return headers or an error before its request-body reader has stopped, so
+// the capture buffer is inspected only after Done provides a read/close barrier.
+// Waiting is bounded, and never blocks response-pipe draining or header return.
+func (t *RoundTripper) finishRequestCapture(log *FullLog, tracking trackingReader, body *bytes.Buffer) {
+	if body == nil && log.Request.ContentLength >= 0 {
+		return
+	}
+
+	// Request cancellation can race the transport's asynchronous body Close
+	// after a successful exchange. Wait for that required cleanup rather than
+	// discard a complete capture just because the handler's context ended.
+	completed := false
+	select {
+	case <-tracking.Done():
+		completed = true
+	default:
+		timer := time.NewTimer(t.captureConfig.maxResponseWait)
+		defer timer.Stop()
+		select {
+		case <-tracking.Done():
+			completed = true
+		case <-timer.C:
+			log.InternalTimeout = true
+			t.logger.Error("timed out waiting for request body to close; full_log will not have accurate size or body", "entry_id", log.Id.String(), "max_wait", t.captureConfig.maxResponseWait.String())
+		}
+	}
+
+	if log.Request.ContentLength < 0 {
+		// On timeout this remains a safe, monotonic partial count; the log's
+		// InternalTimeout flag explains why completion could not be observed.
+		log.Request.ContentLength = tracking.BytesRead()
+	}
+	if completed && body != nil {
+		// bytes.Buffer cannot fail reads; its tee writer is now quiescent.
+		log.Request.Body, _ = io.ReadAll(body)
+	}
 }

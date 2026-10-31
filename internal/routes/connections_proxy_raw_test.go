@@ -127,6 +127,9 @@ func TestCopyInboundHeadersForRawProxy(t *testing.T) {
 	src.Set("Authorization", "Bearer secret")
 	src.Set(HeaderUpstreamURL, "https://api.example.com/x")
 	src.Add(HeaderLabel, "k=v")
+	// Callers cannot send AuthProxy-owned evidence, even with duplicate casing.
+	src.Set(HeaderSendEvidence, "sent")
+	src[strings.ToLower(HeaderSendEvidence)] = []string{"notSent", "mayHaveSent"}
 	src.Set("Content-Type", "application/json")
 	src.Set("Accept", "text/event-stream")
 	src.Set("Connection", "X-Custom-Hop")
@@ -146,6 +149,7 @@ func TestCopyInboundHeadersForRawProxy(t *testing.T) {
 	assert.Empty(t, dst.Get("Authorization"), "Authorization must be stripped — connector replaces it")
 	assert.Empty(t, dst.Get(HeaderUpstreamURL), "envelope header must not leak to upstream")
 	assert.Empty(t, dst.Get(HeaderLabel), "envelope header must not leak to upstream")
+	assert.Empty(t, headerValuesFold(dst, HeaderSendEvidence), "reserved evidence must not leak to upstream")
 	assert.Empty(t, dst.Get("Connection"), "hop-by-hop stripped")
 	assert.Empty(t, dst.Get("X-Custom-Hop"), "header named by Connection: ... stripped")
 	assert.Empty(t, dst.Get("Transfer-Encoding"), "hop-by-hop stripped")

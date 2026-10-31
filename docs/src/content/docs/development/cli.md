@@ -170,7 +170,7 @@ ap signing-proxy --proxyTo=admin-api --enableLoginRedirect=true
 
 ### `ap proxy` — connection-scoped streaming proxy
 
-Routes inbound requests through `POST /api/v1/connections/{id}/_proxyRaw` so the connection's credentials are applied and bodies stream end-to-end (chunked uploads, SSE responses).
+Routes inbound requests through `/api/v1/connections/{id}/_proxyRaw` using the original HTTP method so the connection's credentials are applied and bodies stream end-to-end (chunked uploads, SSE responses).
 
 **Long-running mode.** Boots a listener on `--port` (default 9999). Each inbound request derives its `X-AuthProxy-Upstream-URL` from `--upstream-base` (path + query appended) or the caller may set the header directly.
 
@@ -188,7 +188,7 @@ curl http://127.0.0.1:9999/ \
 **One-shot mode** — append a literal `curl` or `wget` plus that tool's own argv. `ap proxy` boots an ephemeral-port listener in-process, rewrites the URL's scheme+host to point at it (path/query preserved), and execs the tool. Stdout/stderr/exit-code pass through verbatim.
 
 ```bash
-ap proxy --connection cxn_abc curl https://api.openai.com/v1/models
+ap proxy --connection cxn_abc curl -i https://api.openai.com/v1/models
 ap proxy --connection cxn_abc curl -X POST https://api.openai.com/v1/chat/completions \
   -H 'Content-Type: application/json' -d @body.json
 ap proxy --connection cxn_abc wget https://api.example.com/files/big.bin -O out.bin
@@ -197,6 +197,15 @@ ap proxy --connection cxn_abc wget https://api.example.com/files/big.bin -O out.
 **All `ap proxy` flags must come before the `curl`/`wget` literal** — `Flags().SetInterspersed(false)` stops cobra's flag parser at the first positional, so curl's own flags (`-X`, `-d`, `--config`, …) reach the tool without colliding with ours.
 
 Hop-by-hop headers (RFC 7230 §6.1) are stripped on both legs of the proxy hop. Response bodies are flushed after each write so SSE streams tick out in real time.
+
+Use curl's `-i` (`--include`) flag to see the server's
+`X-AuthProxy-Send-Evidence` response header. The CLI forwards this header;
+`notSent`, `mayHaveSent`, and `sent` describe cumulative target-send evidence,
+not whether the provider completed the action. For streams, the header arrives
+before the body and cannot change if the stream later fails. A missing header
+from an older server or a failure before the proxy handler is unknown, never
+proof of `notSent`. See [target-send evidence](/sdks/proxying/#target-send-evidence)
+for the exact meanings and retry considerations.
 
 ### `ap sign-marketplace-login-url`
 

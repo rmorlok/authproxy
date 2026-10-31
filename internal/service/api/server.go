@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
@@ -19,6 +20,12 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+// GetCorsConfig preserves the API's configured CORS policy while exposing raw
+// proxy evidence to browsers. An absent CORS configuration remains disabled.
+func GetCorsConfig(cfg config.C) *cors.Config {
+	return apgin.WithExposedHeaders(cfg.GetRoot().Api.CorsVal.ToGinCorsConfig(nil), common_routes.HeaderSendEvidence)
+}
 
 func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
 	root := dm.GetConfigRoot()
@@ -36,7 +43,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	server := apgin.ForService(service, logger, dm.GetConfig().IsDebugMode(),
 		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
 
-	corsConfig := root.Api.CorsVal.ToGinCorsConfig(nil)
+	corsConfig := GetCorsConfig(dm.GetConfig())
 	if corsConfig != nil {
 		server.Use(apgin.NewCorsMiddleware(*corsConfig, logger))
 	}

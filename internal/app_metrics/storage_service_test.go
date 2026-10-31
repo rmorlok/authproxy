@@ -100,6 +100,10 @@ type fakeTransport struct {
 }
 
 func (f *fakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Match the transport contract even when this fixture skips consumption.
+	if req.Body != nil {
+		defer req.Body.Close()
+	}
 	if f.readReqBody && req.Body != nil {
 		io.ReadAll(req.Body)
 	}

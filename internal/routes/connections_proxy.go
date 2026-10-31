@@ -117,7 +117,7 @@ func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
 		Build()
 
 	g.POST("/connections/:id/_proxy", observeProxySendEvidence, proxyAuth, r.proxy)
-	g.Any("/connections/:id/_proxyRaw", proxyAuth, r.proxyRaw)
+	g.Any("/connections/:id/_proxyRaw", observeRawProxySendEvidence, proxyAuth, r.proxyRaw)
 }
 
 func NewConnectionsProxyRoutes(
