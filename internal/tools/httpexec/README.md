@@ -58,10 +58,13 @@ result, err := program.Execute(ctx, client, httpexec.Invocation{
     ID: "tiv_01example0000001",
     Arguments: common.RawJSON(`{"id":"contact-42"}`),
     Snapshot: render.Input{
-        ToolID: "tol_01example0000001", Revision: 7,
+        ToolID: "tol_01example0000001", 
+		Revision: 7,
         ConnectionID: "cxn_01example0000001",
         ConnectionNamespace: "root.product.owner",
-        Cfg: map[string]any{"tenant": "acme"},
+        Cfg: map[string]any{
+			"tenant": "acme"
+		},
     },
 })
 ```

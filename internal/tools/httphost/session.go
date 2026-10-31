@@ -260,7 +260,7 @@ func (s *Session) Do(req *http.Request) (*Response, error) {
 		if errors.Is(err, auth_methods.ErrCredentialsUnavailable) {
 			return nil, ErrCredentialsUnavailable
 		}
-		
+
 		return nil, ErrTransport
 	}
 

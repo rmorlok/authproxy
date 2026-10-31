@@ -194,7 +194,9 @@ func (r *Response) Map(
 	}
 
 	switch input.ExecutionState {
-	case api.ToolExecutionStateNotStarted, api.ToolExecutionStateMayHaveExecuted, api.ToolExecutionStateCompleted:
+	case api.ToolExecutionStateNotStarted,
+		api.ToolExecutionStateMayHaveExecuted,
+		api.ToolExecutionStateCompleted:
 	default:
 		return nil, errors.New("response execution state must be notStarted, mayHaveExecuted, or completed")
 	}

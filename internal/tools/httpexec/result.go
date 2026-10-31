@@ -15,7 +15,12 @@ import (
 func (p *Program) resultIdentity(invocation Invocation) (*api.ToolResult, error) {
 	input := invocation.Snapshot
 	remaining := p.limits.Response.MaxEncodedResultBytes
-	for _, id := range []string{input.ToolID, invocation.ID, input.ConnectionID} {
+
+	for _, id := range []string{
+		input.ToolID,
+		invocation.ID,
+		input.ConnectionID,
+	} {
 		if len(id) > remaining {
 			return nil, httpcodec.ErrEncodedResultLimit
 		}
@@ -24,28 +29,43 @@ func (p *Program) resultIdentity(invocation Invocation) (*api.ToolResult, error)
 			return nil, ErrInvalidInvocation
 		}
 	}
+
 	result := &api.ToolResult{
-		ToolID: input.ToolID, Revision: input.Revision, InvocationID: invocation.ID,
-		Content: []api.ToolContentBlock{},
+		ToolID:       input.ToolID,
+		Revision:     input.Revision,
+		InvocationID: invocation.ID,
+		Content:      []api.ToolContentBlock{},
 		Metadata: api.ToolResultMetadata{
 			ConnectionID:      input.ConnectionID,
 			ToolSetGeneration: util.CloneValue(input.ToolSetGeneration),
 			CatalogRevision:   util.CloneValue(input.CatalogRevision),
 		},
 	}
+
 	if err := result.Validate(nil); err != nil {
 		return nil, ErrInvalidInvocation
 	}
+
 	return result, nil
 }
 
 // errorResult starts from empty captured metadata, never from partial mapped
 // output. It bounds executor-generated errors just as the mapper bounds status
 // errors. Neither construction nor retry advice can trigger another request.
-func (p *Program) errorResult(ctx context.Context, base *api.ToolResult, state api.ToolExecutionState, code, message string) (*api.ToolResult, error) {
+func (p *Program) errorResult(
+	ctx context.Context,
+	base *api.ToolResult,
+	state api.ToolExecutionState,
+	code, message string,
+) (*api.ToolResult, error) {
 	result := *base
 	result.IsError = true
-	result.Error = &api.ToolResultError{Code: code, Message: message, ExecutionState: state}
+	result.Error = &api.ToolResultError{
+		Code:           code,
+		Message:        message,
+		ExecutionState: state,
+	}
+
 	encoded, err := json.Marshal(result)
 	if err != nil {
 		return nil, ErrInvalidInvocation
@@ -54,12 +74,16 @@ func (p *Program) errorResult(ctx context.Context, base *api.ToolResult, state a
 		result.Error.Code = "OUTPUT_TOO_LARGE"
 		result.Error.Message = "The encoded Tool result exceeds the result byte limit."
 		encoded, err = json.Marshal(result)
-		if err != nil || len(encoded) > p.limits.Response.MaxEncodedResultBytes {
+
+		if err != nil ||
+			len(encoded) > p.limits.Response.MaxEncodedResultBytes {
 			return nil, httpcodec.ErrEncodedResultLimit
 		}
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }

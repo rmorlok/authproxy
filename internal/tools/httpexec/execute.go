@@ -46,21 +46,41 @@ type Invocation struct {
 // too small for an error return a Go error and no result. Policy timeout remains
 // a ToolResult when the caller context is live. Callers must not modify invocation
 // data during the call; results own their bytes, slices, and metadata pointers.
-func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocation Invocation) (*api.ToolResult, error) {
-	if p == nil || p.request == nil || p.response == nil || p.schemas == nil || ctx == nil || client == nil {
+func (p *Program) Execute(
+	ctx context.Context,
+	client iface.HTTPClient,
+	invocation Invocation,
+) (*api.ToolResult, error) {
+	if p == nil ||
+		p.request == nil ||
+		p.response == nil ||
+		p.schemas == nil ||
+		ctx == nil ||
+		client == nil {
 		return nil, ErrInvalidInvocation
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
+	// Transform the invocation data in the core shape for the response with
+	// ids/etc that will be added to as the invocation proceeds.
 	base, err := p.resultIdentity(invocation)
 	if err != nil {
 		return nil, err
 	}
+
+	// Create the HTTP session that acts as an HTTP client. This can be used for
+	// multiple HTTP requests through the connection each automatically applying
+	// the credentials to the request. Each request will have the appropriate
+	// labels, etc. It tracks whether any requests made to the 3rd party to
+	// allow us to understand if the tool might have applied to the 3rd party.
 	session, err := httphost.New(ctx, client, p.limits.HTTP)
 	if err != nil {
 		return nil, err
 	}
+
 	defer session.Close()
 
 	// Failure normalization uses the still-live parent context so a policy
@@ -71,7 +91,10 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 		}
 		return p.failure(ctx, base, session.ExecutionState(), err, code, message)
 	}
+
 	workCtx := session.Context()
+
+	// Validate the data being passed against the schemas defined for this tool
 	params, err := p.schemas.ValidateInput(workCtx, invocation.Arguments)
 	if err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool arguments do not match the input schema.")
@@ -82,6 +105,7 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	// accidentally populated Snapshot.Params with another value.
 	input := invocation.Snapshot
 	input.Params = params
+
 	snapshot, err := render.NewContext(input, p.limits.Render)
 	if err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool invocation context cannot be prepared.")
@@ -108,12 +132,21 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	// Release the provider stream before projection/schema work. Close is
 	// idempotent; the defer still covers failures while reading the body.
 	_ = response.Body.Close()
-	result, err := p.response.Map(workCtx, httpcodec.ResponseInput{
-		StatusCode: response.StatusCode, ContentType: response.ContentType,
-		Body: body, Headers: response.Header, Context: snapshot,
-		ToolID: base.ToolID, Revision: base.Revision, InvocationID: base.InvocationID,
-		Metadata: base.Metadata, ExecutionState: session.ExecutionState(),
-	})
+	result, err := p.response.Map(
+		workCtx,
+		httpcodec.ResponseInput{
+			StatusCode:     response.StatusCode,
+			ContentType:    response.ContentType,
+			Body:           body,
+			Headers:        response.Header,
+			Context:        snapshot,
+			ToolID:         base.ToolID,
+			Revision:       base.Revision,
+			InvocationID:   base.InvocationID,
+			Metadata:       base.Metadata,
+			ExecutionState: session.ExecutionState(),
+		},
+	)
 	if err != nil {
 		if errors.Is(err, httpcodec.ErrEncodedResultLimit) && session.Err() == nil {
 			return nil, err
@@ -137,19 +170,31 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 
 // failure converts host and validation categories into fixed public errors.
 // Arbitrary compiler/transport/validation messages never cross this boundary.
-func (p *Program) failure(ctx context.Context, base *api.ToolResult, state api.ToolExecutionState, err error, code, message string) (*api.ToolResult, error) {
+func (p *Program) failure(
+	ctx context.Context,
+	base *api.ToolResult,
+	state api.ToolExecutionState,
+	err error,
+	code, message string) (*api.ToolResult, error) {
 	if contextErr := ctx.Err(); contextErr != nil {
 		return nil, contextErr
 	}
+
 	switch {
-	case errors.Is(err, httphost.ErrTimeout), errors.Is(err, httphost.ErrRequestLimit), errors.Is(err, validation.ErrLimit):
+	case errors.Is(err, httphost.ErrTimeout),
+		errors.Is(err, httphost.ErrRequestLimit),
+		errors.Is(err, validation.ErrLimit):
 		code, message = "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded an execution limit."
-	case errors.Is(err, httphost.ErrResponseLimit), errors.Is(err, httphost.ErrStreamLimit), errors.Is(err, httphost.ErrHeaderLimit):
+	case errors.Is(err, httphost.ErrResponseLimit),
+		errors.Is(err, httphost.ErrStreamLimit),
+		errors.Is(err, httphost.ErrHeaderLimit):
 		code, message = "OUTPUT_TOO_LARGE", "The upstream response exceeds the response size limits."
 	case errors.Is(err, httphost.ErrCredentialsUnavailable):
 		code, message = "CONNECTION_UNAVAILABLE", "Credentials for the Tool connection are unavailable."
-	case errors.Is(err, httphost.ErrEncoding), errors.Is(err, httphost.ErrInvalidResponse):
+	case errors.Is(err, httphost.ErrEncoding),
+		errors.Is(err, httphost.ErrInvalidResponse):
 		code, message = "UPSTREAM_PROTOCOL_ERROR", "The upstream response is invalid or uses an unsupported encoding."
 	}
+
 	return p.errorResult(ctx, base, state, code, message)
 }
