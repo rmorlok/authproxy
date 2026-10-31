@@ -59,10 +59,12 @@ func (s *service) authorizeToolInvocation(
 	if err != nil {
 		return nil, mapDatabaseError(err)
 	}
+
 	// Stop before decryption if cancellation arrived during the database read.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	plaintext, err := s.encrypt.Decrypt(ctx, snapshot.Revision.EncryptedDefinition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt tool %s revision %d: %w", id, snapshot.Revision.Revision, err)
@@ -72,6 +74,7 @@ func (s *service) authorizeToolInvocation(
 	if err := util.DecodeJSONStrict(plaintext, &definition); err != nil {
 		return nil, fmt.Errorf("failed to decode tool %s revision %d: %w", id, snapshot.Revision.Revision, err)
 	}
+
 	// Do not grant authorization if cancellation arrived during decryption or
 	// decoding, including when a dependency completed without returning an error.
 	if err := ctx.Err(); err != nil {
@@ -84,12 +87,17 @@ func (s *service) authorizeToolInvocation(
 		if !ra.Allows(snapshot.Connection.Namespace, "connections", verb, snapshot.Connection.Id.String()) {
 			continue
 		}
+
 		// Check the revision only after authorization so a denied caller cannot
 		// distinguish a stale descriptor from an unknown Tool ID.
 		if expectedRevision != nil && *expectedRevision != snapshot.Revision.Revision {
 			return nil, ErrToolRevisionChanged
 		}
-		return &authorizedToolInvocation{snapshot: snapshot, definition: definition}, nil
+		return &authorizedToolInvocation{
+			snapshot:   snapshot,
+			definition: definition,
+		}, nil
 	}
+
 	return nil, ErrNotFound
 }
