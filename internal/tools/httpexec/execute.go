@@ -132,14 +132,19 @@ func (p *Program) Execute(
 	input := invocation.Snapshot
 	input.Params = params
 
+	// Render the input down to a context with the cloned, isolated values
 	snapshot, err := render.NewContext(input, p.limits.Render)
 	if err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool invocation context cannot be prepared.")
 	}
+
+	// Render the request
 	req, err := p.request.Render(workCtx, snapshot)
 	if err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool request cannot be prepared from the supplied input.")
 	}
+
+	// Actually invoke the HTTP request
 	response, err := session.Do(req)
 	if err != nil {
 		return fail(err, "UPSTREAM_FAILED", "The upstream request failed.")
@@ -155,9 +160,11 @@ func (p *Program) Execute(
 			return fail(err, "UPSTREAM_FAILED", "The upstream response could not be read.")
 		}
 	}
+
 	// Release the provider stream before projection/schema work. Close is
 	// idempotent; the defer still covers failures while reading the body.
 	_ = response.Body.Close()
+
 	result, err := p.response.Map(
 		workCtx,
 		httpcodec.ResponseInput{
@@ -187,10 +194,12 @@ func (p *Program) Execute(
 			return fail(err, "OUTPUT_INVALID", "The Tool result does not match the output schema.")
 		}
 	}
+
 	// A timeout after mapping/validation must not turn into a successful result.
 	if err := session.Err(); err != nil {
 		return fail(err, "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded its time limit.")
 	}
+
 	return result, nil
 }
 

@@ -205,7 +205,11 @@ func (r *Response) Map(
 	// these required fields before validation/serialization, and never let JSON
 	// encoding silently replace bytes in a captured correlation identity.
 	remainingIdentityBytes := r.limits.MaxEncodedResultBytes
-	for _, identity := range []string{input.ToolID, input.InvocationID, input.Metadata.ConnectionID} {
+	for _, identity := range []string{
+		input.ToolID,
+		input.InvocationID,
+		input.Metadata.ConnectionID,
+	} {
 		if len(identity) > remainingIdentityBytes {
 			return nil, ErrEncodedResultLimit
 		}
@@ -256,8 +260,12 @@ func (r *Response) Map(
 			// status text, error body, headers, or URL into the public failure.
 			// Unused body/MIME size cannot replace an authored status error.
 			failure.Details = []byte(fmt.Sprintf(`{"status":%d}`, input.StatusCode))
-		} else if len(input.Body) > r.limits.MaxResponseBytes || len(input.ContentType) > r.limits.MaxResponseBytes {
-			failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The upstream response exceeds the response byte limit."}
+		} else if len(input.Body) > r.limits.MaxResponseBytes ||
+			len(input.ContentType) > r.limits.MaxResponseBytes {
+			failure = &api.ToolResultError{
+				Code:    "OUTPUT_TOO_LARGE",
+				Message: "The upstream response exceeds the response byte limit.",
+			}
 		} else if r.transform != nil {
 			if input.Context == nil {
 				return nil, errors.New("response transform requires a captured invocation context")
@@ -268,9 +276,17 @@ func (r *Response) Map(
 				return nil, err
 			}
 		} else if len(input.Body) > r.limits.MaxOutputBytes {
-			failure = &api.ToolResultError{Code: "OUTPUT_TOO_LARGE", Message: "The response content exceeds the output byte limit."}
+			failure = &api.ToolResultError{
+				Code:    "OUTPUT_TOO_LARGE",
+				Message: "The response content exceeds the output byte limit.",
+			}
 		} else {
-			failure = mapResponseBody(result, input.ContentType, input.Body, r.limits.MaxEncodedResultBytes)
+			failure = mapResponseBody(
+				result,
+				input.ContentType,
+				input.Body,
+				r.limits.MaxEncodedResultBytes,
+			)
 		}
 	}
 

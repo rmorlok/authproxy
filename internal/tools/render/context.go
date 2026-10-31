@@ -20,16 +20,6 @@ type Input struct {
 	// params. For example, {"id":"contact-42","limit":10} becomes a map whose
 	// values can be read with {{path.params.id}} and {{params.limit}}.
 	//
-	// When using httpexec.Invocation, Arguments is the raw JSON supplied by the
-	// Tool caller. The HTTP executor decodes and validates Arguments against the
-	// Tool's input schema, then uses that map for Params in a local copy of
-	// Snapshot before calling NewContext. Leave Snapshot.Params unset: any value
-	// supplied there is ignored, so it cannot override or add to Arguments.
-	//
-	// Direct callers of NewContext supply the validated map themselves, for example:
-	//
-	//	Params: map[string]any{"id": "contact-42", "limit": json.Number("10")},
-	//
 	// NewContext checks value types and limits but does not validate an input
 	// schema. Nested values must be JSON primitives, map[string]any,
 	// map[string]string, or []any; typed slices such as []string and arbitrary Go
@@ -80,6 +70,9 @@ type Input struct {
 // Context owns detached JSON values. Its contents are private and immutable
 // after construction, so independent renders can safely share the snapshot.
 type Context struct {
+	// root contains essentially JSON-cloned version of Input that has been
+	// validated. The data cloning makes sure that the values changed here
+	// cannot affect their original source.
 	root map[string]any
 }
 
@@ -167,7 +160,14 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 	}
 
 	snapshot := make(map[string]any, len(root))
-	for _, name := range []string{"params", "cfg", "labels", "annotations", "connection", "tool"} {
+	for _, name := range []string{
+		"params",
+		"cfg",
+		"labels",
+		"annotations",
+		"connection",
+		"tool",
+	} {
 		if err := b.addBytes(len(name)); err != nil {
 			return nil, err
 		}
@@ -184,7 +184,12 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 
 	// Missing root maps are convenient empty scopes; nested nil collections
 	// retain their JSON null meaning instead of becoming empty objects/arrays.
-	for _, name := range []string{"params", "cfg", "labels", "annotations"} {
+	for _, name := range []string{
+		"params",
+		"cfg",
+		"labels",
+		"annotations",
+	} {
 		if snapshot[name] == nil {
 			snapshot[name] = map[string]any{}
 		}
