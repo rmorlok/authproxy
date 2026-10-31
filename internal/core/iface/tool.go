@@ -1,6 +1,8 @@
 package iface
 
 import (
+	"errors"
+
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -14,6 +16,13 @@ var ErrToolManaged = database.ErrToolManaged
 // ErrToolRevisionConflict means a write observed a revision that is no longer
 // active, usually because a concurrent update or deletion committed first.
 var ErrToolRevisionConflict = database.ErrToolRevisionConflict
+
+// ErrToolRevisionChanged means an authorized invocation requested a revision
+// other than the one captured for execution. No execution has started; the
+// caller can rediscover the Tool before choosing whether to invoke it again.
+// This differs from ErrToolRevisionConflict, which reports a management write
+// losing a race with another write.
+var ErrToolRevisionChanged = errors.New("tool revision changed")
 
 // Tool is the management view of one connection-bound operation. It carries
 // the active revision's decrypted definition so the canonical resource can be
