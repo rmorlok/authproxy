@@ -23,6 +23,9 @@ import (
 	marketplaceembed "github.com/rmorlok/authproxy/ui/marketplace/embed"
 )
 
+// GetCorsConfig combines marketplace defaults with the public service's CORS
+// policy. Proxy-enabled services also expose raw proxy evidence to browsers;
+// this does not enable CORS when neither defaults nor configuration exist.
 func GetCorsConfig(cfg config.C) *cors.Config {
 	root := cfg.GetRoot()
 	service := root.Public
@@ -44,7 +47,11 @@ func GetCorsConfig(cfg config.C) *cors.Config {
 		}
 	}
 
-	return service.CorsVal.ToGinCorsConfig(baseConfig)
+	corsConfig := service.CorsVal.ToGinCorsConfig(baseConfig)
+	if service.EnableProxy() {
+		return apgin.WithExposedHeaders(corsConfig, common_routes.HeaderSendEvidence)
+	}
+	return corsConfig
 }
 
 func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {

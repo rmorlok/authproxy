@@ -1,10 +1,13 @@
 package app_metrics
 
 import (
+	"bytes"
 	"errors"
 	"io"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -138,4 +141,85 @@ func TestTrackingReadCloser(t *testing.T) {
 		require.Equal(t, 1, body.calls)
 		requireDone(t, r.Done())
 	})
+}
+
+// closeGatedBody allows Close to return before an outstanding Read finishes,
+// matching transports that unblock reads during cancellation or early response.
+type closeGatedBody struct {
+	readStarted chan struct{}
+	closed      chan struct{}
+	finishRead  chan struct{}
+	closeOnce   sync.Once
+}
+
+// Read waits for Close and a test gate before returning the last body bytes.
+func (b *closeGatedBody) Read(p []byte) (int, error) {
+	close(b.readStarted)
+	<-b.closed
+	<-b.finishRead
+	return copy(p, "last bytes"), io.EOF
+}
+
+// Close unblocks the first stage of the read without waiting for it to return.
+func (b *closeGatedBody) Close() error {
+	b.closeOnce.Do(func() { close(b.closed) })
+	return nil
+}
+
+// TestTrackingBodiesConcurrentClose verifies Done is a stable capture barrier
+// even when the underlying Close returns before an in-flight tee has finished.
+func TestTrackingBodiesConcurrentClose(t *testing.T) {
+	for _, tee := range []bool{false, true} {
+		name := "tracking"
+		if tee {
+			name = "tee capture"
+		}
+		t.Run(name, func(t *testing.T) {
+			// Keep the final read alive after the underlying close has returned.
+			body := &closeGatedBody{
+				readStarted: make(chan struct{}), closed: make(chan struct{}), finishRead: make(chan struct{}),
+			}
+			var releaseOnce sync.Once
+			release := func() { releaseOnce.Do(func() { close(body.finishRead) }) }
+			t.Cleanup(release)
+			capture := &bytes.Buffer{}
+			var reader interface {
+				io.ReadCloser
+				trackingReader
+			} = newTrackingReadCloser(body)
+			if tee {
+				reader = newSplitReadCloser(io.TeeReader(body, capture), body)
+			}
+			readDone := make(chan error, 1)
+			go func() {
+				_, err := reader.Read(make([]byte, 64))
+				readDone <- err
+			}()
+			<-body.readStarted
+			closeDone := make(chan error, 1)
+			go func() { closeDone <- reader.Close() }()
+			<-body.closed
+
+			// Closing must unblock the read without publishing Done too early.
+			select {
+			case <-reader.Done():
+				t.Fatal("body marked complete while its read is still active")
+			case <-time.After(20 * time.Millisecond):
+			}
+			require.EqualValues(t, 0, reader.BytesRead())
+			release()
+			require.ErrorIs(t, <-readDone, io.EOF)
+			require.NoError(t, <-closeDone)
+
+			// Once complete, both captured data and the final count are stable.
+			requireDone(t, reader.Done())
+			require.EqualValues(t, len("last bytes"), reader.BytesRead())
+			if tee {
+				require.Equal(t, "last bytes", capture.String())
+			}
+			_, err := reader.Read(make([]byte, 1))
+			require.ErrorIs(t, err, io.ErrClosedPipe)
+			require.NoError(t, reader.Close())
+		})
+	}
 }
