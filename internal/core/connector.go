@@ -136,7 +136,19 @@ func (c *Connector) GetAnnotations() map[string]string {
 	return c.ConnectorWithDefinition.Annotations
 }
 
+// getDefinition loads the cached definition for callers without a context.
 func (c *Connector) getDefinition() (*cschema.ConnectorDefinition, error) {
+	return c.getDefinitionWithContext(context.Background())
+}
+
+// getDefinitionWithContext decrypts this captured generation's definition on
+// first use and caches the decoded value. Decryption observes the caller's
+// cancellation; failed or canceled loads leave the cache empty for a later try.
+func (c *Connector) getDefinitionWithContext(ctx context.Context) (*cschema.ConnectorDefinition, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	c.defMu.RLock()
 	if c.def != nil {
 		defer c.defMu.RUnlock()
@@ -147,7 +159,7 @@ func (c *Connector) getDefinition() (*cschema.ConnectorDefinition, error) {
 	c.defMu.Lock()
 	defer c.defMu.Unlock()
 	if c.def == nil {
-		decrypted, err := c.s.encrypt.DecryptString(context.Background(), c.ConnectorWithDefinition.EncryptedDefinition)
+		decrypted, err := c.s.encrypt.DecryptString(ctx, c.ConnectorWithDefinition.EncryptedDefinition)
 		if err != nil {
 			return nil, err
 		}
@@ -155,6 +167,9 @@ func (c *Connector) getDefinition() (*cschema.ConnectorDefinition, error) {
 		var def cschema.ConnectorDefinition
 		err = json.Unmarshal([]byte(decrypted), &def)
 		if err != nil {
+			return nil, err
+		}
+		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		c.def = &def
