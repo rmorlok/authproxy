@@ -61,6 +61,13 @@ are the canonical ToolSet resource and `ToolSetPatch`; generation PATCH and
 POST bodies use `ToolSetPatch` too and reject metadata and selector fields.
 
 These lists accept `orderBy=<field> [asc|desc]`, like other resource lists.
+`ConnectionToolSetBindingList` is returned by `GET /connections/{id}/toolsets`.
+Each item identifies one assignment by its connection and logical ToolSet
+references. `status.appliedGeneration` is absent until an inventory is installed,
+and the `Installed` condition is `False` with reason `InventoryPending` until then.
+The route does not report `Ready` or MCP catalog status yet, so those are omitted.
+Bindings page by ToolSet ID with a keyset cursor and have no `orderBy` option.
+
 `GET /tools` and `GET /toolsets` sort by `id`, `namespace`, `name`,
 `created_at`, or `updated_at`, defaulting to `id`. Generation lists sort by
 `generation`, `state`, `created_at`, or `updated_at`, defaulting to newest

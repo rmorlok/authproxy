@@ -1729,6 +1729,82 @@
                 }
             }
         },
+        "/connections/{id}/toolsets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List the ToolSets assigned to a connection with their installation status. Requires connections:get on the connection; only ToolSets the caller can read with toolsets:get are returned, so a ToolSet in an ancestor namespace is omitted without that grant. This reports status and grants no Tool invocation.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "List connection toolsets",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return (default 50, max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/openapi.ConnectionToolSetBindingListJson"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/connectors": {
             "get": {
                 "security": [
@@ -6187,6 +6263,140 @@
                 },
                 "connectorRef": {
                     "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "openapi.ConnectionToolSetBindingConditionJson": {
+            "type": "object",
+            "required": [
+                "lastTransitionTime",
+                "status",
+                "type"
+            ],
+            "properties": {
+                "lastTransitionTime": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "observedGeneration": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "reason": {
+                    "type": "string",
+                    "example": "InventoryInstalled"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "True",
+                        "False",
+                        "Unknown"
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "example": "Installed"
+                }
+            }
+        },
+        "openapi.ConnectionToolSetBindingJson": {
+            "description": "One ToolSet's assignment to a connection and its installation status",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "kind",
+                "metadata",
+                "spec",
+                "status"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "ConnectionToolSetBinding"
+                    ],
+                    "example": "ConnectionToolSetBinding"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/meta.ObjectMeta"
+                },
+                "spec": {
+                    "$ref": "#/definitions/openapi.ConnectionToolSetBindingSpecJson"
+                },
+                "status": {
+                    "$ref": "#/definitions/openapi.ConnectionToolSetBindingStatusJson"
+                }
+            }
+        },
+        "openapi.ConnectionToolSetBindingListJson": {
+            "description": "Paginated ToolSet assignments for one connection",
+            "type": "object",
+            "required": [
+                "apiVersion",
+                "items",
+                "kind",
+                "metadata"
+            ],
+            "properties": {
+                "apiVersion": {
+                    "type": "string",
+                    "enum": [
+                        "authproxy.net/v1alpha1"
+                    ],
+                    "example": "authproxy.net/v1alpha1"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.ConnectionToolSetBindingJson"
+                    }
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "metadata": {
+                    "$ref": "#/definitions/v1alpha1.ListMeta"
+                }
+            }
+        },
+        "openapi.ConnectionToolSetBindingSpecJson": {
+            "type": "object",
+            "required": [
+                "connectionRef",
+                "toolSetRef"
+            ],
+            "properties": {
+                "connectionRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                },
+                "toolSetRef": {
+                    "$ref": "#/definitions/meta.ObjectReference"
+                }
+            }
+        },
+        "openapi.ConnectionToolSetBindingStatusJson": {
+            "type": "object",
+            "properties": {
+                "appliedGeneration": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "conditions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/openapi.ConnectionToolSetBindingConditionJson"
+                    }
                 }
             }
         },

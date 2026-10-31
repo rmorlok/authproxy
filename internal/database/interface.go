@@ -183,6 +183,12 @@ type DB interface {
 	// GetToolSetBindingForConnection finds the current assignment for a parent pair.
 	GetToolSetBindingForConnection(ctx context.Context, toolSetId apid.ID, connectionId apid.ID) (*ToolSetBinding, error)
 
+	// ListToolSetBindingsBuilder starts a listing of one connection's live assignments.
+	ListToolSetBindingsBuilder() ListToolSetBindingsBuilder
+
+	// ListToolSetBindingsFromCursor continues a binding listing with its saved filters.
+	ListToolSetBindingsFromCursor(ctx context.Context, cursor string) (ListToolSetBindingsExecutor, error)
+
 	// InstallExplicitToolSetInventory atomically pins a pending binding to its
 	// prepared primary generation and installs its complete first Tool inventory.
 	InstallExplicitToolSetInventory(ctx context.Context, install ToolSetInventoryInstall) (*ToolSetBinding, error)
