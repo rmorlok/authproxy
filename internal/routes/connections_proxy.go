@@ -30,7 +30,7 @@ type ConnectionsProxyRoutes struct {
 }
 
 // @Summary		Proxy request through connection
-// @Description	Proxy an HTTP request through an authenticated connection to the external service. sendEvidence describes cumulative target-send evidence across redirects and credential recovery: notSent, mayHaveSent, or sent. It does not prove successful execution or safe retryability.
+// @Description	Proxy an HTTP request through an authenticated connection to the external service.
 // @Tags			proxy
 // @Accept			json
 // @Produce		json
