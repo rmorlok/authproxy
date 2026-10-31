@@ -21,9 +21,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
-// defaultToolListLimit is the page size used when a list request omits one.
-const defaultToolListLimit = 50
-
 // toolPublishRenderLimits bound request-template compilation at publication.
 // They only reject definitions too large or deep to compile; invocation will
 // recompile under its own effective execution policy.
@@ -186,57 +183,6 @@ func (s *service) DeleteTool(ctx context.Context, id apid.ID, expectedRevision u
 		return mapDatabaseError(err)
 	}
 	return nil
-}
-
-// ListTools returns one hydrated page of management Tools. The namespace scope
-// is required so callers always constrain the listing by their permissions.
-func (s *service) ListTools(ctx context.Context, req iface.ListToolsRequest) (iface.ToolPage, error) {
-	limit := int(req.Limit)
-	if limit <= 0 {
-		limit = defaultToolListLimit
-	}
-	if limit > database.MaxToolListLimit {
-		limit = database.MaxToolListLimit
-	}
-
-	page, err := s.db.ListTools(ctx, database.ToolListQuery{
-		NamespaceMatchers: req.NamespaceMatchers,
-		Name:              req.Name,
-		ConnectionId:      req.ConnectionId,
-		LabelSelector:     req.LabelSelector,
-		Limit:             limit,
-		OrderByField:      req.OrderByField,
-		OrderBy:           req.OrderBy,
-	})
-	if err != nil {
-		return iface.ToolPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
-	}
-	return s.hydrateToolPage(ctx, page)
-}
-
-// ListToolsFromCursor continues a listing with the filters saved in the cursor.
-func (s *service) ListToolsFromCursor(ctx context.Context, cursor string) (iface.ToolPage, error) {
-	page, err := s.db.ListToolsFromCursor(ctx, cursor)
-	if err != nil {
-		return iface.ToolPage{}, fmt.Errorf("%w: invalid cursor: %w", ErrInvalidArgument, err)
-	}
-	return s.hydrateToolPage(ctx, page)
-}
-
-// hydrateToolPage decrypts each listed Tool's active definition.
-func (s *service) hydrateToolPage(ctx context.Context, page database.ToolListPage) (iface.ToolPage, error) {
-	result := iface.ToolPage{
-		Items:  make([]iface.Tool, 0, len(page.Items)),
-		Cursor: page.Cursor,
-	}
-	for i := range page.Items {
-		tool, err := s.hydrateTool(ctx, &page.Items[i])
-		if err != nil {
-			return iface.ToolPage{}, err
-		}
-		result.Items = append(result.Items, tool)
-	}
-	return result, nil
 }
 
 // resolveToolConnection resolves an ID or namespace/name connection reference

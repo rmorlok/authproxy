@@ -146,13 +146,13 @@ type DB interface {
 	// annotations without touching the selector or any generation.
 	UpdateToolSetMetadata(ctx context.Context, id apid.ID, name scommon.ResourceName, userLabels map[string]string, annotations map[string]string) (*ToolSet, error)
 
-	// ListToolSets pages through live logical ToolSets within a namespace scope.
-	ListToolSets(ctx context.Context, query ToolSetListQuery) (ToolSetListPage, error)
-	ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetListPage, error)
+	// ListToolSetsBuilder pages through live logical ToolSets within a namespace scope.
+	ListToolSetsBuilder() ListToolSetsBuilder
+	ListToolSetsFromCursor(ctx context.Context, cursor string) (ListToolSetsExecutor, error)
 
-	// ListToolSetGenerations pages through one live ToolSet's generations, newest first.
-	ListToolSetGenerations(ctx context.Context, query ToolSetGenerationListQuery) (ToolSetGenerationListPage, error)
-	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ToolSetGenerationListPage, error)
+	// ListToolSetGenerationsBuilder pages through one live ToolSet's generations, newest first.
+	ListToolSetGenerationsBuilder() ListToolSetGenerationsBuilder
+	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ListToolSetGenerationsExecutor, error)
 
 	// CreateToolSetGeneration allocates a new draft under a live parent. Only one
 	// live draft may exist, and historical generation numbers are never reused.
@@ -213,12 +213,12 @@ type DB interface {
 	// and limit. Callers must still authorize each returned candidate.
 	ListToolCandidatesFromCursor(ctx context.Context, cursor string) (ToolCandidatePage, error)
 
-	// ListTools pages live Tool identities for management, independent of
+	// ListToolsBuilder pages live Tool identities for management, independent of
 	// connection liveness. Callers must still check per-resource permissions.
-	ListTools(ctx context.Context, query ToolListQuery) (ToolListPage, error)
+	ListToolsBuilder() ListToolsBuilder
 
 	// ListToolsFromCursor resumes a management listing with its saved filters.
-	ListToolsFromCursor(ctx context.Context, cursor string) (ToolListPage, error)
+	ListToolsFromCursor(ctx context.Context, cursor string) (ListToolsExecutor, error)
 
 	// UpdateStandaloneTool appends a revision and switches the pointer only if the observed revision is current.
 	UpdateStandaloneTool(ctx context.Context, tool *Tool, expectedRevision uint64, definition encfield.EncryptedField, digest string) (*ToolRevision, error)

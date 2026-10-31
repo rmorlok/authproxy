@@ -68,118 +68,126 @@ func IsValidToolSetGenerationOrderByField[T string | ToolSetGenerationOrderByFie
 	}
 }
 
-// ToolSetListQuery narrows a management listing of live logical ToolSets. All
-// supplied filters intersect; generations are not consulted.
-type ToolSetListQuery struct {
-	// NamespaceMatchers is the caller's effective namespace scope. Nil or empty
-	// matches nothing, so a missing permission scope never lists every ToolSet.
-	NamespaceMatchers []string `json:"namespaceMatchers"`
+// ListToolSetsExecutor runs a logical ToolSet listing one page at a time or across
+// every remaining page. Each FetchPage advances the listing, and Enumerate stops
+// at the first error.
+type ListToolSetsExecutor interface {
+	FetchPage(context.Context) pagination.PageResult[ToolSet]
+	Enumerate(context.Context, pagination.EnumerateCallback[ToolSet]) error
+}
 
-	// Name optionally selects one exact resource name.
-	Name common.ResourceName `json:"name,omitempty"`
+// ListToolSetsBuilder narrows a management listing of live logical ToolSets in
+// live namespaces. All supplied filters intersect; generations are not consulted.
+//
+// Namespace scope is required: with no matchers the listing is empty, so a
+// missing permission scope never lists every ToolSet. Invalid filters are
+// reported as ErrInvalidListQuery when the listing runs. Callers must still apply
+// per-resource permission checks.
+type ListToolSetsBuilder interface {
+	ListToolSetsExecutor
 
-	// LabelSelector matches the logical ToolSet's labels, including inherited
+	// Limit sets the page size. Non-positive values select the default and values
+	// above MaxToolSetListLimit are capped.
+	Limit(int32) ListToolSetsBuilder
+
+	// ForNamespaceMatcher replaces the namespace scope with one matcher.
+	ForNamespaceMatcher(string) ListToolSetsBuilder
+
+	// ForNamespaceMatchers replaces the namespace scope. Replacing, rather than
+	// adding to it, means a later call can never widen an earlier scope.
+	ForNamespaceMatchers([]string) ListToolSetsBuilder
+
+	// ForName selects one exact resource name.
+	ForName(common.ResourceName) ListToolSetsBuilder
+
+	// ForLabelSelector matches the logical ToolSet's labels, including inherited
 	// namespace labels and self-implicit identity labels.
-	LabelSelector string `json:"labelSelector,omitempty"`
+	ForLabelSelector(string) ListToolSetsBuilder
 
-	// Limit must be between one and MaxToolSetListLimit; there is no default.
-	Limit int `json:"limit"`
-
-	// OrderByField optionally selects the sort column. Results always fall back
-	// to ID so pages stay deterministic when sort values tie; empty sorts by ID.
-	OrderByField ToolSetOrderByField `json:"orderByField,omitempty"`
-
-	// OrderBy is the OrderByField direction, ascending unless descending is set.
-	OrderBy pagination.OrderBy `json:"orderBy,omitempty"`
+	// OrderBy selects the sort column and direction. Results always fall back to
+	// ID so pages stay deterministic when sort values tie; the default sorts by ID.
+	OrderBy(ToolSetOrderByField, pagination.OrderBy) ListToolSetsBuilder
 }
 
-// toolSetListCursor preserves the original query and row offset, so continuation
-// cannot change filters or ordering. Like other offset-paged resources, rows
-// written between pages can shift it.
-type toolSetListCursor struct {
-	ToolSetListQuery
-	Offset uint64 `json:"offset"`
+// listToolSetsFilters implements ListToolSetsBuilder. It is also the cursor
+// payload, so continuation keeps the original filters and row offset. Like other
+// offset-paged resources, rows written between pages can shift it.
+type listToolSetsFilters struct {
+	s                 *service            `json:"-"`
+	LimitVal          uint64              `json:"limit"`
+	Offset            uint64              `json:"offset"`
+	NamespaceMatchers []string            `json:"namespaceMatchers,omitempty"`
+	NameVal           common.ResourceName `json:"name,omitempty"`
+	LabelSelectorVal  string              `json:"labelSelector,omitempty"`
+	OrderByFieldVal   ToolSetOrderByField `json:"orderByField,omitempty"`
+	OrderByVal        pagination.OrderBy  `json:"orderBy,omitempty"`
 }
 
-// ToolSetListPage is one ordered page of live logical ToolSets.
-type ToolSetListPage struct {
-	Items []ToolSet
+func (l *listToolSetsFilters) Limit(limit int32) ListToolSetsBuilder {
+	l.LimitVal = toolListPageSize(limit, MaxToolSetListLimit)
+	return l
+}
 
-	// Cursor resumes through ListToolSetsFromCursor and is empty at the end.
-	Cursor string
+func (l *listToolSetsFilters) ForNamespaceMatcher(matcher string) ListToolSetsBuilder {
+	return l.ForNamespaceMatchers([]string{matcher})
+}
+
+func (l *listToolSetsFilters) ForNamespaceMatchers(matchers []string) ListToolSetsBuilder {
+	l.NamespaceMatchers = matchers
+	return l
+}
+
+func (l *listToolSetsFilters) ForName(name common.ResourceName) ListToolSetsBuilder {
+	l.NameVal = name
+	return l
+}
+
+func (l *listToolSetsFilters) ForLabelSelector(selector string) ListToolSetsBuilder {
+	l.LabelSelectorVal = selector
+	return l
+}
+
+func (l *listToolSetsFilters) OrderBy(field ToolSetOrderByField, by pagination.OrderBy) ListToolSetsBuilder {
+	l.OrderByFieldVal = field
+	l.OrderByVal = by
+	return l
 }
 
 // validate checks every supplied filter and parses the label selector once.
-func (q ToolSetListQuery) validate() (LabelSelector, error) {
-	if q.Limit < 1 || q.Limit > MaxToolSetListLimit {
-		return nil, fmt.Errorf("toolset list limit must be between 1 and %d", MaxToolSetListLimit)
-	}
-
-	for _, matcher := range q.NamespaceMatchers {
+func (l *listToolSetsFilters) validate() (LabelSelector, error) {
+	for _, matcher := range l.NamespaceMatchers {
 		if err := namespace.ValidateMatcher(matcher); err != nil {
 			return nil, fmt.Errorf("invalid toolset namespace matcher: %w", err)
 		}
 	}
 
-	if q.Name != "" {
-		if err := q.Name.Validate(); err != nil {
+	if l.NameVal != "" {
+		if err := l.NameVal.Validate(); err != nil {
 			return nil, fmt.Errorf("invalid toolset name: %w", err)
 		}
 	}
 
-	if q.OrderByField != "" && !IsValidToolSetOrderByField(q.OrderByField) {
-		return nil, fmt.Errorf("invalid toolset order by field %q", q.OrderByField)
+	if l.OrderByFieldVal != "" && !IsValidToolSetOrderByField(l.OrderByFieldVal) {
+		return nil, fmt.Errorf("invalid toolset order by field %q", l.OrderByFieldVal)
 	}
 
-	return ParseLabelSelector(q.LabelSelector)
+	return ParseLabelSelector(l.LabelSelectorVal)
 }
 
-// ListToolSets starts an ordered listing of live ToolSets in live
-// namespaces. Callers must still apply per-resource permission checks.
-func (s *service) ListToolSets(
-	ctx context.Context,
-	query ToolSetListQuery,
-) (ToolSetListPage, error) {
-	return s.listToolSets(ctx, query, 0)
-}
-
-// ListToolSetsFromCursor resumes a listing with its saved filters and limit.
-func (s *service) ListToolSetsFromCursor(
-	ctx context.Context,
-	cursor string,
-) (ToolSetListPage, error) {
-	parsed, err := pagination.ParseCursor[toolSetListCursor](ctx, s.cursorEncryptor, cursor)
+// FetchPage reads one bounded page and advances the offset. A lookahead row
+// reports more results and produces a cursor for the next page.
+func (l *listToolSetsFilters) FetchPage(ctx context.Context) pagination.PageResult[ToolSet] {
+	selector, err := l.validate()
 	if err != nil {
-		return ToolSetListPage{}, err
+		return pagination.PageResult[ToolSet]{Error: fmt.Errorf("%w: %w", ErrInvalidListQuery, err)}
 	}
 
-	// Every continuation follows a returned ToolSet, so the offset is positive.
-	if parsed.Offset == 0 {
-		return ToolSetListPage{}, errors.New("invalid toolset list cursor position")
-	}
-
-	return s.listToolSets(ctx, parsed.ToolSetListQuery, parsed.Offset)
-}
-
-// listToolSets reads one bounded page at the supplied offset. A lookahead row
-// produces a cursor carrying the original query and the next offset.
-func (s *service) listToolSets(
-	ctx context.Context,
-	params ToolSetListQuery,
-	offset uint64,
-) (ToolSetListPage, error) {
-	selector, err := params.validate()
-	if err != nil {
-		return ToolSetListPage{}, err
-	}
-
-	page := ToolSetListPage{Items: []ToolSet{}}
-	if len(params.NamespaceMatchers) == 0 {
-		return page, nil
+	if len(l.NamespaceMatchers) == 0 {
+		return pagination.PageResult[ToolSet]{Results: []ToolSet{}}
 	}
 
 	var row ToolSet
-	q := s.sq.
+	q := l.s.sq.
 		Select(util.PrependStringToAll("t.", row.cols())...).
 		From(ToolSetsTable + " t").
 		Join(NamespacesTable + " n ON n.path = t.namespace").
@@ -187,19 +195,19 @@ func (s *service) listToolSets(
 			"t.deleted_at": nil,
 			"n.deleted_at": nil,
 		}).
-		Limit(uint64(params.Limit + 1)).
-		Offset(offset)
+		Limit(l.LimitVal + 1).
+		Offset(l.Offset)
 
 	// The field is validated above. ID always breaks ties so offsets stay stable.
-	if params.OrderByField != "" {
-		q = q.OrderBy(fmt.Sprintf("t.%s %s", params.OrderByField, params.OrderBy.String()))
+	if l.OrderByFieldVal != "" {
+		q = q.OrderBy(fmt.Sprintf("t.%s %s", l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 	q = q.OrderBy("t.id ASC")
 
 	// Literal prefix comparison avoids LIKE's wildcard and case behavior, matching
 	// the Tool listing so namespace scope agrees on SQLite and PostgreSQL.
 	var scopes sq.Or
-	for _, matcher := range params.NamespaceMatchers {
+	for _, matcher := range l.NamespaceMatchers {
 		base := strings.TrimSuffix(matcher, namespace.WildcardSuffix)
 		condition := sq.Or{sq.Eq{"t.namespace": base}}
 		if base != matcher {
@@ -210,163 +218,256 @@ func (s *service) listToolSets(
 	}
 	q = q.Where(scopes)
 
-	if params.Name != "" {
-		q = q.Where(sq.Eq{"t.name": params.Name})
+	if l.NameVal != "" {
+		q = q.Where(sq.Eq{"t.name": l.NameVal})
 	}
-	q = selector.ApplyToSqlBuilderWithProvider(q, "t.labels", s.cfg.GetProvider())
+	q = selector.ApplyToSqlBuilderWithProvider(q, "t.labels", l.s.cfg.GetProvider())
 
-	rows, err := q.RunWith(s.db).QueryContext(ctx)
+	rows, err := q.RunWith(l.s.db).QueryContext(ctx)
 	if err != nil {
-		return ToolSetListPage{}, err
+		return pagination.PageResult[ToolSet]{Error: err}
 	}
 	defer rows.Close()
 
+	items := []ToolSet{}
 	for rows.Next() {
 		var item ToolSet
 		if err := rows.Scan(item.fields()...); err != nil {
-			return ToolSetListPage{}, err
+			return pagination.PageResult[ToolSet]{Error: err}
 		}
-		page.Items = append(page.Items, item)
+		items = append(items, item)
 	}
 	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return ToolSetListPage{}, err
+		return pagination.PageResult[ToolSet]{Error: err}
 	}
 
-	if len(page.Items) > params.Limit {
-		page.Items = page.Items[:params.Limit]
-		page.Cursor, err = pagination.MakeCursor(ctx, s.cursorEncryptor, toolSetListCursor{
-			ToolSetListQuery: params,
-			Offset:           offset + uint64(params.Limit),
-		})
+	hasMore := uint64(len(items)) > l.LimitVal
+	if hasMore {
+		items = items[:l.LimitVal]
+	}
+	l.Offset += uint64(len(items))
+
+	cursor := ""
+	if hasMore {
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
-			return ToolSetListPage{}, err
+			return pagination.PageResult[ToolSet]{Error: err}
 		}
 	}
 
-	return page, nil
+	return pagination.PageResult[ToolSet]{Results: items, HasMore: hasMore, Cursor: cursor}
 }
 
-// ToolSetGenerationListQuery selects the live generations of one live ToolSet.
-// Results are newest first unless OrderByField is set.
-type ToolSetGenerationListQuery struct {
-	ToolSetId apid.ID `json:"toolSetId"`
+// Enumerate calls callback with each remaining page until the listing ends, the
+// callback stops, or an error occurs.
+func (l *listToolSetsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[ToolSet]) error {
+	var err error
+	keepGoing := pagination.Continue
+	hasMore := true
 
-	// Limit must be between one and MaxToolSetListLimit; there is no default.
-	Limit int `json:"limit"`
+	for err == nil && hasMore && bool(keepGoing) {
+		result := l.FetchPage(ctx)
+		hasMore = result.HasMore
 
-	// OrderByField optionally selects the sort column. Generation number always
+		if result.Error != nil {
+			return result.Error
+		}
+		keepGoing, err = callback(result)
+	}
+
+	return err
+}
+
+// ListToolSetsBuilder starts an ordered logical listing with default paging.
+func (s *service) ListToolSetsBuilder() ListToolSetsBuilder {
+	return &listToolSetsFilters{s: s, LimitVal: defaultToolListLimit}
+}
+
+// ListToolSetsFromCursor resumes a listing with its saved filters and limit.
+func (s *service) ListToolSetsFromCursor(ctx context.Context, cursor string) (ListToolSetsExecutor, error) {
+	parsed, err := pagination.ParseCursor[listToolSetsFilters](ctx, s.cursorEncryptor, cursor)
+	if err != nil {
+		return nil, err
+	}
+
+	// Every continuation follows a returned ToolSet, so the offset is positive.
+	if parsed.Offset == 0 {
+		return nil, errors.New("invalid toolset list cursor position")
+	}
+
+	parsed.s = s
+	return parsed, nil
+}
+
+// ListToolSetGenerationsExecutor runs a generation listing one page at a time or
+// across every remaining page. Each FetchPage advances the listing, and Enumerate
+// stops at the first error.
+type ListToolSetGenerationsExecutor interface {
+	FetchPage(context.Context) pagination.PageResult[ToolSetGeneration]
+	Enumerate(context.Context, pagination.EnumerateCallback[ToolSetGeneration]) error
+}
+
+// ListToolSetGenerationsBuilder selects the live generations of one live ToolSet,
+// newest first unless OrderBy is set. ForToolSetId is required. A missing or
+// deleted parent returns ErrNotFound rather than an empty page, so callers can
+// distinguish an unknown ToolSet from one with no live generations.
+type ListToolSetGenerationsBuilder interface {
+	ListToolSetGenerationsExecutor
+
+	// Limit sets the page size. Non-positive values select the default and values
+	// above MaxToolSetListLimit are capped.
+	Limit(int32) ListToolSetGenerationsBuilder
+
+	// ForToolSetId selects the parent ToolSet.
+	ForToolSetId(apid.ID) ListToolSetGenerationsBuilder
+
+	// OrderBy selects the sort column and direction. Generation number always
 	// breaks ties, newest first, so pages stay deterministic.
-	OrderByField ToolSetGenerationOrderByField `json:"orderByField,omitempty"`
-
-	// OrderBy is the OrderByField direction, ascending unless descending is set.
-	OrderBy pagination.OrderBy `json:"orderBy,omitempty"`
+	OrderBy(ToolSetGenerationOrderByField, pagination.OrderBy) ListToolSetGenerationsBuilder
 }
 
-// toolSetGenerationListCursor preserves the query and row offset, so
-// continuation cannot change the ToolSet or ordering.
-type toolSetGenerationListCursor struct {
-	ToolSetGenerationListQuery
-	Offset uint64 `json:"offset"`
+// listToolSetGenerationsFilters implements ListToolSetGenerationsBuilder. It is
+// also the cursor payload, so continuation cannot change the ToolSet or ordering.
+type listToolSetGenerationsFilters struct {
+	s               *service                      `json:"-"`
+	LimitVal        uint64                        `json:"limit"`
+	Offset          uint64                        `json:"offset"`
+	ToolSetIdVal    apid.ID                       `json:"toolSetId"`
+	OrderByFieldVal ToolSetGenerationOrderByField `json:"orderByField,omitempty"`
+	OrderByVal      pagination.OrderBy            `json:"orderBy,omitempty"`
 }
 
-// ToolSetGenerationListPage is one ordered page of generations.
-type ToolSetGenerationListPage struct {
-	Items []ToolSetGeneration
-
-	// Cursor resumes through ListToolSetGenerationsFromCursor and is empty at the end.
-	Cursor string
+func (l *listToolSetGenerationsFilters) Limit(limit int32) ListToolSetGenerationsBuilder {
+	l.LimitVal = toolListPageSize(limit, MaxToolSetListLimit)
+	return l
 }
 
-// ListToolSetGenerations returns the newest live generations of a live ToolSet.
-// A missing or deleted parent returns ErrNotFound rather than an empty page, so
-// callers can distinguish an unknown ToolSet from one with no live generations.
-func (s *service) ListToolSetGenerations(
+func (l *listToolSetGenerationsFilters) ForToolSetId(id apid.ID) ListToolSetGenerationsBuilder {
+	l.ToolSetIdVal = id
+	return l
+}
+
+func (l *listToolSetGenerationsFilters) OrderBy(
+	field ToolSetGenerationOrderByField,
+	by pagination.OrderBy,
+) ListToolSetGenerationsBuilder {
+	l.OrderByFieldVal = field
+	l.OrderByVal = by
+	return l
+}
+
+// FetchPage reads one bounded page and advances the offset. It checks parent
+// liveness first so deletion hides history.
+func (l *listToolSetGenerationsFilters) FetchPage(ctx context.Context) pagination.PageResult[ToolSetGeneration] {
+	if l.ToolSetIdVal.IsNil() {
+		return pagination.PageResult[ToolSetGeneration]{
+			Error: fmt.Errorf("%w: toolset generation list requires a toolset id", ErrInvalidListQuery),
+		}
+	}
+	if l.OrderByFieldVal != "" && !IsValidToolSetGenerationOrderByField(l.OrderByFieldVal) {
+		return pagination.PageResult[ToolSetGeneration]{
+			Error: fmt.Errorf("%w: invalid toolset generation order by field %q", ErrInvalidListQuery, l.OrderByFieldVal),
+		}
+	}
+	if _, err := l.s.GetToolSet(ctx, l.ToolSetIdVal); err != nil {
+		return pagination.PageResult[ToolSetGeneration]{Error: err}
+	}
+
+	var row ToolSetGeneration
+	q := l.s.sq.
+		Select(row.cols()...).
+		From(ToolSetGenerationsTable).
+		Where(sq.Eq{
+			"tool_set_id": l.ToolSetIdVal,
+			"deleted_at":  nil,
+		}).
+		Limit(l.LimitVal + 1).
+		Offset(l.Offset)
+
+	// The field is validated above. Generation breaks ties so offsets stay stable.
+	if l.OrderByFieldVal != "" {
+		q = q.OrderBy(fmt.Sprintf("%s %s", l.OrderByFieldVal, l.OrderByVal.String()))
+	}
+	q = q.OrderBy("generation DESC")
+
+	rows, err := q.RunWith(l.s.db).QueryContext(ctx)
+	if err != nil {
+		return pagination.PageResult[ToolSetGeneration]{Error: err}
+	}
+	defer rows.Close()
+
+	items := []ToolSetGeneration{}
+	for rows.Next() {
+		var item ToolSetGeneration
+		if err := rows.Scan(item.fields()...); err != nil {
+			return pagination.PageResult[ToolSetGeneration]{Error: err}
+		}
+		items = append(items, item)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return pagination.PageResult[ToolSetGeneration]{Error: err}
+	}
+
+	hasMore := uint64(len(items)) > l.LimitVal
+	if hasMore {
+		items = items[:l.LimitVal]
+	}
+	l.Offset += uint64(len(items))
+
+	cursor := ""
+	if hasMore {
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
+		if err != nil {
+			return pagination.PageResult[ToolSetGeneration]{Error: err}
+		}
+	}
+
+	return pagination.PageResult[ToolSetGeneration]{Results: items, HasMore: hasMore, Cursor: cursor}
+}
+
+// Enumerate calls callback with each remaining page until the listing ends, the
+// callback stops, or an error occurs.
+func (l *listToolSetGenerationsFilters) Enumerate(
 	ctx context.Context,
-	query ToolSetGenerationListQuery,
-) (ToolSetGenerationListPage, error) {
-	return s.listToolSetGenerations(ctx, query, 0)
+	callback pagination.EnumerateCallback[ToolSetGeneration],
+) error {
+	var err error
+	keepGoing := pagination.Continue
+	hasMore := true
+
+	for err == nil && hasMore && bool(keepGoing) {
+		result := l.FetchPage(ctx)
+		hasMore = result.HasMore
+
+		if result.Error != nil {
+			return result.Error
+		}
+		keepGoing, err = callback(result)
+	}
+
+	return err
+}
+
+// ListToolSetGenerationsBuilder starts a generation listing with default paging.
+func (s *service) ListToolSetGenerationsBuilder() ListToolSetGenerationsBuilder {
+	return &listToolSetGenerationsFilters{s: s, LimitVal: defaultToolListLimit}
 }
 
 // ListToolSetGenerationsFromCursor resumes a generation listing.
 func (s *service) ListToolSetGenerationsFromCursor(
 	ctx context.Context,
 	cursor string,
-) (ToolSetGenerationListPage, error) {
-	parsed, err := pagination.ParseCursor[toolSetGenerationListCursor](ctx, s.cursorEncryptor, cursor)
+) (ListToolSetGenerationsExecutor, error) {
+	parsed, err := pagination.ParseCursor[listToolSetGenerationsFilters](ctx, s.cursorEncryptor, cursor)
 	if err != nil {
-		return ToolSetGenerationListPage{}, err
+		return nil, err
 	}
 
 	// Every continuation follows a returned generation, so the offset is positive.
 	if parsed.Offset == 0 {
-		return ToolSetGenerationListPage{}, errors.New("invalid toolset generation cursor position")
+		return nil, errors.New("invalid toolset generation cursor position")
 	}
 
-	return s.listToolSetGenerations(ctx, parsed.ToolSetGenerationListQuery, parsed.Offset)
-}
-
-// listToolSetGenerations reads one page of generations at the supplied offset.
-// It checks parent liveness first so deletion hides history.
-func (s *service) listToolSetGenerations(
-	ctx context.Context,
-	params ToolSetGenerationListQuery,
-	offset uint64,
-) (ToolSetGenerationListPage, error) {
-	if params.Limit < 1 || params.Limit > MaxToolSetListLimit {
-		return ToolSetGenerationListPage{}, fmt.Errorf("toolset generation list limit must be between 1 and %d", MaxToolSetListLimit)
-	}
-	if params.OrderByField != "" && !IsValidToolSetGenerationOrderByField(params.OrderByField) {
-		return ToolSetGenerationListPage{}, fmt.Errorf("invalid toolset generation order by field %q", params.OrderByField)
-	}
-	if _, err := s.GetToolSet(ctx, params.ToolSetId); err != nil {
-		return ToolSetGenerationListPage{}, err
-	}
-
-	var row ToolSetGeneration
-	q := s.sq.
-		Select(row.cols()...).
-		From(ToolSetGenerationsTable).
-		Where(sq.Eq{
-			"tool_set_id": params.ToolSetId,
-			"deleted_at":  nil,
-		}).
-		Limit(uint64(params.Limit + 1)).
-		Offset(offset)
-
-	// The field is validated above. Generation breaks ties so offsets stay stable.
-	if params.OrderByField != "" {
-		q = q.OrderBy(fmt.Sprintf("%s %s", params.OrderByField, params.OrderBy.String()))
-	}
-	q = q.OrderBy("generation DESC")
-
-	rows, err := q.RunWith(s.db).QueryContext(ctx)
-	if err != nil {
-		return ToolSetGenerationListPage{}, err
-	}
-	defer rows.Close()
-
-	page := ToolSetGenerationListPage{Items: []ToolSetGeneration{}}
-	for rows.Next() {
-		var item ToolSetGeneration
-		if err := rows.Scan(item.fields()...); err != nil {
-			return ToolSetGenerationListPage{}, err
-		}
-		page.Items = append(page.Items, item)
-	}
-	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-		return ToolSetGenerationListPage{}, err
-	}
-
-	if len(page.Items) > params.Limit {
-		page.Items = page.Items[:params.Limit]
-		page.Cursor, err = pagination.MakeCursor(ctx, s.cursorEncryptor, toolSetGenerationListCursor{
-			ToolSetGenerationListQuery: params,
-			Offset:                     offset + uint64(params.Limit),
-		})
-		if err != nil {
-			return ToolSetGenerationListPage{}, err
-		}
-	}
-
-	return page, nil
+	parsed.s = s
+	return parsed, nil
 }

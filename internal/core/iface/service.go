@@ -711,11 +711,11 @@ type C interface {
 	// active, retaining its revision history. Generated Tools return ErrToolManaged.
 	DeleteTool(ctx context.Context, id apid.ID, expectedRevision uint64) error
 
-	// ListTools returns one page of management Tool resources.
-	ListTools(ctx context.Context, req ListToolsRequest) (ToolPage, error)
+	// ListToolsBuilder starts a listing of management Tool resources.
+	ListToolsBuilder() ListToolsBuilder
 
-	// ListToolsFromCursor continues a ListTools page with its original filters.
-	ListToolsFromCursor(ctx context.Context, cursor string) (ToolPage, error)
+	// ListToolsFromCursor continues a Tool listing with its original filters.
+	ListToolsFromCursor(ctx context.Context, cursor string) (ListToolsExecutor, error)
 
 	/*
 	 *
@@ -754,18 +754,18 @@ type C interface {
 	// DeleteToolSet soft-deletes the logical ToolSet, which hides every generation.
 	DeleteToolSet(ctx context.Context, id apid.ID) error
 
-	// ListToolSets returns one page of logical ToolSets in their default projection.
-	ListToolSets(ctx context.Context, req ListToolSetsRequest) (ToolSetPage, error)
+	// ListToolSetsBuilder starts a listing of logical ToolSets in their default projection.
+	ListToolSetsBuilder() ListToolSetsBuilder
 
-	// ListToolSetsFromCursor continues a ListToolSets page with its original filters.
-	ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetPage, error)
+	// ListToolSetsFromCursor continues a ToolSet listing with its original filters.
+	ListToolSetsFromCursor(ctx context.Context, cursor string) (ListToolSetsExecutor, error)
 
-	// ListToolSetGenerations returns one page of a ToolSet's generations, newest
-	// first unless the request selects another order.
-	ListToolSetGenerations(ctx context.Context, id apid.ID, req ListToolSetGenerationsRequest) (ToolSetPage, error)
+	// ListToolSetGenerationsBuilder starts a listing of one ToolSet's generations,
+	// newest first unless OrderBy selects another order.
+	ListToolSetGenerationsBuilder() ListToolSetGenerationsBuilder
 
-	// ListToolSetGenerationsFromCursor continues a ListToolSetGenerations page.
-	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ToolSetPage, error)
+	// ListToolSetGenerationsFromCursor continues a generation listing.
+	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ListToolSetGenerationsExecutor, error)
 
 	/*
 	 *

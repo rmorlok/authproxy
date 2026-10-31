@@ -33,64 +33,68 @@ func TestListToolSets(t *testing.T) {
 	child := create("root.owner.child", "calendar", nil)
 	sibling := create("root.owner_x", "calendar", nil)
 
-	ids := func(page ToolSetListPage) []apid.ID {
-		result := make([]apid.ID, 0, len(page.Items))
-		for _, item := range page.Items {
+	ids := func(page pagination.PageResult[ToolSet]) []apid.ID {
+		require.NoError(t, page.Error)
+		result := make([]apid.ID, 0, len(page.Results))
+		for _, item := range page.Results {
 			result = append(result, item.Id)
 		}
 		return result
 	}
 
 	t.Run("empty scope matches nothing", func(t *testing.T) {
-		page, err := db.ListToolSets(ctx, ToolSetListQuery{Limit: 10})
-		require.NoError(t, err)
-		require.Empty(t, page.Items)
+		require.Empty(t, ids(db.ListToolSetsBuilder().Limit(10).FetchPage(ctx)))
 	})
 
 	t.Run("descendant matcher excludes similarly named siblings", func(t *testing.T) {
-		page, err := db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root.owner.**"}, Limit: 10})
-		require.NoError(t, err)
+		page := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner.**").Limit(10).FetchPage(ctx)
 		require.ElementsMatch(t, []apid.ID{owner.Id, other.Id, child.Id}, ids(page))
 	})
 
 	t.Run("name and label filters intersect", func(t *testing.T) {
-		page, err := db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root.**"}, Name: "calendar", Limit: 10})
-		require.NoError(t, err)
-		require.ElementsMatch(t, []apid.ID{owner.Id, child.Id, sibling.Id}, ids(page))
+		named := func() ListToolSetsBuilder {
+			return db.ListToolSetsBuilder().ForNamespaceMatcher("root.**").ForName("calendar").Limit(10)
+		}
 
-		page, err = db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root.**"}, Name: "calendar", LabelSelector: "purpose=calendar", Limit: 10})
-		require.NoError(t, err)
-		require.Equal(t, []apid.ID{owner.Id}, ids(page))
+		require.ElementsMatch(t, []apid.ID{owner.Id, child.Id, sibling.Id}, ids(named().FetchPage(ctx)))
+		require.Equal(t, []apid.ID{owner.Id}, ids(named().ForLabelSelector("purpose=calendar").FetchPage(ctx)))
 	})
 
 	t.Run("cursor preserves filters", func(t *testing.T) {
-		page, err := db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root.owner.**"}, Limit: 2})
-		require.NoError(t, err)
-		require.Len(t, page.Items, 2)
+		page := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner.**").Limit(2).FetchPage(ctx)
+		require.Len(t, ids(page), 2)
 		require.NotEmpty(t, page.Cursor)
 
-		next, err := db.ListToolSetsFromCursor(ctx, page.Cursor)
+		listing, err := db.ListToolSetsFromCursor(ctx, page.Cursor)
 		require.NoError(t, err)
-		require.Len(t, next.Items, 1)
+		next := listing.FetchPage(ctx)
+		require.Len(t, ids(next), 1)
 		require.Empty(t, next.Cursor)
 		require.ElementsMatch(t, []apid.ID{owner.Id, other.Id, child.Id}, append(ids(page), ids(next)...))
 	})
 
+	t.Run("enumerate visits every page", func(t *testing.T) {
+		var seen []apid.ID
+		err := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner.**").Limit(1).
+			Enumerate(ctx, func(page pagination.PageResult[ToolSet]) (pagination.KeepGoing, error) {
+				seen = append(seen, ids(page)...)
+				return pagination.Continue, nil
+			})
+		require.NoError(t, err)
+		require.ElementsMatch(t, []apid.ID{owner.Id, other.Id, child.Id}, seen)
+	})
+
 	t.Run("deleted ToolSets are omitted", func(t *testing.T) {
 		require.NoError(t, db.DeleteToolSet(ctx, other.Id))
-		page, err := db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root.owner"}, Limit: 10})
-		require.NoError(t, err)
+		page := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner").Limit(10).FetchPage(ctx)
 		require.Equal(t, []apid.ID{owner.Id}, ids(page))
 	})
 
 	t.Run("invalid queries are rejected", func(t *testing.T) {
-		_, err := db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root"}, Limit: 0})
-		require.Error(t, err)
-		_, err = db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"root"}, Limit: MaxToolSetListLimit + 1})
-		require.Error(t, err)
-		_, err = db.ListToolSets(ctx, ToolSetListQuery{NamespaceMatchers: []string{"not a matcher"}, Limit: 1})
-		require.Error(t, err)
-		_, err = db.ListToolSetsFromCursor(ctx, "garbage")
+		page := db.ListToolSetsBuilder().ForNamespaceMatcher("not a matcher").FetchPage(ctx)
+		require.ErrorIs(t, page.Error, ErrInvalidListQuery)
+
+		_, err := db.ListToolSetsFromCursor(ctx, "garbage")
 		require.Error(t, err)
 	})
 }
@@ -114,30 +118,45 @@ func TestListToolSetGenerations(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	numbers := func(page ToolSetGenerationListPage) []uint64 {
-		result := make([]uint64, 0, len(page.Items))
-		for _, item := range page.Items {
-			result = append(result, item.Generation)
-		}
-		return result
-	}
-
-	page, err := db.ListToolSetGenerations(ctx, ToolSetGenerationListQuery{ToolSetId: toolSet.Id, Limit: 2})
-	require.NoError(t, err)
-	require.Equal(t, []uint64{3, 2}, numbers(page))
+	// The first page is newest first and reports more results.
+	page := db.ListToolSetGenerationsBuilder().ForToolSetId(toolSet.Id).Limit(2).FetchPage(ctx)
+	require.Equal(t, []uint64{3, 2}, generationNumbersForTest(t, page))
 	require.NotEmpty(t, page.Cursor)
 
-	next, err := db.ListToolSetGenerationsFromCursor(ctx, page.Cursor)
+	// The cursor resumes on the last generation and ends the listing.
+	listing, err := db.ListToolSetGenerationsFromCursor(ctx, page.Cursor)
 	require.NoError(t, err)
-	require.Equal(t, []uint64{1}, numbers(next))
+	next := listing.FetchPage(ctx)
+	require.Equal(t, []uint64{1}, generationNumbersForTest(t, next))
 	require.Empty(t, next.Cursor)
 
-	_, err = db.ListToolSetGenerations(ctx, ToolSetGenerationListQuery{ToolSetId: toolSet.Id, Limit: 0})
-	require.Error(t, err)
+	// Enumerate walks every generation in the same order.
+	var seen []uint64
+	err = db.ListToolSetGenerationsBuilder().ForToolSetId(toolSet.Id).Limit(1).
+		Enumerate(ctx, func(page pagination.PageResult[ToolSetGeneration]) (pagination.KeepGoing, error) {
+			seen = append(seen, generationNumbersForTest(t, page)...)
+			return pagination.Continue, nil
+		})
+	require.NoError(t, err)
+	require.Equal(t, []uint64{3, 2, 1}, seen)
 
+	// A listing without a parent is invalid input.
+	require.ErrorIs(t, db.ListToolSetGenerationsBuilder().FetchPage(ctx).Error, ErrInvalidListQuery)
+
+	// Deleting the parent hides its history, even from an existing cursor.
 	require.NoError(t, db.DeleteToolSet(ctx, toolSet.Id))
-	_, err = db.ListToolSetGenerations(ctx, ToolSetGenerationListQuery{ToolSetId: toolSet.Id, Limit: 2})
-	require.ErrorIs(t, err, ErrNotFound)
+	require.ErrorIs(t, db.ListToolSetGenerationsBuilder().ForToolSetId(toolSet.Id).FetchPage(ctx).Error, ErrNotFound)
+}
+
+// generationNumbersForTest projects a page's generation numbers in order.
+func generationNumbersForTest(t *testing.T, page pagination.PageResult[ToolSetGeneration]) []uint64 {
+	t.Helper()
+	require.NoError(t, page.Error)
+	result := make([]uint64, 0, len(page.Results))
+	for _, item := range page.Results {
+		result = append(result, item.Generation)
+	}
+	return result
 }
 
 // TestUpdateToolSetMetadata replaces user metadata while retaining system
@@ -205,15 +224,14 @@ func TestListToolSetsOrdering(t *testing.T) {
 	third := create(2, "root.a", "alpha")
 
 	list := func(field ToolSetOrderByField, order pagination.OrderBy) []apid.ID {
-		page, err := db.ListToolSets(ctx, ToolSetListQuery{
-			NamespaceMatchers: []string{"root.**"},
-			Limit:             10,
-			OrderByField:      field,
-			OrderBy:           order,
-		})
-		require.NoError(t, err)
-		result := make([]apid.ID, 0, len(page.Items))
-		for _, item := range page.Items {
+		page := db.ListToolSetsBuilder().
+			ForNamespaceMatcher("root.**").
+			Limit(10).
+			OrderBy(field, order).
+			FetchPage(ctx)
+		require.NoError(t, page.Error)
+		result := make([]apid.ID, 0, len(page.Results))
+		for _, item := range page.Results {
 			result = append(result, item.Id)
 		}
 		return result
@@ -237,28 +255,28 @@ func TestListToolSetsOrdering(t *testing.T) {
 			tied = append(tied, id)
 		}
 	}
-	page, err := db.ListToolSets(ctx, ToolSetListQuery{
-		NamespaceMatchers: []string{"root.**"},
-		Limit:             2,
-		OrderByField:      ToolSetOrderByNamespace,
-		OrderBy:           pagination.OrderByDesc,
-	})
+	page := db.ListToolSetsBuilder().
+		ForNamespaceMatcher("root.**").
+		Limit(2).
+		OrderBy(ToolSetOrderByNamespace, pagination.OrderByDesc).
+		FetchPage(ctx)
+	require.NoError(t, page.Error)
+	require.Len(t, page.Results, 2)
+	require.Equal(t, first.Id, page.Results[0].Id)
+	listing, err := db.ListToolSetsFromCursor(ctx, page.Cursor)
 	require.NoError(t, err)
-	require.Len(t, page.Items, 2)
-	require.Equal(t, first.Id, page.Items[0].Id)
-	next, err := db.ListToolSetsFromCursor(ctx, page.Cursor)
-	require.NoError(t, err)
-	require.Len(t, next.Items, 1)
+	next := listing.FetchPage(ctx)
+	require.NoError(t, next.Error)
+	require.Len(t, next.Results, 1)
 	require.Empty(t, next.Cursor)
-	require.Equal(t, tied, []apid.ID{page.Items[1].Id, next.Items[0].Id})
+	require.Equal(t, tied, []apid.ID{page.Results[1].Id, next.Results[0].Id})
 
 	// Unknown columns never reach SQL.
-	_, err = db.ListToolSets(ctx, ToolSetListQuery{
-		NamespaceMatchers: []string{"root.**"},
-		Limit:             1,
-		OrderByField:      "name; DROP TABLE tool_sets",
-	})
-	require.Error(t, err)
+	invalid := db.ListToolSetsBuilder().
+		ForNamespaceMatcher("root.**").
+		OrderBy("name; DROP TABLE tool_sets", pagination.OrderByAsc).
+		FetchPage(ctx)
+	require.ErrorIs(t, invalid.Error, ErrInvalidListQuery)
 }
 
 // TestListToolSetGenerationsOrdering overrides the newest-first default and
@@ -281,37 +299,29 @@ func TestListToolSetGenerationsOrdering(t *testing.T) {
 		}
 	}
 
-	numbers := func(page ToolSetGenerationListPage) []uint64 {
-		result := make([]uint64, 0, len(page.Items))
-		for _, item := range page.Items {
-			result = append(result, item.Generation)
-		}
-		return result
-	}
-
 	// Ascending generation order continues correctly through the cursor.
-	page, err := db.ListToolSetGenerations(ctx, ToolSetGenerationListQuery{
-		ToolSetId:    toolSet.Id,
-		Limit:        2,
-		OrderByField: ToolSetGenerationOrderByGeneration,
-		OrderBy:      pagination.OrderByAsc,
-	})
+	page := db.ListToolSetGenerationsBuilder().
+		ForToolSetId(toolSet.Id).
+		Limit(2).
+		OrderBy(ToolSetGenerationOrderByGeneration, pagination.OrderByAsc).
+		FetchPage(ctx)
+	require.Equal(t, []uint64{1, 2}, generationNumbersForTest(t, page))
+	listing, err := db.ListToolSetGenerationsFromCursor(ctx, page.Cursor)
 	require.NoError(t, err)
-	require.Equal(t, []uint64{1, 2}, numbers(page))
-	next, err := db.ListToolSetGenerationsFromCursor(ctx, page.Cursor)
-	require.NoError(t, err)
-	require.Equal(t, []uint64{3}, numbers(next))
+	require.Equal(t, []uint64{3}, generationNumbersForTest(t, listing.FetchPage(ctx)))
 
 	// State sorts as text: active, draft, primary.
-	page, err = db.ListToolSetGenerations(ctx, ToolSetGenerationListQuery{
-		ToolSetId:    toolSet.Id,
-		Limit:        10,
-		OrderByField: ToolSetGenerationOrderByState,
-	})
-	require.NoError(t, err)
-	require.Equal(t, []uint64{1, 3, 2}, numbers(page))
+	page = db.ListToolSetGenerationsBuilder().
+		ForToolSetId(toolSet.Id).
+		Limit(10).
+		OrderBy(ToolSetGenerationOrderByState, pagination.OrderByAsc).
+		FetchPage(ctx)
+	require.Equal(t, []uint64{1, 3, 2}, generationNumbersForTest(t, page))
 
 	// Unknown columns never reach SQL.
-	_, err = db.ListToolSetGenerations(ctx, ToolSetGenerationListQuery{ToolSetId: toolSet.Id, Limit: 1, OrderByField: "bogus"})
-	require.Error(t, err)
+	invalid := db.ListToolSetGenerationsBuilder().
+		ForToolSetId(toolSet.Id).
+		OrderBy("bogus", pagination.OrderByAsc).
+		FetchPage(ctx)
+	require.ErrorIs(t, invalid.Error, ErrInvalidListQuery)
 }
