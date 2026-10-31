@@ -193,6 +193,41 @@ func TestAuthorizeToolInvocationTargetScope(t *testing.T) {
 	}
 }
 
+// TestAuthorizeToolInvocationCapturesActor keeps later request-actor mutations
+// out of the lazy HTTP client's attribution without retaining permission grants.
+func TestAuthorizeToolInvocationCapturesActor(t *testing.T) {
+	// Authorize a request whose identity and labels will later be edited by its owner.
+	f := newToolAuthorizationFixture(t, []string{"tool:read"})
+	f.expectCapturedDefinition()
+	auth := toolInvocationAuth(toolInvocationGrant("tool:read"), nil)
+	actor := auth.GetActor()
+	actor.Name = "reader"
+	actor.ExternalId = "owner-42"
+	actor.Labels = map[string]string{"team": "support"}
+	actor.Annotations = map[string]string{"note": "captured"}
+	originalID := actor.Id
+
+	got, err := f.service.authorizeToolInvocation(context.Background(), auth, f.snapshot.Revision.ToolId, nil)
+	require.NoError(t, err)
+	require.NotSame(t, actor, got.actor)
+	require.NotEmpty(t, actor.Permissions)
+	require.Nil(t, got.actor.Permissions, "attribution must not carry authority into execution")
+
+	// Preparation and first Do must use the original actor's detached attribution.
+	actor.Id = apid.New(apid.PrefixActor)
+	actor.Name = "changed"
+	actor.ExternalId = "changed"
+	actor.Namespace = "root.other"
+	actor.Labels["team"] = "changed"
+	actor.Annotations["note"] = "changed"
+	require.Equal(t, originalID, got.actor.Id)
+	require.EqualValues(t, "reader", got.actor.Name)
+	require.Equal(t, "owner-42", got.actor.ExternalId)
+	require.Equal(t, "root", got.actor.Namespace)
+	require.Equal(t, map[string]string{"team": "support"}, got.actor.Labels)
+	require.Equal(t, map[string]string{"note": "captured"}, got.actor.Annotations)
+}
+
 // TestAuthorizeToolInvocationRevisionCheck follows alias authorization so an
 // unauthorized caller cannot use expectedRevision to inspect a hidden Tool.
 func TestAuthorizeToolInvocationRevisionCheck(t *testing.T) {

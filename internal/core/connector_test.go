@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -263,4 +264,57 @@ func NewTestConnector(c cschema.ConnectorDefinition) *Connector {
 	}
 
 	return wrapConnector(dbConnector, &service{encrypt: e, logger: aplog.NewNoopLogger()})
+}
+
+// TestConnectorDefinitionContextRetry keeps failed or canceled loads out of the
+// cache, while successful admission preloading serves the legacy lazy getters.
+func TestConnectorDefinitionContextRetry(t *testing.T) {
+	for _, name := range []string{"decrypt failure", "decode failure", "canceled during decrypt"} {
+		t.Run(name, func(t *testing.T) {
+			// The first contextual load fails without poisoning the captured generation.
+			s, _, _, _, _, encryption := FullMockService(t, gomock.NewController(t))
+			stored := database.ConnectorWithDefinition{
+				Id: apid.New(apid.PrefixConnector), Generation: 3,
+				EncryptedDefinition: encfield.EncryptedField{Data: "captured-definition"},
+			}
+			connector := wrapConnector(stored, s)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			loadFailure := errors.New("decryption failed")
+			encryption.EXPECT().DecryptString(ctx, stored.EncryptedDefinition).DoAndReturn(func(context.Context, encfield.EncryptedField) (string, error) {
+				switch name {
+				case "decrypt failure":
+					return "", loadFailure
+				case "decode failure":
+					return "{", nil
+				default:
+					cancel()
+					return `{"displayName":"Canceled"}`, nil
+				}
+			})
+			definition, err := connector.getDefinitionWithContext(ctx)
+			require.Error(t, err)
+			require.Nil(t, definition)
+			require.Nil(t, connector.def)
+			if name == "decrypt failure" {
+				require.ErrorIs(t, err, loadFailure)
+			} else if name == "canceled during decrypt" {
+				require.ErrorIs(t, err, context.Canceled)
+			}
+
+			// A new live context can retry, then future getters use the cached result.
+			encryption.EXPECT().DecryptString(context.Background(), stored.EncryptedDefinition).
+				Return(`{"displayName":"Captured"}`, nil)
+			definition, err = connector.getDefinitionWithContext(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, "Captured", definition.DisplayName)
+			require.Same(t, definition, connector.GetDefinition())
+
+			// Even a cached definition does not make a canceled contextual call succeed.
+			cancel()
+			definition, err = connector.getDefinitionWithContext(ctx)
+			require.ErrorIs(t, err, context.Canceled)
+			require.Nil(t, definition)
+		})
+	}
 }

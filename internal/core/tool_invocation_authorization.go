@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -25,6 +26,11 @@ type authorizedToolInvocation struct {
 	// permission checks and eventual execution use this same definition: a new
 	// revision cannot substitute different aliases or code after authorization.
 	definition toolschema.ToolDefinition
+
+	// actor owns attribution captured at authorization. The lazy HTTP client's
+	// middleware must not observe later changes to the request actor's identity
+	// or labels. Permissions are consumed above this boundary and are not copied.
+	actor *authcore.Actor
 }
 
 // authorizeToolInvocation captures a live Tool and authorizes at least one of
@@ -93,9 +99,16 @@ func (s *service) authorizeToolInvocation(
 		if expectedRevision != nil && *expectedRevision != snapshot.Revision.Revision {
 			return nil, ErrToolRevisionChanged
 		}
+
+		actor := *ra.GetActor()
+		actor.Labels = maps.Clone(actor.Labels)
+		actor.Annotations = maps.Clone(actor.Annotations)
+		actor.Permissions = nil
+
 		return &authorizedToolInvocation{
 			snapshot:   snapshot,
 			definition: definition,
+			actor:      &actor,
 		}, nil
 	}
 
