@@ -4485,6 +4485,12 @@ const docTemplateApi = `{
                         "description": "Filter by label selector",
                         "name": "labelSelector",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Order by id, namespace, name, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id.",
+                        "name": "orderBy",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -4839,6 +4845,12 @@ const docTemplateApi = `{
                         "description": "Filter by label selector",
                         "name": "labelSelector",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Order by id, namespace, name, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id.",
+                        "name": "orderBy",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -5146,7 +5158,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List a ToolSet's generations, newest first. Each projects the current shared connection selector.",
+                "description": "List a ToolSet's generations, newest first by default. Each projects the current shared connection selector.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5175,6 +5187,12 @@ const docTemplateApi = `{
                         "type": "integer",
                         "description": "Maximum number of results to return (default 50, max 100)",
                         "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to newest generation first.",
+                        "name": "orderBy",
                         "in": "query"
                     }
                 ],

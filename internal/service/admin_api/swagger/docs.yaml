@@ -5498,6 +5498,11 @@ paths:
         in: query
         name: labelSelector
         type: string
+      - description: Order by id, namespace, name, created_at, or updated_at, optionally
+          followed by asc or desc (e.g., 'created_at desc'). Defaults to id.
+        in: query
+        name: orderBy
+        type: string
       produces:
       - application/json
       responses:
@@ -5731,6 +5736,11 @@ paths:
         in: query
         name: labelSelector
         type: string
+      - description: Order by id, namespace, name, created_at, or updated_at, optionally
+          followed by asc or desc (e.g., 'created_at desc'). Defaults to id.
+        in: query
+        name: orderBy
+        type: string
       produces:
       - application/json
       responses:
@@ -5942,8 +5952,8 @@ paths:
     get:
       consumes:
       - application/json
-      description: List a ToolSet's generations, newest first. Each projects the current
-        shared connection selector.
+      description: List a ToolSet's generations, newest first by default. Each projects
+        the current shared connection selector.
       parameters:
       - description: ToolSet ID
         in: path
@@ -5958,6 +5968,12 @@ paths:
         in: query
         name: limit
         type: integer
+      - description: Order by generation, state, created_at, or updated_at, optionally
+          followed by asc or desc (e.g., 'created_at desc'). Defaults to newest generation
+          first.
+        in: query
+        name: orderBy
+        type: string
       produces:
       - application/json
       responses:
