@@ -49,7 +49,10 @@ func (s *service) prepareToolInvocation(
 		return nil, err
 	}
 
-	if authorized == nil || authorized.snapshot == nil || authorized.actor == nil || authorized.actor.Id.IsNil() {
+	if authorized == nil ||
+		authorized.snapshot == nil ||
+		authorized.actor == nil ||
+		authorized.actor.Id.IsNil() {
 		return nil, fmt.Errorf("%w: an authorized tool invocation is required", ErrInvalidArgument)
 	}
 
@@ -79,6 +82,7 @@ func (s *service) prepareToolInvocation(
 	storedConnection.Annotations = maps.Clone(storedConnection.Annotations)
 	storedConnection.EncryptedConfiguration = util.CloneValue(storedConnection.EncryptedConfiguration)
 	connection := wrapConnection(&storedConnection, connector, s)
+
 	cfg, err := connection.GetConfiguration(ctx)
 	if err != nil {
 		return nil, err

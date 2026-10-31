@@ -144,7 +144,9 @@ func (c *Connector) getDefinition() (*cschema.ConnectorDefinition, error) {
 // getDefinitionWithContext decrypts this captured generation's definition on
 // first use and caches the decoded value. Decryption observes the caller's
 // cancellation; failed or canceled loads leave the cache empty for a later try.
-func (c *Connector) getDefinitionWithContext(ctx context.Context) (*cschema.ConnectorDefinition, error) {
+func (c *Connector) getDefinitionWithContext(
+	ctx context.Context,
+) (*cschema.ConnectorDefinition, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -159,7 +161,10 @@ func (c *Connector) getDefinitionWithContext(ctx context.Context) (*cschema.Conn
 	c.defMu.Lock()
 	defer c.defMu.Unlock()
 	if c.def == nil {
-		decrypted, err := c.s.encrypt.DecryptString(ctx, c.ConnectorWithDefinition.EncryptedDefinition)
+		decrypted, err := c.s.encrypt.DecryptString(
+			ctx,
+			c.ConnectorWithDefinition.EncryptedDefinition,
+		)
 		if err != nil {
 			return nil, err
 		}
