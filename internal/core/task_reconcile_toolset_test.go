@@ -32,6 +32,10 @@ type toolSetReconcileTest struct {
 	db       database.DB
 	service  *service
 	enqueued *[]*asynq.Task
+
+	// onEnqueue, when set, runs as each task is enqueued. It stands in for a
+	// worker that picks a task up immediately, before the caller continues.
+	onEnqueue func(ctx context.Context, task *asynq.Task)
 }
 
 // newToolSetReconcileTest creates the namespaces the scenarios select across.
@@ -45,22 +49,24 @@ func newToolSetReconcileTest(t *testing.T) *toolSetReconcileTest {
 	cfg, e := encrypt.NewTestEncryptService(cfg, db)
 
 	// Record every enqueued task so trigger tests can assert on them.
-	enqueued := &[]*asynq.Task{}
+	r := &toolSetReconcileTest{ctx: context.Background(), db: db, enqueued: &[]*asynq.Task{}}
 	ac := mock.NewMockClient(gomock.NewController(t))
 	ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
-			*enqueued = append(*enqueued, task)
+		DoAndReturn(func(ctx context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+			*r.enqueued = append(*r.enqueued, task)
+			if r.onEnqueue != nil {
+				r.onEnqueue(ctx, task)
+			}
 			return nil, nil
 		}).AnyTimes()
 
-	s := NewCoreService(cfg, db, e, rds, h, ac, aplog.NewNoopLogger()).(*service)
+	r.service = NewCoreService(cfg, db, e, rds, h, ac, aplog.NewNoopLogger()).(*service)
 
-	ctx := context.Background()
 	for _, path := range []string{"root.team_a", "root.team_a.sub", "root.teamXa"} {
-		require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: path}))
+		require.NoError(t, db.CreateNamespace(r.ctx, &database.Namespace{Path: path}))
 	}
 
-	return &toolSetReconcileTest{ctx: ctx, db: db, service: s, enqueued: enqueued}
+	return r
 }
 
 // connection stores a connection with the supplied placement, state, and labels.
@@ -417,6 +423,106 @@ func TestToolSetChangesEnqueueReconcile(t *testing.T) {
 	_, err = r.service.UpdateToolSetGeneration(r.ctx, id, 1, releasePatch(toolsetschema.ToolSetReleaseStatePrimary, nil))
 	require.NoError(t, err)
 	require.Len(t, *r.enqueued, 3)
+}
+
+// TestUpdateToolSetCombinedPatchReconcile covers one patch changing the selector
+// and publishing a generation, which commit as separate writes.
+func TestUpdateToolSetCombinedPatchReconcile(t *testing.T) {
+	calendar := map[string]string{"provider": "calendar"}
+	crm := map[string]string{"provider": "crm"}
+
+	// combinedPatch selects crm connections and publishes a search-only generation.
+	combinedPatch := func() *toolsetschema.ToolSetPatch {
+		patch := releasePatch(toolsetschema.ToolSetReleaseStatePrimary, &toolsetschema.ToolSetDefinition{
+			Source: toolsetschema.ToolSetSource{
+				Explicit: &toolsetschema.ExplicitSource{Tools: []toolsetschema.ToolTemplate{toolTemplate("search")}},
+			},
+		})
+		patch.Spec.ConnectionSelector = &toolsetschema.ConnectionSelector{MatchLabels: crm}
+		return patch
+	}
+
+	t.Run("a worker starting at any enqueue installs the new primary", func(t *testing.T) {
+		r := newToolSetReconcileTest(t)
+		id := r.toolSet(t, "calendar-tools", toolsetschema.ToolSetReleaseStatePrimary, toolTemplate("list"))
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+
+		// The connection only matches once the patch's selector applies.
+		connection := r.connection(t, "root.team_a", "crm", database.ConnectionStateConfigured, crm)
+
+		// Finish a pass inside every enqueue, as the fastest possible worker would.
+		passes := 0
+		r.onEnqueue = func(ctx context.Context, _ *asynq.Task) {
+			passes++
+			require.NoError(t, r.service.reconcileToolSet(ctx, id))
+		}
+		updated, err := r.service.UpdateToolSet(r.ctx, id, combinedPatch())
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), updated.GetGeneration())
+		require.Positive(t, passes)
+
+		// No pass ran early enough to pin the connection to generation 1.
+		binding, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+		require.NoError(t, err)
+		require.Equal(t, uint64(2), *binding.AppliedGeneration)
+		require.Equal(t, "search", r.generatedTools(t, binding)[0].SourceKey)
+	})
+
+	t.Run("a committed selector still reconciles when publication fails", func(t *testing.T) {
+		r := newToolSetReconcileTest(t)
+		id := r.toolSet(t, "calendar-tools", toolsetschema.ToolSetReleaseStatePrimary, toolTemplate("list"))
+		matching := r.connection(t, "root.team_a", "calendar", database.ConnectionStateConfigured, calendar)
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+		dropped, err := r.db.GetToolSetBindingForConnection(r.ctx, id, matching.Id)
+		require.NoError(t, err)
+
+		// Cancel the request right after the selector commits, so everything the
+		// patch does next fails and the enqueue has only that canceled context.
+		ctx, cancel := context.WithCancel(r.ctx)
+		defer cancel()
+		r.service.db = &cancelAfterSelectorDB{DB: r.db, cancel: cancel}
+		var enqueueErr error
+		r.onEnqueue = func(ctx context.Context, _ *asynq.Task) { enqueueErr = ctx.Err() }
+		*r.enqueued = nil
+
+		_, err = r.service.UpdateToolSet(ctx, id, combinedPatch())
+		require.ErrorIs(t, err, context.Canceled)
+
+		// The update failed, but its selector stands and one pass was still requested
+		// on a context that can reach the queue.
+		stored, err := r.db.GetToolSet(r.ctx, id)
+		require.NoError(t, err)
+		require.Equal(t, crm, stored.ConnectionSelector.MatchLabels)
+		require.Len(t, *r.enqueued, 1)
+		require.NoError(t, enqueueErr)
+
+		// That pass applies the committed selector and removes the stale binding,
+		// which leaves generation 1 as the only one published.
+		r.service.db = r.db
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+		_, err = r.db.GetToolSetBindingForConnection(r.ctx, id, matching.Id)
+		require.ErrorIs(t, err, database.ErrNotFound)
+		require.Empty(t, r.generatedTools(t, dropped))
+	})
+}
+
+// cancelAfterSelectorDB cancels the request context once a selector update has
+// committed, simulating a client that goes away partway through a combined patch.
+type cancelAfterSelectorDB struct {
+	database.DB
+	cancel context.CancelFunc
+}
+
+// UpdateToolSetConnectionSelector commits through the real database, then cancels.
+func (d *cancelAfterSelectorDB) UpdateToolSetConnectionSelector(
+	ctx context.Context,
+	id apid.ID,
+	expectedRevision uint64,
+	selector toolsetschema.ConnectionSelector,
+) (*database.ToolSet, error) {
+	logical, err := d.DB.UpdateToolSetConnectionSelector(ctx, id, expectedRevision, selector)
+	d.cancel()
+	return logical, err
 }
 
 // TestReconcileToolSetTask covers payload handling in the asynq handler.

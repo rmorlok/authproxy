@@ -109,6 +109,11 @@ func (s *service) CreateToolSet(
 // intent without a definition is a no-op while a primary exists, matching the
 // ToolSet generation policy; pending drafts publish through the generation
 // endpoint, or by resending their definition with primary intent.
+//
+// A selector change and a publication in one patch commit as separate writes, so
+// a selector change only requests reconciliation once the whole patch finishes.
+// Requesting it sooner would let a worker install the outgoing primary on newly
+// selected connections, and pins keep them there after the publication.
 func (s *service) UpdateToolSet(
 	ctx context.Context,
 	id apid.ID,
@@ -146,6 +151,15 @@ func (s *service) UpdateToolSet(
 		}
 	}
 
+	// The selector write stands even if a later step fails, including because the
+	// request was canceled, so the pass must not depend on the request's context.
+	selectorChanged := false
+	defer func() {
+		if selectorChanged {
+			s.enqueueToolSetReconcile(context.WithoutCancel(ctx), id)
+		}
+	}()
+
 	if patch.Spec.HasConnectionSelector() {
 		selector := defaultToolSetSelector(*desired.Spec.ConnectionSelector, logical.Namespace)
 
@@ -155,7 +169,7 @@ func (s *service) UpdateToolSet(
 			if logical, err = s.db.UpdateToolSetConnectionSelector(ctx, id, logical.SelectorRevision, selector); err != nil {
 				return nil, mapToolSetDatabaseError(err)
 			}
-			s.enqueueToolSetReconcile(ctx, id)
+			selectorChanged = true
 		}
 	}
 
