@@ -433,8 +433,10 @@ type DB interface {
 	// unlimited. Drift is rare under normal operation, but this method
 	// is the safety net for any propagation task that misfired or any
 	// data path that bypassed the carry-forward triggers. Intended to be
-	// invoked from a daily asynq cron task. Returns the total number of
-	// rows whose labels were corrected.
+	// invoked from a daily asynq cron task. Progress is checkpointed in the
+	// database, so a call continues any unfinished sweep; cancel ctx to stop
+	// a run early and let a later call pick up from there. Returns the number
+	// of rows whose labels were corrected by this call.
 	ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (corrected int64, err error)
 
 	/*
