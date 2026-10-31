@@ -31,22 +31,39 @@ import (
 // executionLimits leaves room for normal requests while bounding every layer.
 func executionLimits() httpexec.Limits {
 	return httpexec.Limits{
-		Render: render.Limits{MaxBytes: 32768, MaxDepth: 32, MaxSteps: 10000},
+		Render: render.Limits{
+			MaxBytes: 32768,
+			MaxDepth: 32,
+			MaxSteps: 10000,
+		},
 		Validation: validation.Limits{
-			MaxInputBytes: 16384, MaxOutputBytes: 16384, MaxDepth: 32,
-			MaxValues: 10000, MaxNumberDigits: 128,
+			MaxInputBytes:   16384,
+			MaxOutputBytes:  16384,
+			MaxDepth:        32,
+			MaxValues:       10000,
+			MaxNumberDigits: 128,
 		},
 		Response: httpcodec.ResponseLimits{
-			MaxSourceBytes: 4096, MaxResponseBytes: 16384,
-			MaxOutputBytes: 16384, MaxEncodedResultBytes: 32768,
+			MaxSourceBytes:        4096,
+			MaxResponseBytes:      16384,
+			MaxOutputBytes:        16384,
+			MaxEncodedResultBytes: 32768,
 			Transform: javascript.Limits{
-				MaxSourceBytes: 4096, MaxInputBytes: 32768, MaxOutputBytes: 16384,
-				MaxDepth: 32, MaxNodes: 10000, MaxStackDepth: 128, Timeout: time.Second,
+				MaxSourceBytes: 4096,
+				MaxInputBytes:  32768,
+				MaxOutputBytes: 16384,
+				MaxDepth:       32,
+				MaxNodes:       10000,
+				MaxStackDepth:  128,
+				Timeout:        time.Second,
 			},
 		},
 		HTTP: httphost.Limits{
-			Timeout: 2 * time.Second, MaxRequests: 1, MaxResponseBytes: 16384,
-			MaxStreamBytes: 16384, MaxHeaderBytes: 4096,
+			Timeout:          2 * time.Second,
+			MaxRequests:      1,
+			MaxResponseBytes: 16384,
+			MaxStreamBytes:   16384,
+			MaxHeaderBytes:   4096,
 		},
 	}
 }
@@ -54,19 +71,26 @@ func executionLimits() httpexec.Limits {
 // executionDefinition provides the smallest ordinary HTTP Tool contract.
 func executionDefinition() tools.ToolDefinition {
 	return tools.ToolDefinition{
-		Description: "Read a contact", Verbs: []string{"read"},
+		Description: "Read a contact",
+		Verbs:       []string{"read"},
 		InputSchema: common.RawJSON(`{"type":"object"}`),
-		ProxyHTTP:   &tools.ProxyHTTP{Method: "GET", URL: "https://example.test/contact"},
+		ProxyHTTP: &tools.ProxyHTTP{
+			Method: "GET",
+			URL:    "https://example.test/contact",
+		},
 	}
 }
 
 // executionInvocation supplies valid captured identities and caller arguments.
 func executionInvocation() httpexec.Invocation {
 	return httpexec.Invocation{
-		ID: "tiv_01example0000001", Arguments: common.RawJSON(`{}`),
+		ID:        "tiv_01example0000001",
+		Arguments: common.RawJSON(`{}`),
 		Snapshot: render.Input{
-			ToolID: "tol_01example0000001", Revision: 7,
-			ConnectionID: "cxn_01example0000001", ConnectionNamespace: "root.product.owner",
+			ToolID:              "tol_01example0000001",
+			Revision:            7,
+			ConnectionID:        "cxn_01example0000001",
+			ConnectionNamespace: "root.product.owner",
 		},
 	}
 }
@@ -95,7 +119,11 @@ func (b *executionBody) Close() error { b.closes.Add(1); return nil }
 
 // executionResponse wraps ordinary JSON in an observable provider stream.
 func executionResponse(body *executionBody) *http.Response {
-	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: body}
+	return &http.Response{
+		StatusCode: 200,
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       body,
+	}
 }
 
 // compileExecution requires a reusable program for an authored definition.

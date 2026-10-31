@@ -42,18 +42,25 @@ func Compile(definition toolschema.ToolDefinition, limits Limits) (*Program, err
 	if definition.ProxyHTTP == nil || definition.Javascript != nil {
 		return nil, errors.New("HTTP Tool requires only the proxyHttp executor")
 	}
-	if limits.HTTP.Timeout <= 0 || limits.HTTP.MaxRequests <= 0 ||
-		limits.HTTP.MaxResponseBytes <= 0 || limits.HTTP.MaxStreamBytes <= 0 || limits.HTTP.MaxHeaderBytes <= 0 {
+
+	if limits.HTTP.Timeout <= 0 ||
+		limits.HTTP.MaxRequests <= 0 ||
+		limits.HTTP.MaxResponseBytes <= 0 ||
+		limits.HTTP.MaxStreamBytes <= 0 ||
+		limits.HTTP.MaxHeaderBytes <= 0 {
 		return nil, errors.New("HTTP Tool host limits must all be positive")
 	}
+
 	schemas, err := validation.Compile(definition.InputSchema, definition.OutputSchema, limits.Validation)
 	if err != nil {
 		return nil, err
 	}
+
 	request, err := httpcodec.CompileRequest(definition.ProxyHTTP, limits.Render)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP Tool request: %w", err)
 	}
+
 	response, err := httpcodec.CompileResponse(definition.ProxyHTTP.Response, limits.Response)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP Tool response: %w", err)
@@ -62,5 +69,11 @@ func Compile(definition toolschema.ToolDefinition, limits Limits) (*Program, err
 	// This executor performs one logical request. Enforce the smaller response
 	// allowance during reading, before allocating a body the mapper would reject.
 	limits.HTTP.MaxResponseBytes = min(limits.HTTP.MaxResponseBytes, int64(limits.Response.MaxResponseBytes))
-	return &Program{request: request, response: response, schemas: schemas, limits: limits}, nil
+
+	return &Program{
+		request:  request,
+		response: response,
+		schemas:  schemas,
+		limits:   limits,
+	}, nil
 }
