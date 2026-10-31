@@ -64,6 +64,12 @@ Each schema is limited to 256 KiB and 64 nested JSON containers. Dialect checks
 apply at compiled schema locations; unused definitions are checked when a
 reference makes them part of the compiled schema.
 
+`CompileInputSchema` and `CompileOutputSchema` expose that same compiler for
+runtime reuse. They return validators that own their parsed source; callers must
+not mutate the compiled validators. The execution-facing
+[validation package](../../../tools/validation/README.md) adds bounded argument
+decoding, exact numbers, optional output checks, and safe invocation errors.
+
 `proxyHttp` permits no body or one of `bodyJson`, `bodyTemplate`, `bodyRaw`,
 `form`, and `multipart`. `bodyJson: null` is a present JSON body and stays
 distinct from omission in both JSON and YAML. Structured values preserve their

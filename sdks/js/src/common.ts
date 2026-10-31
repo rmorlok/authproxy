@@ -3,6 +3,12 @@ export const API_VERSION = 'authproxy.net/v1alpha1' as const;
 
 export type ApiVersion = typeof API_VERSION;
 
+/**
+ * Evidence across all target attempts in a proxied request. `sent` confirms
+ * a target HTTP response, not application success; missing evidence is unknown.
+ */
+export type SendEvidence = 'notSent' | 'mayHaveSent' | 'sent';
+
 /** Kinds that identify durable, client-managed AuthProxy resources. */
 export type ManagedResourceKind =
   | 'Actor'

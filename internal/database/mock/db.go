@@ -1191,6 +1191,21 @@ func (mr *MockDBMockRecorder) GetTool(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTool", reflect.TypeOf((*MockDB)(nil).GetTool), ctx, id)
 }
 
+// GetToolExecutionSnapshot mocks base method.
+func (m *MockDB) GetToolExecutionSnapshot(ctx context.Context, id apid.ID) (*database.ToolExecutionSnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolExecutionSnapshot", ctx, id)
+	ret0, _ := ret[0].(*database.ToolExecutionSnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolExecutionSnapshot indicates an expected call of GetToolExecutionSnapshot.
+func (mr *MockDBMockRecorder) GetToolExecutionSnapshot(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolExecutionSnapshot", reflect.TypeOf((*MockDB)(nil).GetToolExecutionSnapshot), ctx, id)
+}
+
 // GetToolRevision mocks base method.
 func (m *MockDB) GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*database.ToolRevision, error) {
 	m.ctrl.T.Helper()
@@ -1634,26 +1649,54 @@ func (mr *MockDBMockRecorder) ListToolCandidatesFromCursor(ctx, cursor interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolCandidatesFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolCandidatesFromCursor), ctx, cursor)
 }
 
-// ListToolSetGenerations mocks base method.
-func (m *MockDB) ListToolSetGenerations(ctx context.Context, query database.ToolSetGenerationListQuery) (database.ToolSetGenerationListPage, error) {
+// ListToolSetBindingsBuilder mocks base method.
+func (m *MockDB) ListToolSetBindingsBuilder() database.ListToolSetBindingsBuilder {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListToolSetGenerations", ctx, query)
-	ret0, _ := ret[0].(database.ToolSetGenerationListPage)
+	ret := m.ctrl.Call(m, "ListToolSetBindingsBuilder")
+	ret0, _ := ret[0].(database.ListToolSetBindingsBuilder)
+	return ret0
+}
+
+// ListToolSetBindingsBuilder indicates an expected call of ListToolSetBindingsBuilder.
+func (mr *MockDBMockRecorder) ListToolSetBindingsBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetBindingsBuilder", reflect.TypeOf((*MockDB)(nil).ListToolSetBindingsBuilder))
+}
+
+// ListToolSetBindingsFromCursor mocks base method.
+func (m *MockDB) ListToolSetBindingsFromCursor(ctx context.Context, cursor string) (database.ListToolSetBindingsExecutor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetBindingsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListToolSetBindingsExecutor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListToolSetGenerations indicates an expected call of ListToolSetGenerations.
-func (mr *MockDBMockRecorder) ListToolSetGenerations(ctx, query interface{}) *gomock.Call {
+// ListToolSetBindingsFromCursor indicates an expected call of ListToolSetBindingsFromCursor.
+func (mr *MockDBMockRecorder) ListToolSetBindingsFromCursor(ctx, cursor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetGenerations", reflect.TypeOf((*MockDB)(nil).ListToolSetGenerations), ctx, query)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetBindingsFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolSetBindingsFromCursor), ctx, cursor)
+}
+
+// ListToolSetGenerationsBuilder mocks base method.
+func (m *MockDB) ListToolSetGenerationsBuilder() database.ListToolSetGenerationsBuilder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetGenerationsBuilder")
+	ret0, _ := ret[0].(database.ListToolSetGenerationsBuilder)
+	return ret0
+}
+
+// ListToolSetGenerationsBuilder indicates an expected call of ListToolSetGenerationsBuilder.
+func (mr *MockDBMockRecorder) ListToolSetGenerationsBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetGenerationsBuilder", reflect.TypeOf((*MockDB)(nil).ListToolSetGenerationsBuilder))
 }
 
 // ListToolSetGenerationsFromCursor mocks base method.
-func (m *MockDB) ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (database.ToolSetGenerationListPage, error) {
+func (m *MockDB) ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (database.ListToolSetGenerationsExecutor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListToolSetGenerationsFromCursor", ctx, cursor)
-	ret0, _ := ret[0].(database.ToolSetGenerationListPage)
+	ret0, _ := ret[0].(database.ListToolSetGenerationsExecutor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1664,26 +1707,25 @@ func (mr *MockDBMockRecorder) ListToolSetGenerationsFromCursor(ctx, cursor inter
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetGenerationsFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolSetGenerationsFromCursor), ctx, cursor)
 }
 
-// ListToolSets mocks base method.
-func (m *MockDB) ListToolSets(ctx context.Context, query database.ToolSetListQuery) (database.ToolSetListPage, error) {
+// ListToolSetsBuilder mocks base method.
+func (m *MockDB) ListToolSetsBuilder() database.ListToolSetsBuilder {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListToolSets", ctx, query)
-	ret0, _ := ret[0].(database.ToolSetListPage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "ListToolSetsBuilder")
+	ret0, _ := ret[0].(database.ListToolSetsBuilder)
+	return ret0
 }
 
-// ListToolSets indicates an expected call of ListToolSets.
-func (mr *MockDBMockRecorder) ListToolSets(ctx, query interface{}) *gomock.Call {
+// ListToolSetsBuilder indicates an expected call of ListToolSetsBuilder.
+func (mr *MockDBMockRecorder) ListToolSetsBuilder() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSets", reflect.TypeOf((*MockDB)(nil).ListToolSets), ctx, query)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetsBuilder", reflect.TypeOf((*MockDB)(nil).ListToolSetsBuilder))
 }
 
 // ListToolSetsFromCursor mocks base method.
-func (m *MockDB) ListToolSetsFromCursor(ctx context.Context, cursor string) (database.ToolSetListPage, error) {
+func (m *MockDB) ListToolSetsFromCursor(ctx context.Context, cursor string) (database.ListToolSetsExecutor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListToolSetsFromCursor", ctx, cursor)
-	ret0, _ := ret[0].(database.ToolSetListPage)
+	ret0, _ := ret[0].(database.ListToolSetsExecutor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -1694,26 +1736,25 @@ func (mr *MockDBMockRecorder) ListToolSetsFromCursor(ctx, cursor interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetsFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolSetsFromCursor), ctx, cursor)
 }
 
-// ListTools mocks base method.
-func (m *MockDB) ListTools(ctx context.Context, query database.ToolListQuery) (database.ToolListPage, error) {
+// ListToolsBuilder mocks base method.
+func (m *MockDB) ListToolsBuilder() database.ListToolsBuilder {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTools", ctx, query)
-	ret0, _ := ret[0].(database.ToolListPage)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "ListToolsBuilder")
+	ret0, _ := ret[0].(database.ListToolsBuilder)
+	return ret0
 }
 
-// ListTools indicates an expected call of ListTools.
-func (mr *MockDBMockRecorder) ListTools(ctx, query interface{}) *gomock.Call {
+// ListToolsBuilder indicates an expected call of ListToolsBuilder.
+func (mr *MockDBMockRecorder) ListToolsBuilder() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTools", reflect.TypeOf((*MockDB)(nil).ListTools), ctx, query)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolsBuilder", reflect.TypeOf((*MockDB)(nil).ListToolsBuilder))
 }
 
 // ListToolsFromCursor mocks base method.
-func (m *MockDB) ListToolsFromCursor(ctx context.Context, cursor string) (database.ToolListPage, error) {
+func (m *MockDB) ListToolsFromCursor(ctx context.Context, cursor string) (database.ListToolsExecutor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListToolsFromCursor", ctx, cursor)
-	ret0, _ := ret[0].(database.ToolListPage)
+	ret0, _ := ret[0].(database.ListToolsExecutor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

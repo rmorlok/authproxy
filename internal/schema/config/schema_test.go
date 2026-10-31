@@ -149,7 +149,8 @@ func Test_SchemaAppMetricsShape(t *testing.T) {
 			"setupTtl": "1s",
 		},
 		"tasks": map[string]any{
-			"defaultRetention": "24h",
+			"defaultRetention":  "24h",
+			"workflowRetention": "720h",
 		},
 	}))
 }

@@ -207,59 +207,92 @@ func checkRequestSource(source *tools.ProxyHTTP, limits render.Limits) error {
 // replayability does not authorize new retries. Errors return no partial request
 // and never include rendered URL/header/configuration values.
 func (r *Request) Render(ctx context.Context, data *render.Context) (*http.Request, error) {
-	if r == nil || r.envelope == nil || ctx == nil || data == nil {
+	if r == nil ||
+		r.envelope == nil ||
+		ctx == nil ||
+		data == nil {
 		return nil, errors.New("request program, context, and invocation data are required")
 	}
+
+	// Check context cancellation...
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
+	// Compute the URL + headers
 	envelope, err := r.envelope.Render(ctx, data)
 	if err != nil {
 		return nil, err
 	}
+
+	// Pull out the URL + headers
 	var values []string
 	if err := json.Unmarshal(envelope, &values); err != nil || len(values) != len(r.names)+1 {
 		return nil, errors.New("rendered request envelope must contain string fields")
 	}
+
+	// Render the query parameters from the data
 	query, err := r.query.Render(ctx, data)
 	if err != nil {
 		return nil, err
 	}
+
+	// Combine the query + rendered URL
 	u, err := prepareRequestURL(values[0], query)
 	if err != nil {
 		return nil, err
 	}
+
+	// Render the body with the data provided
 	body, err := r.body.Render(ctx, data)
 	if err != nil {
 		return nil, err
 	}
+
+	// construct the header map from the rendered values using the names for the
+	// headers. Both assume a sorted ordering to correlate.
 	fields := make(map[string]string, len(r.names))
 	for i, name := range r.names {
 		fields[name] = values[i+1]
 	}
+
 	headers, hostOverride, err := prepareRequestHeaders(fields, body, r.body.mode)
 	if err != nil {
 		return nil, err
 	}
+
 	urlText := u.String()
-	if err := checkPreparedRequestSize(r.method, urlText, hostOverride, headers, body.Bytes, r.limits.MaxBytes); err != nil {
+	if err := checkPreparedRequestSize(
+		r.method,
+		urlText,
+		hostOverride,
+		headers,
+		body.Bytes,
+		r.limits.MaxBytes,
+	); err != nil {
 		return nil, err
 	}
+
+	// Check context cancellation...
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	var reader io.Reader
 	if body.Present {
 		reader = bytes.NewReader(body.Bytes)
 	}
+
 	request, err := http.NewRequestWithContext(ctx, r.method, urlText, reader)
 	if err != nil {
 		return nil, errors.New("cannot prepare HTTP request")
 	}
+
 	request.Header = headers
 	if hostOverride != "" {
 		request.Host = hostOverride
 	}
+
 	return request, nil
 }
 

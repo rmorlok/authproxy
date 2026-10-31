@@ -146,13 +146,13 @@ type DB interface {
 	// annotations without touching the selector or any generation.
 	UpdateToolSetMetadata(ctx context.Context, id apid.ID, name scommon.ResourceName, userLabels map[string]string, annotations map[string]string) (*ToolSet, error)
 
-	// ListToolSets pages through live logical ToolSets within a namespace scope.
-	ListToolSets(ctx context.Context, query ToolSetListQuery) (ToolSetListPage, error)
-	ListToolSetsFromCursor(ctx context.Context, cursor string) (ToolSetListPage, error)
+	// ListToolSetsBuilder pages through live logical ToolSets within a namespace scope.
+	ListToolSetsBuilder() ListToolSetsBuilder
+	ListToolSetsFromCursor(ctx context.Context, cursor string) (ListToolSetsExecutor, error)
 
-	// ListToolSetGenerations pages through one live ToolSet's generations, newest first.
-	ListToolSetGenerations(ctx context.Context, query ToolSetGenerationListQuery) (ToolSetGenerationListPage, error)
-	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ToolSetGenerationListPage, error)
+	// ListToolSetGenerationsBuilder pages through one live ToolSet's generations, newest first.
+	ListToolSetGenerationsBuilder() ListToolSetGenerationsBuilder
+	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ListToolSetGenerationsExecutor, error)
 
 	// CreateToolSetGeneration allocates a new draft under a live parent. Only one
 	// live draft may exist, and historical generation numbers are never reused.
@@ -182,6 +182,12 @@ type DB interface {
 
 	// GetToolSetBindingForConnection finds the current assignment for a parent pair.
 	GetToolSetBindingForConnection(ctx context.Context, toolSetId apid.ID, connectionId apid.ID) (*ToolSetBinding, error)
+
+	// ListToolSetBindingsBuilder starts a listing of one connection's live assignments.
+	ListToolSetBindingsBuilder() ListToolSetBindingsBuilder
+
+	// ListToolSetBindingsFromCursor continues a binding listing with its saved filters.
+	ListToolSetBindingsFromCursor(ctx context.Context, cursor string) (ListToolSetBindingsExecutor, error)
 
 	// InstallExplicitToolSetInventory atomically pins a pending binding to its
 	// prepared primary generation and installs its complete first Tool inventory.
@@ -213,12 +219,12 @@ type DB interface {
 	// and limit. Callers must still authorize each returned candidate.
 	ListToolCandidatesFromCursor(ctx context.Context, cursor string) (ToolCandidatePage, error)
 
-	// ListTools pages live Tool identities for management, independent of
+	// ListToolsBuilder pages live Tool identities for management, independent of
 	// connection liveness. Callers must still check per-resource permissions.
-	ListTools(ctx context.Context, query ToolListQuery) (ToolListPage, error)
+	ListToolsBuilder() ListToolsBuilder
 
 	// ListToolsFromCursor resumes a management listing with its saved filters.
-	ListToolsFromCursor(ctx context.Context, cursor string) (ToolListPage, error)
+	ListToolsFromCursor(ctx context.Context, cursor string) (ListToolsExecutor, error)
 
 	// UpdateStandaloneTool appends a revision and switches the pointer only if the observed revision is current.
 	UpdateStandaloneTool(ctx context.Context, tool *Tool, expectedRevision uint64, definition encfield.EncryptedField, digest string) (*ToolRevision, error)
@@ -226,8 +232,13 @@ type DB interface {
 	// DeleteStandaloneTool removes the observed identity while retaining its revision history.
 	DeleteStandaloneTool(ctx context.Context, id apid.ID, expectedRevision uint64) error
 
-	// GetCurrentToolRevision reads the active definition and connection in one consistent SQL snapshot.
+	// GetCurrentToolRevision reads the active definition and its connection identity in one SQL snapshot.
 	GetCurrentToolRevision(ctx context.Context, id apid.ID) (*ToolRevision, error)
+
+	// GetToolExecutionSnapshot captures the active definition, connection configuration,
+	// pinned connector definition, and ToolSet provenance together for invocation admission.
+	// Callers still authorize the revision and check expected revision and readiness.
+	GetToolExecutionSnapshot(ctx context.Context, id apid.ID) (*ToolExecutionSnapshot, error)
 
 	// GetToolRevision inspects retained history; it does not select a definition for invocation.
 	GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*ToolRevision, error)

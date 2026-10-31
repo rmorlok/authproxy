@@ -56,7 +56,9 @@ func newProxyRefreshRig(t *testing.T, name string) *proxyRefreshRig {
 
 // newProxyRefreshRigWithOptions is newProxyRefreshRig with a hook to adjust
 // the connector options (e.g. refresh timeout) before the connector is built.
-func newProxyRefreshRigWithOptions(t *testing.T, name string, configure func(*helpers.OAuth2ConnectorOptions)) *proxyRefreshRig {
+// Setup hooks can opt into real HTTP listeners without changing existing
+// in-process scenarios or duplicating provider registration and auth setup.
+func newProxyRefreshRigWithOptions(t *testing.T, name string, configure func(*helpers.OAuth2ConnectorOptions), configureSetup ...func(*helpers.SetupOptions)) *proxyRefreshRig {
 	t.Helper()
 	provider := helpers.NewOAuth2TestProvider(t)
 	provider.SetRefreshRotation(true)
@@ -78,12 +80,16 @@ func newProxyRefreshRigWithOptions(t *testing.T, name string, configure func(*he
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, connectorOpts)
 
 	logCapture := helpers.NewLogCapture()
-	env := helpers.Setup(t, helpers.SetupOptions{
+	setupOptions := helpers.SetupOptions{
 		Service:       helpers.ServiceTypeAPI,
 		IncludePublic: true,
 		Connectors:    []sconfig.Connector{connector},
 		LogCapture:    logCapture,
-	})
+	}
+	for _, configure := range configureSetup {
+		configure(&setupOptions)
+	}
+	env := helpers.Setup(t, setupOptions)
 	t.Cleanup(env.Cleanup)
 
 	registered := provider.CreateClient(helpers.CreateClientRequest{

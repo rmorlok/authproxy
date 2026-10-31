@@ -209,6 +209,9 @@ func Serve(cfg config.C) {
 	)
 	appMetricsTaskHandler.RegisterTasks(mux)
 
+	workflowTaskHandler := apworkflows.NewTaskHandler(workflowRuntime, dm.GetConfigRoot().Tasks, logger)
+	workflowTaskHandler.RegisterTasks(mux)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -249,7 +252,8 @@ func Serve(cfg config.C) {
 		addRegistrar(adminSyncTaskHandler).
 		addRegistrar(encryptTaskHandler).
 		addRegistrar(dbTaskHandler).
-		addRegistrar(appMetricsTaskHandler)
+		addRegistrar(appMetricsTaskHandler).
+		addRegistrar(workflowTaskHandler)
 
 	wg.Add(1)
 	go func() {

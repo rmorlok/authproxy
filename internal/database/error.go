@@ -51,3 +51,7 @@ func wrapDatabaseMutationError(operation string, err error) error {
 
 	return fmt.Errorf("%s: %w", operation, err)
 }
+
+// ErrInvalidListQuery is returned when a Tool, ToolSet, or binding listing runs with an
+// invalid filter, so callers can tell bad input from a database failure.
+var ErrInvalidListQuery = errors.New("invalid list query")

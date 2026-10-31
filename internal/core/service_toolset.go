@@ -17,9 +17,6 @@ import (
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 )
 
-// defaultToolSetListLimit is the page size used when a list request omits one.
-const defaultToolSetListLimit = 50
-
 // GetToolSet returns the default projection of a live ToolSet.
 func (s *service) GetToolSet(
 	ctx context.Context,
@@ -303,148 +300,6 @@ func (s *service) DeleteToolSet(ctx context.Context, id apid.ID) error {
 	return mapToolSetDatabaseError(s.db.DeleteToolSet(ctx, id))
 }
 
-// ListToolSets lists logical ToolSets, each in its default projection.
-func (s *service) ListToolSets(
-	ctx context.Context,
-	req iface.ListToolSetsRequest,
-) (iface.ToolSetPage, error) {
-	limit := int(req.Limit)
-	if limit <= 0 {
-		limit = defaultToolSetListLimit
-	}
-	limit = min(limit, database.MaxToolSetListLimit)
-
-	page, err := s.db.ListToolSets(ctx, database.ToolSetListQuery{
-		NamespaceMatchers: req.NamespaceMatchers,
-		Name:              req.Name,
-		LabelSelector:     req.LabelSelector,
-		Limit:             limit,
-		OrderByField:      req.OrderByField,
-		OrderBy:           req.OrderBy,
-	})
-	if err != nil {
-		return iface.ToolSetPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
-	}
-
-	return s.hydrateToolSetListPage(ctx, page)
-}
-
-// ListToolSetsFromCursor continues a logical listing with its saved filters.
-func (s *service) ListToolSetsFromCursor(
-	ctx context.Context,
-	cursor string,
-) (iface.ToolSetPage, error) {
-	page, err := s.db.ListToolSetsFromCursor(ctx, cursor)
-	if err != nil {
-		return iface.ToolSetPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
-	}
-	return s.hydrateToolSetListPage(ctx, page)
-}
-
-// ListToolSetGenerations lists one ToolSet's generations, newest first unless
-// the request selects another order.
-func (s *service) ListToolSetGenerations(
-	ctx context.Context,
-	id apid.ID,
-	req iface.ListToolSetGenerationsRequest,
-) (iface.ToolSetPage, error) {
-	pageLimit := int(req.Limit)
-	if pageLimit <= 0 {
-		pageLimit = defaultToolSetListLimit
-	}
-	pageLimit = min(pageLimit, database.MaxToolSetListLimit)
-
-	page, err := s.db.ListToolSetGenerations(
-		ctx,
-		database.ToolSetGenerationListQuery{
-			ToolSetId:    id,
-			Limit:        pageLimit,
-			OrderByField: req.OrderByField,
-			OrderBy:      req.OrderBy,
-		},
-	)
-	if err != nil {
-		return iface.ToolSetPage{}, mapToolSetDatabaseError(err)
-	}
-
-	return s.hydrateToolSetGenerationPage(ctx, id, page)
-}
-
-// ListToolSetGenerationsFromCursor continues a generation listing.
-func (s *service) ListToolSetGenerationsFromCursor(
-	ctx context.Context,
-	cursor string,
-) (iface.ToolSetPage, error) {
-	page, err := s.db.ListToolSetGenerationsFromCursor(ctx, cursor)
-	if errors.Is(err, database.ErrNotFound) {
-		return iface.ToolSetPage{}, ErrNotFound
-	}
-	if err != nil {
-		return iface.ToolSetPage{}, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
-	}
-	if len(page.Items) == 0 {
-		return iface.ToolSetPage{Items: []iface.ToolSet{}}, nil
-	}
-
-	return s.hydrateToolSetGenerationPage(ctx, page.Items[0].ToolSetId, page)
-}
-
-// hydrateToolSetListPage renders each logical ToolSet's default projection.
-// This reads each ToolSet's generations separately; pages are bounded.
-func (s *service) hydrateToolSetListPage(
-	ctx context.Context,
-	page database.ToolSetListPage,
-) (iface.ToolSetPage, error) {
-	result := iface.ToolSetPage{
-		Items:  make([]iface.ToolSet, 0, len(page.Items)),
-		Cursor: page.Cursor,
-	}
-
-	for i := range page.Items {
-		view, err := s.defaultToolSetView(ctx, &page.Items[i])
-		if errors.Is(err, ErrNotFound) {
-			// A ToolSet deleted after the page was read is skipped.
-			continue
-		}
-		if err != nil {
-			return iface.ToolSetPage{}, err
-		}
-
-		result.Items = append(result.Items, view)
-	}
-
-	return result, nil
-}
-
-// hydrateToolSetGenerationPage pairs each generation with the current logical
-// record, so every item projects today's selector.
-func (s *service) hydrateToolSetGenerationPage(
-	ctx context.Context,
-	id apid.ID,
-	page database.ToolSetGenerationListPage,
-) (iface.ToolSetPage, error) {
-	logical, err := s.db.GetToolSet(ctx, id)
-	if err != nil {
-		return iface.ToolSetPage{}, mapToolSetDatabaseError(err)
-	}
-
-	result := iface.ToolSetPage{
-		Items:  make([]iface.ToolSet, 0, len(page.Items)),
-		Cursor: page.Cursor,
-	}
-
-	for i := range page.Items {
-		view, err := s.hydrateToolSet(ctx, logical, &page.Items[i])
-		if err != nil {
-			return iface.ToolSetPage{}, err
-		}
-
-		result.Items = append(result.Items, view)
-	}
-
-	return result, nil
-}
-
 // loadToolSetGeneration reads a live logical ToolSet and one of its live generations.
 func (s *service) loadToolSetGeneration(
 	ctx context.Context,
@@ -492,22 +347,19 @@ func (s *service) newestToolSetView(
 	ctx context.Context,
 	logical *database.ToolSet,
 ) (*ToolSet, error) {
-	page, err := s.db.ListToolSetGenerations(
-		ctx,
-		database.ToolSetGenerationListQuery{
-			ToolSetId: logical.Id,
-			Limit:     1,
-		},
-	)
-	if err != nil {
-		return nil, mapToolSetDatabaseError(err)
+	page := s.db.ListToolSetGenerationsBuilder().
+		ForToolSetId(logical.Id).
+		Limit(1).
+		FetchPage(ctx)
+	if page.Error != nil {
+		return nil, mapToolSetDatabaseError(page.Error)
 	}
 
-	if len(page.Items) == 0 {
+	if len(page.Results) == 0 {
 		return nil, ErrNotFound
 	}
 
-	return s.hydrateToolSet(ctx, logical, &page.Items[0])
+	return s.hydrateToolSet(ctx, logical, &page.Results[0])
 }
 
 // createToolSetDraft compiles a definition, stores it as a new draft, and

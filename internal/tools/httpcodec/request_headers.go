@@ -43,18 +43,28 @@ func requestHeaderNames(source map[string]string) ([]string, error) {
 // the authored Content-Type with the body's encoding and keeps codec-owned
 // parameters, especially multipart boundaries. No credentials are applied here;
 // the connection proxy retains final header and query credential precedence.
-func prepareRequestHeaders(source map[string]string, body RenderedBody, mode bodyMode) (http.Header, string, error) {
+func prepareRequestHeaders(
+	source map[string]string, // already rendered headers
+	body RenderedBody,
+	mode bodyMode,
+) (http.Header, string, error) {
 	names, err := requestHeaderNames(source)
 	if err != nil {
 		return nil, "", err
 	}
+
 	headers := make(http.Header, len(source)+1)
+
 	var host string
 	for _, name := range names {
 		value := source[name]
+
+		// Make sure the header is valid
 		if !validRequestHeaderValue(value) {
 			return nil, "", errors.New("request header values must be valid UTF-8 without prohibited control characters")
 		}
+
+		// Special validation for the host header
 		if strings.EqualFold(name, "Host") {
 			if err := validateRequestAuthority(value); err != nil {
 				return nil, "", err
@@ -64,14 +74,26 @@ func prepareRequestHeaders(source map[string]string, body RenderedBody, mode bod
 		}
 		headers.Set(name, value)
 	}
+
+	// Track if content type was set explicitly
 	_, authored := headers["Content-Type"]
-	contentType, err := requestContentType(headers.Get("Content-Type"), authored, body.ContentType, mode)
+
+	// Compute the final content type based on the value supplied, enhancing it
+	// with information from the rendered body, etc. Handles things like multipart
+	contentType, err := requestContentType(
+		headers.Get("Content-Type"),
+		authored,
+		body.ContentType,
+		mode,
+	)
 	if err != nil {
 		return nil, "", err
 	}
+
 	if contentType != "" {
 		headers.Set("Content-Type", contentType)
 	}
+
 	return headers, host, nil
 }
 
@@ -104,9 +126,9 @@ func validRequestHeaderValue(value string) bool {
 // modes, incompatible types or parameter values, an authored multipart boundary,
 // or a missing generated boundary.
 func requestContentType(
-	authored string,
-	present bool,
-	generated string,
+	authored string, // The originally set content type
+	present bool, // If the content type header existed previously
+	generated string, // The content type from the rendered body
 	mode bodyMode,
 ) (string, error) {
 	var authoredBase string

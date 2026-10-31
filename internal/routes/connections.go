@@ -1687,6 +1687,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.getScopes,
 	)
+	g.GET(
+		"/connections/:id/toolsets",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.listToolSetBindings,
+	)
 }
 
 func NewConnectionsRoutes(

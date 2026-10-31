@@ -60,6 +60,55 @@ func mapResponse(t *testing.T, program *httpcodec.Response, input httpcodec.Resp
 	return result
 }
 
+// TestResponseNeedsBody keeps stream consumption aligned with status mapping,
+// including custom errors on statuses that would otherwise indicate success.
+func TestResponseNeedsBody(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		source *tools.HTTPResponse
+	}{
+		{"absent definition", nil},
+		{"empty definition", &tools.HTTPResponse{}},
+		{"fallback", &tools.HTTPResponse{Errors: []tools.HTTPErrorRule{
+			{Default: true, Code: "PROVIDER_OTHER", Message: "The provider request failed."},
+		}}},
+		{"exact", &tools.HTTPResponse{Errors: []tools.HTTPErrorRule{
+			{Statuses: []int{200, 404}, Code: "PROVIDER_EXACT", Message: "The provider returned an unexpected status."},
+		}}},
+		{"class and exact", &tools.HTTPResponse{Errors: []tools.HTTPErrorRule{
+			{StatusClass: util.ToPtr(2), Code: "PROVIDER_SUCCESS", Message: "This operation must not succeed."},
+			{StatusClass: util.ToPtr(4), Code: "PROVIDER_CLIENT", Message: "The provider declined the request."},
+			{Statuses: []int{200, 404}, Code: "PROVIDER_EXACT", Message: "The provider returned an unexpected status."},
+			{Default: true, Code: "PROVIDER_OTHER", Message: "The provider request failed."},
+		}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Valid JSON isolates status classification from content failures.
+			program := compileResponse(t, test.source, responseLimits())
+			for _, status := range []int{-1, 0, 99, 100, 199, 200, 201, 204, 299, 300, 404, 429, 503, 599, 600} {
+				input := responseInput()
+				input.StatusCode = status
+				result := mapResponse(t, program, input)
+				require.Equal(t, !result.IsError, program.NeedsBody(status), "status %d", status)
+			}
+		})
+	}
+
+	// Invalid programs never authorize reading a body, even for a 2xx status.
+	var absent *httpcodec.Response
+	require.False(t, absent.NeedsBody(200))
+	require.False(t, new(httpcodec.Response).NeedsBody(200))
+
+	// A throwing transform still needs successful response bytes. This query
+	// does not execute it or change the status policy for an unsuccessful status.
+	program := compileResponseTransform(t, `(() => { throw "private-transform-error"; })()`, transformResponseLimits())
+	require.True(t, program.NeedsBody(200))
+	require.False(t, program.NeedsBody(500))
+	result := mapResponse(t, program, transformResponseInput(t))
+	require.True(t, result.IsError)
+	require.Equal(t, "OUTPUT_INVALID", result.Error.Code)
+}
+
 // TestResponseStatusMappings applies authored precedence before interpreting
 // provider content, including an explicit error mapping for a successful status.
 func TestResponseStatusMappings(t *testing.T) {

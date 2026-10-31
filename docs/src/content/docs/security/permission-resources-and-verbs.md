@@ -17,7 +17,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 |---|---|---|
 | `actors` | `create`, `delete`, `get`, `list`, `update` | Actor records, permissions, labels, annotations, and signing keys |
 | `app-metrics` | `query`, `schema` | Aggregate application-metric queries and metric-schema discovery |
-| `connections` | `create`, `disconnect`, `force_state`, `get`, `list`, `proxy`, `update` | Connection setup, configuration, lifecycle, and authenticated proxy requests |
+| `connections` | `create`, `disconnect`, `force_state`, `get`, `list`, `proxy`, `update`, and Tool-defined verbs | Connection setup, configuration, lifecycle, authenticated proxy requests, and internal Tool invocation authorization |
 | `connectors` | `archive`, `create`, `disconnect_all`, `force_state`, `get`, `list`, `list/generations`, `update` | Connector definitions, generations, metadata, and lifecycle operations |
 | `keys` | `create`, `delete`, `get`, `list`, `update` | Reusable signing and encryption-key resources; `delete` also gates `DELETE /keys/{id}/unused`, which rejects namespace references and encryption history |
 | `namespaces` | `create`, `get`, `list`, `update` | Namespace records, metadata, and namespace key assignments |
@@ -25,7 +25,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `request-events` | `get`, `list` | Individual and listed proxy request events |
 | `secrets` | `replay` | Unredacted replay of secret-tagged fields in an otherwise authorized API response |
 | `tools` | `create`, `delete`, `get`, `list`, `update` | Standalone Tool definitions under `/tools`; generated Tools are readable but changed only through their ToolSet. These verbs do not authorize Tool invocation |
-| `toolsets` | `create`, `delete`, `get`, `list`, `list/generations`, `update` | ToolSet definitions and generations under `/toolsets`. `create` also gates new draft generations; `update` gates logical metadata and selector changes, draft edits, and publication. These verbs do not install, migrate, or invoke generated Tools |
+| `toolsets` | `create`, `delete`, `get`, `list`, `list/generations`, `update` | ToolSet definitions and generations under `/toolsets`. `create` also gates new draft generations; `update` gates logical metadata and selector changes, draft edits, and publication. `get` also limits which ToolSets `GET /connections/{id}/toolsets` returns. These verbs do not install, migrate, or invoke generated Tools |
 | `task_monitoring` | `get`, `list`, `manage` | Asynq queue, server, scheduler, and task inspection or mutation |
 | `workflow_monitoring` | `get`, `list`, `manage` | Workflow instance inspection, cancellation, and removal |
 
@@ -58,12 +58,32 @@ bound connection must be in that same namespace, and no `connections` verb is
 checked. Granting `tools:update` lets an actor change what an executable Tool
 does, so treat it as trusted administration.
 
+The internal Tool invocation authorization gate checks the verbs declared by
+the captured Tool revision against the connection's namespace and ID. At least
+one of those verbs must be allowed by both the actor and any JWT restrictions.
+For example, if a Tool declares `tool:read` and `tool:inspect`, granting the
+actor only `tool:read` and the JWT only `tool:inspect` does not authorize it.
+Granting both the same verb does. A broad administrator grant is still narrowed
+by JWT restrictions.
+
+This check requires neither `connections:proxy` nor a separate `tools:invoke`
+permission. A `tool:*` verb is a literal string; only `*` is a wildcard. This
+gate is an internal building block; the public invocation endpoint is not yet
+available.
+
 ToolSet management follows the same rule. `toolsets` verbs are checked in the
 ToolSet's namespace, and a connection selector may only select that namespace
 or its descendants. Selecting a connection grants no permission to invoke its
 generated Tools, and no `tools` or `connections` verb authorizes ToolSet
 management. Publishing with `toolsets:update` changes what new matching
 connections install, so treat it as trusted administration as well.
+
+`GET /connections/{id}/toolsets` needs two checks. `connections:get` on the
+connection authorizes the route. Each assigned ToolSet is then returned only if
+the caller also has `toolsets:get` on that ToolSet's namespace and ID, which can
+be an ancestor of the connection's namespace. ToolSets the caller cannot read are
+left out, and the request still succeeds. The response reports installation
+status only; it grants no Tool invocation.
 
 See [Authentication and Authorization](/security/authentication-and-authorization/)
 for namespace matching, resource ID restrictions, actor permissions, and JWT

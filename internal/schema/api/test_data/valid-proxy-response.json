@@ -1,8 +1,10 @@
 {
   "statusCode": 200,
+  "sendEvidence": "sent",
   "headers": {
     "content-type": "application/json"
   },
+  "bodyRaw": null,
   "bodyJson": {
     "ok": true
   }

@@ -234,8 +234,9 @@ func (s *service) getToolRevision(
 }
 
 // GetCurrentToolRevision returns the active encrypted definition and its captured
-// connection through a single joined read. This is a storage snapshot, not an
-// authorization decision or execution-readiness check.
+// connection identity through a single joined read. Use GetToolExecutionSnapshot
+// to also capture connection configuration and its pinned connector definition.
+// Neither read is an authorization decision or execution-readiness check.
 // Generated revisions require a live installed binding and matching published
 // source generation. Connection readiness and caller permissions still need to
 // be checked by admission; historical reads do not use these ownership checks.

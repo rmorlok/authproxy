@@ -66,6 +66,7 @@ func newToolsTestSetup(t *testing.T) (*toolsTestSetup, map[string]*database.Conn
 	r := apgin.ForTest(nil)
 	NewToolsRoutes(cfg, auth, c).Register(r)
 	NewToolSetsRoutes(cfg, auth, c).Register(r)
+	NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, aplog.NewNoopLogger()).Register(r)
 
 	ctx := context.Background()
 	require.NoError(t, db.CreateNamespace(ctx, &database.Namespace{Path: "root.acme"}))

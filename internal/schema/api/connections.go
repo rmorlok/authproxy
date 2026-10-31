@@ -330,10 +330,13 @@ func NewConnectionForceStateResponse(
 	)}
 }
 
-// ProxyResponseJson is the unwrapped response from a proxied request.
+// ProxyResponseJson is the wrapped HTTP result and cumulative target-send
+// evidence returned by the structured proxy endpoint.
 type ProxyResponseJson struct {
 	StatusCode int               `json:"statusCode" yaml:"statusCode" example:"200"`
 	Headers    map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
 	BodyRaw    []byte            `json:"bodyRaw,omitempty" yaml:"bodyRaw,omitempty"`
 	BodyJson   interface{}       `json:"bodyJson,omitempty" yaml:"bodyJson,omitempty"`
+	// SendEvidence covers all target attempts; sent does not imply provider success.
+	SendEvidence common.SendEvidence `json:"sendEvidence" yaml:"sendEvidence" binding:"required" swaggertype:"string" enums:"notSent,mayHaveSent,sent" example:"sent"`
 }

@@ -27,6 +27,22 @@ runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
 or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
 contract ownership stays clear.
 
+## Proxy response metadata
+
+The wrapped proxy response carries required `sendEvidence` alongside its
+existing status, headers, and body fields. `ProxyResponseJson`, the OpenAPI
+projection, and the runtime `iface.ProxyResponse` use the shared
+`common.SendEvidence` vocabulary. The runtime body fields retain their existing
+serialization, including JSON null for unused `bodyRaw` and `bodyJson`; the
+reference schema accepts those values.
+
+The shared `ErrorResponse.sendEvidence` is optional because only wrapped-proxy
+errors populate it. Unrelated API errors retain their existing shape. The route
+uses trusted request-local evidence, never provider response fields, and keeps
+the existing outer HTTP status/error behavior. See the public
+[proxying guide](https://docs.authproxy.net/sdks/proxying/#target-send-evidence)
+for the cumulative semantics and client retry considerations.
+
 ## Tool management lists
 
 `ListToolsResponseJson` is the `ToolList` envelope returned by `GET /tools`.
@@ -45,6 +61,13 @@ are the canonical ToolSet resource and `ToolSetPatch`; generation PATCH and
 POST bodies use `ToolSetPatch` too and reject metadata and selector fields.
 
 These lists accept `orderBy=<field> [asc|desc]`, like other resource lists.
+`ConnectionToolSetBindingList` is returned by `GET /connections/{id}/toolsets`.
+Each item identifies one assignment by its connection and logical ToolSet
+references. `status.appliedGeneration` is absent until an inventory is installed,
+and the `Installed` condition is `False` with reason `InventoryPending` until then.
+The route does not report `Ready` or MCP catalog status yet, so those are omitted.
+Bindings page by ToolSet ID with a keyset cursor and have no `orderBy` option.
+
 `GET /tools` and `GET /toolsets` sort by `id`, `namespace`, `name`,
 `created_at`, or `updated_at`, defaulting to `id`. Generation lists sort by
 `generation`, `state`, `created_at`, or `updated_at`, defaulting to newest
