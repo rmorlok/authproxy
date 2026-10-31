@@ -21,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 var (
@@ -145,10 +146,10 @@ func renderToolSet(
 func renderToolSetPage(
 	gctx *gin.Context,
 	val *auth.ResourcePermissionValidator,
-	page coreIface.ToolSetPage,
+	page pagination.PageResult[coreIface.ToolSet],
 ) {
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListToolSetsResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, page.Items), func(toolSet coreIface.ToolSet) toolsetschema.ToolSet {
+		util.Map(auth.FilterForValidatedResources(val, page.Results), func(toolSet coreIface.ToolSet) toolsetschema.ToolSet {
 			return *toolSet.GetResource()
 		}),
 		page.Cursor,
@@ -249,21 +250,25 @@ func (r *ToolSetsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	var page coreIface.ToolSetPage
-	var err error
+	var ex coreIface.ListToolSetsExecutor
 	if req.Cursor != nil {
-		page, err = r.core.ListToolSetsFromCursor(ctx, *req.Cursor)
-	} else {
-		listReq := coreIface.ListToolSetsRequest{
-			NamespaceMatchers: val.GetEffectiveNamespaceMatchers(req.NamespaceVal),
+		var err error
+		ex, err = r.core.ListToolSetsFromCursor(ctx, *req.Cursor)
+		if err != nil {
+			writeToolSetError(gctx, val, err, apid.Nil)
+			return
 		}
+	} else {
+		b := r.core.
+			ListToolSetsBuilder().
+			ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 		if req.LimitVal != nil {
 			if *req.LimitVal < 1 {
 				apgin.WriteError(gctx, nil, httperr.BadRequest("limit must be positive"))
 				val.MarkErrorReturn()
 				return
 			}
-			listReq.Limit = *req.LimitVal
+			b = b.Limit(*req.LimitVal)
 		}
 		if req.NameVal != nil {
 			name := scommon.ResourceName(*req.NameVal)
@@ -272,27 +277,28 @@ func (r *ToolSetsRoutes) list(gctx *gin.Context) {
 				val.MarkErrorReturn()
 				return
 			}
-			listReq.Name = name
+			b = b.ForName(name)
 		}
 		if req.LabelSelector != nil {
-			listReq.LabelSelector = *req.LabelSelector
+			b = b.ForLabelSelector(*req.LabelSelector)
 		}
 		if req.OrderByVal != nil {
 			field, order, ok := parseListOrderBy(gctx, val, *req.OrderByVal, database.IsValidToolSetOrderByField[database.ToolSetOrderByField])
 			if !ok {
 				return
 			}
-			listReq.OrderByField = field
-			listReq.OrderBy = order
+			b = b.OrderBy(field, order)
 		}
-		page, err = r.core.ListToolSets(ctx, listReq)
+		ex = b
 	}
-	if err != nil {
-		writeToolSetError(gctx, val, err, apid.Nil)
+
+	result := ex.FetchPage(ctx)
+	if result.Error != nil {
+		writeToolSetError(gctx, val, result.Error, apid.Nil)
 		return
 	}
 
-	renderToolSetPage(gctx, val, page)
+	renderToolSetPage(gctx, val, result)
 }
 
 // @Summary		Update toolset
@@ -433,37 +439,43 @@ func (r *ToolSetsRoutes) listGenerations(gctx *gin.Context) {
 		return
 	}
 
-	var page coreIface.ToolSetPage
-	var err error
+	var ex coreIface.ListToolSetGenerationsExecutor
 	if req.Cursor != nil {
-		page, err = r.core.ListToolSetGenerationsFromCursor(ctx, *req.Cursor)
-		// A cursor carries its own ToolSet; refuse one minted for another path.
-		if err == nil && len(page.Items) > 0 && page.Items[0].GetId() != toolSet.GetId() {
-			apgin.WriteError(gctx, nil, httperr.BadRequest("cursor does not belong to this toolset"))
-			val.MarkErrorReturn()
+		var err error
+		ex, err = r.core.ListToolSetGenerationsFromCursor(ctx, *req.Cursor)
+		if err != nil {
+			writeToolSetError(gctx, val, err, toolSet.GetId())
 			return
 		}
 	} else {
-		var listReq coreIface.ListToolSetGenerationsRequest
+		b := r.core.ListToolSetGenerationsBuilder().ForToolSetId(toolSet.GetId())
 		if req.LimitVal != nil {
-			listReq.Limit = *req.LimitVal
+			b = b.Limit(*req.LimitVal)
 		}
 		if req.OrderByVal != nil {
 			field, order, ok := parseListOrderBy(gctx, val, *req.OrderByVal, database.IsValidToolSetGenerationOrderByField[database.ToolSetGenerationOrderByField])
 			if !ok {
 				return
 			}
-			listReq.OrderByField = field
-			listReq.OrderBy = order
+			b = b.OrderBy(field, order)
 		}
-		page, err = r.core.ListToolSetGenerations(ctx, toolSet.GetId(), listReq)
+		ex = b
 	}
-	if err != nil {
-		writeToolSetError(gctx, val, err, toolSet.GetId())
+
+	result := ex.FetchPage(ctx)
+	if result.Error != nil {
+		writeToolSetError(gctx, val, result.Error, toolSet.GetId())
 		return
 	}
 
-	renderToolSetPage(gctx, val, page)
+	// A cursor carries its own ToolSet; refuse one minted for another path.
+	if len(result.Results) > 0 && result.Results[0].GetId() != toolSet.GetId() {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("cursor does not belong to this toolset"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	renderToolSetPage(gctx, val, result)
 }
 
 // @Summary		Get toolset generation

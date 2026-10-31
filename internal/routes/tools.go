@@ -231,21 +231,25 @@ func (r *ToolsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	var page coreIface.ToolPage
-	var err error
+	var ex coreIface.ListToolsExecutor
 	if req.Cursor != nil {
-		page, err = r.core.ListToolsFromCursor(ctx, *req.Cursor)
-	} else {
-		listReq := coreIface.ListToolsRequest{
-			NamespaceMatchers: val.GetEffectiveNamespaceMatchers(req.NamespaceVal),
+		var err error
+		ex, err = r.core.ListToolsFromCursor(ctx, *req.Cursor)
+		if err != nil {
+			writeToolError(gctx, val, err, apid.Nil)
+			return
 		}
+	} else {
+		b := r.core.
+			ListToolsBuilder().
+			ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 		if req.LimitVal != nil {
 			if *req.LimitVal < 1 {
 				apgin.WriteError(gctx, nil, httperr.BadRequest("limit must be positive"))
 				val.MarkErrorReturn()
 				return
 			}
-			listReq.Limit = *req.LimitVal
+			b = b.Limit(*req.LimitVal)
 		}
 		if req.NameVal != nil {
 			name := scommon.ResourceName(*req.NameVal)
@@ -254,7 +258,7 @@ func (r *ToolsRoutes) list(gctx *gin.Context) {
 				val.MarkErrorReturn()
 				return
 			}
-			listReq.Name = name
+			b = b.ForName(name)
 		}
 		if req.ConnectionId != nil {
 			if err := connectionschema.ValidateID(*req.ConnectionId); err != nil {
@@ -262,31 +266,32 @@ func (r *ToolsRoutes) list(gctx *gin.Context) {
 				val.MarkErrorReturn()
 				return
 			}
-			listReq.ConnectionId = apid.ID(*req.ConnectionId)
+			b = b.ForConnectionId(apid.ID(*req.ConnectionId))
 		}
 		if req.LabelSelector != nil {
-			listReq.LabelSelector = *req.LabelSelector
+			b = b.ForLabelSelector(*req.LabelSelector)
 		}
 		if req.OrderByVal != nil {
 			field, order, ok := parseListOrderBy(gctx, val, *req.OrderByVal, database.IsValidToolOrderByField[database.ToolOrderByField])
 			if !ok {
 				return
 			}
-			listReq.OrderByField = field
-			listReq.OrderBy = order
+			b = b.OrderBy(field, order)
 		}
-		page, err = r.core.ListTools(ctx, listReq)
+		ex = b
 	}
-	if err != nil {
-		writeToolError(gctx, val, err, apid.Nil)
+
+	result := ex.FetchPage(ctx)
+	if result.Error != nil {
+		writeToolError(gctx, val, result.Error, apid.Nil)
 		return
 	}
 
 	apgin.APIJSON(gctx, http.StatusOK, schemaapi.NewListToolsResponseJson(
-		util.Map(auth.FilterForValidatedResources(val, page.Items), func(tool coreIface.Tool) toolschema.Tool {
+		util.Map(auth.FilterForValidatedResources(val, result.Results), func(tool coreIface.Tool) toolschema.Tool {
 			return *tool.GetResource()
 		}),
-		page.Cursor,
+		result.Cursor,
 	))
 }
 

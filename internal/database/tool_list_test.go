@@ -39,84 +39,106 @@ func TestListTools(t *testing.T) {
 	child := create("root.owner.child", childConnection.Id, "child", nil)
 	sibling := create("root.owner_x", otherConnection.Id, "sibling", nil)
 
-	ids := func(page ToolListPage) []apid.ID {
-		return mapToolIDsForTest(page.Items)
+	// fetch returns one page's IDs and fails the test on a listing error.
+	fetch := func(listing ListToolsExecutor) []apid.ID {
+		page := listing.FetchPage(ctx)
+		require.NoError(t, page.Error)
+		return mapToolIDsForTest(page.Results)
 	}
 
 	t.Run("empty scope matches nothing", func(t *testing.T) {
-		page, err := db.ListTools(ctx, ToolListQuery{Limit: 10})
-		require.NoError(t, err)
-		require.Empty(t, page.Items)
+		require.Empty(t, fetch(db.ListToolsBuilder().Limit(10)))
 	})
 
 	t.Run("descendant matcher excludes similarly named siblings", func(t *testing.T) {
-		page, err := db.ListTools(ctx, ToolListQuery{NamespaceMatchers: []string{"root.owner.**"}, Limit: 10})
-		require.NoError(t, err)
-		require.ElementsMatch(t, []apid.ID{base.Id, tagged.Id, child.Id}, ids(page))
-		require.NotContains(t, ids(page), sibling.Id)
+		ids := fetch(db.ListToolsBuilder().ForNamespaceMatcher("root.owner.**").Limit(10))
+		require.ElementsMatch(t, []apid.ID{base.Id, tagged.Id, child.Id}, ids)
+		require.NotContains(t, ids, sibling.Id)
 	})
 
 	t.Run("exact namespace, name, connection, and label filters intersect", func(t *testing.T) {
-		page, err := db.ListTools(ctx, ToolListQuery{NamespaceMatchers: []string{"root.owner"}, Limit: 10})
-		require.NoError(t, err)
-		require.ElementsMatch(t, []apid.ID{base.Id, tagged.Id}, ids(page))
+		all := func() ListToolsBuilder { return db.ListToolsBuilder().ForNamespaceMatcher("root.**").Limit(10) }
 
-		page, err = db.ListTools(ctx, ToolListQuery{NamespaceMatchers: []string{"root.**"}, Name: "child", Limit: 10})
-		require.NoError(t, err)
-		require.Equal(t, []apid.ID{child.Id}, ids(page))
+		// An exact matcher leaves out descendants.
+		require.ElementsMatch(t, []apid.ID{base.Id, tagged.Id}, fetch(db.ListToolsBuilder().ForNamespaceMatcher("root.owner").Limit(10)))
 
-		page, err = db.ListTools(ctx, ToolListQuery{NamespaceMatchers: []string{"root.**"}, ConnectionId: otherConnection.Id, Limit: 10})
-		require.NoError(t, err)
-		require.Equal(t, []apid.ID{sibling.Id}, ids(page))
+		// Each optional filter narrows the full scope to one Tool.
+		require.Equal(t, []apid.ID{child.Id}, fetch(all().ForName("child")))
+		require.Equal(t, []apid.ID{sibling.Id}, fetch(all().ForConnectionId(otherConnection.Id)))
+		require.Equal(t, []apid.ID{tagged.Id}, fetch(all().ForLabelSelector("purpose=lookup")))
+		require.Equal(t, []apid.ID{child.Id}, fetch(all().ForLabelSelector("apxy/cxn/-/id="+childConnection.Id.String())))
+	})
 
-		page, err = db.ListTools(ctx, ToolListQuery{NamespaceMatchers: []string{"root.**"}, LabelSelector: "purpose=lookup", Limit: 10})
-		require.NoError(t, err)
-		require.Equal(t, []apid.ID{tagged.Id}, ids(page))
-
-		page, err = db.ListTools(ctx, ToolListQuery{
-			NamespaceMatchers: []string{"root.**"},
-			LabelSelector:     "apxy/cxn/-/id=" + childConnection.Id.String(),
-			Limit:             10,
-		})
-		require.NoError(t, err)
-		require.Equal(t, []apid.ID{child.Id}, ids(page))
+	t.Run("a later scope replaces an earlier one", func(t *testing.T) {
+		// Scope is replaced, so a second call can never widen the first.
+		ids := fetch(db.ListToolsBuilder().ForNamespaceMatcher("root.**").ForNamespaceMatchers([]string{"root.owner_x"}).Limit(10))
+		require.Equal(t, []apid.ID{sibling.Id}, ids)
 	})
 
 	t.Run("cursor preserves filters and visits every tool once", func(t *testing.T) {
-		query := ToolListQuery{NamespaceMatchers: []string{"root.**"}, Limit: 1}
-		page, err := db.ListTools(ctx, query)
-		require.NoError(t, err)
-		seen := ids(page)
-		for page.Cursor != "" {
-			page, err = db.ListToolsFromCursor(ctx, page.Cursor)
+		page := db.ListToolsBuilder().ForNamespaceMatcher("root.**").Limit(1).FetchPage(ctx)
+		require.NoError(t, page.Error)
+		seen := mapToolIDsForTest(page.Results)
+		for page.HasMore {
+			listing, err := db.ListToolsFromCursor(ctx, page.Cursor)
 			require.NoError(t, err)
-			require.LessOrEqual(t, len(page.Items), 1)
-			seen = append(seen, ids(page)...)
+			page = listing.FetchPage(ctx)
+			require.NoError(t, page.Error)
+			require.LessOrEqual(t, len(page.Results), 1)
+			seen = append(seen, mapToolIDsForTest(page.Results)...)
 		}
 		require.ElementsMatch(t, []apid.ID{base.Id, tagged.Id, child.Id, sibling.Id}, seen)
+		require.Empty(t, page.Cursor)
+	})
+
+	t.Run("enumerate visits every page", func(t *testing.T) {
+		var seen []apid.ID
+		err := db.ListToolsBuilder().ForNamespaceMatcher("root.**").Limit(1).
+			Enumerate(ctx, func(page pagination.PageResult[Tool]) (pagination.KeepGoing, error) {
+				seen = append(seen, mapToolIDsForTest(page.Results)...)
+				return pagination.Continue, nil
+			})
+		require.NoError(t, err)
+		require.ElementsMatch(t, []apid.ID{base.Id, tagged.Id, child.Id, sibling.Id}, seen)
+	})
+
+	t.Run("enumerate stops when the callback does", func(t *testing.T) {
+		pages := 0
+		err := db.ListToolsBuilder().ForNamespaceMatcher("root.**").Limit(1).
+			Enumerate(ctx, func(pagination.PageResult[Tool]) (pagination.KeepGoing, error) {
+				pages++
+				return pagination.Stop, nil
+			})
+		require.NoError(t, err)
+		require.Equal(t, 1, pages)
 	})
 
 	t.Run("deleted tools are omitted", func(t *testing.T) {
 		require.NoError(t, db.DeleteStandaloneTool(ctx, tagged.Id, tagged.ActiveRevision))
-		page, err := db.ListTools(ctx, ToolListQuery{NamespaceMatchers: []string{"root.owner"}, Limit: 10})
-		require.NoError(t, err)
-		require.Equal(t, []apid.ID{base.Id}, ids(page))
+		require.Equal(t, []apid.ID{base.Id}, fetch(db.ListToolsBuilder().ForNamespaceMatcher("root.owner").Limit(10)))
 	})
 
-	t.Run("invalid queries fail", func(t *testing.T) {
-		for _, query := range []ToolListQuery{
-			{NamespaceMatchers: []string{"root"}},
-			{NamespaceMatchers: []string{"root"}, Limit: MaxToolListLimit + 1},
-			{NamespaceMatchers: []string{"not a namespace"}, Limit: 1},
-			{NamespaceMatchers: []string{"root"}, ConnectionId: apid.New(apid.PrefixTool), Limit: 1},
-			{NamespaceMatchers: []string{"root"}, LabelSelector: "=", Limit: 1},
+	t.Run("invalid filters report ErrInvalidListQuery", func(t *testing.T) {
+		for _, listing := range []ListToolsBuilder{
+			db.ListToolsBuilder().ForNamespaceMatcher("not a namespace"),
+			db.ListToolsBuilder().ForNamespaceMatcher("root").ForConnectionId(apid.New(apid.PrefixTool)),
+			db.ListToolsBuilder().ForNamespaceMatcher("root").ForLabelSelector("="),
 		} {
-			_, err := db.ListTools(ctx, query)
-			require.Error(t, err, "%+v", query)
+			require.ErrorIs(t, listing.FetchPage(ctx).Error, ErrInvalidListQuery)
 		}
+
+		// A malformed cursor fails before any listing exists.
 		_, err := db.ListToolsFromCursor(ctx, "not-a-cursor")
 		require.Error(t, err)
 	})
+}
+
+// TestToolListPageSize selects the default for unset sizes and caps large ones.
+func TestToolListPageSize(t *testing.T) {
+	require.Equal(t, uint64(defaultToolListLimit), toolListPageSize(0, MaxToolListLimit))
+	require.Equal(t, uint64(defaultToolListLimit), toolListPageSize(-1, MaxToolListLimit))
+	require.Equal(t, uint64(7), toolListPageSize(7, MaxToolListLimit))
+	require.Equal(t, uint64(MaxToolListLimit), toolListPageSize(MaxToolListLimit+1, MaxToolListLimit))
 }
 
 // mapToolIDsForTest projects listed identities for order-insensitive checks.
@@ -151,40 +173,40 @@ func TestListToolsOrdering(t *testing.T) {
 	zulu := create("zulu", time.Hour)
 	alpha := create("alpha", 2*time.Hour)
 
-	list := func(field ToolOrderByField, order pagination.OrderBy, limit int) ToolListPage {
-		page, err := db.ListTools(ctx, ToolListQuery{
-			NamespaceMatchers: []string{base.Namespace},
-			Limit:             limit,
-			OrderByField:      field,
-			OrderBy:           order,
-		})
-		require.NoError(t, err)
+	list := func(field ToolOrderByField, order pagination.OrderBy, limit int32) pagination.PageResult[Tool] {
+		page := db.ListToolsBuilder().
+			ForNamespaceMatcher(base.Namespace).
+			Limit(limit).
+			OrderBy(field, order).
+			FetchPage(ctx)
+		require.NoError(t, page.Error)
 		return page
 	}
 
 	// created_at sorts in both directions; the base Tool is oldest.
-	require.Equal(t, []apid.ID{base.Id, zulu.Id, alpha.Id}, mapToolIDsForTest(list(ToolOrderByCreatedAt, pagination.OrderByAsc, 10).Items))
-	require.Equal(t, []apid.ID{alpha.Id, zulu.Id, base.Id}, mapToolIDsForTest(list(ToolOrderByCreatedAt, pagination.OrderByDesc, 10).Items))
+	require.Equal(t, []apid.ID{base.Id, zulu.Id, alpha.Id}, mapToolIDsForTest(list(ToolOrderByCreatedAt, pagination.OrderByAsc, 10).Results))
+	require.Equal(t, []apid.ID{alpha.Id, zulu.Id, base.Id}, mapToolIDsForTest(list(ToolOrderByCreatedAt, pagination.OrderByDesc, 10).Results))
 
 	// A descending name sort continues correctly through the cursor.
 	page := list(ToolOrderByName, pagination.OrderByDesc, 1)
-	require.Equal(t, []apid.ID{zulu.Id}, mapToolIDsForTest(page.Items))
-	next, err := db.ListToolsFromCursor(ctx, page.Cursor)
+	require.Equal(t, []apid.ID{zulu.Id}, mapToolIDsForTest(page.Results))
+	listing, err := db.ListToolsFromCursor(ctx, page.Cursor)
 	require.NoError(t, err)
-	require.NotContains(t, mapToolIDsForTest(next.Items), zulu.Id)
+	next := listing.FetchPage(ctx)
+	require.NoError(t, next.Error)
+	require.NotContains(t, mapToolIDsForTest(next.Results), zulu.Id)
 
 	// Equal namespaces tie-break in the database's own ID order, which follows
 	// its collation rather than Go's byte order.
 	require.Equal(t,
-		mapToolIDsForTest(list(ToolOrderById, pagination.OrderByAsc, 10).Items),
-		mapToolIDsForTest(list(ToolOrderByNamespace, pagination.OrderByAsc, 10).Items),
+		mapToolIDsForTest(list(ToolOrderById, pagination.OrderByAsc, 10).Results),
+		mapToolIDsForTest(list(ToolOrderByNamespace, pagination.OrderByAsc, 10).Results),
 	)
 
 	// Unknown columns never reach SQL.
-	_, err = db.ListTools(ctx, ToolListQuery{
-		NamespaceMatchers: []string{base.Namespace},
-		Limit:             1,
-		OrderByField:      "name; DROP TABLE tools",
-	})
-	require.Error(t, err)
+	invalid := db.ListToolsBuilder().
+		ForNamespaceMatcher(base.Namespace).
+		OrderBy("name; DROP TABLE tools", pagination.OrderByAsc).
+		FetchPage(ctx)
+	require.ErrorIs(t, invalid.Error, ErrInvalidListQuery)
 }
