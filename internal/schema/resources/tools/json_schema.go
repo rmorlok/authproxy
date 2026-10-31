@@ -18,17 +18,43 @@ const (
 	schemaResourceURL   = "https://authproxy.invalid/tool-schema.json"
 )
 
-// validateSchema checks an authored schema without validating or changing any
-// invocation data. Compilation never fetches external resources, applies
-// defaults, or coerces values. Input schemas explicitly declare an object root;
-// a local root $ref may accompany that declaration.
+// CompileInputSchema compiles a required native JSON Schema 2020-12 document
+// with an explicitly declared object root. References must resolve within the
+// document; compilation never loads external resources. The returned validator
+// owns its parsed source and may be reused concurrently if it is not mutated.
+// Validation checks values without applying defaults, coercing types, or removing
+// properties. Callers should decode JSON numbers with json.Decoder.UseNumber.
+func CompileInputSchema(raw common.RawJSON) (*jsonschemav5.Schema, error) {
+	return compileSchema(raw, true)
+}
+
+// CompileOutputSchema compiles a required native JSON Schema 2020-12 document
+// that may accept any JSON value, including a boolean schema. An omitted output
+// schema must be handled by the caller. Source ownership, local-reference policy,
+// concurrent reuse, and read-only validation match CompileInputSchema.
+func CompileOutputSchema(raw common.RawJSON) (*jsonschemav5.Schema, error) {
+	return compileSchema(raw, false)
+}
+
+// validateSchema attaches the resource field's validation path to schema
+// compilation errors without validating or changing invocation data.
 func validateSchema(
 	raw common.RawJSON,
 	requireObject bool,
 	vc *common.ValidationContext,
 ) error {
+	if _, err := compileSchema(raw, requireObject); err != nil {
+		return vc.NewError(err.Error())
+	}
+	return nil
+}
+
+// compileSchema applies the shared native-schema policy before retaining the
+// compiled validator. Input roots explicitly declare object; a local root $ref
+// may accompany that declaration. Both parsing passes own their decoded values.
+func compileSchema(raw common.RawJSON, requireObject bool) (*jsonschemav5.Schema, error) {
 	if len(raw) > maxSchemaBytes {
-		return vc.NewErrorf("JSON schema exceeds %d bytes", maxSchemaBytes)
+		return nil, fmt.Errorf("JSON schema exceeds %d bytes", maxSchemaBytes)
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(raw))
@@ -36,35 +62,35 @@ func validateSchema(
 
 	var document any
 	if err := decoder.Decode(&document); err != nil {
-		return vc.NewErrorf("invalid JSON schema: %v", err)
+		return nil, fmt.Errorf("invalid JSON schema: %v", err)
 	}
 
 	var extra any
 	if err := decoder.Decode(&extra); err != io.EOF {
-		return vc.NewError("JSON schema must contain exactly one JSON value")
+		return nil, fmt.Errorf("JSON schema must contain exactly one JSON value")
 	}
 
 	if !schemaJSONDepthAllowed(document, maxSchemaDepth) {
-		return vc.NewErrorf("JSON schema nesting exceeds %d levels", maxSchemaDepth)
+		return nil, fmt.Errorf("JSON schema nesting exceeds %d levels", maxSchemaDepth)
 	}
 
 	switch root := document.(type) {
 	case map[string]any:
 		if requireObject && !hasExplicitObjectType(root["type"]) {
-			return vc.NewError("input schema must declare top-level type object or [object]")
+			return nil, fmt.Errorf("input schema must declare top-level type object or [object]")
 		}
 
 		// Check the root before compilation: Compiler.Draft is a default, not
 		// a restriction on an explicitly declared older dialect.
 		if err := validateNativeSchemaDialect(root); err != nil {
-			return vc.NewError(err.Error())
+			return nil, err
 		}
 	case bool:
 		if requireObject {
-			return vc.NewError("input schema must declare top-level type object or [object]")
+			return nil, fmt.Errorf("input schema must declare top-level type object or [object]")
 		}
 	default:
-		return vc.NewError("JSON schema must be an object or boolean")
+		return nil, fmt.Errorf("JSON schema must be an object or boolean")
 	}
 
 	compiler := jsonschemav5.NewCompiler()
@@ -83,14 +109,15 @@ func validateSchema(
 		schemaResourceURL,
 		bytes.NewReader(raw),
 	); err != nil {
-		return vc.NewErrorf("invalid JSON schema: %v", err)
+		return nil, fmt.Errorf("invalid JSON schema: %v", err)
 	}
 
-	if _, err := compiler.Compile(schemaResourceURL); err != nil {
-		return vc.NewErrorf("invalid JSON schema: %v", err)
+	schema, err := compiler.Compile(schemaResourceURL)
+	if err != nil {
+		return nil, fmt.Errorf("invalid JSON schema: %v", err)
 	}
 
-	return nil
+	return schema, nil
 }
 
 // hasExplicitObjectType avoids trying to infer the root type through arbitrary
