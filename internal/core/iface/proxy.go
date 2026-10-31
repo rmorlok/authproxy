@@ -86,11 +86,15 @@ func (r *ProxyRequest) Validate() error {
 	return nil
 }
 
+// ProxyResponse carries the buffered provider result. Public routes populate
+// SendEvidence from the observation for the complete logical proxy call.
 type ProxyResponse struct {
 	StatusCode int               `json:"statusCode"`
 	Headers    map[string]string `json:"headers"`
 	BodyRaw    []byte            `json:"bodyRaw"`
 	BodyJson   interface{}       `json:"bodyJson"`
+	// SendEvidence is independent of StatusCode and never comes from provider data.
+	SendEvidence common.SendEvidence `json:"sendEvidence" yaml:"sendEvidence"`
 }
 
 // ProxyResponseFromGentlemen creates a ProxyResponse from a gentleman.Response

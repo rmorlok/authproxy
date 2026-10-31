@@ -1288,7 +1288,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Proxy an HTTP request through an authenticated connection to the external service",
+                "description": "Proxy an HTTP request through an authenticated connection to the external service.",
                 "consumes": [
                     "application/json"
                 ],
@@ -8149,6 +8149,16 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "Bad Request"
                 },
+                "sendEvidence": {
+                    "description": "SendEvidence is populated for proxy failures; unrelated API errors omit it.",
+                    "type": "string",
+                    "enum": [
+                        "notSent",
+                        "mayHaveSent",
+                        "sent"
+                    ],
+                    "example": "notSent"
+                },
                 "stackTrace": {
                     "description": "Stack trace, only populated in debug mode.",
                     "type": "string"
@@ -8925,6 +8935,9 @@ const docTemplateApi = `{
         "routes.OpenAPIProxyResponseJson": {
             "description": "Response from a proxied HTTP request",
             "type": "object",
+            "required": [
+                "sendEvidence"
+            ],
             "properties": {
                 "bodyJson": {},
                 "bodyRaw": {
@@ -8938,6 +8951,16 @@ const docTemplateApi = `{
                     "additionalProperties": {
                         "type": "string"
                     }
+                },
+                "sendEvidence": {
+                    "description": "SendEvidence covers all target attempts; sent does not imply provider success.",
+                    "type": "string",
+                    "enum": [
+                        "notSent",
+                        "mayHaveSent",
+                        "sent"
+                    ],
+                    "example": "sent"
                 },
                 "statusCode": {
                     "type": "integer",

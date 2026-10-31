@@ -283,14 +283,16 @@ func (env *IntegrationTestEnv) ReauthOAuth2Connection(t *testing.T, connectionID
 	return resp.Status.RedirectURL
 }
 
-// FollowOAuth2Redirect issues an in-process GET to the public service's
+// FollowOAuth2Redirect issues a GET to the public service's
 // `/oauth2/redirect` endpoint with the same stateId and signed JWT the user's
 // browser would carry, and returns the Location header — the URL of the OAuth
 // provider's authorize endpoint. The proxy generates the upstream URL from the
-// connector config, so callers can assert on its query parameters.
+// connector config, so callers can assert on its query parameters. It uses the
+// real listener when configured and otherwise dispatches in-process.
 func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL string) string {
 	t.Helper()
-	require.NotNil(t, env.PublicGin, "FollowOAuth2Redirect requires SetupOptions.IncludePublic=true")
+	require.True(t, env.PublicURL != "" || env.PublicGin != nil,
+		"FollowOAuth2Redirect requires SetupOptions.IncludePublic=true")
 
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
@@ -305,8 +307,7 @@ func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL st
 	)
 	require.NoError(t, err)
 
-	w := httptest.NewRecorder()
-	env.PublicGin.ServeHTTP(w, req)
+	w := env.doOAuth2PublicRequest(t, req)
 	require.Equalf(t, http.StatusFound, w.Code, "/oauth2/redirect should 302; got %d body=%s", w.Code, w.Body.String())
 
 	loc := w.Header().Get("Location")
@@ -314,14 +315,16 @@ func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL st
 	return loc
 }
 
-// DeliverOAuth2Callback issues an in-process GET to the public service's
+// DeliverOAuth2Callback issues a GET to the public service's
 // `/oauth2/callback` endpoint and returns the final Location header — typically
 // the test's returnToUrl on success, or error_pages.internal_error on
 // rejection. By default the request is signed as actor "test-actor" in the root
 // namespace; pass WithActor(...) to mirror a specific tenant's browser session.
+// Real HTTP mode uses the public listener without following its redirect.
 func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string, opts ...ActorOption) string {
 	t.Helper()
-	require.NotNil(t, env.PublicGin, "DeliverOAuth2Callback requires SetupOptions.IncludePublic=true")
+	require.True(t, env.PublicURL != "" || env.PublicGin != nil,
+		"DeliverOAuth2Callback requires SetupOptions.IncludePublic=true")
 
 	cfg := env.resolveActorOptions(opts)
 
@@ -338,13 +341,48 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 	)
 	require.NoError(t, err)
 
-	w := httptest.NewRecorder()
-	env.PublicGin.ServeHTTP(w, req)
+	w := env.doOAuth2PublicRequest(t, req)
 	require.Equalf(t, http.StatusFound, w.Code, "/oauth2/callback should 302; got %d body=%s", w.Code, w.Body.String())
 
 	loc := w.Header().Get("Location")
 	require.NotEmpty(t, loc, "/oauth2/callback should set Location")
 	return loc
+}
+
+// doOAuth2PublicRequest dispatches a signed public-service request through the
+// configured listener or in-process router. Redirects remain observable rather
+// than being followed to a provider or the test's return-to URL.
+func (env *IntegrationTestEnv) doOAuth2PublicRequest(t *testing.T, req *http.Request) *httptest.ResponseRecorder {
+	t.Helper()
+	require.True(t, env.PublicURL != "" || env.PublicGin != nil,
+		"OAuth public requests require SetupOptions.IncludePublic=true")
+	w := httptest.NewRecorder()
+	if env.PublicURL == "" {
+		env.PublicGin.ServeHTTP(w, req)
+		return w
+	}
+
+	abs, err := url.Parse(env.PublicURL + req.URL.RequestURI())
+	require.NoError(t, err)
+	req.URL = abs
+	req.Host = abs.Host
+	req.RequestURI = ""
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	w.Code = resp.StatusCode
+	for name, values := range resp.Header {
+		w.Header()[name] = append([]string(nil), values...)
+	}
+	_, err = w.Body.ReadFrom(resp.Body)
+	require.NoError(t, err)
+	return w
 }
 
 // OAuth2StateForTest mirrors the unexported `state` struct in

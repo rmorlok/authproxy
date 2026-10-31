@@ -30,7 +30,7 @@ type ConnectionsProxyRoutes struct {
 }
 
 // @Summary		Proxy request through connection
-// @Description	Proxy an HTTP request through an authenticated connection to the external service
+// @Description	Proxy an HTTP request through an authenticated connection to the external service.
 // @Tags			proxy
 // @Accept			json
 // @Produce		json
@@ -92,13 +92,21 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
+	// Begin only after local validation. An uninstrumented implementation stays
+	// uncertain, while reports from every target attempt accumulate here.
+	ctx, complete := beginProxyDispatch(gctx)
 	resp, err := conn.ProxyRequest(ctx, httpf.RequestTypeProxy, &proxyRequest)
+	sendEvidence := complete()
 	if err != nil {
 		apgin.WriteErr(gctx, r.logger, err)
 		return
 	}
 
-	apgin.APIJSON(gctx, 200, resp)
+	// Set trusted metadata outside the provider's body and headers. Copy the
+	// envelope so a shared or cached response cannot leak another call's state.
+	response := *resp
+	response.SendEvidence = sendEvidence
+	apgin.APIJSON(gctx, 200, &response)
 }
 
 func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
@@ -108,7 +116,7 @@ func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
 		ForIdField("id").
 		Build()
 
-	g.POST("/connections/:id/_proxy", proxyAuth, r.proxy)
+	g.POST("/connections/:id/_proxy", observeProxySendEvidence, proxyAuth, r.proxy)
 	g.Any("/connections/:id/_proxyRaw", proxyAuth, r.proxyRaw)
 }
 

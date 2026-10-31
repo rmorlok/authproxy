@@ -6,6 +6,8 @@
 // that builds an HTTP request to send through an AuthProxy connection
 // should produce one of these.
 
+import type { SendEvidence } from './common';
+
 export interface ProxyRequest {
     url: string;
     method: string;
@@ -28,8 +30,10 @@ export interface ProxyRequest {
 export interface ProxyResponse {
     statusCode: number;
     headers: Record<string, string>;
-    bodyRaw?: string;
+    bodyRaw?: string | null;
     bodyJson?: unknown;
+    /** Optional for older servers. Absence must not be treated as `notSent`. */
+    sendEvidence?: SendEvidence;
 }
 
 // Valid HTTP methods accepted by the proxy. Mirrors the server's

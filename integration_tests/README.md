@@ -36,6 +36,32 @@ go test -tags integration -v -run TestRateLimiting429 ./proxy/...
 
 Integration tests use the `integration` build tag so they are excluded from `go test ./...`.
 
+### Proxy send evidence
+
+The wrapped proxy evidence suite uses real API HTTP listeners and an isolated,
+controllable upstream. It checks the JSON contract against independent upstream
+request recordings, including local rejections, transport failures, redirects,
+and concurrent requests. OAuth evidence scenarios additionally use the test
+provider's separate token/resource recordings.
+
+After starting the infrastructure, run the focused suites against both database
+providers from the repository root:
+
+```bash
+AUTH_PROXY_TEST_DATABASE_PROVIDER=sqlite POSTGRES_TEST_PORT=5433 \
+  go -C integration_tests test -tags integration -count=1 \
+  -run '^(TestWrappedProxySendEvidence_|TestProxySendEvidence_)' ./proxy ./oauth2
+AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres POSTGRES_TEST_PORT=5433 \
+  go -C integration_tests test -tags integration -count=1 \
+  -run '^(TestWrappedProxySendEvidence_|TestProxySendEvidence_)' ./proxy ./oauth2
+```
+
+See [wrapped scenario notes](proxy/wrapped_send_evidence_test.md) and
+[OAuth scenario notes](oauth2/proxy_send_evidence_test.md) for the assertions and
+limits. These tests run in the existing integration CI job. They do not call
+external third-party APIs. The shared upstream fixture lives in
+`helpers/controlled_upstream.go` and can also drive raw streaming scenarios.
+
 The main database portion of the suite runs against either a fresh SQLite file
 or the PostgreSQL service above:
 

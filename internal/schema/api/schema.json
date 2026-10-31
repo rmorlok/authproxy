@@ -166,6 +166,9 @@
         },
         "stackTrace": {
           "type": "string"
+        },
+        "sendEvidence": {
+          "$ref": "../common/schema.json#/$defs/SendEvidence"
         }
       },
       "required": [
@@ -1213,17 +1216,21 @@
         "statusCode": {
           "type": "integer"
         },
+        "sendEvidence": {
+          "$ref": "../common/schema.json#/$defs/SendEvidence"
+        },
         "headers": {
           "$ref": "#/$defs/StringMap"
         },
         "bodyRaw": {
-          "type": "string",
+          "type": ["string", "null"],
           "contentEncoding": "base64"
         },
         "bodyJson": {}
       },
       "required": [
-        "statusCode"
+        "statusCode",
+        "sendEvidence"
       ],
       "additionalProperties": false
     },

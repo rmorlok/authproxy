@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 // Error is an HTTP-aware error with dual tracks: a public response message
@@ -74,14 +75,18 @@ func IsClientClosedRequest(ctx context.Context, err error) bool {
 
 // ErrorResponse is the standardized JSON error response format.
 type ErrorResponse struct {
-	Error      string `json:"error"`
-	StackTrace string `json:"stackTrace,omitempty"`
+	Error      string `json:"error" yaml:"error"`
+	StackTrace string `json:"stackTrace,omitempty" yaml:"stackTrace,omitempty"`
+	// SendEvidence is present only for proxy requests that install response
+	// metadata; ordinary endpoints preserve their existing error envelope.
+	SendEvidence common.SendEvidence `json:"sendEvidence,omitempty" yaml:"sendEvidence,omitempty"`
 }
 
 // ToErrorResponse converts the error to a JSON-serializable ErrorResponse.
 func (e *Error) ToErrorResponse(ctx context.Context) *ErrorResponse {
 	resp := &ErrorResponse{
-		Error: e.ResponseMsgOrDefault(),
+		Error:        e.ResponseMsgOrDefault(),
+		SendEvidence: apctx.GetProxySendEvidence(ctx),
 	}
 	if apctx.IsDebugMode(ctx) {
 		if e.InternalErr != nil {

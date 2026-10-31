@@ -27,6 +27,22 @@ runtime/core/database models. Do not add new endpoint-specific `*RequestJson`
 or `*ResponseJson` structs under `internal/routes`; preflight rejects that so
 contract ownership stays clear.
 
+## Proxy response metadata
+
+The wrapped proxy response carries required `sendEvidence` alongside its
+existing status, headers, and body fields. `ProxyResponseJson`, the OpenAPI
+projection, and the runtime `iface.ProxyResponse` use the shared
+`common.SendEvidence` vocabulary. The runtime body fields retain their existing
+serialization, including JSON null for unused `bodyRaw` and `bodyJson`; the
+reference schema accepts those values.
+
+The shared `ErrorResponse.sendEvidence` is optional because only wrapped-proxy
+errors populate it. Unrelated API errors retain their existing shape. The route
+uses trusted request-local evidence, never provider response fields, and keeps
+the existing outer HTTP status/error behavior. See the public
+[proxying guide](https://docs.authproxy.net/sdks/proxying/#target-send-evidence)
+for the cumulative semantics and client retry considerations.
+
 ## Tool management lists
 
 `ListToolsResponseJson` is the `ToolList` envelope returned by `GET /tools`.

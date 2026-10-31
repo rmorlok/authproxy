@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 // ErrorResponse is the standardized error response format for authproxy API errors.
@@ -12,6 +13,8 @@ type ErrorResponse struct {
 	Error string `json:"error" yaml:"error" example:"Bad Request"`
 	// Stack trace, only populated in debug mode.
 	StackTrace string `json:"stackTrace,omitempty" yaml:"stackTrace,omitempty"`
+	// SendEvidence is populated for proxy failures; unrelated API errors omit it.
+	SendEvidence common.SendEvidence `json:"sendEvidence,omitempty" yaml:"sendEvidence,omitempty" swaggertype:"string" enums:"notSent,mayHaveSent,sent" example:"notSent"`
 }
 
 // SessionInitiateParams is the request body for POST /session/_initiate.
