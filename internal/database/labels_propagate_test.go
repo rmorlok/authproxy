@@ -113,11 +113,11 @@ func TestRateLimitDriftReconciliation(t *testing.T) {
 	}))
 
 	// Drain pre-existing drift on the seeded root namespace.
-	_, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+	_, err := reconcileFullSweep(db, ctx, 100, nil)
 	require.NoError(t, err)
 
 	// Now everything is clean; a second run finds nothing to do.
-	fixed, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+	fixed, err := reconcileFullSweep(db, ctx, 100, nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), fixed, "no drift expected after the first sweep")
 
@@ -127,7 +127,7 @@ func TestRateLimitDriftReconciliation(t *testing.T) {
 		`{"apxy/ns/team":"stale","apxy/rl/-/id":"`+string(rlID)+`","apxy/rl/-/ns":"root.drift"}`, rlID)
 	require.NoError(t, err)
 
-	fixed, err = db.ReconcileCarryForwardLabels(ctx, 100, nil)
+	fixed, err = reconcileFullSweep(db, ctx, 100, nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), fixed, "exactly the drifted rate-limit row should be corrected")
 

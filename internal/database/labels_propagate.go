@@ -10,7 +10,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"golang.org/x/time/rate"
 )
 
@@ -716,6 +715,26 @@ func (s *service) writeRecomputedLabels(ctx context.Context, tx *sql.Tx, table s
 	return true, nil
 }
 
+// ReconcilePosition identifies where a carry-forward labels sweep continues. The
+// zero value is the start of a sweep. Callers treat it as an opaque token that they
+// hand back to the next slice.
+type ReconcilePosition struct {
+	// Step names the step to continue.
+	Step string
+	// AfterKey is the last key finished within Step, or empty to start the step.
+	AfterKey string
+}
+
+// ReconcileSlice is the outcome of one slice of a carry-forward labels sweep.
+type ReconcileSlice struct {
+	// Next is where the following slice continues, meaningful when Done is false.
+	Next ReconcilePosition
+	// Done is true when the sweep has visited every table.
+	Done bool
+	// Corrected counts rows whose labels were rewritten by this slice.
+	Corrected int64
+}
+
 // labelsEqual reports whether two label maps contain exactly the same
 // key/value pairs. nil and empty are treated as equal.
 func labelsEqual(a, b Labels) bool {
@@ -730,53 +749,134 @@ func labelsEqual(a, b Labels) bool {
 	return true
 }
 
-// ReconcileCarryForwardLabels walks every labelled resource type in
-// batches and re-derives the materialized apxy/ portion of each row. Each
-// row's update runs in its own short transaction; matching labels and modification
-// timestamps remain unchanged. Returns the total
-// number of rows corrected across all resource types.
+// reconcileStep is one table walked by the carry-forward labels sweep.
+type reconcileStep struct {
+	// name identifies the step in logs and in a sweep's ReconcilePosition, which
+	// is persisted in workflow history, so it must stay stable across releases.
+	name string
+	// table is the known table to walk.
+	table string
+	// keyColumn is the table's unique, immutable key. Label writes never change it,
+	// which keeps the walk's position valid while it updates rows.
+	keyColumn string
+	// recompute repairs the row with the given key, reporting whether it had drifted.
+	recompute func(ctx context.Context, key string) (bool, error)
+}
+
+// byID adapts an ID-keyed recompute function to the string keys of reconcileStep.
+func byID(recompute func(context.Context, apid.ID) (bool, error)) func(context.Context, string) (bool, error) {
+	return func(ctx context.Context, key string) (bool, error) {
+		return recompute(ctx, apid.ID(key))
+	}
+}
+
+// reconcileSteps lists the sweep's walks in order: top-down, so child resources
+// see parent labels repaired earlier in the same pass. Keep the names of existing
+// steps when adding new ones.
+func (s *service) reconcileSteps() []reconcileStep {
+	return []reconcileStep{
+		// Namespace paths sort each parent before its children, so a single pass
+		// repairs a whole subtree.
+		{name: "namespaces", table: NamespacesTable, keyColumn: "path", recompute: s.recomputeNamespaceLabelsTx},
+		{name: "connectors", table: ConnectorsTable, keyColumn: "id", recompute: byID(s.recomputeConnectorLabelsTx)},
+		{name: "connections", table: ConnectionsTable, keyColumn: "id", recompute: byID(s.recomputeConnectionLabelsTx)},
+		{name: "actors", table: ActorTable, keyColumn: "id", recompute: byID(s.recomputeActorLabelsTx)},
+		{name: "keys", table: KeysTable, keyColumn: "id", recompute: byID(s.recomputeEncryptionKeyLabelsTx)},
+		{name: "rate_limits", table: RateLimitsTable, keyColumn: "id", recompute: byID(s.recomputeRateLimitLabelsTx)},
+		{name: "tool_sets", table: ToolSetsTable, keyColumn: "id", recompute: byID(s.recomputeToolSetLabelsTx)},
+		// Tools follow their parent connections, and this step also initializes
+		// labels on rows created before metadata storage was introduced.
+		{name: "tools", table: ToolsTable, keyColumn: "id", recompute: byID(s.recomputeToolLabelsTx)},
+	}
+}
+
+// reconcileStartIndex returns the index of the step to run first and the key after
+// which to continue it. The zero position starts the sweep from the top, as does a
+// position naming a step this release no longer has.
+func (s *service) reconcileStartIndex(steps []reconcileStep, from ReconcilePosition) (int, string) {
+	if from.Step == "" {
+		return 0, ""
+	}
+
+	for i, step := range steps {
+		if step.name == from.Step {
+			return i, from.AfterKey
+		}
+	}
+
+	s.logger.Warn("restarting carry-forward labels sweep from unknown step", "step", from.Step)
+	return 0, ""
+}
+
+// ReconcileCarryForwardLabelsSlice re-derives the materialized apxy/ portion of
+// the next rows of a sweep over every labelled resource type, starting at from.
+// Each row's update runs in its own short transaction; matching labels and
+// modification timestamps remain unchanged.
 //
-// batchSize controls the page size for each list query. limiter, when
+// The slice ends at the first page boundary at or past maxRows, so it can run a
+// little over but always ends at a position a later slice can continue from.
+// Running a slice again from the same position is safe, because repairs are
+// idempotent. Corrected counts rows from this call only. On error the caller
+// retries from the same position, because Next is not set.
+//
+// batchSize controls the page size for each key query. limiter, when
 // non-nil, is consulted before processing each row — providing a per-row
 // records/sec rate limit so a daily sweep over a large fleet is bounded
 // even though page reads are cheap. A nil limiter means unlimited.
-func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+func (s *service) ReconcileCarryForwardLabelsSlice(
+	ctx context.Context,
+	from ReconcilePosition,
+	maxRows int,
+	batchSize int32,
+	limiter *rate.Limiter,
+) (ReconcileSlice, error) {
 	if batchSize <= 0 {
 		batchSize = 100
 	}
 
-	s.logger.Info("starting carry-forward labels reconciliation", "batch_size", batchSize, "rate_limit", rateLimitLogValue(limiter))
+	steps := s.reconcileSteps()
+	first, afterKey := s.reconcileStartIndex(steps, from)
 
-	var totalCorrected int64
+	s.logger.Info(
+		"reconciling slice of carry-forward labels",
+		"step", steps[first].name,
+		"after_key", afterKey,
+		"max_rows", maxRows,
+		"batch_size", batchSize,
+		"rate_limit", rateLimitLogValue(limiter),
+	)
 
-	steps := []struct {
-		name string
-		walk func(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error)
-	}{
-		// Top-down: namespaces first (so child resources see fresh
-		// parent labels in subsequent passes), then per-resource walks.
-		{name: "namespaces", walk: s.reconcileNamespaces},
-		{name: "connectors", walk: s.reconcileConnectors},
-		{name: "connections", walk: s.reconcileConnections},
-		{name: "actors", walk: s.reconcileActors},
-		{name: "keys", walk: s.reconcileEncryptionKeys},
-		{name: "rate_limits", walk: s.reconcileRateLimits},
-		{name: "tool_sets", walk: s.reconcileToolSets},
-		{name: "tools", walk: s.reconcileTools},
-	}
+	var slice ReconcileSlice
+	remaining := maxRows
 
-	for _, step := range steps {
-		corrected, err := step.walk(ctx, batchSize, limiter)
+	for i := first; i < len(steps); i++ {
+		step := steps[i]
+
+		walk, err := s.reconcileLabelsByKey(ctx, step, afterKey, remaining, batchSize, limiter)
+		slice.Corrected += walk.corrected
 		if err != nil {
-			s.logger.Error("carry-forward labels reconciliation failed", "step", step.name, "corrected_so_far", totalCorrected, "error", err)
-			return totalCorrected, fmt.Errorf("reconcile %s: %w", step.name, err)
+			s.logger.Error("carry-forward labels reconciliation failed", "step", step.name, "corrected_so_far", slice.Corrected, "error", err)
+			return slice, fmt.Errorf("reconcile %s: %w", step.name, err)
 		}
-		totalCorrected += corrected
-		s.logger.Info("reconciled resource type", "step", step.name, "corrected", corrected)
+
+		// The row budget ran out partway through this step.
+		if !walk.finished {
+			slice.Next = ReconcilePosition{Step: step.name, AfterKey: walk.lastKey}
+			return slice, nil
+		}
+
+		s.logger.Info("reconciled resource type", "step", step.name, "corrected_in_slice", walk.corrected)
+
+		afterKey = ""
+		remaining -= walk.visited
+		if remaining <= 0 && i+1 < len(steps) {
+			slice.Next = ReconcilePosition{Step: steps[i+1].name}
+			return slice, nil
+		}
 	}
 
-	s.logger.Info("carry-forward labels reconciliation complete", "total_corrected", totalCorrected)
-	return totalCorrected, nil
+	slice.Done = true
+	return slice, nil
 }
 
 func rateLimitLogValue(limiter *rate.Limiter) string {
@@ -786,212 +886,94 @@ func rateLimitLogValue(limiter *rate.Limiter) string {
 	return fmt.Sprintf("%v rps", limiter.Limit())
 }
 
-func (s *service) reconcileNamespaces(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
-	var corrected int64
-	err := pagination.EnumerateThrottled(
-		ctx,
-		s.ListNamespacesBuilder().Limit(batchSize).Enumerate,
-		limiter,
-		func(ns Namespace) error {
-			wasCorrected, err := s.recomputeNamespaceLabelsTx(ctx, ns.Path)
-			if err != nil {
-				return err
-			}
-			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "namespace", "path", ns.Path)
-			}
-			return nil
-		})
-	return corrected, err
+// reconcileWalk reports how far reconcileLabelsByKey got through a step.
+type reconcileWalk struct {
+	// corrected counts rows whose labels were rewritten.
+	corrected int64
+	// visited counts rows the walk processed.
+	visited int
+	// lastKey is the last key of the last full page, meaningful when !finished.
+	lastKey string
+	// finished is true when the walk reached the end of the step.
+	finished bool
 }
 
-func (s *service) reconcileConnectors(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
-	var corrected int64
-	err := pagination.EnumerateThrottled(
-		ctx,
-		s.ListConnectorsBuilder().Limit(batchSize).Enumerate,
-		limiter,
-		func(connector ConnectorWithDefinition) error {
-			wasCorrected, err := s.recomputeConnectorLabelsTx(ctx, connector.Id)
-			if err != nil {
-				return err
-			}
-			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "connector", "id", connector.Id)
-			}
-			return nil
-		})
-	return corrected, err
-}
-
-func (s *service) reconcileConnections(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
-	var corrected int64
-	err := pagination.EnumerateThrottled(
-		ctx,
-		s.ListConnectionsBuilder().Limit(batchSize).Enumerate,
-		limiter,
-		func(conn Connection) error {
-			wasCorrected, err := s.recomputeConnectionLabelsTx(ctx, conn.Id)
-			if err != nil {
-				return err
-			}
-			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "connection", "id", conn.Id)
-			}
-			return nil
-		})
-	return corrected, err
-}
-
-func (s *service) reconcileActors(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
-	var corrected int64
-	err := pagination.EnumerateThrottled(
-		ctx,
-		s.ListActorsBuilder().Limit(batchSize).Enumerate,
-		limiter,
-		func(a *Actor) error {
-			wasCorrected, err := s.recomputeActorLabelsTx(ctx, a.Id)
-			if err != nil {
-				return err
-			}
-			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "actor", "id", a.Id)
-			}
-			return nil
-		})
-	return corrected, err
-}
-
-func (s *service) reconcileEncryptionKeys(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
-	var corrected int64
-	err := pagination.EnumerateThrottled(
-		ctx,
-		s.ListKeysBuilder().Limit(batchSize).Enumerate,
-		limiter,
-		func(ek Key) error {
-			wasCorrected, err := s.recomputeEncryptionKeyLabelsTx(ctx, ek.Id)
-			if err != nil {
-				return err
-			}
-			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "encryption_key", "id", ek.Id)
-			}
-			return nil
-		})
-	return corrected, err
-}
-
-func (s *service) reconcileRateLimits(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
-	var corrected int64
-	err := pagination.EnumerateThrottled(
-		ctx,
-		s.ListRateLimitsBuilder().Limit(batchSize).Enumerate,
-		limiter,
-		func(rl RateLimit) error {
-			wasCorrected, err := s.recomputeRateLimitLabelsTx(ctx, rl.Id)
-			if err != nil {
-				return err
-			}
-			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", "rate_limit", "id", rl.Id)
-			}
-			return nil
-		})
-	return corrected, err
-}
-
-// reconcileToolSets repairs logical ToolSet projections in bounded ID pages.
-func (s *service) reconcileToolSets(
+// reconcileLabelsByKey walks a step's live keys in bounded ascending pages,
+// starting after afterKey (empty starts at the beginning) and stopping after the
+// first full page that reaches maxRows. Paging by key instead of by offset keeps
+// writes from moving the walk's position: PostgreSQL stores an updated row at a
+// new physical location, so an unordered offset walk that repairs rows skips and
+// repeats others. The caller supplies a positive batchSize; limiting applies per row.
+func (s *service) reconcileLabelsByKey(
 	ctx context.Context,
+	step reconcileStep,
+	afterKey string,
+	maxRows int,
 	batchSize int32,
 	limiter *rate.Limiter,
-) (int64, error) {
-	return s.reconcileLabelsByID(ctx, ToolSetsTable, batchSize, limiter, s.recomputeToolSetLabelsTx)
-}
-
-// reconcileTools repairs Tool projections after parent resources. It also
-// initializes labels on rows created before metadata storage was introduced.
-func (s *service) reconcileTools(
-	ctx context.Context,
-	batchSize int32,
-	limiter *rate.Limiter,
-) (int64, error) {
-	return s.reconcileLabelsByID(ctx, ToolsTable, batchSize, limiter, s.recomputeToolLabelsTx)
-}
-
-// reconcileLabelsByID walks live IDs in bounded ascending pages. Reading IDs
-// instead of sorting by updated_at keeps writes from shifting the cursor. The
-// caller supplies a known table and positive batchSize; limiting applies per row.
-func (s *service) reconcileLabelsByID(
-	ctx context.Context,
-	table string,
-	batchSize int32,
-	limiter *rate.Limiter,
-	recompute func(context.Context, apid.ID) (bool, error),
-) (int64, error) {
-	var corrected int64
-	var lastID apid.ID
+) (reconcileWalk, error) {
+	walk := reconcileWalk{lastKey: afterKey}
 	for {
 		query := s.sq.
-			Select("id").
-			From(table).
+			Select(step.keyColumn).
+			From(step.table).
 			Where(sq.Eq{"deleted_at": nil}).
-			OrderBy("id").
+			OrderBy(step.keyColumn).
 			Limit(uint64(batchSize))
-		if lastID != "" {
-			query = query.Where(sq.Gt{"id": lastID})
+		if walk.lastKey != "" {
+			query = query.Where(sq.Gt{step.keyColumn: walk.lastKey})
 		}
 
 		rows, err := query.
 			RunWith(s.db).
 			QueryContext(ctx)
 		if err != nil {
-			return corrected, err
+			return walk, err
 		}
 
-		ids := make([]apid.ID, 0, batchSize)
+		keys := make([]string, 0, batchSize)
 		for rows.Next() {
-			var id apid.ID
-			if err := rows.Scan(&id); err != nil {
+			var key string
+			if err := rows.Scan(&key); err != nil {
 				rows.Close()
-				return corrected, err
+				return walk, err
 			}
 
-			ids = append(ids, id)
+			keys = append(keys, key)
 		}
 
 		// Release the read cursor before opening any per-row write transaction.
 		if err := errors.Join(rows.Err(), rows.Close()); err != nil {
-			return corrected, err
+			return walk, err
 		}
 
-		for _, id := range ids {
+		for _, key := range keys {
 			if limiter != nil {
 				if err := limiter.Wait(ctx); err != nil {
-					return corrected, err
+					return walk, err
 				}
 			}
 
-			wasCorrected, err := recompute(ctx, id)
+			wasCorrected, err := step.recompute(ctx, key)
 			if err != nil {
-				return corrected, err
+				return walk, err
 			}
 
+			walk.visited++
 			if wasCorrected {
-				corrected++
-				s.logger.Info("reconciled drifted carry-forward labels", "type", table, "id", id)
+				walk.corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", step.name, "key", key)
 			}
 		}
 
-		if len(ids) < int(batchSize) {
-			return corrected, nil
+		if len(keys) < int(batchSize) {
+			walk.finished = true
+			return walk, nil
 		}
-		lastID = ids[len(ids)-1]
+
+		walk.lastKey = keys[len(keys)-1]
+		if walk.visited >= maxRows {
+			return walk, nil
+		}
 	}
 }

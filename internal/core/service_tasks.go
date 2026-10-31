@@ -15,6 +15,7 @@ func (s *service) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypeProbe, s.runProbeForConnection)
 	mux.HandleFunc(taskTypeVerifyConnection, s.verifyConnection)
 	mux.HandleFunc(taskTypeProbeOutcomeCleanup, s.runProbeOutcomeCleanup)
+	mux.HandleFunc(taskTypeReconcileCarryForwardLabels, s.startReconcileCarryForwardLabels)
 }
 
 func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
@@ -88,6 +89,13 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 			Cronspec: "@every 24h",
 		})
 	}
+
+	// Daily carry-forward label sweep. The task only starts the durable workflow
+	// that does the work, and is a no-op while an earlier sweep is still running.
+	periodTasks = append(periodTasks, &asynq.PeriodicTaskConfig{
+		Task:     newReconcileCarryForwardLabelsTask(),
+		Cronspec: "@daily",
+	})
 
 	return periodTasks
 }

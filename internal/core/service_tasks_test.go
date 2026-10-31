@@ -74,10 +74,14 @@ func TestGetCronTasks_SchedulesOnlyEnabledPeriodicProbes(t *testing.T) {
 		Return(string(connJSON), nil)
 
 	tasks := svc.GetCronTasks()
-	require.Len(t, tasks, 2)
+	require.Len(t, tasks, 3)
 	assert.Equal(t, taskTypeProbe, tasks[0].Task.Type())
 	assert.Equal(t, "@every 1m0s", tasks[0].Cronspec)
 	assert.Equal(t, taskTypeProbeOutcomeCleanup, tasks[1].Task.Type())
+
+	// The daily carry-forward label sweep is scheduled regardless of connections.
+	assert.Equal(t, taskTypeReconcileCarryForwardLabels, tasks[2].Task.Type())
+	assert.Equal(t, "@daily", tasks[2].Cronspec)
 }
 
 type staticListConnectionsBuilder struct {
