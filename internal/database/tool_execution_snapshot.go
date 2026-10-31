@@ -88,12 +88,15 @@ func (s *service) GetToolExecutionSnapshot(ctx context.Context, id apid.ID) (*To
 			"cn.deleted_at":  nil,
 		}).
 		Where(s.currentToolOwnershipCondition()).
-		RunWith(s.db).QueryRowContext(ctx).Scan(fields...)
+		RunWith(s.db).
+		QueryRowContext(ctx).
+		Scan(fields...)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
