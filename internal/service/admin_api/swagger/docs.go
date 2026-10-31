@@ -1288,7 +1288,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Proxy an HTTP request through an authenticated connection to the external service. sendEvidence describes cumulative target-send evidence across redirects and credential recovery: notSent, mayHaveSent, or sent. It does not prove successful execution or safe retryability.",
+                "description": "Proxy an HTTP request through an authenticated connection to the external service.",
                 "consumes": [
                     "application/json"
                 ],

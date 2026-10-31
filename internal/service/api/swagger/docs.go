@@ -1288,7 +1288,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Proxy an HTTP request through an authenticated connection to the external service. sendEvidence describes cumulative target-send evidence across redirects and credential recovery: notSent, mayHaveSent, or sent. It does not prove successful execution or safe retryability.",
+                "description": "Proxy an HTTP request through an authenticated connection to the external service.",
                 "consumes": [
                     "application/json"
                 ],
@@ -5632,19 +5632,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "common.SendEvidence": {
-            "type": "string",
-            "enum": [
-                "notSent",
-                "mayHaveSent",
-                "sent"
-            ],
-            "x-enum-varnames": [
-                "SendEvidenceNotSent",
-                "SendEvidenceMayHaveSent",
-                "SendEvidenceSent"
-            ]
-        },
         "connection.ConnectionConfigurationStatus": {
             "type": "object",
             "properties": {
@@ -8164,15 +8151,11 @@ const docTemplateApi = `{
                 },
                 "sendEvidence": {
                     "description": "SendEvidence is populated for proxy failures; unrelated API errors omit it.",
+                    "type": "string",
                     "enum": [
                         "notSent",
                         "mayHaveSent",
                         "sent"
-                    ],
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/common.SendEvidence"
-                        }
                     ],
                     "example": "notSent"
                 },
@@ -8971,15 +8954,11 @@ const docTemplateApi = `{
                 },
                 "sendEvidence": {
                     "description": "SendEvidence covers all target attempts; sent does not imply provider success.",
+                    "type": "string",
                     "enum": [
                         "notSent",
                         "mayHaveSent",
                         "sent"
-                    ],
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/common.SendEvidence"
-                        }
                     ],
                     "example": "sent"
                 },

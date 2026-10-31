@@ -14,7 +14,7 @@ type ErrorResponse struct {
 	// Stack trace, only populated in debug mode.
 	StackTrace string `json:"stackTrace,omitempty" yaml:"stackTrace,omitempty"`
 	// SendEvidence is populated for proxy failures; unrelated API errors omit it.
-	SendEvidence common.SendEvidence `json:"sendEvidence,omitempty" yaml:"sendEvidence,omitempty" enums:"notSent,mayHaveSent,sent" example:"notSent"`
+	SendEvidence common.SendEvidence `json:"sendEvidence,omitempty" yaml:"sendEvidence,omitempty" swaggertype:"string" enums:"notSent,mayHaveSent,sent" example:"notSent"`
 }
 
 // SessionInitiateParams is the request body for POST /session/_initiate.

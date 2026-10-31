@@ -656,5 +656,5 @@ type ProxyResponseJson struct {
 	BodyRaw    []byte            `json:"bodyRaw,omitempty"`
 	BodyJson   interface{}       `json:"bodyJson,omitempty"`
 	// SendEvidence covers all target attempts; sent does not imply provider success.
-	SendEvidence common.SendEvidence `json:"sendEvidence" yaml:"sendEvidence" binding:"required" enums:"notSent,mayHaveSent,sent" example:"sent"`
+	SendEvidence common.SendEvidence `json:"sendEvidence" yaml:"sendEvidence" binding:"required" swaggertype:"string" enums:"notSent,mayHaveSent,sent" example:"sent"`
 }

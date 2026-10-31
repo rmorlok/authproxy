@@ -102,16 +102,6 @@ definitions:
           type: string
         type: array
     type: object
-  common.SendEvidence:
-    enum:
-    - notSent
-    - mayHaveSent
-    - sent
-    type: string
-    x-enum-varnames:
-    - SendEvidenceNotSent
-    - SendEvidenceMayHaveSent
-    - SendEvidenceSent
   connection.ConnectionConfigurationStatus:
     properties:
       configured:
@@ -1860,8 +1850,6 @@ definitions:
         example: Bad Request
         type: string
       sendEvidence:
-        allOf:
-        - $ref: '#/definitions/common.SendEvidence'
         description: SendEvidence is populated for proxy failures; unrelated API errors
           omit it.
         enum:
@@ -1869,6 +1857,7 @@ definitions:
         - mayHaveSent
         - sent
         example: notSent
+        type: string
       stackTrace:
         description: Stack trace, only populated in debug mode.
         type: string
@@ -2431,8 +2420,6 @@ definitions:
           type: string
         type: object
       sendEvidence:
-        allOf:
-        - $ref: '#/definitions/common.SendEvidence'
         description: SendEvidence covers all target attempts; sent does not imply
           provider success.
         enum:
@@ -2440,6 +2427,7 @@ definitions:
         - mayHaveSent
         - sent
         example: sent
+        type: string
       statusCode:
         example: 200
         type: integer
@@ -3445,10 +3433,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 'Proxy an HTTP request through an authenticated connection to the
-        external service. sendEvidence describes cumulative target-send evidence across
-        redirects and credential recovery: notSent, mayHaveSent, or sent. It does
-        not prove successful execution or safe retryability.'
+      description: Proxy an HTTP request through an authenticated connection to the
+        external service.
       parameters:
       - description: Connection UUID
         in: path
