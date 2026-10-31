@@ -91,6 +91,8 @@ func (p *proxy) maybeAccelerateProbes(ctx context.Context, reqType httpf.Request
 // ProxyRequest resolves credentials, sends the request, and on a 401
 // from the upstream attempts to recover (e.g. refresh an OAuth2 token)
 // and replay the request exactly once.
+// Target send evidence accumulates across both attempts; credential endpoint
+// traffic never contributes, and decoding failures retain transport evidence.
 //
 // If RecoverFrom401 returns auth_methods.ErrCannotRecover the upstream
 // 401 is returned to the caller unchanged. If recovery fails for any
@@ -335,26 +337,31 @@ func closeRawRequestBody(outbound *http.Request) {
 // this method until handed to the HTTP client; cancellation or credential
 // resolution errors before that handoff close the unsent body. The applied
 // AuthApplication is returned so a 401 can identify the rejected credential.
+// Each completed attempt reports its transport evidence. An interrupted attempt
+// remains uncertain rather than preserving an earlier known-unsent result.
 func (p *proxy) sendRaw(
 	ctx context.Context,
 	client *http.Client,
 	outbound *http.Request,
 ) (*http.Response, auth_methods.AuthApplication, error) {
+	state := httpf.SendStateMayHaveSent
+	defer func() { httpf.ReportSendState(ctx, state) }()
+
 	outbound = outbound.Clone(ctx)
 	if err := ctx.Err(); err != nil {
 		closeRawRequestBody(outbound)
-		httpf.ReportSendEvidence(ctx, false)
+		state = httpf.SendStateNotSent
 		return nil, auth_methods.AuthApplication{}, err
 	}
 	app, err := p.auth.Resolve(ctx)
 	if contextErr := ctx.Err(); contextErr != nil {
 		closeRawRequestBody(outbound)
-		httpf.ReportSendEvidence(ctx, false)
+		state = httpf.SendStateNotSent
 		return nil, auth_methods.AuthApplication{}, contextErr
 	}
 	if err != nil {
 		closeRawRequestBody(outbound)
-		httpf.ReportSendEvidence(ctx, false)
+		state = httpf.SendStateNotSent
 		return nil, auth_methods.AuthApplication{}, err
 	}
 	if outbound.Header == nil {
@@ -378,8 +385,8 @@ func (p *proxy) sendRaw(
 	// Only the target request gets a transport tracker. Resolve and 401
 	// recovery use the original context, so OAuth token requests cannot be
 	// mistaken for target execution. Reports accumulate across every attempt.
-	resp, mayHaveSent, err := httpf.DoWithSendEvidence(client, outbound)
-	httpf.ReportSendEvidence(ctx, mayHaveSent)
+	var resp *http.Response
+	resp, state, err = httpf.DoWithSendState(client, outbound)
 	return resp, app, err
 }
 
@@ -532,13 +539,19 @@ func splitCommaTrim(s string) []string {
 //
 // The applied AuthApplication is returned alongside the response so a 401
 // can be handed back to RecoverFrom401 identifying the rejected credential.
+// Evidence is reported even while unwinding a panic; only a completed tracked
+// attempt or a known credential failure can replace the conservative default.
 func (p *proxy) send(
 	ctx context.Context,
 	reqType httpf.RequestType,
 	req *iface.ProxyRequest,
 ) (*gentleman.Response, auth_methods.AuthApplication, error) {
+	state := httpf.SendStateMayHaveSent
+	defer func() { httpf.ReportSendState(ctx, state) }()
+
 	app, err := p.auth.Resolve(ctx)
 	if err != nil {
+		state = httpf.SendStateNotSent
 		return nil, auth_methods.AuthApplication{}, err
 	}
 
@@ -558,6 +571,9 @@ func (p *proxy) send(
 	for k, v := range app.QueryParams {
 		r.SetQuery(k, v)
 	}
-	resp, err := r.Do()
+	// Install the private target tracker only after Resolve so its OAuth HTTP
+	// responses cannot be mistaken for responses to this target request.
+	var resp *gentleman.Response
+	resp, state, err = httpf.DoGentlemanWithSendState(r)
 	return resp, app, err
 }
