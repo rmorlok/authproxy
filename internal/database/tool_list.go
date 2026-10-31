@@ -47,6 +47,24 @@ func IsValidToolOrderByField[T string | ToolOrderByField](field T) bool {
 	}
 }
 
+// toolNamespaceScope matches a namespace column against any supplied matcher.
+// Literal prefix comparison avoids LIKE's wildcard and case behavior, matching the
+// candidate scan so namespace scope agrees on SQLite and PostgreSQL. The column
+// must be a trusted constant because it is interpolated into SQL.
+func toolNamespaceScope(column string, matchers []string) sq.Or {
+	scopes := make(sq.Or, 0, len(matchers))
+	for _, matcher := range matchers {
+		base := strings.TrimSuffix(matcher, namespace.WildcardSuffix)
+		condition := sq.Or{sq.Eq{column: base}}
+		if base != matcher {
+			prefix := base + namespace.PathSeparator
+			condition = append(condition, sq.Expr("substr("+column+", 1, ?) = ?", len(prefix), prefix))
+		}
+		scopes = append(scopes, condition)
+	}
+	return scopes
+}
+
 // toolListPageSize resolves a requested page size. Non-positive values select
 // the default and larger values are capped, so a caller cannot read unbounded
 // pages. The result is always between one and limit.
@@ -210,19 +228,7 @@ func (l *listToolsFilters) FetchPage(ctx context.Context) pagination.PageResult[
 	}
 	q = q.OrderBy("t.id ASC")
 
-	// Literal prefix comparison avoids LIKE's wildcard and case behavior, matching
-	// the candidate scan so namespace scope agrees on SQLite and PostgreSQL.
-	var scopes sq.Or
-	for _, matcher := range l.NamespaceMatchers {
-		base := strings.TrimSuffix(matcher, namespace.WildcardSuffix)
-		condition := sq.Or{sq.Eq{"t.namespace": base}}
-		if base != matcher {
-			prefix := base + namespace.PathSeparator
-			condition = append(condition, sq.Expr("substr(t.namespace, 1, ?) = ?", len(prefix), prefix))
-		}
-		scopes = append(scopes, condition)
-	}
-	q = q.Where(scopes)
+	q = q.Where(toolNamespaceScope("t.namespace", l.NamespaceMatchers))
 
 	if l.NameVal != "" {
 		q = q.Where(sq.Eq{"t.name": l.NameVal})

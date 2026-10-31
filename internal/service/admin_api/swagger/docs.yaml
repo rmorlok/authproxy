@@ -480,6 +480,101 @@ definitions:
     required:
     - connectorRef
     type: object
+  openapi.ConnectionToolSetBindingConditionJson:
+    properties:
+      lastTransitionTime:
+        format: date-time
+        type: string
+      message:
+        type: string
+      observedGeneration:
+        example: 3
+        type: integer
+      reason:
+        example: InventoryInstalled
+        type: string
+      status:
+        enum:
+        - "True"
+        - "False"
+        - Unknown
+        type: string
+      type:
+        example: Installed
+        type: string
+    required:
+    - lastTransitionTime
+    - status
+    - type
+    type: object
+  openapi.ConnectionToolSetBindingJson:
+    description: One ToolSet's assignment to a connection and its installation status
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      kind:
+        enum:
+        - ConnectionToolSetBinding
+        example: ConnectionToolSetBinding
+        type: string
+      metadata:
+        $ref: '#/definitions/meta.ObjectMeta'
+      spec:
+        $ref: '#/definitions/openapi.ConnectionToolSetBindingSpecJson'
+      status:
+        $ref: '#/definitions/openapi.ConnectionToolSetBindingStatusJson'
+    required:
+    - apiVersion
+    - kind
+    - metadata
+    - spec
+    - status
+    type: object
+  openapi.ConnectionToolSetBindingListJson:
+    description: Paginated ToolSet assignments for one connection
+    properties:
+      apiVersion:
+        enum:
+        - authproxy.net/v1alpha1
+        example: authproxy.net/v1alpha1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/openapi.ConnectionToolSetBindingJson'
+        type: array
+      kind:
+        type: string
+      metadata:
+        $ref: '#/definitions/v1alpha1.ListMeta'
+    required:
+    - apiVersion
+    - items
+    - kind
+    - metadata
+    type: object
+  openapi.ConnectionToolSetBindingSpecJson:
+    properties:
+      connectionRef:
+        $ref: '#/definitions/meta.ObjectReference'
+      toolSetRef:
+        $ref: '#/definitions/meta.ObjectReference'
+    required:
+    - connectionRef
+    - toolSetRef
+    type: object
+  openapi.ConnectionToolSetBindingStatusJson:
+    properties:
+      appliedGeneration:
+        example: 3
+        type: integer
+      conditions:
+        items:
+          $ref: '#/definitions/openapi.ConnectionToolSetBindingConditionJson'
+        type: array
+    type: object
   openapi.ConnectorJson:
     description: Kubernetes-style Connector resource
     properties:
@@ -3713,6 +3808,58 @@ paths:
       security:
       - BearerAuth: []
       summary: Get OAuth2 scopes for a connection
+      tags:
+      - connections
+  /connections/{id}/toolsets:
+    get:
+      description: List the ToolSets assigned to a connection with their installation
+        status. Requires connections:get on the connection; only ToolSets the caller
+        can read with toolsets:get are returned, so a ToolSet in an ancestor namespace
+        is omitted without that grant. This reports status and grants no Tool invocation.
+      parameters:
+      - description: Connection ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return (default 50, max 100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/openapi.ConnectionToolSetBindingListJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List connection toolsets
       tags:
       - connections
   /connectors:

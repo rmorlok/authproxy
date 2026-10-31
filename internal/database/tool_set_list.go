@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -204,19 +203,7 @@ func (l *listToolSetsFilters) FetchPage(ctx context.Context) pagination.PageResu
 	}
 	q = q.OrderBy("t.id ASC")
 
-	// Literal prefix comparison avoids LIKE's wildcard and case behavior, matching
-	// the Tool listing so namespace scope agrees on SQLite and PostgreSQL.
-	var scopes sq.Or
-	for _, matcher := range l.NamespaceMatchers {
-		base := strings.TrimSuffix(matcher, namespace.WildcardSuffix)
-		condition := sq.Or{sq.Eq{"t.namespace": base}}
-		if base != matcher {
-			prefix := base + namespace.PathSeparator
-			condition = append(condition, sq.Expr("substr(t.namespace, 1, ?) = ?", len(prefix), prefix))
-		}
-		scopes = append(scopes, condition)
-	}
-	q = q.Where(scopes)
+	q = q.Where(toolNamespaceScope("t.namespace", l.NamespaceMatchers))
 
 	if l.NameVal != "" {
 		q = q.Where(sq.Eq{"t.name": l.NameVal})

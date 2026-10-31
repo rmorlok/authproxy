@@ -46,3 +46,22 @@ type ListToolSetGenerationsBuilder interface {
 	ForToolSetId(apid.ID) ListToolSetGenerationsBuilder
 	OrderBy(database.ToolSetGenerationOrderByField, pagination.OrderBy) ListToolSetGenerationsBuilder
 }
+
+// ListConnectionToolSetBindingsExecutor runs a binding listing one page at a time
+// or across every remaining page. Callers must still filter results by permission.
+type ListConnectionToolSetBindingsExecutor interface {
+	FetchPage(context.Context) pagination.PageResult[ConnectionToolSetBinding]
+	Enumerate(context.Context, pagination.EnumerateCallback[ConnectionToolSetBinding]) error
+}
+
+// ListConnectionToolSetBindingsBuilder pages one connection's ToolSet assignments,
+// ordered by ToolSet ID. ForConnectionId is required. ToolSet namespace scope is
+// required and should be the caller's effective ToolSet permission scope; an empty
+// scope matches nothing. Invalid filters surface as ErrInvalidArgument when the
+// listing runs.
+type ListConnectionToolSetBindingsBuilder interface {
+	ListConnectionToolSetBindingsExecutor
+	Limit(int32) ListConnectionToolSetBindingsBuilder
+	ForConnectionId(apid.ID) ListConnectionToolSetBindingsBuilder
+	ForToolSetNamespaceMatchers([]string) ListConnectionToolSetBindingsBuilder
+}

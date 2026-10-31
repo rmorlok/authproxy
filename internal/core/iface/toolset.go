@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 )
@@ -30,4 +31,19 @@ type ToolSet interface {
 
 	// GetResource returns a detached canonical resource for API responses.
 	GetResource() *toolsetschema.ToolSet
+}
+
+// ConnectionToolSetBinding is the management view of one ToolSet assigned to a
+// connection. It reports installation state only and grants no execution access.
+type ConnectionToolSetBinding interface {
+	GetConnectionId() apid.ID
+
+	// GetToolSetId and GetToolSetNamespace identify the parent ToolSet, whose
+	// namespace can be an ancestor of the connection's. Callers authorize it
+	// separately because seeing a connection does not reveal its ToolSets.
+	GetToolSetId() apid.ID
+	GetToolSetNamespace() string
+
+	// GetResource returns a detached canonical resource for API responses.
+	GetResource() *schemaapi.ConnectionToolSetBinding
 }
