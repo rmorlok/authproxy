@@ -46,9 +46,12 @@ func (o *oAuth2Connection) Refresh(ctx context.Context) error {
 		if errors.Is(err, database.ErrNotFound) {
 			return auth_methods.MarkCredentialsUnavailable(err)
 		}
+
 		return err
 	}
+
 	_, err = o.refreshAccessToken(ctx, token, refreshModeAlways)
+
 	return err
 }
 

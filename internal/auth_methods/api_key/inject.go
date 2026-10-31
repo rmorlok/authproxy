@@ -31,7 +31,10 @@ type authApplication struct {
 // the result into gentleman.Request calls. Returning structured data (rather
 // than mutating a gentleman.Request directly) lets unit tests assert on the
 // applied auth without booting an HTTP transport.
-func computeAuthApplication(placement *cschema.ApiKeyPlacement, plaintext database.ApiKeyCredentialPlaintext) (authApplication, error) {
+func computeAuthApplication(
+	placement *cschema.ApiKeyPlacement,
+	plaintext database.ApiKeyCredentialPlaintext,
+) (authApplication, error) {
 	if placement == nil {
 		return authApplication{}, errors.New("api-key placement is required")
 	}

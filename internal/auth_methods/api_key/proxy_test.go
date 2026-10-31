@@ -25,7 +25,10 @@ import (
 // newTestApiKeyConn builds an apiKeyConnection with mock DB + fake encrypt
 // for resolveAuth tests. The fake encrypt service stores plaintext in Data
 // (no actual encryption), which lets resolveAuth's json.Unmarshal succeed.
-func newTestApiKeyConn(t *testing.T, ctrl *gomock.Controller, conn *mockCore.Connection) (*apiKeyConnection, *mockDb.MockDB) {
+func newTestApiKeyConn(
+	t *testing.T, ctrl *gomock.Controller,
+	conn *mockCore.Connection,
+) (*apiKeyConnection, *mockDb.MockDB) {
 	t.Helper()
 	db := mockDb.NewMockDB(ctrl)
 	return &apiKeyConnection{
@@ -157,13 +160,22 @@ func TestResolveAuth_DecryptNotFoundIsNotCredentialLoss(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
 	conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{Id: connectionId})
 	cred := &database.ApiKeyCredential{
-		ConnectionId:         connectionId,
-		EncryptedCredentials: encfield.EncryptedField{ID: "dek_missing", Data: "private-ciphertext"},
-		PlacementSnapshot:    &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
+		ConnectionId: connectionId,
+		EncryptedCredentials: encfield.EncryptedField{
+			ID:   "dek_missing",
+			Data: "private-ciphertext",
+		},
+		PlacementSnapshot: &cschema.ApiKeyPlacement{
+			Type: cschema.ApiKeyPlacementBearer,
+		},
 	}
-	db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).Return(cred, nil)
+	db.EXPECT().
+		GetActiveApiKeyCredential(gomock.Any(), connectionId).
+		Return(cred, nil)
 	encryption := mockEncrypt.NewMockE(ctrl)
-	encryption.EXPECT().DecryptString(gomock.Any(), cred.EncryptedCredentials).Return("", database.ErrNotFound)
+	encryption.EXPECT().
+		DecryptString(gomock.Any(), cred.EncryptedCredentials).
+		Return("", database.ErrNotFound)
 	conn.encrypt = encryption
 	_, err := conn.Resolve(context.Background())
 

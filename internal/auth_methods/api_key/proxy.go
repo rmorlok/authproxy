@@ -23,11 +23,13 @@ func (a *apiKeyConnection) resolveAuth(ctx context.Context) (authApplication, er
 	cred, err := a.db.GetActiveApiKeyCredential(ctx, a.connection.GetId())
 	if err != nil {
 		err = fmt.Errorf("failed to load api-key credential: %w", err)
+
 		// Only this lookup's not-found result proves the connection lacks
 		// credentials. Storage, decryption, and configuration errors do not.
 		if errors.Is(err, database.ErrNotFound) {
 			err = auth_methods.MarkCredentialsUnavailable(err)
 		}
+
 		return authApplication{}, err
 	}
 
@@ -39,6 +41,7 @@ func (a *apiKeyConnection) resolveAuth(ctx context.Context) (authApplication, er
 	if err != nil {
 		return authApplication{}, fmt.Errorf("failed to decrypt api-key credential: %w", err)
 	}
+
 	var plaintext database.ApiKeyCredentialPlaintext
 	if err := json.Unmarshal([]byte(decrypted), &plaintext); err != nil {
 		return authApplication{}, fmt.Errorf("failed to unmarshal api-key plaintext: %w", err)

@@ -17,7 +17,9 @@ import (
 // client_secret. For token_endpoint_auth_method == "none" the secret is
 // optional — public clients have no secret to send — so its absence is not
 // an error.
-func (o *oAuth2Connection) resolveClientCredentials(ctx context.Context) (string, string, error) {
+func (o *oAuth2Connection) resolveClientCredentials(
+	ctx context.Context,
+) (string, string, error) {
 	if o.auth.GetGrantTypeOrDefault() == sconfig.OAuth2GrantClientCredentials {
 		return o.resolveStoredClientCredentials(ctx)
 	}
@@ -35,19 +37,24 @@ func (o *oAuth2Connection) resolveClientCredentials(ctx context.Context) (string
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get client secret for connector: %w", err)
 	}
+
 	return clientId, clientSecret, nil
 }
 
 // resolveStoredClientCredentials loads the connection-owned client grant.
 // A missing row is unavailable credentials; malformed or undecryptable stored
 // data remains an internal failure rather than implying a need to reconnect.
-func (o *oAuth2Connection) resolveStoredClientCredentials(ctx context.Context) (string, string, error) {
+func (o *oAuth2Connection) resolveStoredClientCredentials(
+	ctx context.Context,
+) (string, string, error) {
 	cred, err := o.db.GetActiveApiKeyCredential(ctx, o.connection.GetId())
 	if err != nil {
 		err = fmt.Errorf("failed to load OAuth2 client credentials: %w", err)
+
 		if errors.Is(err, database.ErrNotFound) {
 			err = auth_methods.MarkCredentialsUnavailable(err)
 		}
+
 		return "", "", err
 	}
 
