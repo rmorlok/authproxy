@@ -2,6 +2,7 @@ package oauth2
 
 import (
 	"context"
+	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
@@ -42,9 +43,15 @@ func (o *oAuth2Connection) Resolve(
 func (o *oAuth2Connection) Refresh(ctx context.Context) error {
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return auth_methods.MarkCredentialsUnavailable(err)
+		}
+
 		return err
 	}
+
 	_, err = o.refreshAccessToken(ctx, token, refreshModeAlways)
+
 	return err
 }
 

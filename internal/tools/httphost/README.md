@@ -160,13 +160,23 @@ response releases its request without canceling other calls in the session.
 
 Proxy and body failures return fixed error classifications, without URLs,
 credential text, response bodies, or upstream error messages. Callers can use
-`errors.Is` and map them to Tool error results. Non-context errors returned by
-the proxy currently use `ErrTransport`, including credential-resolution failures.
-The proxy does not yet expose stable categories that distinguish revoked
-credentials from database, decryption, or configuration failures. Those categories
-must be added at their source before an executor can reliably recommend
-reconnecting. Local rate-limit rejections are 429 responses, not Go errors, and
-remain available to status rules.
+`errors.Is` and map them to Tool error results. A returned proxy error explicitly
+marked with `auth_methods.ErrCredentialsUnavailable` becomes
+`httphost.ErrCredentialsUnavailable`. The marker identifies credentials known to
+be missing or unusable; see the [authentication failure contract](../../auth_methods/README.md#error-contract).
+The host discards the underlying private cause. Cancellation takes precedence,
+and other proxy errors remain `ErrTransport`.
+
+For example, a missing API-key row produces `ErrCredentialsUnavailable`, while
+failure to decrypt an existing key produces `ErrTransport`. Neither an error's
+text nor a 401/403 status alone is enough to infer missing credentials or advise
+reconnecting. The error category also does not establish retry safety: check the
+invocation's independent `ExecutionState()` for possible earlier effects.
+
+Failed credential recovery still returns the original upstream 401 response,
+including when the refresh error was marked unavailable. The response remains
+available to status rules. Local rate-limit rejections likewise remain normal
+429 responses, not Go errors.
 
 `ExecutionState()` starts as `notStarted`. While any `Do` call is outstanding,
 the answer is provisional and reports `mayHaveExecuted`. It can return to

@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -251,6 +252,11 @@ func (o *oAuth2Connection) refreshAccessTokenLocked(
 	// Get the latest token to make sure we still need to refresh
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
+		// A token can disappear between initial resolution and the locked
+		// refresh. Only a missing row proves the credential is unavailable.
+		if errors.Is(err, database.ErrNotFound) {
+			err = auth_methods.MarkCredentialsUnavailable(err)
+		}
 		return nil, o.classifyAndRecordRefreshFailure(
 			ctx,
 			tokenRefreshInternalError,
@@ -397,8 +403,9 @@ func (o *oAuth2Connection) refreshAccessTokenLocked(
 
 // classifyAndRecordRefreshFailure emits the structured failure event and, if
 // the category is permanent, flips the connection's health_state to
-// unhealthy. Returns the underlying error so callers can return it directly
-// from refreshAccessToken.
+// unhealthy. Known unusable-token categories additionally mark the error as
+// credentials unavailable, preserving its text and underlying cause. Other
+// permanent categories need not be credential problems and remain unmarked.
 //
 // Centralizing the emit + mark dance here ensures every refresh failure
 // path produces the same observable shape, and that the "permanent →
@@ -433,14 +440,26 @@ func (o *oAuth2Connection) classifyAndRecordRefreshFailure(
 		}
 	}
 
+	switch category {
+	case tokenRefreshNoRefreshToken, tokenRefreshInvalidGrant, tokenRefreshInvalidGrantAfterAmbiguousAttempt:
+		return auth_methods.MarkCredentialsUnavailable(err)
+	}
+
 	return err
 }
 
+// getValidToken loads the active token and refreshes it when expired. Missing
+// token rows are marked for internal callers without changing public errors.
 func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2Token, error) {
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
-		if errors.Is(database.ErrNotFound, err) {
-			return nil, httperr.New(422, "no valid oauth token found", httperr.WithInternalErr(err))
+		// Preserve the legacy HTTP distinction: a direct sentinel yields 422,
+		// while a wrapped missing-row error retains its original HTTP handling.
+		if err == database.ErrNotFound {
+			return nil, auth_methods.MarkCredentialsUnavailable(httperr.New(422, "no valid oauth token found", httperr.WithInternalErr(err)))
+		}
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, auth_methods.MarkCredentialsUnavailable(err)
 		}
 
 		return nil, err
