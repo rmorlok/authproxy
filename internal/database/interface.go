@@ -226,8 +226,13 @@ type DB interface {
 	// DeleteStandaloneTool removes the observed identity while retaining its revision history.
 	DeleteStandaloneTool(ctx context.Context, id apid.ID, expectedRevision uint64) error
 
-	// GetCurrentToolRevision reads the active definition and connection in one consistent SQL snapshot.
+	// GetCurrentToolRevision reads the active definition and its connection identity in one SQL snapshot.
 	GetCurrentToolRevision(ctx context.Context, id apid.ID) (*ToolRevision, error)
+
+	// GetToolExecutionSnapshot captures the active definition, connection configuration,
+	// pinned connector definition, and ToolSet provenance together for invocation admission.
+	// Callers still authorize the revision and check expected revision and readiness.
+	GetToolExecutionSnapshot(ctx context.Context, id apid.ID) (*ToolExecutionSnapshot, error)
 
 	// GetToolRevision inspects retained history; it does not select a definition for invocation.
 	GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*ToolRevision, error)
