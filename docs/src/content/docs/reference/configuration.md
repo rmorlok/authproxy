@@ -23,6 +23,24 @@ Fields can use AuthProxy value sources such as direct development values,
 environment variables, and file paths. Never put production credentials or
 key material directly in a committed YAML file.
 
+## Workflow retention
+
+The worker removes finished workflow instances and their history once a day.
+Set `tasks.workflowRetention` to control how long they are kept after they
+finish. The default is 30 days:
+
+```yaml
+tasks:
+  workflowRetention: 720h
+```
+
+Instances that are still running are never removed. Set `0s` to disable the
+cleanup and keep finished instances indefinitely. Use hours rather than days in
+YAML files.
+
+Once an instance is removed, it no longer appears in workflow monitoring, and
+polling its task returns `404`.
+
 ## Connector manifests
 
 Define connectors as `authproxy.net/v1alpha1` `Connector` resources in YAML or
