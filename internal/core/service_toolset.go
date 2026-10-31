@@ -47,6 +47,8 @@ func (s *service) GetToolSetGeneration(
 // CreateToolSet validates and compiles the first generation before creating
 // anything, then creates the logical ToolSet and its generation-1 draft, and
 // publishes it when primary is requested. Server-owned status is rejected.
+// Reconciliation is requested either way: a draft-only ToolSet still records
+// which connections are waiting for a first primary.
 func (s *service) CreateToolSet(
 	ctx context.Context,
 	resource *toolsetschema.ToolSet,
@@ -94,6 +96,8 @@ func (s *service) CreateToolSet(
 			return nil, mapToolSetDatabaseError(err)
 		}
 	}
+
+	s.enqueueToolSetReconcile(ctx, id)
 
 	return &ToolSet{logical: *logical, generation: *row, definition: candidate.Spec.Definition}, nil
 }
@@ -151,6 +155,7 @@ func (s *service) UpdateToolSet(
 			if logical, err = s.db.UpdateToolSetConnectionSelector(ctx, id, logical.SelectorRevision, selector); err != nil {
 				return nil, mapToolSetDatabaseError(err)
 			}
+			s.enqueueToolSetReconcile(ctx, id)
 		}
 	}
 
@@ -393,6 +398,7 @@ func (s *service) createToolSetDraft(
 		); err != nil {
 			return nil, mapToolSetDatabaseError(err)
 		}
+		s.enqueueToolSetReconcile(ctx, logical.Id)
 	}
 	return &ToolSet{logical: *logical, generation: *row, definition: *definition}, nil
 }
@@ -438,6 +444,7 @@ func (s *service) writeToolSetDraft(
 		); err != nil {
 			return nil, mapToolSetDatabaseError(err)
 		}
+		s.enqueueToolSetReconcile(ctx, logical.Id)
 	}
 	return &ToolSet{logical: *logical, generation: *row, definition: *definition}, nil
 }

@@ -183,7 +183,7 @@ type DB interface {
 	// GetToolSetBindingForConnection finds the current assignment for a parent pair.
 	GetToolSetBindingForConnection(ctx context.Context, toolSetId apid.ID, connectionId apid.ID) (*ToolSetBinding, error)
 
-	// ListToolSetBindingsBuilder starts a listing of one connection's live assignments.
+	// ListToolSetBindingsBuilder starts a listing of one parent's live assignments.
 	ListToolSetBindingsBuilder() ListToolSetBindingsBuilder
 
 	// ListToolSetBindingsFromCursor continues a binding listing with its saved filters.
