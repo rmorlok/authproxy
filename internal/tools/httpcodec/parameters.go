@@ -59,9 +59,11 @@ func (p *Parameters) Render(ctx context.Context, data *render.Context) (string, 
 	if p == nil {
 		return "", errors.New("parameter program is required")
 	}
+
 	values, err := p.template.Render(ctx, data)
 	if err != nil {
 		return "", err
 	}
+
 	return encodeParameterValues(ctx, p.names, values, p.limits.MaxBytes)
 }

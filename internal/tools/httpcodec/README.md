@@ -505,6 +505,11 @@ including JSON-only and error results.
 The executor owns response reading, decompression, cancellation of network I/O,
 aggregate invocation accounting, and output-schema validation. `Map` operates
 only on supplied bytes and does not access the network or close a stream.
+Before reading a response, call `NeedsBody(statusCode)`. It returns false for
+invalid statuses, non-2xx statuses, and 2xx statuses covered by an explicit error
+rule. In those cases, close the unread body and call `Map` with no body bytes;
+the status determines the error without decoding provider content. A true result
+means normal body handling is needed, including any configured transform.
 
 ### Response transforms
 

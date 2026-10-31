@@ -16,10 +16,15 @@ import (
 // Params and capture configuration/metadata before constructing this snapshot.
 // There is deliberately no connection object or credential field to reflect on.
 type Input struct {
-	// Params is the caller-validated tool input, exposed as params. Nested values
-	// must be JSON primitives, map[string]any, map[string]string, or []any; typed
-	// slices such as []string and arbitrary Go objects are rejected. NewContext
-	// copies these caller-owned values, including nested maps and slices.
+	// Params holds the decoded, validated Tool arguments exposed to templates as
+	// params. For example, {"id":"contact-42","limit":10} becomes a map whose
+	// values can be read with {{path.params.id}} and {{params.limit}}.
+	//
+	// NewContext checks value types and limits but does not validate an input
+	// schema. Nested values must be JSON primitives, map[string]any,
+	// map[string]string, or []any; typed slices such as []string and arbitrary Go
+	// objects are rejected. NewContext copies these caller-owned values,
+	// including nested maps and slices.
 	Params map[string]any
 
 	// Cfg is the captured connection configuration, exposed as cfg. It follows
@@ -65,6 +70,9 @@ type Input struct {
 // Context owns detached JSON values. Its contents are private and immutable
 // after construction, so independent renders can safely share the snapshot.
 type Context struct {
+	// root contains essentially JSON-cloned version of Input that has been
+	// validated. The data cloning makes sure that the values changed here
+	// cannot affect their original source.
 	root map[string]any
 }
 
@@ -152,7 +160,14 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 	}
 
 	snapshot := make(map[string]any, len(root))
-	for _, name := range []string{"params", "cfg", "labels", "annotations", "connection", "tool"} {
+	for _, name := range []string{
+		"params",
+		"cfg",
+		"labels",
+		"annotations",
+		"connection",
+		"tool",
+	} {
 		if err := b.addBytes(len(name)); err != nil {
 			return nil, err
 		}
@@ -169,7 +184,12 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 
 	// Missing root maps are convenient empty scopes; nested nil collections
 	// retain their JSON null meaning instead of becoming empty objects/arrays.
-	for _, name := range []string{"params", "cfg", "labels", "annotations"} {
+	for _, name := range []string{
+		"params",
+		"cfg",
+		"labels",
+		"annotations",
+	} {
 		if snapshot[name] == nil {
 			snapshot[name] = map[string]any{}
 		}
