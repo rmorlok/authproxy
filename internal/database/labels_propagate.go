@@ -729,8 +729,20 @@ func labelsEqual(a, b Labels) bool {
 	return true
 }
 
-// reconcileCarryForwardLabelsCheckpoint names the daily sweep's task checkpoint.
-const reconcileCarryForwardLabelsCheckpoint = "reconcile_carry_forward_labels"
+// ReconcilePosition is the carry-forward labels sweep's task checkpoint payload: the
+// point after which the sweep continues. It is stored as JSON, so its field names
+// must stay compatible across releases.
+type ReconcilePosition struct {
+	// Step names the reconcileStep to continue.
+	Step string `json:"step"`
+	// AfterKey is the last key finished within Step, or empty when no key in the
+	// step has been finished yet.
+	AfterKey string `json:"afterKey"`
+}
+
+// ReconcileCheckpointer saves and resumes the carry-forward labels sweep. It is a
+// named alias because the DB interface's mock generator cannot parse generic types.
+type ReconcileCheckpointer = TaskCheckpointer[ReconcilePosition]
 
 // reconcileStep is one table walked by the carry-forward labels sweep.
 type reconcileStep struct {
@@ -778,27 +790,33 @@ func (s *service) reconcileSteps() []reconcileStep {
 // row's update runs in its own short transaction; matching labels and modification
 // timestamps remain unchanged.
 //
-// Progress is saved in a task checkpoint after each full batch and each finished
+// Progress is saved through checkpointer after each full batch and each finished
 // step. A sweep is finished only when its last step completes: until then, every
 // call continues from the checkpoint, so a retry, a restarted worker, or the next
 // scheduled run repeats at most one batch and a sweep too large for one run still
 // reaches every table. Returns the number of rows corrected by this call, not the
 // sweep as a whole, including when it returns an error.
 //
-// Overlapping calls are safe but wasteful: rows are repaired idempotently and
-// the checkpoint only tracks whichever call saved last.
+// Overlapping calls are safe: rows are repaired idempotently, and when one call
+// saves progress the others get an error wrapping ErrTaskCheckpointConflict at
+// their next save and stop, leaving the sweep to the call that won.
 //
 // batchSize controls the page size for each key query. limiter, when
 // non-nil, is consulted before processing each row — providing a per-row
 // records/sec rate limit so a daily sweep over a large fleet is bounded
 // even though page reads are cheap. A nil limiter means unlimited.
-func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+func (s *service) ReconcileCarryForwardLabels(
+	ctx context.Context,
+	checkpointer *ReconcileCheckpointer,
+	batchSize int32,
+	limiter *rate.Limiter,
+) (int64, error) {
 	if batchSize <= 0 {
 		batchSize = 100
 	}
 
 	steps := s.reconcileSteps()
-	firstStep, afterKey, err := s.reconcileResumePoint(ctx, steps)
+	firstStep, afterKey, err := s.reconcileResumePoint(ctx, checkpointer, steps)
 	if err != nil {
 		return 0, fmt.Errorf("load reconcile checkpoint: %w", err)
 	}
@@ -816,7 +834,7 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 	for i := firstStep; i < len(steps); i++ {
 		step := steps[i]
 		saveProgress := func(lastKey string) error {
-			return s.saveTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint, step.name, lastKey)
+			return checkpointer.Save(ctx, ReconcilePosition{Step: step.name, AfterKey: lastKey})
 		}
 
 		corrected, err := s.reconcileLabelsByKey(ctx, step, afterKey, batchSize, limiter, saveProgress)
@@ -829,13 +847,13 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 
 		afterKey = ""
 		if i+1 < len(steps) {
-			if err := s.saveTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint, steps[i+1].name, ""); err != nil {
+			if err := checkpointer.Save(ctx, ReconcilePosition{Step: steps[i+1].name}); err != nil {
 				return totalCorrected, fmt.Errorf("save reconcile checkpoint: %w", err)
 			}
 		}
 	}
 
-	if err := s.deleteTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint); err != nil {
+	if err := checkpointer.Clear(ctx); err != nil {
 		return totalCorrected, fmt.Errorf("clear reconcile checkpoint: %w", err)
 	}
 
@@ -844,21 +862,31 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 }
 
 // reconcileResumePoint returns the index of the step to run first and the key
-// after which to continue it. With no checkpoint the sweep starts from the top,
-// as it does for a checkpoint naming a step this release no longer has.
-func (s *service) reconcileResumePoint(ctx context.Context, steps []reconcileStep) (int, string, error) {
-	checkpoint, err := s.getTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint)
-	if err != nil || checkpoint == nil {
+// after which to continue it. With no checkpoint the sweep starts from the top, as
+// it does for a checkpoint this release cannot use: one naming a step it no longer
+// has, or one it cannot decode. The checkpointer keeps that checkpoint's revision,
+// so the sweep's first save replaces it.
+func (s *service) reconcileResumePoint(
+	ctx context.Context,
+	checkpointer *ReconcileCheckpointer,
+	steps []reconcileStep,
+) (int, string, error) {
+	position, err := checkpointer.Load(ctx)
+	if errors.Is(err, ErrInvalidTaskCheckpointPayload) {
+		s.logger.Warn("ignoring unreadable reconcile checkpoint", "error", err)
+		return 0, "", nil
+	}
+	if err != nil || position == nil {
 		return 0, "", err
 	}
 
 	for i, step := range steps {
-		if step.name == checkpoint.Step {
-			return i, checkpoint.LastKey, nil
+		if step.name == position.Step {
+			return i, position.AfterKey, nil
 		}
 	}
 
-	s.logger.Warn("ignoring reconcile checkpoint for unknown step", "step", checkpoint.Step)
+	s.logger.Warn("ignoring reconcile checkpoint for unknown step", "step", position.Step)
 	return 0, "", nil
 }
 

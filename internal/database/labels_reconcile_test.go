@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -17,6 +18,29 @@ import (
 // staleLabels is drifted content for a labelled row: valid JSON that lacks the
 // row's implicit labels, so a recompute always rewrites it.
 const staleLabels = `{"apxy/stale":"1"}`
+
+// testReconcileCheckpointKey is the checkpoint key used by reconcile tests.
+var testReconcileCheckpointKey = TaskCheckpointKey{TaskType: "test:reconcile"}
+
+// testReconcileCheckpointer returns a checkpointer for one run of the sweep, as
+// the reconcile task creates for each of its runs.
+func testReconcileCheckpointer(db DB) *ReconcileCheckpointer {
+	return NewTaskCheckpointer[ReconcilePosition](db, testReconcileCheckpointKey, time.Hour)
+}
+
+// rivalRunDB saves progress as an overlapping run immediately after the checkpoint
+// is read, so the run under test is stale from its first save.
+type rivalRunDB struct {
+	DB
+	rival func(ctx context.Context)
+}
+
+// GetTaskCheckpoint reads the checkpoint, then lets the rival run overtake the caller.
+func (d *rivalRunDB) GetTaskCheckpoint(ctx context.Context, key TaskCheckpointKey) (*TaskCheckpoint, error) {
+	checkpoint, err := d.DB.GetTaskCheckpoint(ctx, key)
+	d.rival(ctx)
+	return checkpoint, err
+}
 
 // reconcileTestCtx returns a context with a fixed clock for reconcile tests.
 func reconcileTestCtx() context.Context {
@@ -70,12 +94,12 @@ func TestReconcileCarryForwardLabelsCoverage(t *testing.T) {
 		corruptAllKeys(t, rawDb)
 
 		// A single pass finds and repairs every drifted row exactly once.
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 50, nil)
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 50, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(total), fixed)
 
 		// Nothing is left for a second pass to find.
-		fixed, err = db.ReconcileCarryForwardLabels(ctx, 50, nil)
+		fixed, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 50, nil)
 		require.NoError(t, err)
 		require.Zero(t, fixed)
 	})
@@ -90,7 +114,7 @@ func TestReconcileCarryForwardLabelsCoverage(t *testing.T) {
 		for _, path := range paths {
 			require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: path, State: NamespaceStateActive}))
 		}
-		_, err := db.ReconcileCarryForwardLabels(ctx, 2, nil)
+		_, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 2, nil)
 		require.NoError(t, err)
 
 		// Changing the top row's user labels leaves its whole subtree stale.
@@ -98,14 +122,14 @@ func TestReconcileCarryForwardLabelsCoverage(t *testing.T) {
 		require.NoError(t, err)
 
 		// One pass reaches each parent before its child, so the label arrives at the leaf.
-		_, err = db.ReconcileCarryForwardLabels(ctx, 2, nil)
+		_, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 2, nil)
 		require.NoError(t, err)
 		leaf, err := db.GetNamespace(ctx, "root.a.b.c")
 		require.NoError(t, err)
 		require.Equal(t, "changed", leaf.Labels["apxy/ns/team"])
 
 		// A second pass confirms the first left nothing stale.
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 2, nil)
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 2, nil)
 		require.NoError(t, err)
 		require.Zero(t, fixed)
 	})
@@ -126,7 +150,7 @@ func TestReconcileCarryForwardLabelsCheckpoint(t *testing.T) {
 		runCtx, cancel := context.WithTimeout(ctx, time.Minute)
 		defer cancel()
 		limiter := rate.NewLimiter(0, earlierRows+keys)
-		_, err := db.ReconcileCarryForwardLabels(runCtx, 10, limiter)
+		_, err := db.ReconcileCarryForwardLabels(runCtx, testReconcileCheckpointer(db), 10, limiter)
 		require.ErrorContains(t, err, "reconcile keys")
 	}
 
@@ -134,11 +158,10 @@ func TestReconcileCarryForwardLabelsCheckpoint(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		defer rawDb.Close()
 		ctx := reconcileTestCtx()
-		s := db.(*service)
 
 		// Clear existing drift so that only the rows corrupted below count.
 		seedReconcileKeys(t, ctx, db, 30)
-		_, err := db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		_, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		total := countRows(t, rawDb, KeysTable)
 		corruptAllKeys(t, rawDb)
@@ -147,28 +170,28 @@ func TestReconcileCarryForwardLabelsCheckpoint(t *testing.T) {
 		interruptedAfterKeys(t, ctx, db, rawDb, 25)
 
 		// Progress stops at the last full page, so at most one batch is repeated.
-		checkpoint, err := s.getTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint)
+		position, err := testReconcileCheckpointer(db).Load(ctx)
 		require.NoError(t, err)
-		require.NotNil(t, checkpoint)
-		require.Equal(t, "keys", checkpoint.Step)
-		require.NotEmpty(t, checkpoint.LastKey)
+		require.NotNil(t, position)
+		require.Equal(t, "keys", position.Step)
+		require.NotEmpty(t, position.AfterKey)
 
 		// Drift behind the checkpoint must be left alone by the resumed run.
-		corruptKey(t, rawDb, checkpoint.LastKey)
+		corruptKey(t, rawDb, position.AfterKey)
 
 		// The resumed run repeats the interrupted page, whose first 5 rows are
 		// already clean, and repairs only the rows the first run never reached.
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(total-25), fixed)
 
 		// Finishing the last step clears the checkpoint.
-		checkpoint, err = s.getTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint)
+		position, err = testReconcileCheckpointer(db).Load(ctx)
 		require.NoError(t, err)
-		require.Nil(t, checkpoint)
+		require.Nil(t, position)
 
 		// The following run starts over and finds the drift the resumed run skipped.
-		fixed, err = db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		fixed, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), fixed)
 	})
@@ -177,25 +200,24 @@ func TestReconcileCarryForwardLabelsCheckpoint(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		defer rawDb.Close()
 		ctx := reconcileTestCtx()
-		s := db.(*service)
 
 		// Drift one row in an earlier step and one in the saved step.
 		ids := seedReconcileKeys(t, ctx, db, 1)
 		require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: "root.early", State: NamespaceStateActive}))
-		_, err := db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		_, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		_, err = rawDb.Exec(fmt.Sprintf(`UPDATE namespaces SET labels = '%s' WHERE path = 'root.early'`, staleLabels))
 		require.NoError(t, err)
 		corruptKey(t, rawDb, ids[0].String())
 
 		// A checkpoint at the start of the keys step skips only namespaces.
-		require.NoError(t, s.saveTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint, "keys", ""))
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		require.NoError(t, testReconcileCheckpointer(db).Save(ctx, ReconcilePosition{Step: "keys"}))
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), fixed)
 
 		// With the sweep finished, the next run reaches the namespace.
-		fixed, err = db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		fixed, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), fixed)
 	})
@@ -204,44 +226,62 @@ func TestReconcileCarryForwardLabelsCheckpoint(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		defer rawDb.Close()
 		ctx := reconcileTestCtx()
-		s := db.(*service)
 
 		// Rows are drifted, and the checkpoint names a step no release has.
 		seedReconcileKeys(t, ctx, db, 3)
 		total := countRows(t, rawDb, KeysTable)
 		corruptAllKeys(t, rawDb)
-		require.NoError(t, s.saveTaskCheckpoint(ctx, reconcileCarryForwardLabelsCheckpoint, "retired", "zzz"))
+		require.NoError(t, testReconcileCheckpointer(db).Save(ctx, ReconcilePosition{Step: "retired", AfterKey: "zzz"}))
 
 		// The whole sweep runs, ignoring the checkpoint's key.
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 10, nil)
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, fixed, int64(total))
 	})
 
-	t.Run("saving replaces earlier progress", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig(t, nil)
+	t.Run("an unreadable checkpoint restarts the sweep and is replaced", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		defer rawDb.Close()
 		ctx := reconcileTestCtx()
-		s := db.(*service)
 
-		// A missing checkpoint reads as nil rather than an error.
-		checkpoint, err := s.getTaskCheckpoint(ctx, "sweep")
+		// Rows are drifted, and the stored payload has a shape no release can decode.
+		seedReconcileKeys(t, ctx, db, 3)
+		total := countRows(t, rawDb, KeysTable)
+		corruptAllKeys(t, rawDb)
+		_, err := db.SaveTaskCheckpoint(ctx, testReconcileCheckpointKey, "", json.RawMessage(`["old format"]`), time.Hour)
 		require.NoError(t, err)
-		require.Nil(t, checkpoint)
 
-		// A second save overwrites the first.
-		require.NoError(t, s.saveTaskCheckpoint(ctx, "sweep", "first", "a"))
-		require.NoError(t, s.saveTaskCheckpoint(ctx, "sweep", "second", "b"))
-		checkpoint, err = s.getTaskCheckpoint(ctx, "sweep")
+		// The whole sweep runs and its saves replace the checkpoint, which it then clears.
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 10, nil)
 		require.NoError(t, err)
-		require.Equal(t, "second", checkpoint.Step)
-		require.Equal(t, "b", checkpoint.LastKey)
-		require.True(t, apctx.GetClock(ctx).Now().Equal(checkpoint.UpdatedAt))
+		require.GreaterOrEqual(t, fixed, int64(total))
+		_, err = db.GetTaskCheckpoint(ctx, testReconcileCheckpointKey)
+		require.ErrorIs(t, err, ErrNotFound)
+	})
 
-		// Deleting is repeatable and leaves no progress behind.
-		require.NoError(t, s.deleteTaskCheckpoint(ctx, "sweep"))
-		require.NoError(t, s.deleteTaskCheckpoint(ctx, "sweep"))
-		checkpoint, err = s.getTaskCheckpoint(ctx, "sweep")
+	t.Run("a run overtaken by an overlapping run stops and leaves its progress", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		defer rawDb.Close()
+		ctx := reconcileTestCtx()
+
+		// An earlier run left progress at the keys step.
+		require.NoError(t, testReconcileCheckpointer(db).Save(ctx, ReconcilePosition{Step: "keys"}))
+
+		// A rival advances the sweep just after the run under test reads the checkpoint.
+		overlapping := &rivalRunDB{DB: db, rival: func(ctx context.Context) {
+			rival := testReconcileCheckpointer(db)
+			_, err := rival.Load(ctx)
+			require.NoError(t, err)
+			require.NoError(t, rival.Save(ctx, ReconcilePosition{Step: "tools", AfterKey: "tol_rival"}))
+		}}
+
+		// The run under test finds it no longer owns the sweep at its first save.
+		_, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(overlapping), 10, nil)
+		require.ErrorIs(t, err, ErrTaskCheckpointConflict)
+
+		// The rival's position survives, so the sweep continues from there.
+		position, err := testReconcileCheckpointer(db).Load(ctx)
 		require.NoError(t, err)
-		require.Nil(t, checkpoint)
+		require.Equal(t, ReconcilePosition{Step: "tools", AfterKey: "tol_rival"}, *position)
 	})
 }

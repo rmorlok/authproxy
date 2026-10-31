@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -444,11 +445,44 @@ type DB interface {
 	// unlimited. Drift is rare under normal operation, but this method
 	// is the safety net for any propagation task that misfired or any
 	// data path that bypassed the carry-forward triggers. Intended to be
-	// invoked from a daily asynq cron task. Progress is checkpointed in the
-	// database, so a call continues any unfinished sweep; cancel ctx to stop
-	// a run early and let a later call pick up from there. Returns the number
-	// of rows whose labels were corrected by this call.
-	ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (corrected int64, err error)
+	// invoked from a daily asynq cron task. Progress is saved through
+	// `checkpointer`, so a call continues any unfinished sweep; cancel ctx to
+	// stop a run early and let a later call pick up from there. Returns the
+	// number of rows whose labels were corrected by this call. An error
+	// wrapping ErrTaskCheckpointConflict means an overlapping call took over.
+	ReconcileCarryForwardLabels(
+		ctx context.Context,
+		checkpointer *ReconcileCheckpointer,
+		batchSize int32,
+		limiter *rate.Limiter,
+	) (corrected int64, err error)
+
+	/*
+	 *  Task checkpoints
+	 */
+
+	// GetTaskCheckpoint returns the live checkpoint for key, or ErrNotFound.
+	// Tasks should normally use TaskCheckpointer rather than calling this.
+	GetTaskCheckpoint(ctx context.Context, key TaskCheckpointKey) (*TaskCheckpoint, error)
+
+	// SaveTaskCheckpoint compare-and-swaps the checkpoint for key, returning its
+	// new revision. expectedRevision is empty to create one. It returns
+	// ErrTaskCheckpointConflict when expectedRevision is no longer current.
+	SaveTaskCheckpoint(
+		ctx context.Context,
+		key TaskCheckpointKey,
+		expectedRevision string,
+		payload json.RawMessage,
+		ttl time.Duration,
+	) (revision string, err error)
+
+	// DeleteTaskCheckpoint removes the checkpoint for key, returning
+	// ErrTaskCheckpointConflict when revision is no longer current.
+	DeleteTaskCheckpoint(ctx context.Context, key TaskCheckpointKey, revision string) error
+
+	// DeleteExpiredTaskCheckpoints hard-deletes every expired checkpoint and
+	// returns how many were removed.
+	DeleteExpiredTaskCheckpoints(ctx context.Context) (int64, error)
 
 	/*
 	 *  Nonces

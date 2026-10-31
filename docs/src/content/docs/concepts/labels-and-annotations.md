@@ -193,7 +193,7 @@ Carry-forward is **materialised on create** — and **eventually consistent** af
 There are two propagation paths:
 
 1. **Targeted refresh.** Admin API mutators (e.g., updating a namespace's labels) enqueue a background task that re-derives every descendant's `apxy/` mirror — running each row's update in its own short transaction so concurrent reads aren't blocked. Typical latency: seconds to a few minutes, longer for deep fan-outs.
-2. **Daily consistency checker.** A scheduled job walks every resource type, compares the on-disk labels to what the carry-forward rule would compute, and corrects any drift. Belt-and-braces for the targeted refresh; the worst-case bound is "next daily run plus the time the walk itself takes" — minutes to hours.
+2. **Daily consistency checker.** A scheduled job walks every resource type, compares the on-disk labels to what the carry-forward rule would compute, and corrects any drift. Belt-and-braces for the targeted refresh; the worst-case bound is "next daily run plus the time the walk itself takes" — minutes to hours, or a few days on installs too large for one run, where the walk continues across daily runs.
 
 A rename updates the resource's own `apxy/<rt>/-/name` label in the same write.
 Copies carried to descendants use the same eventual reconciliation paths. For

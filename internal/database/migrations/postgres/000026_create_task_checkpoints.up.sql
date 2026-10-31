@@ -1,11 +1,20 @@
--- Progress of a long-running background sweep, so a retried or later run resumes
--- where the previous one stopped. A row exists only while a sweep is unfinished.
--- name identifies the sweep, step is the sweep-defined phase, and last_key is the
--- last key finished in that step ('' when the step has not started).
+-- Progress saved by a long-running background task, so a retried or later run
+-- resumes where the previous one stopped. task_type and scope identify the work:
+-- scope is '' for a task with one logical run, or separates parameterized runs of
+-- the same task. payload is task-defined JSON. revision is a unique token replaced
+-- by every write, which writers must present to prove they saw the latest progress.
+-- Rows past expires_at count as absent and are removed by a scheduled cleanup task.
 create table task_checkpoints
 (
-    name       text primary key,
-    step       text not null,
-    last_key   text not null,
-    updated_at timestamptz not null
+    task_type  text        not null,
+    scope      text        not null,
+    revision   text        not null,
+    payload    jsonb       not null,
+    expires_at timestamptz not null,
+    created_at timestamptz not null,
+    updated_at timestamptz not null,
+    primary key (task_type, scope)
 );
+
+create index idx_task_checkpoints_expires_at
+    on task_checkpoints (expires_at);

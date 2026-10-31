@@ -2,9 +2,11 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/database"
 	"golang.org/x/time/rate"
 )
 
@@ -39,6 +41,11 @@ const (
 	// reconcileMaxRetry stays small because retries only bridge transient errors:
 	// once they run out, the next daily run continues from the checkpoint.
 	reconcileMaxRetry = 3
+
+	// reconcileCheckpointTTL is how long a stalled sweep's progress stays usable. It
+	// spans several daily runs, and each save extends it, so only a sweep that has
+	// made no progress for this long starts over.
+	reconcileCheckpointTTL = 7 * 24 * time.Hour
 )
 
 // reconcileTaskOptions overrides asynq's defaults of a 30 minute timeout, which
@@ -59,7 +66,8 @@ func (th *taskHandler) reconcileCarryForwardLabels(ctx context.Context, _ *asynq
 }
 
 // runReconcile advances the sweep for at most budget. Running out of budget is a
-// success because the sweep's checkpoint lets the next run continue; any other
+// success because the sweep's checkpoint lets the next run continue, and so is
+// losing the checkpoint to an overlapping run, which now owns the sweep. Any other
 // error is returned so asynq retries, and cancellation of ctx is left to asynq.
 func (th *taskHandler) runReconcile(ctx context.Context, budget time.Duration) error {
 	th.logger.Info("running carry-forward labels reconciliation task")
@@ -69,9 +77,20 @@ func (th *taskHandler) runReconcile(ctx context.Context, budget time.Duration) e
 	runCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
 
+	// All runs share the task type as their key so that each continues the last.
+	checkpointer := database.NewTaskCheckpointer[database.ReconcilePosition](
+		th.db,
+		database.TaskCheckpointKey{TaskType: taskTypeReconcileCarryForwardLabels},
+		reconcileCheckpointTTL,
+	)
+
 	limiter := rate.NewLimiter(reconcileRecordsPerSecond, reconcileBurst)
-	corrected, err := th.db.ReconcileCarryForwardLabels(runCtx, reconcileBatchSize, limiter)
+	corrected, err := th.db.ReconcileCarryForwardLabels(runCtx, checkpointer, reconcileBatchSize, limiter)
 	if err != nil {
+		if errors.Is(err, database.ErrTaskCheckpointConflict) {
+			th.logger.Warn("carry-forward labels reconciliation stopped: another run owns the sweep", "corrected", corrected)
+			return nil
+		}
 		if ctx.Err() == nil && time.Until(deadline) <= reconcileBudgetSlack {
 			th.logger.Info("carry-forward labels reconciliation paused until next run", "corrected", corrected)
 			return nil
