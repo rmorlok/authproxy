@@ -196,7 +196,7 @@ func TestToolProjectionMaintenance(t *testing.T) {
 	ctx, db, tool, definition := standaloneToolForTest(t)
 	_, err := db.UpdateConnectionLabels(ctx, tool.ConnectionId, map[string]string{"region": "west"})
 	require.NoError(t, err)
-	_, err = db.ReconcileCarryForwardLabels(ctx, 1, nil)
+	_, err = reconcileFullSweep(db, ctx, 1, nil)
 	require.NoError(t, err)
 	rotated := encfield.EncryptedField{ID: apid.New(apid.PrefixDataEncryptionKey), Data: "cm90YXRlZA=="}
 	rotationTime := apctx.GetClock(ctx).Now().Add(time.Hour)

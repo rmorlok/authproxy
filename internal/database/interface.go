@@ -431,16 +431,23 @@ type DB interface {
 	// after a connector's user labels change.
 	RefreshConnectionsForConnector(ctx context.Context, id apid.ID) error
 
-	// ReconcileCarryForwardLabels walks every labelled resource in batches
-	// of `batchSize` and re-derives the materialized apxy/ portion of
-	// each row. The optional `limiter` is consulted before each row is
-	// processed, providing a per-row records/sec rate limit; nil means
+	// ReconcileCarryForwardLabelsSlice advances a sweep over every labelled
+	// resource by about maxRows rows from `from`, re-deriving the materialized
+	// apxy/ portion of each row in batches of `batchSize`. The zero position
+	// starts a sweep, and the returned slice says where to continue and whether
+	// the sweep is done. The optional `limiter` is consulted before each row
+	// is processed, providing a per-row records/sec rate limit; nil means
 	// unlimited. Drift is rare under normal operation, but this method
 	// is the safety net for any propagation task that misfired or any
 	// data path that bypassed the carry-forward triggers. Intended to be
-	// invoked from a daily asynq cron task. Returns the total number of
-	// rows whose labels were corrected.
-	ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (corrected int64, err error)
+	// driven by a durable workflow, which persists the position between slices.
+	ReconcileCarryForwardLabelsSlice(
+		ctx context.Context,
+		from ReconcilePosition,
+		maxRows int,
+		batchSize int32,
+		limiter *rate.Limiter,
+	) (ReconcileSlice, error)
 
 	/*
 	 *  Nonces

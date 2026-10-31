@@ -2392,7 +2392,7 @@ func TestConnectorLabelChangePropagation(t *testing.T) {
 	})
 }
 
-func TestReconcileCarryForwardLabels(t *testing.T) {
+func TestReconcileCarryForwardLabelsSweep(t *testing.T) {
 	t.Run("corrects drifted apxy labels and reports the count", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		defer rawDb.Close()
@@ -2423,9 +2423,9 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 
 		// First run may fix any pre-existing drift (e.g. on the auto-created
 		// root namespace from migrations). Drain it so we start clean.
-		_, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		_, err := reconcileFullSweep(db, ctx, 100, nil)
 		require.NoError(t, err)
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		fixed, err := reconcileFullSweep(db, ctx, 100, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), fixed, "second run should be a no-op once everything is materialized")
 
@@ -2435,7 +2435,7 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 			`{"apxy/cxr/type":"stale","apxy/cxn/-/id":"`+string(connID)+`","apxy/cxn/-/ns":"root.recon"}`, connID)
 		require.NoError(t, err)
 
-		fixed, err = db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		fixed, err = reconcileFullSweep(db, ctx, 100, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(1), fixed, "exactly the drifted connection row should be corrected")
 
@@ -2461,10 +2461,10 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		}))
 
 		// Drain any pre-existing drift on the auto-created root namespace.
-		_, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		_, err := reconcileFullSweep(db, ctx, 100, nil)
 		require.NoError(t, err)
 
-		fixed, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		fixed, err := reconcileFullSweep(db, ctx, 100, nil)
 		require.NoError(t, err)
 		require.Equal(t, int64(0), fixed)
 	})
@@ -2490,7 +2490,7 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		ctxWithDeadline, cancel := context.WithDeadline(ctx, time.Now().Add(-time.Second))
 		defer cancel()
 
-		_, err := db.ReconcileCarryForwardLabels(ctxWithDeadline, 100, limited)
+		_, err := reconcileFullSweep(db, ctxWithDeadline, 100, limited)
 		require.Error(t, err, "a tripped limiter should propagate its error from the reconciler")
 	})
 }

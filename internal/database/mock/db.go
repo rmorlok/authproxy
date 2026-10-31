@@ -2003,19 +2003,19 @@ func (mr *MockDBMockRecorder) PutRateLimitLabels(ctx, id, labels interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutRateLimitLabels", reflect.TypeOf((*MockDB)(nil).PutRateLimitLabels), ctx, id, labels)
 }
 
-// ReconcileCarryForwardLabels mocks base method.
-func (m *MockDB) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+// ReconcileCarryForwardLabelsSlice mocks base method.
+func (m *MockDB) ReconcileCarryForwardLabelsSlice(ctx context.Context, from database.ReconcilePosition, maxRows int, batchSize int32, limiter *rate.Limiter) (database.ReconcileSlice, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReconcileCarryForwardLabels", ctx, batchSize, limiter)
-	ret0, _ := ret[0].(int64)
+	ret := m.ctrl.Call(m, "ReconcileCarryForwardLabelsSlice", ctx, from, maxRows, batchSize, limiter)
+	ret0, _ := ret[0].(database.ReconcileSlice)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ReconcileCarryForwardLabels indicates an expected call of ReconcileCarryForwardLabels.
-func (mr *MockDBMockRecorder) ReconcileCarryForwardLabels(ctx, batchSize, limiter interface{}) *gomock.Call {
+// ReconcileCarryForwardLabelsSlice indicates an expected call of ReconcileCarryForwardLabelsSlice.
+func (mr *MockDBMockRecorder) ReconcileCarryForwardLabelsSlice(ctx, from, maxRows, batchSize, limiter interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabels", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabels), ctx, batchSize, limiter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabelsSlice", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabelsSlice), ctx, from, maxRows, batchSize, limiter)
 }
 
 // RefreshConnectionsForConnector mocks base method.
