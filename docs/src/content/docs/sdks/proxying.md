@@ -58,9 +58,11 @@ AuthProxy returns the upstream result in a response envelope:
 ```json
 {
   "statusCode": 201,
+  "sendEvidence": "sent",
   "headers": {
     "Content-Type": "application/json"
   },
+  "bodyRaw": null,
   "bodyJson": {
     "id": "widget-123",
     "name": "example"
@@ -68,9 +70,47 @@ AuthProxy returns the upstream result in a response envelope:
 }
 ```
 
-The outer AuthProxy request returns `200` when an upstream response was received. Inspect `statusCode` for the third-party status. AuthProxy authorization, validation, or transport failures use an error status on the outer request.
+The outer AuthProxy request returns `200` when the proxy produces a response envelope, including a locally generated rate-limit response. Inspect `statusCode` for that result's HTTP status. AuthProxy authorization, validation, or transport failures use an error status on the outer request.
 
 Responses with an `application/json` content type populate `bodyJson`. Other response bodies are returned as base64-encoded `bodyRaw`.
+
+### Target-send evidence
+
+The wrapped endpoint includes `sendEvidence` in its response envelope and in
+AuthProxy error bodies. It describes all target attempts made for that logical
+request, including redirects and a retry after credential recovery:
+
+| Value | Meaning |
+|---|---|
+| `notSent` | AuthProxy can prove that no target attempt reached the underlying HTTP transport. Examples include validation or authorization rejection, credential resolution failure, and a local rate-limit rejection before any target send. |
+| `mayHaveSent` | An attempt reached the target transport without a confirmed HTTP response, or tracking is incomplete. DNS/TLS failures and a lost response fall here; the provider may still have performed the action. |
+| `sent` | At least one target attempt returned an HTTP response, regardless of status. This includes provider 401, 429, and 500 responses. It does not prove that the requested action succeeded. |
+
+A local 429 can carry `notSent`, while a provider 429 carries `sent`. If the
+provider first returns 401 and a credential retry is later rejected locally,
+the result remains `sent`. OAuth token requests are excluded: a failed token
+refresh can leave the target request `notSent` even though AuthProxy contacted
+the token endpoint. A response-body or JSON-decoding failure after a target
+response also retains `sent`.
+
+For example, a wrapped-proxy validation error returns an outer `400` with:
+
+```json
+{
+  "error": "url is required",
+  "sendEvidence": "notSent"
+}
+```
+
+Only `notSent` rules out a target send. Decide whether and when to retry based
+on the failure cause, backoff requirements, and the provider's idempotency
+contract. Neither `sent` nor `mayHaveSent` makes a non-idempotent request safe
+to repeat automatically.
+
+Treat missing or unrecognized evidence as unknown. Older servers, failures
+before proxy routing, and infrastructure-generated errors may omit the field;
+a disconnected caller may receive no response at all. None of these outcomes
+proves `notSent`. This field is currently exposed on the wrapped endpoint.
 
 ### JavaScript
 
@@ -108,6 +148,8 @@ const {data} = await client.post<ProxyResponse>(
 if (data.statusCode >= 400) {
   throw new Error(`Upstream returned ${data.statusCode}`);
 }
+
+console.log(data.sendEvidence ?? 'mayHaveSent');
 ```
 
 See the [JavaScript/TypeScript SDK guide](/sdks/javascript/) for client configuration and session handling.

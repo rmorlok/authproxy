@@ -7,6 +7,7 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	authschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	actorschema "github.com/rmorlok/authproxy/internal/schema/resources/actor"
 	connectionschema "github.com/rmorlok/authproxy/internal/schema/resources/connection"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -654,4 +655,6 @@ type ProxyResponseJson struct {
 	Headers    map[string]string `json:"headers,omitempty"`
 	BodyRaw    []byte            `json:"bodyRaw,omitempty"`
 	BodyJson   interface{}       `json:"bodyJson,omitempty"`
+	// SendEvidence covers all target attempts; sent does not imply provider success.
+	SendEvidence common.SendEvidence `json:"sendEvidence" yaml:"sendEvidence" binding:"required" enums:"notSent,mayHaveSent,sent" example:"sent"`
 }

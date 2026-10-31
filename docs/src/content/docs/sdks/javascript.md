@@ -159,8 +159,10 @@ and later updates.
 The SDK exports `ProxyRequest`, `ProxyResponse`, `ProxyMethod`, and the shared `client`, but it does not currently include a dedicated proxy function. Call the wrapped proxy endpoint with `client.post`:
 
 ```ts
+import {isAxiosError} from 'axios';
 import {
   client,
+  type ApiError,
   type ProxyRequest,
   type ProxyResponse,
 } from '@authproxy/api';
@@ -172,13 +174,32 @@ const request: ProxyRequest = {
   labels: {'app.example.com/tenant': 'tenant-42'},
 };
 
-const {data} = await client.post<ProxyResponse>(
-  `/api/v1/connections/${encodeURIComponent(connectionId)}/_proxy`,
-  request,
-);
-
-console.log(data.statusCode, data.bodyJson);
+try {
+  const {data} = await client.post<ProxyResponse>(
+    `/api/v1/connections/${encodeURIComponent(connectionId)}/_proxy`,
+    request,
+  );
+  console.log(data.statusCode, data.bodyJson, data.sendEvidence ?? 'mayHaveSent');
+} catch (error) {
+  if (isAxiosError<ApiError>(error)) {
+    const reported = error.response?.data?.sendEvidence;
+    const evidence = reported === 'notSent' || reported === 'sent'
+      ? reported
+      : 'mayHaveSent';
+    console.error(error.response?.data?.error ?? error.message, evidence);
+  }
+  throw error;
+}
 ```
+
+`ProxyResponse.sendEvidence` and `ApiError.sendEvidence` use the exported
+`SendEvidence` union: `'notSent' | 'mayHaveSent' | 'sent'`. On a failed outer
+request, the error payload is available as `error.response?.data` on the Axios
+error. Both fields are optional in SDK types so older servers and unrelated
+API errors remain compatible. Missing metadata is unknown, never `notSent`;
+the SDK preserves the server's value without adding retries. See
+[target-send evidence](/sdks/proxying/#target-send-evidence) for the semantics
+and retry considerations.
 
 The wrapped endpoint buffers request and response bodies. For large files, chunked bodies, or server-sent events, use [`ap proxy`](/sdks/proxying/#use-ap-proxy) and the streaming raw endpoint instead.
 

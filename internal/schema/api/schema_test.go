@@ -71,6 +71,7 @@ func TestSchemaSamples(t *testing.T) {
 		file string
 	}{
 		{name: "error response", ref: "./schema.json#/$defs/ErrorResponse", file: "valid-error-response.json"},
+		{name: "proxy error response", ref: "./schema.json#/$defs/ErrorResponse", file: "valid-proxy-error-response.json"},
 		{name: "initiate connection", ref: "./schema.json#/$defs/ConnectionInitiateAction", file: "valid-initiate-connection.json"},
 		{name: "setup redirect", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-redirect.json"},
 		{name: "setup form", ref: "./schema.json#/$defs/ConnectionSetupAction", file: "valid-connection-setup-form.json"},

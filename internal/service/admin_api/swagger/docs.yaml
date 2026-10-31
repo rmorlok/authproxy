@@ -1849,6 +1849,15 @@ definitions:
         description: Error message.
         example: Bad Request
         type: string
+      sendEvidence:
+        description: SendEvidence is populated for proxy failures; unrelated API errors
+          omit it.
+        enum:
+        - notSent
+        - mayHaveSent
+        - sent
+        example: notSent
+        type: string
       stackTrace:
         description: Stack trace, only populated in debug mode.
         type: string
@@ -2410,9 +2419,20 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      sendEvidence:
+        description: SendEvidence covers all target attempts; sent does not imply
+          provider success.
+        enum:
+        - notSent
+        - mayHaveSent
+        - sent
+        example: sent
+        type: string
       statusCode:
         example: 200
         type: integer
+    required:
+    - sendEvidence
     type: object
   routes.OpenAPIRequestEventsEntry:
     description: Immutable, resource-shaped HTTP request event projection
@@ -3413,8 +3433,10 @@ paths:
     post:
       consumes:
       - application/json
-      description: Proxy an HTTP request through an authenticated connection to the
-        external service
+      description: 'Proxy an HTTP request through an authenticated connection to the
+        external service. sendEvidence describes cumulative target-send evidence across
+        redirects and credential recovery: notSent, mayHaveSent, or sent. It does
+        not prove successful execution or safe retryability.'
       parameters:
       - description: Connection UUID
         in: path

@@ -5,23 +5,24 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"gopkg.in/h2non/gentleman.v2"
 	gentlemancontext "gopkg.in/h2non/gentleman.v2/context"
 )
 
-// SendState describes transport evidence for a logical target request. It does
-// not establish whether the provider completed the requested action.
-type SendState string
+// SendState re-exports the shared transport evidence contract so existing
+// HTTP-client callers keep their terminology while API schemas use one enum.
+type SendState = common.SendEvidence
 
 const (
 	// SendStateNotSent means every reported attempt stopped before target transport.
-	SendStateNotSent SendState = "notSent"
+	SendStateNotSent = common.SendEvidenceNotSent
 	// SendStateMayHaveSent means a target handoff occurred without a response, or
 	// the implementation cannot account for all possible target sends.
-	SendStateMayHaveSent SendState = "mayHaveSent"
+	SendStateMayHaveSent = common.SendEvidenceMayHaveSent
 	// SendStateSent means the target transport returned an HTTP response on at
 	// least one attempt, regardless of its status or subsequent failures.
-	SendStateSent SendState = "sent"
+	SendStateSent = common.SendEvidenceSent
 )
 
 // SendObservation collects trusted reports for one logical target request,

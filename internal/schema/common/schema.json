@@ -23,6 +23,11 @@
       "type": "string",
       "description": "A cron expression, e.g., '0 0 1 * * *'."
     },
+    "SendEvidence": {
+      "type": "string",
+      "enum": ["notSent", "mayHaveSent", "sent"],
+      "description": "Cumulative target-send evidence: no target handoff, possible or unknown send, or a confirmed target HTTP response. A response does not prove application success."
+    },
     "RequestType": {
       "type": "string",
       "enum": [
