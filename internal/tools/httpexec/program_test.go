@@ -3,15 +3,18 @@ package httpexec_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
+	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -145,4 +148,58 @@ func TestExecuteOutputValidationLimits(t *testing.T) {
 		}
 		require.EqualValues(t, 1, body.closes.Load())
 	}
+}
+
+// TestCompileRejectsInvalidAuthoredAndOperatorLimits checks every authored cap
+// through the public compiler and prevents valid caps from repairing bad policy.
+func TestCompileRejectsInvalidAuthoredAndOperatorLimits(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		cap      func(*tools.ExecutionLimits, int64)
+		operator func(*httpexec.Limits, int64)
+	}{
+		{"timeout", func(c *tools.ExecutionLimits, v int64) { c.TimeoutMillis = &v }, func(l *httpexec.Limits, v int64) { l.HTTP.Timeout = time.Duration(v) }},
+		{"requests", func(c *tools.ExecutionLimits, v int64) { c.MaxRequests = util.ToPtr(int(v)) }, func(l *httpexec.Limits, v int64) { l.HTTP.MaxRequests = int(v) }},
+		{"input", func(c *tools.ExecutionLimits, v int64) { c.MaxInputBytes = &v }, func(l *httpexec.Limits, v int64) { l.Validation.MaxInputBytes = int(v) }},
+		{"output", func(c *tools.ExecutionLimits, v int64) { c.MaxOutputBytes = &v }, func(l *httpexec.Limits, v int64) { l.Response.MaxOutputBytes = int(v) }},
+		{"response", func(c *tools.ExecutionLimits, v int64) { c.MaxResponseBytes = &v }, func(l *httpexec.Limits, v int64) { l.HTTP.MaxResponseBytes = v }},
+		{"envelope", func(c *tools.ExecutionLimits, v int64) { c.MaxEncodedResultBytes = &v }, func(l *httpexec.Limits, v int64) { l.Response.MaxEncodedResultBytes = int(v) }},
+		{"stack", func(c *tools.ExecutionLimits, v int64) { c.MaxStackDepth = util.ToPtr(int(v)) }, func(l *httpexec.Limits, v int64) { l.Response.Transform.MaxStackDepth = int(v) }},
+	} {
+		for _, value := range []int64{0, -1} {
+			t.Run(fmt.Sprintf("%s/%d", test.name, value), func(t *testing.T) {
+				definition := executionDefinition()
+				definition.ProxyHTTP.Response = &tools.HTTPResponse{TransformJavascript: util.ToPtr(`true`)}
+				definition.Limits = &tools.ExecutionLimits{}
+				// Invalid authored values fail even when the operator policy is usable.
+				test.cap(definition.Limits, value)
+				program, err := httpexec.Compile(definition, executionLimits())
+				require.Error(t, err)
+				require.Nil(t, program)
+				// A positive cap must not replace a required zero or negative ceiling.
+				test.cap(definition.Limits, 1)
+				limits := executionLimits()
+				test.operator(&limits, value)
+				program, err = httpexec.Compile(definition, limits)
+				require.Error(t, err)
+				require.Nil(t, program)
+			})
+		}
+	}
+}
+
+// TestCompileAuthoredCapsLeaveUnusedTransformLimitsOptional permits a plain HTTP
+// Tool to omit pure-JavaScript policy even when its caps also affect projections.
+func TestCompileAuthoredCapsLeaveUnusedTransformLimitsOptional(t *testing.T) {
+	definition, limits := executionDefinition(), executionLimits()
+	definition.Limits = &tools.ExecutionLimits{
+		TimeoutMillis: util.ToPtr(int64(1000)), MaxStackDepth: util.ToPtr(12),
+		MaxOutputBytes: util.ToPtr(int64(512)),
+	}
+	limits.Response.Transform = javascript.Limits{}
+
+	// Authored caps constrain active components without enabling a transform.
+	program, err := httpexec.Compile(definition, limits)
+	require.NoError(t, err)
+	require.NotNil(t, program)
 }

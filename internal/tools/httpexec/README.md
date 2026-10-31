@@ -36,10 +36,11 @@ is `{"name":"Ada"}`. The output schema checks the projected result.
 ## Compile and invoke
 
 Compile the decoded `tools.ToolDefinition` once for its captured revision and
-effective policy. `Limits` groups the existing renderer, schema validator,
-response mapper, and HTTP host limits. All required values must be positive;
-the caller resolves defaults, operator ceilings, and the Tool's optional limits
-before passing them here. `Compile` does not resolve `definition.Limits` itself.
+operator policy. `Limits` groups the existing renderer, schema validator,
+response mapper, and HTTP host limits. Required operator limits must be positive;
+`Compile` lowers them with the Tool's optional `limits` before compiling
+the components. Omitted Tool limits inherit operator policy, and larger Tool
+values cannot raise it. Zero or negative Tool values fail compilation.
 
 ```go
 program, err := httpexec.Compile(definition, limits)
@@ -76,6 +77,45 @@ See the [renderer](../render/README.md), [schema validator](../validation/README
 [response mapper](../httpcodec/README.md#response-limits), and
 [HTTP host](../httphost/README.md) for their limit fields and units.
 
+For example, the contact lookup above can declare:
+
+```yaml
+limits:
+  timeoutMillis: 1500
+  maxInputBytes: 1024
+  maxResponseBytes: 65536
+  maxOutputBytes: 8192
+  maxEncodedResultBytes: 16384
+```
+
+With a 60-second operator timeout, this Tool gets 1.5 seconds for the entire
+invocation. A stricter one-second operator timeout still wins. Arguments are
+limited to 1 KiB, provider response bytes to 64 KiB, and result content to 8 KiB.
+The response can be larger than the result because a projection can select just
+the fields the caller needs. The complete serialized result, including metadata
+and base64 expansion, must also fit within 16 KiB. Each allowance remains subject
+to any smaller operator limit.
+
+Tool limits apply to these components:
+
+| Tool field | Execution allowance |
+| --- | --- |
+| `timeoutMillis` | HTTP session and response-transform time |
+| `maxRequests` | Logical HTTP client calls; credential recovery uses existing proxy policy |
+| `maxInputBytes` | Raw caller arguments, including JSON whitespace |
+| `maxOutputBytes` | Result content, structured-output validation, and transform output |
+| `maxResponseBytes` | Decoded response reads and response mapping |
+| `maxEncodedResultBytes` | Complete serialized result envelope |
+| `maxStackDepth` | Response-transform JavaScript call depth |
+
+The argument cap does not reduce the renderer's snapshot/request allowance or
+the transform's combined snapshot/response input allowance. Those contain
+connection configuration and provider data as well as arguments. Source size,
+nesting, work, numeric precision, encoded response streams, and headers retain
+their separate operator limits. Response and output byte caps are independent;
+this compiler does not add a shared total across them. No defaults or unlimited
+values are introduced here.
+
 The program owns its compiled source and can be reused concurrently. Each call
 validates `Arguments` and replaces `Snapshot.Params` with that private decoded
 tree. Configuration, labels, annotations, and provenance are then copied for
@@ -111,7 +151,7 @@ Failures use fixed messages and discard partial output:
 | Unavailable connection credentials | `CONNECTION_UNAVAILABLE` |
 | Transport or response-read failure | `UPSTREAM_FAILED` |
 | Invalid HTTP response or content encoding | `UPSTREAM_PROTOCOL_ERROR` |
-| Invocation timeout, request allowance, or input validation data limit | `EXECUTION_LIMIT_EXCEEDED` |
+| Invocation timeout, request allowance, input validation data limit, or transform runtime limit (including its output encoder) | `EXECUTION_LIMIT_EXCEEDED` |
 | Response/output data limits or result-envelope size | `OUTPUT_TOO_LARGE` |
 | Invalid successful output or output-schema mismatch | `OUTPUT_INVALID` |
 

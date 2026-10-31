@@ -13,9 +13,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/tools/validation"
 )
 
-// Limits contains effective execution policy. The caller resolves operator
-// ceilings and the definition's optional caps before compilation. The component
-// limits retain their own units and meanings; no defaults are supplied here.
+// Limits contains operator execution policy. Compile lowers these limits with
+// the definition's optional caps; a Tool cannot raise them. The component limits
+// retain their own units and meanings; no defaults are supplied here.
 type Limits struct {
 	Render     render.Limits            // Context copying and complete request rendering.
 	Validation validation.Limits        // Argument and structured-output JSON validation.
@@ -35,12 +35,18 @@ type Program struct {
 
 // Compile prepares an HTTP executor without sending requests or running authored
 // JavaScript. The caller owns full resource validation, authorization, revision
-// selection, and policy resolution (including definition.Limits). This compiler
-// accepts exactly the proxyHttp executor and retains no caller-owned definition
-// data. Compiled programs must not be reused for a different revision or policy.
+// selection, and operator policy. Compile validates definition.Limits and applies
+// its smaller caps before compiling the components. This compiler accepts exactly
+// the proxyHttp executor and retains no caller-owned definition data. Compiled
+// programs must not be reused for a different revision or policy.
 func Compile(definition toolschema.ToolDefinition, limits Limits) (*Program, error) {
 	if definition.ProxyHTTP == nil || definition.Javascript != nil {
 		return nil, errors.New("HTTP Tool requires only the proxyHttp executor")
+	}
+
+	limits, err := resolveLimits(limits, definition.Limits)
+	if err != nil {
+		return nil, err
 	}
 
 	if limits.HTTP.Timeout <= 0 ||
