@@ -155,7 +155,7 @@ func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 //
 // Authorization is granted if:
 //  1. The actor is authenticated
-//  2. The actor's permissions allow the action (or actor is admin/superadmin)
+//  2. The actor's permissions allow the action
 //  3. If request-level restrictions are set, they also allow the action
 //
 // Parameters:

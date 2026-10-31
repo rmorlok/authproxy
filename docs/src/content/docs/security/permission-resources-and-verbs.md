@@ -17,7 +17,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 |---|---|---|
 | `actors` | `create`, `delete`, `get`, `list`, `update` | Actor records, permissions, labels, annotations, and signing keys |
 | `app-metrics` | `query`, `schema` | Aggregate application-metric queries and metric-schema discovery |
-| `connections` | `create`, `disconnect`, `force_state`, `get`, `list`, `proxy`, `update` | Connection setup, configuration, lifecycle, and authenticated proxy requests |
+| `connections` | `create`, `disconnect`, `force_state`, `get`, `list`, `proxy`, `update`, and Tool-defined verbs | Connection setup, configuration, lifecycle, authenticated proxy requests, and internal Tool invocation authorization |
 | `connectors` | `archive`, `create`, `disconnect_all`, `force_state`, `get`, `list`, `list/generations`, `update` | Connector definitions, generations, metadata, and lifecycle operations |
 | `keys` | `create`, `delete`, `get`, `list`, `update` | Reusable signing and encryption-key resources; `delete` also gates `DELETE /keys/{id}/unused`, which rejects namespace references and encryption history |
 | `namespaces` | `create`, `get`, `list`, `update` | Namespace records, metadata, and namespace key assignments |
@@ -57,6 +57,19 @@ a Tool needs only `tools:create` or `tools:update` in the Tool's namespace; the
 bound connection must be in that same namespace, and no `connections` verb is
 checked. Granting `tools:update` lets an actor change what an executable Tool
 does, so treat it as trusted administration.
+
+The internal Tool invocation authorization gate checks the verbs declared by
+the captured Tool revision against the connection's namespace and ID. At least
+one of those verbs must be allowed by both the actor and any JWT restrictions.
+For example, if a Tool declares `tool:read` and `tool:inspect`, granting the
+actor only `tool:read` and the JWT only `tool:inspect` does not authorize it.
+Granting both the same verb does. A broad administrator grant is still narrowed
+by JWT restrictions.
+
+This check requires neither `connections:proxy` nor a separate `tools:invoke`
+permission. A `tool:*` verb is a literal string; only `*` is a wildcard. This
+gate is an internal building block; the public invocation endpoint is not yet
+available.
 
 ToolSet management follows the same rule. `toolsets` verbs are checked in the
 ToolSet's namespace, and a connection selector may only select that namespace
