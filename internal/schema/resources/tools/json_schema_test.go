@@ -2,6 +2,8 @@ package tools
 
 import (
 	"bytes"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -9,6 +11,128 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestCompileInputSchemaOwnsLocalReferences verifies that compiled constraints
+// retain their meaning after the caller reuses the authored document's bytes.
+func TestCompileInputSchemaOwnsLocalReferences(t *testing.T) {
+	// Compile an input with a local reference and an object-valued constant.
+	raw := common.RawJSON(`{
+		"type":"object","required":["selection"],
+		"properties":{"selection":{"$ref":"#/$defs/selection"}},
+		"$defs":{"selection":{"const":{"name":"original"}}}
+	}`)
+	before := bytes.Clone(raw)
+	schema, err := CompileInputSchema(raw)
+	require.NoError(t, err)
+	assert.Equal(t, before, []byte(raw), "compilation must preserve the authored document")
+
+	// The compiled schema owns decoded values rather than the caller's buffer.
+	copy(raw, bytes.Repeat([]byte("x"), len(raw)))
+	require.NoError(t, schema.Validate(map[string]any{
+		"selection": map[string]any{"name": "original"},
+	}))
+	require.Error(t, schema.Validate(map[string]any{
+		"selection": map[string]any{"name": "changed"},
+	}))
+	require.Error(t, schema.Validate(map[string]any{}))
+}
+
+// TestCompileOutputSchemaChecksValues verifies that output validators retain
+// non-object and boolean schema constraints, and require an authored document.
+func TestCompileOutputSchemaChecksValues(t *testing.T) {
+	// Output may be a scalar even though the input contract requires an object.
+	schema, err := CompileOutputSchema(common.RawJSON(`{"type":"integer","minimum":2}`))
+	require.NoError(t, err)
+	require.NoError(t, schema.Validate(json.Number("2")))
+	require.Error(t, schema.Validate(json.Number("1")))
+	require.Error(t, schema.Validate("2"))
+
+	// Boolean output schemas allow or reject every value, including null.
+	for _, accepted := range []bool{false, true} {
+		schema, err = CompileOutputSchema(common.RawJSON(fmt.Sprint(accepted)))
+		require.NoError(t, err)
+		if accepted {
+			require.NoError(t, schema.Validate(nil))
+		} else {
+			require.Error(t, schema.Validate(nil))
+		}
+	}
+
+	// Optional output omission is a caller decision, not an accepting schema.
+	schema, err = CompileOutputSchema(nil)
+	require.ErrorContains(t, err, "invalid JSON schema")
+	assert.Nil(t, schema)
+}
+
+// TestCompiledSchemaValidationPreservesValues ensures annotations and rejected
+// properties never become implicit transformations of invocation data.
+func TestCompiledSchemaValidationPreservesValues(t *testing.T) {
+	schema, err := CompileInputSchema(common.RawJSON(`{
+		"type":"object","required":["name"],"additionalProperties":false,
+		"properties":{
+			"name":{"type":"string","default":"anonymous"},
+			"count":{"type":"integer","default":1}
+		}
+	}`))
+	require.NoError(t, err)
+
+	for name, test := range map[string]struct {
+		value map[string]any
+		valid bool
+	}{
+		"optional default stays absent":    {map[string]any{"name": "Alice"}, true},
+		"required default is not inserted": {map[string]any{}, false},
+		"additional properties are not stripped": {
+			map[string]any{"name": "Alice", "extra": map[string]any{"nested": true}}, false,
+		},
+		"types are not coerced": {map[string]any{"name": json.Number("42")}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Capture the entire input, including unknown nested properties.
+			before, err := json.Marshal(test.value)
+			require.NoError(t, err)
+
+			// Both successful and failed validation must leave all data intact.
+			err = schema.Validate(test.value)
+			if test.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+			after, err := json.Marshal(test.value)
+			require.NoError(t, err)
+			assert.Equal(t, before, after)
+		})
+	}
+}
+
+// TestCompiledSchemaConcurrentReuse shares one compiled schema across validators
+// so race-enabled tests check that runtime validation keeps state per call.
+func TestCompiledSchemaConcurrentReuse(t *testing.T) {
+	// Local recursion exercises repeated traversal of the same compiled nodes.
+	schema, err := CompileInputSchema(common.RawJSON(`{
+		"type":"object","required":["name"],
+		"properties":{
+			"name":{"type":"string"},
+			"children":{"type":"array","items":{"$ref":"#"}}
+		}
+	}`))
+	require.NoError(t, err)
+
+	for i := range 16 {
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
+
+			// Each call has independent values while sharing the compiled graph.
+			require.NoError(t, schema.Validate(map[string]any{
+				"name": "parent", "children": []any{map[string]any{"name": "child"}},
+			}))
+			require.Error(t, schema.Validate(map[string]any{
+				"name": "parent", "children": []any{map[string]any{}},
+			}))
+		})
+	}
+}
 
 // TestValidateSchemaNativeDialectAndLocalReferences covers supported local
 // pointers, anchors, bundled resources, and recursive schemas without mutation.
