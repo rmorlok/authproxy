@@ -4,22 +4,43 @@ import (
 	"context"
 	"net/http"
 	"sync/atomic"
+
+	"gopkg.in/h2non/gentleman.v2"
+	gentlemancontext "gopkg.in/h2non/gentleman.v2/context"
+)
+
+// SendState describes transport evidence for a logical target request. It does
+// not establish whether the provider completed the requested action.
+type SendState string
+
+const (
+	// SendStateNotSent means every reported attempt stopped before target transport.
+	SendStateNotSent SendState = "notSent"
+	// SendStateMayHaveSent means a target handoff occurred without a response, or
+	// the implementation cannot account for all possible target sends.
+	SendStateMayHaveSent SendState = "mayHaveSent"
+	// SendStateSent means the target transport returned an HTTP response on at
+	// least one attempt, regardless of its status or subsequent failures.
+	SendStateSent SendState = "sent"
 )
 
 // SendObservation collects trusted reports for one logical target request,
 // including credential-recovery attempts. Its zero value is usable and remains
-// uncertain until a report arrives. Reports of possible sends are permanent.
-// It is safe to report and inspect evidence concurrently.
+// uncertain until a report arrives. A confirmed send dominates uncertainty,
+// which dominates known-unsent reports. Reporting and inspection are safe
+// concurrently; callers must wait for their logical call to finish before
+// interpreting its settled state.
 type SendObservation struct {
-	// state distinguishes unreported uncertainty from an explicit report, so a
-	// later known-unsent attempt cannot erase an earlier possible send.
+	// state orders explicit evidence without treating initial uncertainty as a
+	// report: a first known-unsent report can still establish notSent.
 	state atomic.Uint32
 }
 
 const (
-	sendUnreported      uint32 = iota // No implementation has reported evidence.
-	sendNotAttempted                  // Every reported attempt is known unsent.
-	sendMayHaveOccurred               // At least one reported attempt may have sent.
+	sendUnreported       uint32 = iota // No implementation has reported evidence.
+	sendNotAttempted                   // Every reported attempt is known unsent.
+	sendMayHaveOccurred                // At least one reported attempt may have sent.
+	sendResponseReceived               // At least one target HTTP response was received.
 )
 
 // sendObservationKey isolates caller observations from transport tracking.
@@ -33,20 +54,32 @@ func ObserveSends(ctx context.Context) (context.Context, *SendObservation) {
 	return context.WithValue(ctx, sendObservationKey{}, observation), observation
 }
 
-// MayHaveSent reports whether the observed call might have reached its target.
-// It returns true for missing evidence, including a nil observation. Only an
-// explicit trusted report that no target handoff occurred can make it false.
-func (o *SendObservation) MayHaveSent() bool {
-	return o == nil || o.state.Load() != sendNotAttempted
+// State returns cumulative target evidence. Missing evidence, including a nil
+// observation, remains mayHaveSent. A sent report cannot be erased by later
+// uncertainty or local rejection.
+func (o *SendObservation) State() SendState {
+	if o != nil {
+		switch o.state.Load() {
+		case sendNotAttempted:
+			return SendStateNotSent
+		case sendResponseReceived:
+			return SendStateSent
+		}
+	}
+	return SendStateMayHaveSent
 }
 
-// ReportSendEvidence adds a trusted target-send report to ctx's observation.
-// Passing false asserts that the reported work never reached the target
-// transport. Passing true records either a possible send or missing evidence;
-// it is permanent even if a later attempt is known unsent. Without an installed
-// observation this function does nothing. Credential endpoint I/O must not be
-// reported as a target send.
-func ReportSendEvidence(ctx context.Context, mayHaveSent bool) {
+// MayHaveSent preserves the conservative boolean contract: only known-unsent
+// evidence is false, while confirmed sends and missing evidence are true.
+func (o *SendObservation) MayHaveSent() bool {
+	return o.State() != SendStateNotSent
+}
+
+// ReportSendState adds trusted target evidence to ctx's observation. Reports
+// accumulate across attempts: sent wins over mayHaveSent, which wins over
+// notSent. Invalid states are treated as uncertainty. Without an observation
+// this does nothing. Credential endpoint I/O must not be reported here.
+func ReportSendState(ctx context.Context, state SendState) {
 	if ctx == nil {
 		return
 	}
@@ -56,12 +89,29 @@ func ReportSendEvidence(ctx context.Context, mayHaveSent bool) {
 		return
 	}
 
-	if mayHaveSent {
-		observation.state.Store(sendMayHaveOccurred)
-		return
+	report := sendMayHaveOccurred
+	switch state {
+	case SendStateNotSent:
+		report = sendNotAttempted
+	case SendStateSent:
+		report = sendResponseReceived
 	}
 
-	observation.state.CompareAndSwap(sendUnreported, sendNotAttempted)
+	for previous := observation.state.Load(); previous < report; previous = observation.state.Load() {
+		if observation.state.CompareAndSwap(previous, report) {
+			return
+		}
+	}
+}
+
+// ReportSendEvidence preserves boolean reporting for existing callers. True is
+// uncertainty, never proof of a received response; false is trusted notSent.
+func ReportSendEvidence(ctx context.Context, mayHaveSent bool) {
+	state := SendStateNotSent
+	if mayHaveSent {
+		state = SendStateMayHaveSent
+	}
+	ReportSendState(ctx, state)
 }
 
 // targetSendEvidence accumulates transport evidence across a single client.Do,
@@ -75,22 +125,49 @@ type targetSendEvidence struct {
 	// handedOff remains true after any attempt enters the underlying transport.
 	// It deliberately includes failures before actual network writes.
 	handedOff atomic.Bool
+
+	// responseReceived remains true after an underlying transport response,
+	// including when a later redirect or middleware produces an error.
+	responseReceived atomic.Bool
 }
 
-// targetSendEvidenceKey can only be installed by DoWithSendEvidence.
+// targetSendEvidenceKey is installed only by the target-send helpers.
 type targetSendEvidenceKey struct{}
 
 // targetEvidenceFrom returns the private transport tracker, when this request
-// was prepared by DoWithSendEvidence. Ordinary HTTP calls have no tracker.
+// was prepared by a target-send helper. Ordinary HTTP calls have no tracker.
 func targetEvidenceFrom(ctx context.Context) *targetSendEvidence {
 	evidence, _ := ctx.Value(targetSendEvidenceKey{}).(*targetSendEvidence)
 	return evidence
 }
 
-// DoWithSendEvidence sends req and reports whether any target attempt may have
-// reached the underlying transport. The client and request must be non-nil;
-// response/body ownership and errors retain client.Do semantics. The caller's
-// request context is not changed.
+// state returns the settled evidence for one client call. A confirmed target
+// response is useful even through an unknown outer wrapper. Only direct use of
+// the complete factory stack can establish that no target send occurred.
+func (e *targetSendEvidence) state(supported bool) SendState {
+	if e.responseReceived.Load() {
+		return SendStateSent
+	}
+	if supported && e.covered.Load() && !e.handedOff.Load() {
+		return SendStateNotSent
+	}
+	return SendStateMayHaveSent
+}
+
+// usesSendCoverage reports direct use of the complete factory stack. Check it
+// before and after dispatch because plugins or redirect callbacks can install
+// an unknown wrapper during a call. A nil client is not instrumented.
+func usesSendCoverage(client *http.Client) bool {
+	if client == nil {
+		return false
+	}
+	_, supported := client.Transport.(*sendCoverageTransport)
+	return supported
+}
+
+// DoWithSendState sends req and returns cumulative target evidence across
+// redirects. The client and request must be non-nil; response/body ownership
+// and errors retain client.Do semantics. The caller's context is not changed.
 //
 // Only a client using the factory's complete middleware stack directly can
 // prove no transport handoff; an unknown wrapper may perform untracked I/O
@@ -98,13 +175,14 @@ func targetEvidenceFrom(ctx context.Context) *targetSendEvidence {
 // transport counts even if dialing or TLS later fails. The private tracker
 // follows redirects but is not installed in the original context, so callers
 // can resolve credentials with that context without counting token requests.
-// This helper returns evidence without reporting to a SendObservation.
-func DoWithSendEvidence(
+// A response observed below middleware establishes sent even if later work
+// fails. This helper returns evidence without reporting to a SendObservation.
+func DoWithSendState(
 	client *http.Client,
 	req *http.Request,
-) (resp *http.Response, mayHaveReached bool, err error) {
-	// Check if we have the coverage transport to record what we need
-	_, supported := client.Transport.(*sendCoverageTransport)
+) (resp *http.Response, state SendState, err error) {
+	// Both checks are required: redirect callbacks can change the transport.
+	supported := usesSendCoverage(client)
 
 	// Attach the evidence to the context for tracking
 	evidence := &targetSendEvidence{}
@@ -113,12 +191,44 @@ func DoWithSendEvidence(
 	// Execute the request
 	resp, err = client.Do(req.WithContext(ctx))
 
-	// Evaluate if we may have reached transport
-	mayHaveReached = !supported ||
-		!evidence.covered.Load() ||
-		evidence.handedOff.Load()
+	return resp, evidence.state(supported && usesSendCoverage(client)), err
+}
 
-	return resp, mayHaveReached, err
+// DoWithSendEvidence preserves the original boolean helper contract. It does
+// not report to an observation; only notSent maps to false.
+func DoWithSendEvidence(
+	client *http.Client,
+	req *http.Request,
+) (*http.Response, bool, error) {
+	resp, state, err := DoWithSendState(client, req)
+	return resp, state != SendStateNotSent, err
+}
+
+// DoGentlemanWithSendState sends a single-use Gentleman request with the same
+// target evidence as DoWithSendState. It installs tracking after request
+// middleware has configured the effective HTTP client and request context.
+// Early interception or an unknown transport remains uncertain without a
+// confirmed target response. The helper does not report to an observation or
+// change Gentleman's response, error, and body ownership behavior.
+func DoGentlemanWithSendState(req *gentleman.Request) (*gentleman.Response, SendState, error) {
+	evidence := &targetSendEvidence{}
+	supported := false
+	var effectiveContext *gentlemancontext.Context
+	req.UseHandler("before dial", func(ctx *gentlemancontext.Context, handler gentlemancontext.Handler) {
+		effectiveContext = ctx
+		supported = usesSendCoverage(ctx.Client)
+		tracked := context.WithValue(ctx.Request.Context(), targetSendEvidenceKey{}, evidence)
+		// SetRequest would discard the new context; preserve Gentleman's store
+		// while adding tracking directly to the final outbound request.
+		ctx.Request = ctx.Request.WithContext(tracked)
+		handler.Next(ctx)
+	})
+
+	resp, err := req.Do()
+	// A parent before-dial handler can replace either the client or its transport
+	// after Next returns, so inspect the final context rather than a saved client.
+	stillSupported := effectiveContext != nil && usesSendCoverage(effectiveContext.Client)
+	return resp, evidence.state(supported && stillSupported), err
 }
 
 // sendCoverageTransport acknowledges that the complete factory middleware
@@ -146,8 +256,8 @@ type sendHandoffTransport struct {
 	transport http.RoundTripper
 }
 
-// RoundTrip records the handoff before calling the underlying transport, so
-// transport failures and retries cannot erase evidence of a possible send.
+// RoundTrip records the handoff and any valid underlying response. Recording
+// below middleware prevents synthetic local responses from looking sent.
 func (t *sendHandoffTransport) RoundTrip(
 	req *http.Request,
 ) (*http.Response, error) {
@@ -155,5 +265,13 @@ func (t *sendHandoffTransport) RoundTrip(
 		evidence.handedOff.Store(true)
 	}
 
-	return t.transport.RoundTrip(req)
+	resp, err := t.transport.RoundTrip(req)
+	// RoundTripper must return a nil error when it obtained a response. Reject
+	// invalid placeholder responses rather than promoting them to sent.
+	if err == nil && resp != nil && resp.StatusCode >= 100 && resp.StatusCode <= 999 {
+		if evidence := targetEvidenceFrom(req.Context()); evidence != nil {
+			evidence.responseReceived.Store(true)
+		}
+	}
+	return resp, err
 }

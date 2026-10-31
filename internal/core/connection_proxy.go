@@ -49,6 +49,9 @@ func (c *connection) resolveAuthenticator(
 	return factory.NewAuthenticator(c), nil
 }
 
+// ProxyRequest initializes the connection proxy and delegates a buffered target
+// request. Initialization errors report no target send, including cached errors;
+// evidence from an earlier attempt in the same observation is preserved.
 func (c *connection) ProxyRequest(
 	ctx context.Context,
 	reqType httpf.RequestType,
@@ -56,12 +59,16 @@ func (c *connection) ProxyRequest(
 ) (*iface.ProxyResponse, error) {
 	p, err := c.getProxyImpl()
 	if err != nil {
+		httpf.ReportSendEvidence(ctx, false)
 		return nil, err
 	}
 
 	return p.ProxyRequest(ctx, reqType, req)
 }
 
+// ProxyRequestRaw initializes the connection proxy and streams the target
+// response into w. Initialization errors report no target send and close the
+// outgoing body without reading it or writing a downstream response.
 func (c *connection) ProxyRequestRaw(
 	ctx context.Context,
 	reqType httpf.RequestType,
@@ -70,6 +77,7 @@ func (c *connection) ProxyRequestRaw(
 ) error {
 	p, err := c.getProxyImpl()
 	if err != nil {
+		httpf.ReportSendEvidence(ctx, false)
 		closeRawProxyRequestBody(req)
 		return err
 	}
@@ -77,6 +85,9 @@ func (c *connection) ProxyRequestRaw(
 	return p.ProxyRequestRaw(ctx, reqType, req, w)
 }
 
+// ProxyRequestStream initializes the connection proxy and returns a target
+// response whose body the caller owns. Initialization errors report no target
+// send and close the outgoing body without reading it.
 func (c *connection) ProxyRequestStream(
 	ctx context.Context,
 	reqType httpf.RequestType,
@@ -84,6 +95,7 @@ func (c *connection) ProxyRequestStream(
 ) (*http.Response, error) {
 	p, err := c.getProxyImpl()
 	if err != nil {
+		httpf.ReportSendEvidence(ctx, false)
 		closeRawProxyRequestBody(req)
 		return nil, err
 	}
