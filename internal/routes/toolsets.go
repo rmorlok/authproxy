@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
@@ -35,12 +36,14 @@ type ListToolSetsRequestQueryParams struct {
 	NamespaceVal  *string `form:"namespace"`
 	NameVal       *string `form:"name"`
 	LabelSelector *string `form:"labelSelector"`
+	OrderByVal    *string `form:"orderBy"`
 }
 
 // ListToolSetGenerationsRequestQueryParams page GET /toolsets/{id}/generations.
 type ListToolSetGenerationsRequestQueryParams struct {
-	Cursor   *string `form:"cursor"`
-	LimitVal *int32  `form:"limit"`
+	Cursor     *string `form:"cursor"`
+	LimitVal   *int32  `form:"limit"`
+	OrderByVal *string `form:"orderBy"`
 }
 
 // ToolSetsRoutes serves ToolSet management: the logical resource, which owns
@@ -228,6 +231,7 @@ func (r *ToolSetsRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace matcher"
 // @Param			name			query		string	false	"Filter by exact name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy			query		string	false	"Order by id, namespace, name, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	schemaapiopenapi.ListToolSetsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -272,6 +276,14 @@ func (r *ToolSetsRoutes) list(gctx *gin.Context) {
 		}
 		if req.LabelSelector != nil {
 			listReq.LabelSelector = *req.LabelSelector
+		}
+		if req.OrderByVal != nil {
+			field, order, ok := parseListOrderBy(gctx, val, *req.OrderByVal, database.IsValidToolSetOrderByField[database.ToolSetOrderByField])
+			if !ok {
+				return
+			}
+			listReq.OrderByField = field
+			listReq.OrderBy = order
 		}
 		page, err = r.core.ListToolSets(ctx, listReq)
 	}
@@ -384,13 +396,14 @@ func (r *ToolSetsRoutes) delete(gctx *gin.Context) {
 }
 
 // @Summary		List toolset generations
-// @Description	List a ToolSet's generations, newest first. Each projects the current shared connection selector.
+// @Description	List a ToolSet's generations, newest first by default. Each projects the current shared connection selector.
 // @Tags			toolsets
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string	true	"ToolSet ID"
 // @Param			cursor	query		string	false	"Pagination cursor"
 // @Param			limit	query		integer	false	"Maximum number of results to return (default 50, max 100)"
+// @Param			orderBy	query		string	false	"Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to newest generation first."
 // @Success		200		{object}	schemaapiopenapi.ListToolSetsResponseJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -431,11 +444,19 @@ func (r *ToolSetsRoutes) listGenerations(gctx *gin.Context) {
 			return
 		}
 	} else {
-		var limit int32
+		var listReq coreIface.ListToolSetGenerationsRequest
 		if req.LimitVal != nil {
-			limit = *req.LimitVal
+			listReq.Limit = *req.LimitVal
 		}
-		page, err = r.core.ListToolSetGenerations(ctx, toolSet.GetId(), limit)
+		if req.OrderByVal != nil {
+			field, order, ok := parseListOrderBy(gctx, val, *req.OrderByVal, database.IsValidToolSetGenerationOrderByField[database.ToolSetGenerationOrderByField])
+			if !ok {
+				return
+			}
+			listReq.OrderByField = field
+			listReq.OrderBy = order
+		}
+		page, err = r.core.ListToolSetGenerations(ctx, toolSet.GetId(), listReq)
 	}
 	if err != nil {
 		writeToolSetError(gctx, val, err, toolSet.GetId())

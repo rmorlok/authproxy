@@ -18,6 +18,32 @@ import (
 // identity rows, so the cap matches the internal candidate scan.
 const MaxToolListLimit = MaxToolCandidateLimit
 
+// ToolOrderByField names a column management Tool listings can sort by.
+type ToolOrderByField string
+
+const (
+	ToolOrderById        ToolOrderByField = "id"
+	ToolOrderByNamespace ToolOrderByField = "namespace"
+	ToolOrderByName      ToolOrderByField = "name"
+	ToolOrderByCreatedAt ToolOrderByField = "created_at"
+	ToolOrderByUpdatedAt ToolOrderByField = "updated_at"
+)
+
+// IsValidToolOrderByField reports whether field is a supported sort column.
+// Listings interpolate the field into SQL, so only these values may reach it.
+func IsValidToolOrderByField[T string | ToolOrderByField](field T) bool {
+	switch ToolOrderByField(field) {
+	case ToolOrderById,
+		ToolOrderByNamespace,
+		ToolOrderByName,
+		ToolOrderByCreatedAt,
+		ToolOrderByUpdatedAt:
+		return true
+	default:
+		return false
+	}
+}
+
 // ToolListQuery narrows a management listing of live Tool identities. Unlike
 // ToolCandidateQuery it does not require a live connection, active definition
 // projections, or an installed binding, so administrators can inspect and clean
@@ -38,16 +64,24 @@ type ToolListQuery struct {
 
 	// Limit must be between one and MaxToolListLimit; there is no default.
 	Limit int `json:"limit"`
+
+	// OrderByField optionally selects the sort column. Results always fall back
+	// to ID so pages stay deterministic when sort values tie; empty sorts by ID.
+	OrderByField ToolOrderByField `json:"orderByField,omitempty"`
+
+	// OrderBy is the OrderByField direction, ascending unless descending is set.
+	OrderBy pagination.OrderBy `json:"orderBy,omitempty"`
 }
 
-// toolListCursor preserves the original query and exclusive ID position inside
-// the shared encrypted cursor format, so continuation cannot change filters.
+// toolListCursor preserves the original query and row offset inside the shared
+// encrypted cursor format, so continuation cannot change filters or ordering.
+// Like other offset-paged resources, rows written between pages can shift it.
 type toolListCursor struct {
 	ToolListQuery
-	AfterID apid.ID `json:"afterId"`
+	Offset uint64 `json:"offset"`
 }
 
-// ToolListPage is one ID-ordered page of live Tool identities. It contains
+// ToolListPage is one ordered page of live Tool identities. It contains
 // management metadata only; definitions stay in the encrypted revision table.
 type ToolListPage struct {
 	Items []Tool
@@ -80,17 +114,21 @@ func (q ToolListQuery) validate() (LabelSelector, error) {
 		}
 	}
 
+	if q.OrderByField != "" && !IsValidToolOrderByField(q.OrderByField) {
+		return nil, fmt.Errorf("invalid tool order by field %q", q.OrderByField)
+	}
+
 	return ParseLabelSelector(q.LabelSelector)
 }
 
-// ListTools starts an ID-ordered management listing. Results include standalone
+// ListTools starts an ordered management listing. Results include standalone
 // and generated Tools in live namespaces, whether or not their connection is
 // still live; callers must still apply per-resource permission checks.
 func (s *service) ListTools(
 	ctx context.Context,
 	query ToolListQuery,
 ) (ToolListPage, error) {
-	return s.listTools(ctx, query, apid.Nil)
+	return s.listTools(ctx, query, 0)
 }
 
 // ListToolsFromCursor resumes a management listing with its saved filters and
@@ -108,20 +146,20 @@ func (s *service) ListToolsFromCursor(
 		return ToolListPage{}, err
 	}
 
-	// Every continuation follows a returned Tool, so the position is required.
-	if err := validateToolID(parsed.AfterID); err != nil {
-		return ToolListPage{}, err
+	// Every continuation follows a returned Tool, so the offset is positive.
+	if parsed.Offset == 0 {
+		return ToolListPage{}, errors.New("invalid tool list cursor position")
 	}
 
-	return s.listTools(ctx, parsed.ToolListQuery, parsed.AfterID)
+	return s.listTools(ctx, parsed.ToolListQuery, parsed.Offset)
 }
 
-// listTools reads one bounded page after the supplied position. A lookahead row
-// produces a cursor carrying the original query and the last returned ID.
+// listTools reads one bounded page at the supplied offset. A lookahead row
+// produces a cursor carrying the original query and the next offset.
 func (s *service) listTools(
 	ctx context.Context,
 	params ToolListQuery,
-	afterID apid.ID,
+	offset uint64,
 ) (ToolListPage, error) {
 	selector, err := params.validate()
 	if err != nil {
@@ -144,8 +182,14 @@ func (s *service) listTools(
 			"t.deleted_at": nil,
 			"n.deleted_at": nil,
 		}).
-		OrderBy("t.id ASC").
-		Limit(uint64(params.Limit + 1))
+		Limit(uint64(params.Limit + 1)).
+		Offset(offset)
+
+	// The field is validated above. ID always breaks ties so offsets stay stable.
+	if params.OrderByField != "" {
+		q = q.OrderBy(fmt.Sprintf("t.%s %s", params.OrderByField, params.OrderBy.String()))
+	}
+	q = q.OrderBy("t.id ASC")
 
 	// Literal prefix comparison avoids LIKE's wildcard and case behavior, matching
 	// the candidate scan so namespace scope agrees on SQLite and PostgreSQL.
@@ -166,9 +210,6 @@ func (s *service) listTools(
 	}
 	if !params.ConnectionId.IsNil() {
 		q = q.Where(sq.Eq{"t.connection_id": params.ConnectionId})
-	}
-	if !afterID.IsNil() {
-		q = q.Where(sq.Gt{"t.id": afterID})
 	}
 	q = selector.ApplyToSqlBuilderWithProvider(q, "t.labels", s.cfg.GetProvider())
 
@@ -193,7 +234,7 @@ func (s *service) listTools(
 		page.Items = page.Items[:params.Limit]
 		page.Cursor, err = pagination.MakeCursor(ctx, s.cursorEncryptor, toolListCursor{
 			ToolListQuery: params,
-			AfterID:       page.Items[len(page.Items)-1].Id,
+			Offset:        offset + uint64(params.Limit),
 		})
 		if err != nil {
 			return ToolListPage{}, err

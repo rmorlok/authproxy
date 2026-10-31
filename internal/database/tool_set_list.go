@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
@@ -18,6 +17,56 @@ import (
 // MaxToolSetListLimit bounds one management page of logical ToolSets or of one
 // ToolSet's generations.
 const MaxToolSetListLimit = 100
+
+// ToolSetOrderByField names a column logical ToolSet listings can sort by.
+type ToolSetOrderByField string
+
+const (
+	ToolSetOrderById        ToolSetOrderByField = "id"
+	ToolSetOrderByNamespace ToolSetOrderByField = "namespace"
+	ToolSetOrderByName      ToolSetOrderByField = "name"
+	ToolSetOrderByCreatedAt ToolSetOrderByField = "created_at"
+	ToolSetOrderByUpdatedAt ToolSetOrderByField = "updated_at"
+)
+
+// IsValidToolSetOrderByField reports whether field is a supported sort column.
+// Listings interpolate the field into SQL, so only these values may reach it.
+func IsValidToolSetOrderByField[T string | ToolSetOrderByField](field T) bool {
+	switch ToolSetOrderByField(field) {
+	case ToolSetOrderById,
+		ToolSetOrderByNamespace,
+		ToolSetOrderByName,
+		ToolSetOrderByCreatedAt,
+		ToolSetOrderByUpdatedAt:
+		return true
+	default:
+		return false
+	}
+}
+
+// ToolSetGenerationOrderByField names a column generation listings can sort by.
+type ToolSetGenerationOrderByField string
+
+const (
+	ToolSetGenerationOrderByGeneration ToolSetGenerationOrderByField = "generation"
+	ToolSetGenerationOrderByState      ToolSetGenerationOrderByField = "state"
+	ToolSetGenerationOrderByCreatedAt  ToolSetGenerationOrderByField = "created_at"
+	ToolSetGenerationOrderByUpdatedAt  ToolSetGenerationOrderByField = "updated_at"
+)
+
+// IsValidToolSetGenerationOrderByField reports whether field is a supported
+// sort column. Listings interpolate the field into SQL, so only these may reach it.
+func IsValidToolSetGenerationOrderByField[T string | ToolSetGenerationOrderByField](field T) bool {
+	switch ToolSetGenerationOrderByField(field) {
+	case ToolSetGenerationOrderByGeneration,
+		ToolSetGenerationOrderByState,
+		ToolSetGenerationOrderByCreatedAt,
+		ToolSetGenerationOrderByUpdatedAt:
+		return true
+	default:
+		return false
+	}
+}
 
 // ToolSetListQuery narrows a management listing of live logical ToolSets. All
 // supplied filters intersect; generations are not consulted.
@@ -35,16 +84,24 @@ type ToolSetListQuery struct {
 
 	// Limit must be between one and MaxToolSetListLimit; there is no default.
 	Limit int `json:"limit"`
+
+	// OrderByField optionally selects the sort column. Results always fall back
+	// to ID so pages stay deterministic when sort values tie; empty sorts by ID.
+	OrderByField ToolSetOrderByField `json:"orderByField,omitempty"`
+
+	// OrderBy is the OrderByField direction, ascending unless descending is set.
+	OrderBy pagination.OrderBy `json:"orderBy,omitempty"`
 }
 
-// toolSetListCursor preserves the original query and exclusive ID position, so
-// continuation cannot change filters.
+// toolSetListCursor preserves the original query and row offset, so continuation
+// cannot change filters or ordering. Like other offset-paged resources, rows
+// written between pages can shift it.
 type toolSetListCursor struct {
 	ToolSetListQuery
-	AfterID apid.ID `json:"afterId"`
+	Offset uint64 `json:"offset"`
 }
 
-// ToolSetListPage is one ID-ordered page of live logical ToolSets.
+// ToolSetListPage is one ordered page of live logical ToolSets.
 type ToolSetListPage struct {
 	Items []ToolSet
 
@@ -70,16 +127,20 @@ func (q ToolSetListQuery) validate() (LabelSelector, error) {
 		}
 	}
 
+	if q.OrderByField != "" && !IsValidToolSetOrderByField(q.OrderByField) {
+		return nil, fmt.Errorf("invalid toolset order by field %q", q.OrderByField)
+	}
+
 	return ParseLabelSelector(q.LabelSelector)
 }
 
-// ListToolSets starts an ID-ordered listing of live ToolSets in live
+// ListToolSets starts an ordered listing of live ToolSets in live
 // namespaces. Callers must still apply per-resource permission checks.
 func (s *service) ListToolSets(
 	ctx context.Context,
 	query ToolSetListQuery,
 ) (ToolSetListPage, error) {
-	return s.listToolSets(ctx, query, apid.Nil)
+	return s.listToolSets(ctx, query, 0)
 }
 
 // ListToolSetsFromCursor resumes a listing with its saved filters and limit.
@@ -92,20 +153,20 @@ func (s *service) ListToolSetsFromCursor(
 		return ToolSetListPage{}, err
 	}
 
-	// Every continuation follows a returned ToolSet, so the position is required.
-	if err := validateToolSetID(parsed.AfterID); err != nil {
-		return ToolSetListPage{}, err
+	// Every continuation follows a returned ToolSet, so the offset is positive.
+	if parsed.Offset == 0 {
+		return ToolSetListPage{}, errors.New("invalid toolset list cursor position")
 	}
 
-	return s.listToolSets(ctx, parsed.ToolSetListQuery, parsed.AfterID)
+	return s.listToolSets(ctx, parsed.ToolSetListQuery, parsed.Offset)
 }
 
-// listToolSets reads one bounded page after the supplied position. A lookahead
-// row produces a cursor carrying the original query and the last returned ID.
+// listToolSets reads one bounded page at the supplied offset. A lookahead row
+// produces a cursor carrying the original query and the next offset.
 func (s *service) listToolSets(
 	ctx context.Context,
 	params ToolSetListQuery,
-	afterID apid.ID,
+	offset uint64,
 ) (ToolSetListPage, error) {
 	selector, err := params.validate()
 	if err != nil {
@@ -126,8 +187,14 @@ func (s *service) listToolSets(
 			"t.deleted_at": nil,
 			"n.deleted_at": nil,
 		}).
-		OrderBy("t.id ASC").
-		Limit(uint64(params.Limit + 1))
+		Limit(uint64(params.Limit + 1)).
+		Offset(offset)
+
+	// The field is validated above. ID always breaks ties so offsets stay stable.
+	if params.OrderByField != "" {
+		q = q.OrderBy(fmt.Sprintf("t.%s %s", params.OrderByField, params.OrderBy.String()))
+	}
+	q = q.OrderBy("t.id ASC")
 
 	// Literal prefix comparison avoids LIKE's wildcard and case behavior, matching
 	// the Tool listing so namespace scope agrees on SQLite and PostgreSQL.
@@ -145,9 +212,6 @@ func (s *service) listToolSets(
 
 	if params.Name != "" {
 		q = q.Where(sq.Eq{"t.name": params.Name})
-	}
-	if !afterID.IsNil() {
-		q = q.Where(sq.Gt{"t.id": afterID})
 	}
 	q = selector.ApplyToSqlBuilderWithProvider(q, "t.labels", s.cfg.GetProvider())
 
@@ -172,7 +236,7 @@ func (s *service) listToolSets(
 		page.Items = page.Items[:params.Limit]
 		page.Cursor, err = pagination.MakeCursor(ctx, s.cursorEncryptor, toolSetListCursor{
 			ToolSetListQuery: params,
-			AfterID:          page.Items[len(page.Items)-1].Id,
+			Offset:           offset + uint64(params.Limit),
 		})
 		if err != nil {
 			return ToolSetListPage{}, err
@@ -182,22 +246,30 @@ func (s *service) listToolSets(
 	return page, nil
 }
 
-// ToolSetGenerationListQuery selects the live generations of one live ToolSet,
-// newest first.
+// ToolSetGenerationListQuery selects the live generations of one live ToolSet.
+// Results are newest first unless OrderByField is set.
 type ToolSetGenerationListQuery struct {
 	ToolSetId apid.ID `json:"toolSetId"`
 
 	// Limit must be between one and MaxToolSetListLimit; there is no default.
 	Limit int `json:"limit"`
+
+	// OrderByField optionally selects the sort column. Generation number always
+	// breaks ties, newest first, so pages stay deterministic.
+	OrderByField ToolSetGenerationOrderByField `json:"orderByField,omitempty"`
+
+	// OrderBy is the OrderByField direction, ascending unless descending is set.
+	OrderBy pagination.OrderBy `json:"orderBy,omitempty"`
 }
 
-// toolSetGenerationListCursor resumes below the last returned generation.
+// toolSetGenerationListCursor preserves the query and row offset, so
+// continuation cannot change the ToolSet or ordering.
 type toolSetGenerationListCursor struct {
 	ToolSetGenerationListQuery
-	BeforeGeneration uint64 `json:"beforeGeneration"`
+	Offset uint64 `json:"offset"`
 }
 
-// ToolSetGenerationListPage is one page of generations in descending order.
+// ToolSetGenerationListPage is one ordered page of generations.
 type ToolSetGenerationListPage struct {
 	Items []ToolSetGeneration
 
@@ -212,7 +284,7 @@ func (s *service) ListToolSetGenerations(
 	ctx context.Context,
 	query ToolSetGenerationListQuery,
 ) (ToolSetGenerationListPage, error) {
-	return s.listToolSetGenerations(ctx, query, math.MaxInt64)
+	return s.listToolSetGenerations(ctx, query, 0)
 }
 
 // ListToolSetGenerationsFromCursor resumes a generation listing.
@@ -225,40 +297,49 @@ func (s *service) ListToolSetGenerationsFromCursor(
 		return ToolSetGenerationListPage{}, err
 	}
 
-	if parsed.BeforeGeneration == 0 || parsed.BeforeGeneration > math.MaxInt64 {
+	// Every continuation follows a returned generation, so the offset is positive.
+	if parsed.Offset == 0 {
 		return ToolSetGenerationListPage{}, errors.New("invalid toolset generation cursor position")
 	}
 
-	return s.listToolSetGenerations(ctx, parsed.ToolSetGenerationListQuery, parsed.BeforeGeneration)
+	return s.listToolSetGenerations(ctx, parsed.ToolSetGenerationListQuery, parsed.Offset)
 }
 
-// listToolSetGenerations reads one page of generations numbered strictly below
-// beforeGeneration. It checks parent liveness first so deletion hides history.
+// listToolSetGenerations reads one page of generations at the supplied offset.
+// It checks parent liveness first so deletion hides history.
 func (s *service) listToolSetGenerations(
 	ctx context.Context,
 	params ToolSetGenerationListQuery,
-	beforeGeneration uint64,
+	offset uint64,
 ) (ToolSetGenerationListPage, error) {
 	if params.Limit < 1 || params.Limit > MaxToolSetListLimit {
 		return ToolSetGenerationListPage{}, fmt.Errorf("toolset generation list limit must be between 1 and %d", MaxToolSetListLimit)
+	}
+	if params.OrderByField != "" && !IsValidToolSetGenerationOrderByField(params.OrderByField) {
+		return ToolSetGenerationListPage{}, fmt.Errorf("invalid toolset generation order by field %q", params.OrderByField)
 	}
 	if _, err := s.GetToolSet(ctx, params.ToolSetId); err != nil {
 		return ToolSetGenerationListPage{}, err
 	}
 
 	var row ToolSetGeneration
-	rows, err := s.sq.
+	q := s.sq.
 		Select(row.cols()...).
 		From(ToolSetGenerationsTable).
 		Where(sq.Eq{
 			"tool_set_id": params.ToolSetId,
 			"deleted_at":  nil,
 		}).
-		Where(sq.Lt{"generation": beforeGeneration}).
-		OrderBy("generation DESC").
 		Limit(uint64(params.Limit + 1)).
-		RunWith(s.db).
-		QueryContext(ctx)
+		Offset(offset)
+
+	// The field is validated above. Generation breaks ties so offsets stay stable.
+	if params.OrderByField != "" {
+		q = q.OrderBy(fmt.Sprintf("%s %s", params.OrderByField, params.OrderBy.String()))
+	}
+	q = q.OrderBy("generation DESC")
+
+	rows, err := q.RunWith(s.db).QueryContext(ctx)
 	if err != nil {
 		return ToolSetGenerationListPage{}, err
 	}
@@ -280,7 +361,7 @@ func (s *service) listToolSetGenerations(
 		page.Items = page.Items[:params.Limit]
 		page.Cursor, err = pagination.MakeCursor(ctx, s.cursorEncryptor, toolSetGenerationListCursor{
 			ToolSetGenerationListQuery: params,
-			BeforeGeneration:           page.Items[len(page.Items)-1].Generation,
+			Offset:                     offset + uint64(params.Limit),
 		})
 		if err != nil {
 			return ToolSetGenerationListPage{}, err

@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
@@ -20,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 var (
@@ -36,6 +38,7 @@ type ListToolsRequestQueryParams struct {
 	NameVal       *string `form:"name"`
 	ConnectionId  *string `form:"connectionId"`
 	LabelSelector *string `form:"labelSelector"`
+	OrderByVal    *string `form:"orderBy"`
 }
 
 // ToolsRoutes serves management CRUD for standalone Tools. These routes use
@@ -74,6 +77,31 @@ func managedToolConflict(tool coreIface.Tool) *httperr.Error {
 		return nil
 	}
 	return httperr.Conflictf("tool is managed by ToolSet '%s'; update the owning ToolSet instead", owner)
+}
+
+// parseListOrderBy splits an orderBy query value of "<field> [asc|desc]" and
+// checks the field with valid, shared by the Tool and ToolSet list routes. It
+// writes the error response and returns false when the value is invalid.
+func parseListOrderBy[T ~string](
+	gctx *gin.Context,
+	val *auth.ResourcePermissionValidator,
+	raw string,
+	valid func(T) bool,
+) (T, pagination.OrderBy, bool) {
+	field, order, err := pagination.SplitOrderByParam[T](raw)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return "", "", false
+	}
+
+	if !valid(field) {
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
+		val.MarkErrorReturn()
+		return "", "", false
+	}
+
+	return field, order, true
 }
 
 // loadTool reads one Tool for an ID route and checks the caller's permission on
@@ -185,6 +213,7 @@ func (r *ToolsRoutes) create(gctx *gin.Context) {
 // @Param			name			query		string	false	"Filter by exact name"
 // @Param			connectionId	query		string	false	"Filter by bound connection ID"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
+// @Param			orderBy			query		string	false	"Order by id, namespace, name, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	schemaapiopenapi.ListToolsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -237,6 +266,14 @@ func (r *ToolsRoutes) list(gctx *gin.Context) {
 		}
 		if req.LabelSelector != nil {
 			listReq.LabelSelector = *req.LabelSelector
+		}
+		if req.OrderByVal != nil {
+			field, order, ok := parseListOrderBy(gctx, val, *req.OrderByVal, database.IsValidToolOrderByField[database.ToolOrderByField])
+			if !ok {
+				return
+			}
+			listReq.OrderByField = field
+			listReq.OrderBy = order
 		}
 		page, err = r.core.ListTools(ctx, listReq)
 	}
