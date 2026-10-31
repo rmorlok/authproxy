@@ -1649,6 +1649,35 @@ func (mr *MockDBMockRecorder) ListToolCandidatesFromCursor(ctx, cursor interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolCandidatesFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolCandidatesFromCursor), ctx, cursor)
 }
 
+// ListToolSetBindingsBuilder mocks base method.
+func (m *MockDB) ListToolSetBindingsBuilder() database.ListToolSetBindingsBuilder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetBindingsBuilder")
+	ret0, _ := ret[0].(database.ListToolSetBindingsBuilder)
+	return ret0
+}
+
+// ListToolSetBindingsBuilder indicates an expected call of ListToolSetBindingsBuilder.
+func (mr *MockDBMockRecorder) ListToolSetBindingsBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetBindingsBuilder", reflect.TypeOf((*MockDB)(nil).ListToolSetBindingsBuilder))
+}
+
+// ListToolSetBindingsFromCursor mocks base method.
+func (m *MockDB) ListToolSetBindingsFromCursor(ctx context.Context, cursor string) (database.ListToolSetBindingsExecutor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListToolSetBindingsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListToolSetBindingsExecutor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListToolSetBindingsFromCursor indicates an expected call of ListToolSetBindingsFromCursor.
+func (mr *MockDBMockRecorder) ListToolSetBindingsFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListToolSetBindingsFromCursor", reflect.TypeOf((*MockDB)(nil).ListToolSetBindingsFromCursor), ctx, cursor)
+}
+
 // ListToolSetGenerationsBuilder mocks base method.
 func (m *MockDB) ListToolSetGenerationsBuilder() database.ListToolSetGenerationsBuilder {
 	m.ctrl.T.Helper()

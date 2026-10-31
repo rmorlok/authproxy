@@ -25,7 +25,7 @@ dimension. Prefer the explicit values below for least-privilege grants.
 | `request-events` | `get`, `list` | Individual and listed proxy request events |
 | `secrets` | `replay` | Unredacted replay of secret-tagged fields in an otherwise authorized API response |
 | `tools` | `create`, `delete`, `get`, `list`, `update` | Standalone Tool definitions under `/tools`; generated Tools are readable but changed only through their ToolSet. These verbs do not authorize Tool invocation |
-| `toolsets` | `create`, `delete`, `get`, `list`, `list/generations`, `update` | ToolSet definitions and generations under `/toolsets`. `create` also gates new draft generations; `update` gates logical metadata and selector changes, draft edits, and publication. These verbs do not install, migrate, or invoke generated Tools |
+| `toolsets` | `create`, `delete`, `get`, `list`, `list/generations`, `update` | ToolSet definitions and generations under `/toolsets`. `create` also gates new draft generations; `update` gates logical metadata and selector changes, draft edits, and publication. `get` also limits which ToolSets `GET /connections/{id}/toolsets` returns. These verbs do not install, migrate, or invoke generated Tools |
 | `task_monitoring` | `get`, `list`, `manage` | Asynq queue, server, scheduler, and task inspection or mutation |
 | `workflow_monitoring` | `get`, `list`, `manage` | Workflow instance inspection, cancellation, and removal |
 
@@ -77,6 +77,13 @@ or its descendants. Selecting a connection grants no permission to invoke its
 generated Tools, and no `tools` or `connections` verb authorizes ToolSet
 management. Publishing with `toolsets:update` changes what new matching
 connections install, so treat it as trusted administration as well.
+
+`GET /connections/{id}/toolsets` needs two checks. `connections:get` on the
+connection authorizes the route. Each assigned ToolSet is then returned only if
+the caller also has `toolsets:get` on that ToolSet's namespace and ID, which can
+be an ancestor of the connection's namespace. ToolSets the caller cannot read are
+left out, and the request still succeeds. The response reports installation
+status only; it grants no Tool invocation.
 
 See [Authentication and Authorization](/security/authentication-and-authorization/)
 for namespace matching, resource ID restrictions, actor permissions, and JWT

@@ -767,6 +767,13 @@ type C interface {
 	// ListToolSetGenerationsFromCursor continues a generation listing.
 	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ListToolSetGenerationsExecutor, error)
 
+	// ListConnectionToolSetBindingsBuilder starts a listing of one connection's
+	// ToolSet assignments and their installation status.
+	ListConnectionToolSetBindingsBuilder() ListConnectionToolSetBindingsBuilder
+
+	// ListConnectionToolSetBindingsFromCursor continues a binding listing.
+	ListConnectionToolSetBindingsFromCursor(ctx context.Context, cursor string) (ListConnectionToolSetBindingsExecutor, error)
+
 	/*
 	 *
 	 * Tasks

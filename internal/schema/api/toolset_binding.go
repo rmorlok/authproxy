@@ -20,6 +20,13 @@ const (
 	ToolSetBindingConditionMigrationSucceeded = "MigrationSucceeded"
 )
 
+// ToolSetBindingReasonInventoryPending explains a false Installed condition: the
+// assignment exists, but no complete generated inventory has been activated.
+const ToolSetBindingReasonInventoryPending = "InventoryPending"
+
+// ToolSetBindingReasonInventoryInstalled explains a true Installed condition.
+const ToolSetBindingReasonInventoryInstalled = "InventoryInstalled"
+
 // ConnectionToolSetBinding reports one logical ToolSet's assignment to a
 // connection. Metadata carries the connection namespace and optional observed
 // metadata; spec references identify the pair, without a fabricated binding ID,
