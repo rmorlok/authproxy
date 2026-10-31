@@ -18,15 +18,41 @@ import (
 // missing correlation identities or an unconfigured client. It carries no data.
 var ErrInvalidInvocation = errors.New("invalid HTTP Tool invocation")
 
-// Invocation carries the facts captured at admission. The caller must associate
-// the program, snapshot, and configured client with the same authorized Tool
-// revision and connection. This is an internal input, not an API request type.
+// Invocation combines the Tool caller's arguments with the connection and Tool
+// context captured by admission. The admission layer must associate the program,
+// snapshot, and configured client with the same authorized Tool revision and
+// connection. This is an internal input, not an API request type.
 type Invocation struct {
-	ID        string         // Captured tiv_ correlation identity.
-	Arguments common.RawJSON // Exactly one argument object; validated before rendering or I/O.
-	// Snapshot contains safe connection configuration/metadata and revision IDs.
-	// Params is ignored and replaced with validated Arguments, preventing a second
-	// argument source. Credentials must never be placed in Cfg or other fields.
+	ID string // Captured tiv_ correlation identity.
+
+	// Arguments is the JSON object supplied by the Tool caller for this call.
+	// For a contact lookup, it might be {"id":"contact-42","limit":10}.
+	// Execute decodes and validates it against the captured Tool's input schema
+	// before rendering or I/O, then exposes the validated values as params.
+	// Templates can use {{path.params.id}} or {{params.limit}}; response
+	// projections use the same values. Numbers retain their exact precision;
+	// validation does not insert defaults or coerce types.
+	Arguments common.RawJSON
+
+	// Snapshot is the execution context supplied by admission: connection
+	// configuration, labels/annotations, connection identity, and the captured
+	// Tool revision and optional ToolSet/catalog provenance. For example:
+	//
+	//	render.Input{
+	//	    Cfg: map[string]any{"tenant": "acme"},
+	//	    ConnectionID: "cxn_01example0000001",
+	//	    ToolID: "tol_01example0000001", Revision: 7,
+	//	}
+	//
+	// With the Arguments above, /{{path.cfg.tenant}}/contacts/{{path.params.id}}
+	// renders as /acme/contacts/contact-42: the tenant comes from the admitted
+	// connection, while the contact ID comes from the Tool caller's arguments.
+	// Execute copies these values and the validated arguments into one immutable
+	// rendering context shared by the request and response projection. Leave
+	// Params unset; Execute ignores it and replaces it with validated Arguments.
+	// Tool/connection identities and revision metadata also populate the result.
+	// Authentication comes from the configured HTTP client; credentials must
+	// never be placed in Cfg or other snapshot fields.
 	Snapshot render.Input
 }
 
