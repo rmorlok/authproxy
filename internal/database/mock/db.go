@@ -1191,6 +1191,21 @@ func (mr *MockDBMockRecorder) GetTool(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTool", reflect.TypeOf((*MockDB)(nil).GetTool), ctx, id)
 }
 
+// GetToolExecutionSnapshot mocks base method.
+func (m *MockDB) GetToolExecutionSnapshot(ctx context.Context, id apid.ID) (*database.ToolExecutionSnapshot, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetToolExecutionSnapshot", ctx, id)
+	ret0, _ := ret[0].(*database.ToolExecutionSnapshot)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetToolExecutionSnapshot indicates an expected call of GetToolExecutionSnapshot.
+func (mr *MockDBMockRecorder) GetToolExecutionSnapshot(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetToolExecutionSnapshot", reflect.TypeOf((*MockDB)(nil).GetToolExecutionSnapshot), ctx, id)
+}
+
 // GetToolRevision mocks base method.
 func (m *MockDB) GetToolRevision(ctx context.Context, id apid.ID, revision uint64) (*database.ToolRevision, error) {
 	m.ctrl.T.Helper()
