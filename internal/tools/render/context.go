@@ -16,10 +16,25 @@ import (
 // Params and capture configuration/metadata before constructing this snapshot.
 // There is deliberately no connection object or credential field to reflect on.
 type Input struct {
-	// Params is the caller-validated tool input, exposed as params. Nested values
-	// must be JSON primitives, map[string]any, map[string]string, or []any; typed
-	// slices such as []string and arbitrary Go objects are rejected. NewContext
-	// copies these caller-owned values, including nested maps and slices.
+	// Params holds the decoded, validated Tool arguments exposed to templates as
+	// params. For example, {"id":"contact-42","limit":10} becomes a map whose
+	// values can be read with {{path.params.id}} and {{params.limit}}.
+	//
+	// When using httpexec.Invocation, Arguments is the raw JSON supplied by the
+	// Tool caller. The HTTP executor decodes and validates Arguments against the
+	// Tool's input schema, then uses that map for Params in a local copy of
+	// Snapshot before calling NewContext. Leave Snapshot.Params unset: any value
+	// supplied there is ignored, so it cannot override or add to Arguments.
+	//
+	// Direct callers of NewContext supply the validated map themselves, for example:
+	//
+	//	Params: map[string]any{"id": "contact-42", "limit": json.Number("10")},
+	//
+	// NewContext checks value types and limits but does not validate an input
+	// schema. Nested values must be JSON primitives, map[string]any,
+	// map[string]string, or []any; typed slices such as []string and arbitrary Go
+	// objects are rejected. NewContext copies these caller-owned values,
+	// including nested maps and slices.
 	Params map[string]any
 
 	// Cfg is the captured connection configuration, exposed as cfg. It follows
