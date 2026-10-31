@@ -240,7 +240,9 @@ func (r *ToolsRoutes) list(gctx *gin.Context) {
 			return
 		}
 	} else {
-		b := r.core.ListToolsBuilder().ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+		b := r.core.
+			ListToolsBuilder().
+			ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 		if req.LimitVal != nil {
 			if *req.LimitVal < 1 {
 				apgin.WriteError(gctx, nil, httperr.BadRequest("limit must be positive"))

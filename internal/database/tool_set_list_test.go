@@ -47,13 +47,21 @@ func TestListToolSets(t *testing.T) {
 	})
 
 	t.Run("descendant matcher excludes similarly named siblings", func(t *testing.T) {
-		page := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner.**").Limit(10).FetchPage(ctx)
+		page := db.
+			ListToolSetsBuilder().
+			ForNamespaceMatcher("root.owner.**").
+			Limit(10).
+			FetchPage(ctx)
 		require.ElementsMatch(t, []apid.ID{owner.Id, other.Id, child.Id}, ids(page))
 	})
 
 	t.Run("name and label filters intersect", func(t *testing.T) {
 		named := func() ListToolSetsBuilder {
-			return db.ListToolSetsBuilder().ForNamespaceMatcher("root.**").ForName("calendar").Limit(10)
+			return db.
+				ListToolSetsBuilder().
+				ForNamespaceMatcher("root.**").
+				ForName("calendar").
+				Limit(10)
 		}
 
 		require.ElementsMatch(t, []apid.ID{owner.Id, child.Id, sibling.Id}, ids(named().FetchPage(ctx)))
@@ -61,7 +69,11 @@ func TestListToolSets(t *testing.T) {
 	})
 
 	t.Run("cursor preserves filters", func(t *testing.T) {
-		page := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner.**").Limit(2).FetchPage(ctx)
+		page := db.
+			ListToolSetsBuilder().
+			ForNamespaceMatcher("root.owner.**").
+			Limit(2).
+			FetchPage(ctx)
 		require.Len(t, ids(page), 2)
 		require.NotEmpty(t, page.Cursor)
 
@@ -75,7 +87,10 @@ func TestListToolSets(t *testing.T) {
 
 	t.Run("enumerate visits every page", func(t *testing.T) {
 		var seen []apid.ID
-		err := db.ListToolSetsBuilder().ForNamespaceMatcher("root.owner.**").Limit(1).
+		err := db.
+			ListToolSetsBuilder().
+			ForNamespaceMatcher("root.owner.**").
+			Limit(1).
 			Enumerate(ctx, func(page pagination.PageResult[ToolSet]) (pagination.KeepGoing, error) {
 				seen = append(seen, ids(page)...)
 				return pagination.Continue, nil
@@ -91,7 +106,10 @@ func TestListToolSets(t *testing.T) {
 	})
 
 	t.Run("invalid queries are rejected", func(t *testing.T) {
-		page := db.ListToolSetsBuilder().ForNamespaceMatcher("not a matcher").FetchPage(ctx)
+		page := db.
+			ListToolSetsBuilder().
+			ForNamespaceMatcher("not a matcher").
+			FetchPage(ctx)
 		require.ErrorIs(t, page.Error, ErrInvalidListQuery)
 
 		_, err := db.ListToolSetsFromCursor(ctx, "garbage")
@@ -119,7 +137,11 @@ func TestListToolSetGenerations(t *testing.T) {
 	}
 
 	// The first page is newest first and reports more results.
-	page := db.ListToolSetGenerationsBuilder().ForToolSetId(toolSet.Id).Limit(2).FetchPage(ctx)
+	page := db.
+		ListToolSetGenerationsBuilder().
+		ForToolSetId(toolSet.Id).
+		Limit(2).
+		FetchPage(ctx)
 	require.Equal(t, []uint64{3, 2}, generationNumbersForTest(t, page))
 	require.NotEmpty(t, page.Cursor)
 
@@ -132,7 +154,10 @@ func TestListToolSetGenerations(t *testing.T) {
 
 	// Enumerate walks every generation in the same order.
 	var seen []uint64
-	err = db.ListToolSetGenerationsBuilder().ForToolSetId(toolSet.Id).Limit(1).
+	err = db.
+		ListToolSetGenerationsBuilder().
+		ForToolSetId(toolSet.Id).
+		Limit(1).
 		Enumerate(ctx, func(page pagination.PageResult[ToolSetGeneration]) (pagination.KeepGoing, error) {
 			seen = append(seen, generationNumbersForTest(t, page)...)
 			return pagination.Continue, nil
