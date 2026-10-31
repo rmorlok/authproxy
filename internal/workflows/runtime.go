@@ -317,6 +317,11 @@ func (r *Runtime) GetWorkflowInstanceHistory(ctx context.Context, instance *wfli
 	return r.backend.GetWorkflowInstanceHistory(ctx, instance, lastSequenceID)
 }
 
+// RemoveWorkflowInstances permanently deletes finished workflow instances and their history that match options.
+func (r *Runtime) RemoveWorkflowInstances(ctx context.Context, options ...wfbackend.RemovalOption) error {
+	return r.client.RemoveWorkflowInstances(ctx, options...)
+}
+
 func (r *Runtime) Ping(ctx context.Context) bool {
 	if r == nil || r.backend == nil {
 		return false

@@ -546,6 +546,9 @@
       "properties": {
         "defaultRetention": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "workflowRetention": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
         }
       },
       "additionalProperties": false,
