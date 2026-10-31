@@ -158,6 +158,20 @@ func CompileResponse(
 	}, nil
 }
 
+// NeedsBody reports whether this status can reach successful body mapping.
+// Executors check it before reading or decompressing a response: invalid and
+// non-2xx statuses, and explicit error rules for 2xx statuses, need no body.
+// A true result permits reading; it does not promise that decoding, projection,
+// or output validation will succeed. This method never evaluates a transform.
+// Nil and uninitialized programs return false and remain invalid for Map.
+func (r *Response) NeedsBody(status int) bool {
+	if r == nil || r.rules == nil || status < 200 || status >= 300 {
+		return false
+	}
+	_, matched := r.rules.lookup(status)
+	return !matched
+}
+
 // Map translates a complete buffered response into a detached ToolResult.
 // Supplied identities must be valid, and the caller must have authorized the
 // invocation. Status rules run before body decoding, including rules for 2xx.
