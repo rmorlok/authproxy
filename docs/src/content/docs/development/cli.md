@@ -2,7 +2,10 @@
 title: Command-line interface (ap)
 ---
 
-The `ap` CLI under [`cmd/cli/`](https://github.com/rmorlok/authproxy/tree/main/cmd/cli/) is the developer/operator tool for talking to a running AuthProxy server: listing connectors and connections, signing JWTs to drive scripted calls, and running local reverse proxies that route through a connection's credentials.
+The `ap` CLI under [`cmd/cli/`](https://github.com/rmorlok/authproxy/tree/main/cmd/cli/) is the developer/operator tool for talking 
+to a running AuthProxy server: listing connectors and connections, signing JWTs 
+to drive scripted calls, and running local reverse proxies that route through a 
+connection's credentials.
 
 Build/run:
 
@@ -52,7 +55,8 @@ signingProxy:
     default: "8888"
 ```
 
-Every value here can be overridden per-invocation by the flag of the same shape (`--apiUrl`, `--privateKeyPath`, `--actorId`, `--port`, etc.).
+Every value here can be overridden per-invocation by the flag of the same shape
+(`--apiUrl`, `--privateKeyPath`, `--actorId`, `--port`, etc.).
 
 ### Signing keys
 
@@ -63,11 +67,16 @@ AuthProxy supports two JWT signing modes:
 | RS256 (asymmetric) | `adminPrivateKeyPath` / `--privateKeyPath` | `systemAuth.jwtSigningKey.publicKey.path` |
 | HS256 (shared secret) | `adminSharedKeyPath` / `--secretKeyPath` | `systemAuth.jwtSigningKey.privateKey.path` (used as the shared secret) |
 
-The dev stack ships a ready-to-use RSA keypair under [`dev_config/keys/admin/`](https://github.com/rmorlok/authproxy/tree/main/dev_config/keys/admin/) (`bobdole` + `bobdole.pub`) paired with the matching public key registered in `dev_config/default.yaml`. Point `adminPrivateKeyPath` at `dev_config/keys/admin/bobdole` and you're signed in as `bobdole` against a fresh `docker compose up -d` server.
+The dev stack ships a ready-to-use RSA keypair under 
+[`dev_config/keys/admin/`](https://github.com/rmorlok/authproxy/tree/main/dev_config/keys/admin/) (`bobdole` + `bobdole.pub`) paired with the matching 
+public key registered in `dev_config/default.yaml`. Point `adminPrivateKeyPath` 
+at `dev_config/keys/admin/bobdole` and you're signed in as `bobdole` against a 
+fresh `docker compose up -d` server.
 
 ### Actor and scope
 
-Every signed token has an **actor** (who is making the call) and a **service-id allowlist** (which AuthProxy services the token is valid against).
+Every signed token has an **actor** (who is making the call) and a **service-id 
+allowlist** (which AuthProxy services the token is valid against).
 
 - Actor defaults: `--actorId` > YAML `adminUsername` > current OS username (only when `--admin` is set).
 - Service allowlist defaults to `all`. Override with `--apis admin-api,api` to scope a token down. Valid IDs: `admin-api`, `api`, `public`, `worker`.
@@ -110,7 +119,9 @@ for create, rename-by-ID, conflict, and query examples.
 
 ### `ap sign-jwt`
 
-Prints a signed JWT to stdout — useful for piping into `curl -H "Authorization: Bearer $(ap sign-jwt)"` or for debugging server-side verification.
+Prints a signed JWT to stdout — useful for piping into 
+`curl -H "Authorization: Bearer $(ap sign-jwt)"` or for debugging server-side 
+verification.
 
 ```bash
 ap sign-jwt --admin                   # sign as the current OS user, all services
@@ -145,7 +156,10 @@ the token; the backing actor still needs matching normal permissions. The
 server rejects a token whose top-level permissions are broader than the
 backing actor's grants.
 
-Permission namespaces in a permissions file support the same actor templates as normal actor permissions: `{{externalId}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. These render against the backing actor, and missing label or annotation values make the permission fail to match.
+Permission namespaces in a permissions file support the same actor templates as 
+normal actor permissions: `{{externalId}}`, `{{labels.<label>}}`, and 
+`{{annotations.<annotation>}}`. These render against the backing actor, and 
+missing label or annotation values make the permission fail to match.
 
 ### `ap verify-jwt`
 
@@ -157,22 +171,36 @@ echo "$TOKEN" | ap verify-jwt --publicKeyPath /etc/authproxy/keys/system.pub
 
 ### `ap signing-proxy`
 
-Long-running reverse proxy that signs an admin JWT onto every forwarded request, then sends it to one of the AuthProxy services. This is the tool for driving the admin UI / marketplace SPA against a local backend without baking auth into the browser.
+Long-running reverse proxy that signs an admin JWT onto every forwarded request, 
+then sends it to one of the AuthProxy services. This is the tool for driving the
+admin UI / marketplace SPA against a local backend without baking auth into the 
+browser.
 
 ```bash
 ap signing-proxy --proxyTo=api --port 8888
 ap signing-proxy --proxyTo=admin-api --enableLoginRedirect=true
 ```
 
-`--proxyTo` accepts a service id (`api`, `admin-api`, `public`) or an absolute URL. `--enableLoginRedirect` adds a `/login-redirect` handler that simulates the host application's session-initiation flow — wire `hostApplication.initiateSessionUrl` (or `adminApi.ui.initiateSessionUrl`) at the printed URL.
+`--proxyTo` accepts a service id (`api`, `admin-api`, `public`) or an absolute URL.
+`--enableLoginRedirect` adds a `/login-redirect` handler that simulates the host
+application's session-initiation flow — wire `hostApplication.initiateSessionUrl` 
+(or `adminApi.ui.initiateSessionUrl`) at the printed URL.
 
-`--port` defaults to `8888`. If the CLI config sets `signingProxy.port`, that value is used instead when `--port` is not given on the command line. Multiple clones on one machine should set `AUTHPROXY_SIGNING_PROXY_PORT` per clone in their `.env` and reference it from a shared `~/.authproxy.yaml` via `signingProxy.port.envVar`.
+`--port` defaults to `8888`. If the CLI config sets `signingProxy.port`, that value 
+is used instead when `--port` is not given on the command line. Multiple clones 
+on one machine should set `AUTHPROXY_SIGNING_PROXY_PORT` per clone in their 
+`.env` and reference it from a shared `~/.authproxy.yaml` via 
+`signingProxy.port.envVar`.
 
 ### `ap proxy` — connection-scoped streaming proxy
 
-Routes inbound requests through `/api/v1/connections/{id}/_proxyRaw` using the original HTTP method so the connection's credentials are applied and bodies stream end-to-end (chunked uploads, SSE responses).
+Routes inbound requests through `/api/v1/connections/{id}/_proxyRaw` using the 
+original HTTP method so the connection's credentials are applied and bodies stream
+end-to-end (chunked uploads, SSE responses).
 
-**Long-running mode.** Boots a listener on `--port` (default 9999). Each inbound request derives its `X-AuthProxy-Upstream-URL` from `--upstream-base` (path + query appended) or the caller may set the header directly.
+**Long-running mode.** Boots a listener on `--port` (default 9999). Each inbound 
+request derives its `X-AuthProxy-Upstream-URL` from `--upstream-base` (path + 
+query appended) or the caller may set the header directly.
 
 ```bash
 # Auto-derive upstream from base.
@@ -185,7 +213,10 @@ curl http://127.0.0.1:9999/ \
   -H 'X-AuthProxy-Upstream-URL: https://api.openai.com/v1/models'
 ```
 
-**One-shot mode** — append a literal `curl` or `wget` plus that tool's own argv. `ap proxy` boots an ephemeral-port listener in-process, rewrites the URL's scheme+host to point at it (path/query preserved), and execs the tool. Stdout/stderr/exit-code pass through verbatim.
+**One-shot mode** — append a literal `curl` or `wget` plus that tool's own argv.
+`ap proxy` boots an ephemeral-port listener in-process, rewrites the URL's 
+scheme+host to point at it (path/query preserved), and execs the tool. 
+Stdout/stderr/exit-code pass through verbatim.
 
 ```bash
 ap proxy --connection cxn_abc curl -i https://api.openai.com/v1/models
@@ -194,22 +225,18 @@ ap proxy --connection cxn_abc curl -X POST https://api.openai.com/v1/chat/comple
 ap proxy --connection cxn_abc wget https://api.example.com/files/big.bin -O out.bin
 ```
 
-**All `ap proxy` flags must come before the `curl`/`wget` literal** — `Flags().SetInterspersed(false)` stops cobra's flag parser at the first positional, so curl's own flags (`-X`, `-d`, `--config`, …) reach the tool without colliding with ours.
+**All `ap proxy` flags must come before the `curl`/`wget` literal** — 
+`Flags().SetInterspersed(false)` stops cobra's flag parser at the first 
+positional, so curl's own flags (`-X`, `-d`, `--config`, …) reach the tool 
+without colliding with ours.
 
-Hop-by-hop headers (RFC 7230 §6.1) are stripped on both legs of the proxy hop. Response bodies are flushed after each write so SSE streams tick out in real time.
-
-Use curl's `-i` (`--include`) flag to see the server's
-`X-AuthProxy-Send-Evidence` response header. The CLI forwards this header;
-`notSent`, `mayHaveSent`, and `sent` describe cumulative target-send evidence,
-not whether the provider completed the action. For streams, the header arrives
-before the body and cannot change if the stream later fails. A missing header
-from an older server or a failure before the proxy handler is unknown, never
-proof of `notSent`. See [target-send evidence](/sdks/proxying/#target-send-evidence)
-for the exact meanings and retry considerations.
+Hop-by-hop headers (RFC 7230 §6.1) are stripped on both legs of the proxy hop. 
+Response bodies are flushed after each write so SSE streams tick out in real time.
 
 ### `ap sign-marketplace-login-url`
 
-Generates a signed marketplace login URL — the URL the host application redirects the user to so the marketplace SPA can establish a session.
+Generates a signed marketplace login URL — the URL the host application redirects 
+the user to so the marketplace SPA can establish a session.
 
 ```bash
 ap sign-marketplace-login-url --actorId alice
@@ -217,7 +244,10 @@ ap sign-marketplace-login-url --actorId alice
 
 ### `ap login-redirect`
 
-Local stand-in for a host application's session-initiation endpoint. Hosts `/login-redirect` on the configured port and returns the same payload your real host would. Useful when developing UI changes against a local stack without spinning up the host app.
+Local stand-in for a host application's session-initiation endpoint. Hosts 
+`/login-redirect` on the configured port and returns the same payload your real 
+host would. Useful when developing UI changes against a local stack without 
+spinning up the host app.
 
 ```bash
 ap login-redirect --port 8889
@@ -249,11 +279,15 @@ ap proxy --connection cxn_openai curl -N \
   -d '{"model":"gpt-4o","stream":true,"messages":[{"role":"user","content":"hi"}]}'
 ```
 
-The `-N` (`--no-buffer`) is curl's, not ours — it disables curl's own line buffering so the tokens print as they arrive.
+The `-N` (`--no-buffer`) is curl's, not ours — it disables curl's own line 
+buffering so the tokens print as they arrive.
 
 ### Run several AuthProxy clones on one machine
 
-Each clone (`~/src/authproxy1`, `~/src/authproxy2`, …) needs its own port pool so they don't collide. The pool lives in each clone's `.env` (gitignored) — see [`.env.example`](https://github.com/rmorlok/authproxy/blob/main/.env.example) for the slot table. The `AUTHPROXY_SIGNING_PROXY_PORT` slot picks the listen port for `ap signing-proxy`:
+Each clone (`~/src/authproxy1`, `~/src/authproxy2`, …) needs its own port pool 
+so they don't collide. The pool lives in each clone's `.env` (gitignored) — see 
+[`.env.example`](https://github.com/rmorlok/authproxy/blob/main/.env.example) for the slot table. The `AUTHPROXY_SIGNING_PROXY_PORT` slot 
+picks the listen port for `ap signing-proxy`:
 
 | Clone | `AUTHPROXY_SIGNING_PROXY_PORT` |
 |---|---|
@@ -262,7 +296,8 @@ Each clone (`~/src/authproxy1`, `~/src/authproxy2`, …) needs its own port pool
 | authproxy3 | 8908 |
 | authproxy*N* | 8888 + (N−1)·10 |
 
-A single shared `~/.authproxy.yaml` picks up whichever clone you ran `ap` from by reading the env var loaded from that clone's `.env`:
+A single shared `~/.authproxy.yaml` picks up whichever clone you ran `ap` from by 
+reading the env var loaded from that clone's `.env`:
 
 ```yaml
 signingProxy:
@@ -277,13 +312,17 @@ cd ~/src/authproxy1 && ap signing-proxy --proxyTo=api   # listens on 8888
 ap signing-proxy --proxyTo=api --port 9000              # --port always wins
 ```
 
-The matching `AUTHPROXY_HOST_APP_INITIATE_SESSION_URL` in each `.env` is templated `http://127.0.0.1:${AUTHPROXY_SIGNING_PROXY_PORT}/login-redirect`, so the server's session-initiation URL automatically matches the port the local signing-proxy listens on.
+The matching `AUTHPROXY_HOST_APP_INITIATE_SESSION_URL` in each `.env` is templated 
+`http://127.0.0.1:${AUTHPROXY_SIGNING_PROXY_PORT}/login-redirect`, so the server's
+session-initiation URL automatically matches the port the local signing-proxy 
+listens on.
 
 ## See also
 
 - [Local development](/development/local-development/) — the surrounding source and UI workflow.
 - [AGENTS.md — Running locally](https://github.com/rmorlok/authproxy/blob/main/AGENTS.md#running-locally) — repository-specific contributor guidance.
-- [Telemetry](/operations/telemetry/) — what shows up in traces/metrics when these commands fire requests through the server.
+- [Telemetry](/operations/telemetry/) — what shows up in traces/metrics when these commands fire 
+- requests through the server.
 
 ## Apply resource manifests
 
@@ -435,8 +474,9 @@ result envelopes rather than replayable manifests.
 The loader checks every resource before producing output, including resources
 excluded by a selector. Validation modes never permit malformed identities,
 duplicate keys, invalid field types, server-owned fields, or redacted secret
-placeholders. Warn/ignore remove unknown fields before output. A selector matching no resources succeeds with empty
-output (`[]` for JSON); input containing no resource documents fails.
+placeholders. Warn/ignore remove unknown fields before output. A selector 
+matching no resources succeeds with empty output (`[]` for JSON); input containing 
+no resource documents fails.
 
 URL downloads use an independent, unsigned HTTP client, a 30-second timeout,
 and a 16 MiB limit per source. URL credentials and HTTPS-to-HTTP redirects are
