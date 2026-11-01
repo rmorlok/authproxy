@@ -74,7 +74,8 @@ type Session struct {
 	// cancel interrupts requests and response reads when the session ends.
 	cancel context.CancelCauseFunc
 
-	// stopTimer releases the total invocation timer on Close.
+	// stopTimer releases the invocation timeout and optional admission deadline
+	// timers on Close.
 	stopTimer context.CancelFunc
 
 	// limits is immutable effective policy for the entire invocation.
@@ -112,6 +113,21 @@ func New(
 	client iface.HTTPClient,
 	limits Limits,
 ) (*Session, error) {
+	return NewWithDeadline(ctx, client, limits, time.Time{})
+}
+
+// NewWithDeadline starts a session with New's configured client and policy,
+// additionally honoring an absolute policy deadline captured during admission.
+// A zero deadline adds no restriction. An earlier deadline includes preparation
+// time in the shared allowance; a later one cannot extend limits.Timeout or a
+// caller deadline. Policy expiration returns ErrTimeout while caller cancellation
+// retains its original context error, even when both restrict the session.
+func NewWithDeadline(
+	ctx context.Context,
+	client iface.HTTPClient,
+	limits Limits,
+	deadline time.Time,
+) (*Session, error) {
 	if ctx == nil ||
 		client == nil ||
 		limits.Timeout <= 0 ||
@@ -125,7 +141,21 @@ func New(
 		return nil, err
 	}
 
-	timed, stopTimer := context.WithTimeoutCause(ctx, limits.Timeout, ErrTimeout)
+	timed, stopTimeout := context.WithTimeoutCause(ctx, limits.Timeout, ErrTimeout)
+	stopTimer := stopTimeout
+	currentDeadline, hasDeadline := timed.Deadline()
+
+	if !deadline.IsZero() && (!hasDeadline || deadline.Before(currentDeadline)) {
+		// Do not duplicate an equal caller deadline with a policy timer: its
+		// callback could win the race and misclassify caller expiration.
+		var stopDeadline context.CancelFunc
+		timed, stopDeadline = context.WithDeadlineCause(timed, deadline, ErrTimeout)
+		stopTimer = func() {
+			stopDeadline()
+			stopTimeout()
+		}
+	}
+
 	run, cancel := context.WithCancelCause(timed)
 
 	return &Session{

@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
@@ -172,6 +173,16 @@ func TestExecuteAuthoredOutputLimitAllowsShrinkingProjection(t *testing.T) {
 // TestExecuteAuthoredTimeout interrupts a waiting connection call before the
 // looser operator deadline while preserving the caller's still-live context.
 func TestExecuteAuthoredTimeout(t *testing.T) {
+	for _, withAdmissionDeadline := range []bool{false, true} {
+		t.Run(fmt.Sprint(withAdmissionDeadline), func(t *testing.T) {
+			testExecuteAuthoredTimeout(t, withAdmissionDeadline)
+		})
+	}
+}
+
+// testExecuteAuthoredTimeout checks the authored cap with a zero admission
+// deadline and with a later admission deadline that must not raise that cap.
+func testExecuteAuthoredTimeout(t *testing.T, withAdmissionDeadline bool) {
 	definition := executionDefinition()
 	definition.Limits = &tools.ExecutionLimits{TimeoutMillis: util.ToPtr(int64(200))}
 	limits := executionLimits()
@@ -179,6 +190,10 @@ func TestExecuteAuthoredTimeout(t *testing.T) {
 	program := compileExecution(t, definition, limits)
 	watchdog, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
+	invocation := executionInvocation()
+	if withAdmissionDeadline {
+		invocation.Deadline, _ = watchdog.Deadline()
+	}
 	var calls atomic.Int32
 	client := executionClient(func(request *http.Request) (*http.Response, error) {
 		calls.Add(1)
@@ -187,11 +202,118 @@ func TestExecuteAuthoredTimeout(t *testing.T) {
 	})
 
 	// The unknown client has been entered, so timeout cannot claim no execution.
-	result, err := program.Execute(watchdog, client, executionInvocation())
+	result, err := program.Execute(watchdog, client, invocation)
 	require.NoError(t, err)
 	require.NoError(t, watchdog.Err())
 	requireExecutionFailure(t, result, "EXECUTION_LIMIT_EXCEEDED", api.ToolExecutionStateMayHaveExecuted)
 	require.EqualValues(t, 1, calls.Load())
+}
+
+// TestExecuteExpiredAdmissionDeadline spends no HTTP allowance when preparation
+// has already exhausted the invocation's absolute policy deadline.
+func TestExecuteExpiredAdmissionDeadline(t *testing.T) {
+	program := compileExecution(t, executionDefinition(), executionLimits())
+	invocation := executionInvocation()
+	invocation.Deadline = time.Unix(1, 0)
+	var calls atomic.Int32
+	client := executionClient(func(*http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return executionResponse(&executionBody{reader: strings.NewReader(`true`)}), nil
+	})
+
+	// The caller is live, so policy expiration produces a safe, unsent result.
+	result, err := program.Execute(context.Background(), client, invocation)
+	require.NoError(t, err)
+	requireExecutionFailure(t, result, "EXECUTION_LIMIT_EXCEEDED", api.ToolExecutionStateNotStarted)
+	require.EqualValues(t, 0, calls.Load())
+}
+
+// TestExecuteDeadlineAfterSend distinguishes the admission policy from a caller
+// deadline after entering a client whose send evidence remains uncertain.
+func TestExecuteDeadlineAfterSend(t *testing.T) {
+	for _, callerDeadline := range []bool{false, true} {
+		t.Run(fmt.Sprint(callerDeadline), func(t *testing.T) {
+			limits := executionLimits()
+			limits.HTTP.Timeout = 10 * time.Second
+			program := compileExecution(t, executionDefinition(), limits)
+			watchdog, stopWatchdog := context.WithTimeout(context.Background(), 5*time.Second)
+			defer stopWatchdog()
+
+			// Start the short timer after compilation; wait on its cancellation
+			// in the client rather than guessing when it expires with a sleep.
+			deadlineCtx, stopDeadline := context.WithTimeout(watchdog, 250*time.Millisecond)
+			defer stopDeadline()
+			deadline, _ := deadlineCtx.Deadline()
+			invocation := executionInvocation()
+			invocation.Deadline = deadline
+			parent := watchdog
+			if callerDeadline {
+				parent = deadlineCtx
+			}
+			var calls atomic.Int32
+			client := executionClient(func(request *http.Request) (*http.Response, error) {
+				calls.Add(1)
+				actual, ok := request.Context().Deadline()
+				require.True(t, ok)
+				require.Equal(t, deadline, actual)
+				<-request.Context().Done()
+				if callerDeadline {
+					require.ErrorIs(t, context.Cause(request.Context()), context.DeadlineExceeded)
+				}
+				return nil, request.Context().Err()
+			})
+
+			// Policy expiration keeps the result and send state; a caller's
+			// deadline remains its context error instead of becoming Tool output.
+			result, err := program.Execute(parent, client, invocation)
+			require.NoError(t, watchdog.Err())
+			require.EqualValues(t, 1, calls.Load())
+			if callerDeadline {
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				requireExecutionFailure(t, result, "EXECUTION_LIMIT_EXCEEDED", api.ToolExecutionStateMayHaveExecuted)
+			}
+		})
+	}
+}
+
+// pendingDeadlineContext models the interval between a caller deadline passing
+// and its timer callback delivering cancellation. The embedded context controls
+// delivery so the regression does not depend on competing real timer callbacks.
+type pendingDeadlineContext struct {
+	context.Context
+	deadline time.Time
+}
+
+// Deadline reports the caller's deadline independently of cancellation delivery.
+func (c pendingDeadlineContext) Deadline() (time.Time, bool) { return c.deadline, true }
+
+// TestEqualAdmissionDeadlineKeepsCallerTimer prevents an equal policy deadline
+// from canceling independently while caller cancellation is still being delivered.
+func TestEqualAdmissionDeadlineKeepsCallerTimer(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	caller := pendingDeadlineContext{Context: parent, deadline: time.Unix(1, 0)}
+	client := executionClient(func(*http.Request) (*http.Response, error) {
+		t.Fatal("no request should be issued while testing deadline ownership")
+		return nil, nil
+	})
+
+	// The caller owns this deadline. A duplicate policy timer would expire
+	// synchronously here, incorrectly attaching ErrTimeout to the session.
+	session, err := httphost.NewWithDeadline(caller, client, executionLimits().HTTP, caller.deadline)
+	require.NoError(t, err)
+	defer session.Close()
+	require.NoError(t, session.Err())
+	require.NoError(t, context.Cause(session.Context()))
+
+	// Deliver caller cancellation explicitly and preserve its classification.
+	cancel()
+	<-session.Context().Done()
+	require.ErrorIs(t, session.Err(), context.Canceled)
+	require.ErrorIs(t, context.Cause(session.Context()), context.Canceled)
 }
 
 // TestExecuteAuthoredStackLimit constrains response projection without changing

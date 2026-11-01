@@ -44,7 +44,7 @@ func Compile(definition toolschema.ToolDefinition, limits Limits) (*Program, err
 		return nil, errors.New("HTTP Tool requires only the proxyHttp executor")
 	}
 
-	limits, err := resolveLimits(limits, definition.Limits)
+	limits, err := ResolveLimits(limits, definition.Limits)
 	if err != nil {
 		return nil, err
 	}

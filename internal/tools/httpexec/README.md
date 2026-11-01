@@ -166,7 +166,20 @@ envelope cannot fit, execution returns `httpcodec.ErrEncodedResultLimit` with no
 partial result. A policy timeout can still produce a result while the caller's
 context remains live.
 
+Admission can set `Invocation.Deadline` to its absolute policy deadline so time
+spent preparing the connection and compiling the Tool reduces the time available
+to execute it. The earlier of that deadline, the compiled timeout, and the caller's
+deadline applies. Leaving it zero starts the policy timeout in `Execute`. An
+expired policy deadline returns `EXECUTION_LIMIT_EXCEEDED` with `notStarted` if no
+request was sent; expiration after a possible send retains `mayHaveExecuted`.
+
 ## Integration boundary
+
+Core's private `invokeHTTPTool` helper connects authorization and connection
+preparation to this executor using explicit operator limits. It uses
+`ResolveLimits` and `ErrorResult` to return bounded readiness failures before
+compilation, and supplies one deadline for preparation and execution. Operator
+configuration and the public invocation endpoint are still separate work.
 
 The caller must authorize the Tool aliases for the connection, check readiness
 and any expected revision, and capture the same revision/configuration for the
