@@ -3,6 +3,7 @@ package apjs
 import (
 	"testing"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -134,4 +135,82 @@ func TestLibraryEvaluationUsesFreshRuntime(t *testing.T) {
 	second, err := ctx.EvaluateBoolean(`firstCallOnly()`)
 	require.NoError(t, err)
 	assert.True(t, second)
+}
+
+func TestLibraryRunInitializesCallerRuntime(t *testing.T) {
+	// Compile once, with lexical state and a helper that uses caller-provided data.
+	library, err := CompileLibrary(`
+		const PREFIX = suppliedPrefix;
+		let count = 0;
+		function nextItem() { return PREFIX + (++count); }
+	`)
+	require.NoError(t, err)
+
+	// Initialization leaves lexical names and helper functions available to later code.
+	first := goja.New()
+	require.NoError(t, first.Set("suppliedPrefix", "first:"))
+	require.NoError(t, library.Run(first))
+	value, err := first.RunString(`PREFIX + "/" + nextItem() + "/" + nextItem()`)
+	require.NoError(t, err)
+	assert.Equal(t, "first:/first:1/first:2", value.String())
+
+	// Reusing the compiled library in another runtime creates independent lexical state.
+	second := goja.New()
+	require.NoError(t, second.Set("suppliedPrefix", "second:"))
+	require.NoError(t, library.Run(second))
+	value, err = second.RunString(`nextItem()`)
+	require.NoError(t, err)
+	assert.Equal(t, "second:1", value.String())
+
+	// Library initialization adds no network, module-loading, or process capability.
+	value, err = first.RunString(`typeof fetch + "/" + typeof require + "/" + typeof process`)
+	require.NoError(t, err)
+	assert.Equal(t, "undefined/undefined/undefined", value.String())
+}
+
+func TestLibraryRunLeavesReservedNamePolicyToCaller(t *testing.T) {
+	// A different JavaScript host may reserve names other than connector predicates do.
+	library, err := CompileLibrary(`const cfg = { tenant: "example" };`)
+	require.NoError(t, err)
+	vm := goja.New()
+	require.NoError(t, library.Run(vm))
+	value, err := vm.RunString(`cfg.tenant`)
+	require.NoError(t, err)
+	assert.Equal(t, "example", value.String())
+
+	// The existing connector validation path continues to enforce its own reserved names.
+	require.ErrorContains(t, library.Validate(), `reserved runtime variable "cfg"`)
+}
+
+func TestLibraryRunEmptyLibraries(t *testing.T) {
+	// Missing, zero-value, and whitespace-only libraries all preserve the caller's VM.
+	empty, err := CompileLibrary(" \n\t")
+	require.NoError(t, err)
+	for name, library := range map[string]*Library{
+		"nil":        nil,
+		"zero value": {},
+		"empty":      empty,
+	} {
+		t.Run(name, func(t *testing.T) {
+			vm := goja.New()
+			require.NoError(t, vm.Set("existing", "preserved"))
+			require.NoError(t, library.Run(vm))
+			assert.Equal(t, "preserved", vm.Get("existing").String())
+		})
+	}
+}
+
+func TestLibraryRunRequiresRuntime(t *testing.T) {
+	// Reject missing runtimes consistently, including when there is no source to execute.
+	library, err := CompileLibrary(`const value = 1;`)
+	require.NoError(t, err)
+	for name, library := range map[string]*Library{
+		"nil":        nil,
+		"zero value": {},
+		"compiled":   library,
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorContains(t, library.Run(nil), "runtime is required")
+		})
+	}
 }

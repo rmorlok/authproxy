@@ -83,7 +83,7 @@ func (l *Library) Validate() error {
 	}
 
 	vm := goja.New()
-	if err := l.run(vm); err != nil {
+	if err := l.Run(vm); err != nil {
 		return err
 	}
 	return validateReservedRuntimeVars(vm)
@@ -98,7 +98,21 @@ func (l *Library) NewContext(vars map[string]any) Context {
 	}
 }
 
-func (l *Library) run(vm *goja.Runtime) error {
+// Run initializes the compiled library in a caller-owned runtime, leaving its
+// lexical bindings and helper functions available to subsequent programs. A nil
+// or empty library is a no-op, but vm must be non-nil. Running the same library
+// twice in one VM may fail when it redeclares lexical bindings.
+//
+// The caller owns vm, keeps ordinary VM access on one goroutine, and enforces
+// any execution timeout and stack limits. The compiled library may be reused
+// concurrently in different VMs. Run installs no host capabilities and performs
+// no reserved-name validation; callers choose the policy for their execution
+// context. Returned errors include authored diagnostics and must be sanitized
+// before public use.
+func (l *Library) Run(vm *goja.Runtime) error {
+	if vm == nil {
+		return fmt.Errorf("JavaScript runtime is required")
+	}
 	if l == nil || l.program == nil {
 		return nil
 	}

@@ -92,7 +92,7 @@ func (c Context) runExpression(expression string) (goja.Value, error) {
 	vm := goja.New()
 
 	if c.library != nil {
-		if err := c.library.run(vm); err != nil {
+		if err := c.library.Run(vm); err != nil {
 			return nil, err
 		}
 		if err := validateReservedRuntimeVars(vm); err != nil {
