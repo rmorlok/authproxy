@@ -91,6 +91,76 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Tools": {
+      "type": "object",
+      "properties": {
+        "invocation": {
+          "$ref": "#/$defs/ToolInvocationLimits"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ToolInvocationLimits": {
+      "type": "object",
+      "properties": {
+        "timeout": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "maxRequests": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxInputBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxResponseBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxOutputBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxEncodedResultBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxStackDepth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxRenderBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxTransformInputBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxResponseStreamBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxResponseHeaderBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxResponseSourceBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxDepth": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxValues": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxRenderSteps": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maxNumberDigits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        }
+      },
+      "additionalProperties": false
+    },
     "CookieConfig": {
       "properties": {
         "domain": {
@@ -1191,6 +1261,9 @@
     },
     "tasks": {
       "$ref": "#/$defs/Tasks"
+    },
+    "tools": {
+      "$ref": "#/$defs/Tools"
     },
     "telemetry": {
       "$ref": "#/$defs/Telemetry"
