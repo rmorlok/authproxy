@@ -135,13 +135,22 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			ApplyAttributionToLogRecord(record, ctx)
 
 			if storeErr := t.store.StoreRecord(asyncCtx, record); storeErr != nil {
-				t.logger.Error("error storing HTTP log record", "error", storeErr, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+				t.logger.Error(
+					"error storing HTTP log record",
+					"error", storeErr,
+					"entry_id", full_log.Id.String(),
+					"correlation_id", full_log.CorrelationID,
+				)
 				return
 			}
 
 			if t.fullStore != nil {
 				if storeErr := t.fullStore.Store(asyncCtx, full_log); storeErr != nil {
-					t.logger.Error("error storing full HTTP log in blob storage", "error", storeErr, "entry_id", full_log.Id.String())
+					t.logger.Error(
+						"error storing full HTTP log in blob storage",
+						"error", storeErr,
+						"entry_id", full_log.Id.String(),
+					)
 				}
 			}
 		}()
@@ -209,7 +218,11 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			if responseBodyReader != nil {
 				responseData, err := io.ReadAll(responseBodyReader)
 				if err != nil {
-					t.logger.Error("error reading full request body", "error", err, "entry_id", full_log.Id.String())
+					t.logger.Error(
+						"error reading full request body",
+						"error", err,
+						"entry_id", full_log.Id.String(),
+					)
 					full_log.Response.Body = []byte(err.Error())
 				} else {
 					full_log.Response.Body = responseData
@@ -217,8 +230,9 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 		}
 
-		// This select should immediately return the body reader done if the full request is being recorded. This
-		// is to cover cases where we aren't recording the full response but need to wait for the client to fully
+		// This select should immediately return the body reader done if the full
+		// request is being recorded. This is to cover cases where we aren't
+		// recording the full response but need to wait for the client to fully
 		// consume the data.
 		select {
 		case <-ctx.Done():
@@ -229,7 +243,12 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 		case <-time.After(cc.maxResponseWait):
 			full_log.InternalTimeout = true
-			t.logger.Error("timed out waiting for response body to be read; full_log will not have accurate size", "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID, "max_wait", cc.maxResponseWait.String())
+			t.logger.Error(
+				"timed out waiting for response body to be read; full_log will not have accurate size",
+				"entry_id", full_log.Id.String(),
+				"correlation_id", full_log.CorrelationID,
+				"max_wait", cc.maxResponseWait.String(),
+			)
 		}
 		t.finishRequestCapture(full_log, requestBodyTrackingReader, requestBodyBuf)
 
@@ -238,12 +257,21 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		ApplyAttributionToLogRecord(record, ctx)
 
 		if err := t.store.StoreRecord(asyncCtx, record); err != nil {
-			t.logger.Error("error storing HTTP log record", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+			t.logger.Error(
+				"error storing HTTP log record",
+				"error", err,
+				"entry_id", full_log.Id.String(),
+				"correlation_id", full_log.CorrelationID,
+			)
 		}
 
 		if t.fullStore != nil {
 			if err := t.fullStore.Store(asyncCtx, full_log); err != nil {
-				t.logger.Error("error storing full HTTP log entry in blob storage", "error", err, "record_id", full_log.Id.String())
+				t.logger.Error(
+					"error storing full HTTP log entry in blob storage",
+					"error", err,
+					"record_id", full_log.Id.String(),
+				)
 			}
 		}
 	}()
@@ -255,7 +283,11 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 // may return headers or an error before its request-body reader has stopped, so
 // the capture buffer is inspected only after Done provides a read/close barrier.
 // Waiting is bounded, and never blocks response-pipe draining or header return.
-func (t *RoundTripper) finishRequestCapture(log *FullLog, tracking trackingReader, body *bytes.Buffer) {
+func (t *RoundTripper) finishRequestCapture(
+	log *FullLog,
+	tracking trackingReader,
+	body *bytes.Buffer,
+) {
 	if body == nil && log.Request.ContentLength >= 0 {
 		return
 	}
@@ -275,7 +307,11 @@ func (t *RoundTripper) finishRequestCapture(log *FullLog, tracking trackingReade
 			completed = true
 		case <-timer.C:
 			log.InternalTimeout = true
-			t.logger.Error("timed out waiting for request body to close; full_log will not have accurate size or body", "entry_id", log.Id.String(), "max_wait", t.captureConfig.maxResponseWait.String())
+			t.logger.Error(
+				"timed out waiting for request body to close; full_log will not have accurate size or body",
+				"entry_id", log.Id.String(),
+				"max_wait", t.captureConfig.maxResponseWait.String(),
+			)
 		}
 	}
 
