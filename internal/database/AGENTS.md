@@ -47,6 +47,16 @@ The re-encryption registry (`reencrypt_registry.go`) tracks which tables/columns
 3. Register the field in an `init()` function using `RegisterEncryptedField()`
 4. Update `cols()`, `fields()`, `values()` for both the encrypted column and `encrypted_at`
 
+## Task Checkpoints
+
+Long-running background tasks save and resume progress with `TaskCheckpointer[T]` (`task_checkpoint.go`), rather than adding their own progress tables. Create one per run, `Load` once, `Save` as work completes, and `Clear` when finished. See `internal/database/tasks/task_reconcile_carry_forward_labels.go` for a complete example.
+
+- **Key:** `TaskCheckpointKey` is the asynq task type plus an optional scope for parameterized tasks. Do not use asynq's task ID: it changes on every scheduled enqueue, so a later run could not find the progress.
+- **Payload:** a task-defined type stored as JSON. Keep it compatible across releases, and handle `ErrInvalidTaskCheckpointPayload` from `Load` if it might not be.
+- **TTL:** applied on every save, and it must comfortably exceed the gap between saves, including the gap between scheduled runs. Expired checkpoints count as missing immediately; the `database:cleanup_expired_task_checkpoints` task only reclaims storage.
+- **Overlapping runs:** every write is a compare-and-swap on an opaque revision. `ErrTaskCheckpointConflict` means another run owns the work, so stop and report success instead of retrying.
+- **Repeated work:** saves are not idempotent and progress is at-least-once, so work since the last save must be safe to repeat.
+
 ## Provider-Specific SQL
 
 SQLite and PostgreSQL have different JSON functions. When writing raw SQL expressions involving JSON:
