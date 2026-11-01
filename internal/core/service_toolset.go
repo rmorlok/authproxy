@@ -47,6 +47,8 @@ func (s *service) GetToolSetGeneration(
 // CreateToolSet validates and compiles the first generation before creating
 // anything, then creates the logical ToolSet and its generation-1 draft, and
 // publishes it when primary is requested. Server-owned status is rejected.
+// Reconciliation is requested either way: a draft-only ToolSet still records
+// which connections are waiting for a first primary.
 func (s *service) CreateToolSet(
 	ctx context.Context,
 	resource *toolsetschema.ToolSet,
@@ -95,6 +97,8 @@ func (s *service) CreateToolSet(
 		}
 	}
 
+	s.enqueueToolSetReconcile(ctx, id)
+
 	return &ToolSet{logical: *logical, generation: *row, definition: candidate.Spec.Definition}, nil
 }
 
@@ -105,6 +109,11 @@ func (s *service) CreateToolSet(
 // intent without a definition is a no-op while a primary exists, matching the
 // ToolSet generation policy; pending drafts publish through the generation
 // endpoint, or by resending their definition with primary intent.
+//
+// A selector change and a publication in one patch commit as separate writes, so
+// a selector change only requests reconciliation once the whole patch finishes.
+// Requesting it sooner would let a worker install the outgoing primary on newly
+// selected connections, and pins keep them there after the publication.
 func (s *service) UpdateToolSet(
 	ctx context.Context,
 	id apid.ID,
@@ -142,6 +151,15 @@ func (s *service) UpdateToolSet(
 		}
 	}
 
+	// The selector write stands even if a later step fails, including because the
+	// request was canceled, so the pass must not depend on the request's context.
+	selectorChanged := false
+	defer func() {
+		if selectorChanged {
+			s.enqueueToolSetReconcile(context.WithoutCancel(ctx), id)
+		}
+	}()
+
 	if patch.Spec.HasConnectionSelector() {
 		selector := defaultToolSetSelector(*desired.Spec.ConnectionSelector, logical.Namespace)
 
@@ -151,6 +169,7 @@ func (s *service) UpdateToolSet(
 			if logical, err = s.db.UpdateToolSetConnectionSelector(ctx, id, logical.SelectorRevision, selector); err != nil {
 				return nil, mapToolSetDatabaseError(err)
 			}
+			selectorChanged = true
 		}
 	}
 
@@ -393,6 +412,7 @@ func (s *service) createToolSetDraft(
 		); err != nil {
 			return nil, mapToolSetDatabaseError(err)
 		}
+		s.enqueueToolSetReconcile(ctx, logical.Id)
 	}
 	return &ToolSet{logical: *logical, generation: *row, definition: *definition}, nil
 }
@@ -438,6 +458,7 @@ func (s *service) writeToolSetDraft(
 		); err != nil {
 			return nil, mapToolSetDatabaseError(err)
 		}
+		s.enqueueToolSetReconcile(ctx, logical.Id)
 	}
 	return &ToolSet{logical: *logical, generation: *row, definition: *definition}, nil
 }

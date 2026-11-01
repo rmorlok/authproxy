@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-// MaxToolSetBindingListLimit bounds one page of a connection's ToolSet bindings.
+// MaxToolSetBindingListLimit bounds one page of ToolSet bindings.
 const MaxToolSetBindingListLimit = 100
 
 // ToolSetBindingListing is one live assignment with the parent identity a
@@ -34,8 +34,9 @@ type ListToolSetBindingsExecutor interface {
 	Enumerate(context.Context, pagination.EnumerateCallback[ToolSetBindingListing]) error
 }
 
-// ListToolSetBindingsBuilder pages one connection's live assignments whose two
-// parents are live, ordered by ToolSet ID. ForConnectionId is required.
+// ListToolSetBindingsBuilder pages live assignments whose two parents are live.
+// Exactly one parent must be chosen: ForConnectionId orders by ToolSet ID, and
+// ForToolSetId orders by connection ID.
 //
 // ToolSet namespace scope is required too: with no matchers the listing is empty,
 // so a caller with no ToolSet access never learns what is bound. Invalid filters
@@ -51,6 +52,9 @@ type ListToolSetBindingsBuilder interface {
 	// ForConnectionId selects the connection whose assignments are listed.
 	ForConnectionId(apid.ID) ListToolSetBindingsBuilder
 
+	// ForToolSetId selects the ToolSet whose assignments are listed.
+	ForToolSetId(apid.ID) ListToolSetBindingsBuilder
+
 	// ForToolSetNamespaceMatchers replaces the scope of visible parent ToolSets.
 	// This scopes the ToolSet's namespace, which can be an ancestor of the
 	// connection's. Replacing means a later call can never widen an earlier scope.
@@ -58,15 +62,18 @@ type ListToolSetBindingsBuilder interface {
 }
 
 // listToolSetBindingsFilters implements ListToolSetBindingsBuilder. It is also the
-// cursor payload. A connection holds at most one live assignment per ToolSet, so
-// the last ToolSet ID is an exact keyset position that writes between pages cannot
-// shift, unlike the offsets other Tool listings use.
+// cursor payload. A parent pair holds at most one live assignment, so the other
+// parent's last ID is an exact keyset position that writes between pages cannot
+// shift, unlike the offsets other Tool listings use. A reconciler can therefore
+// remove bindings while enumerating them without skipping any.
 type listToolSetBindingsFilters struct {
 	s                 *service `json:"-"`
 	LimitVal          uint64   `json:"limit"`
-	ConnectionIdVal   apid.ID  `json:"connectionId"`
+	ConnectionIdVal   apid.ID  `json:"connectionId,omitempty"`
+	ToolSetIdVal      apid.ID  `json:"toolSetId,omitempty"`
 	NamespaceMatchers []string `json:"namespaceMatchers,omitempty"`
 	AfterToolSetId    apid.ID  `json:"afterToolSetId,omitempty"`
+	AfterConnectionId apid.ID  `json:"afterConnectionId,omitempty"`
 }
 
 func (l *listToolSetBindingsFilters) Limit(limit int32) ListToolSetBindingsBuilder {
@@ -79,19 +86,29 @@ func (l *listToolSetBindingsFilters) ForConnectionId(id apid.ID) ListToolSetBind
 	return l
 }
 
+func (l *listToolSetBindingsFilters) ForToolSetId(id apid.ID) ListToolSetBindingsBuilder {
+	l.ToolSetIdVal = id
+	return l
+}
+
 func (l *listToolSetBindingsFilters) ForToolSetNamespaceMatchers(matchers []string) ListToolSetBindingsBuilder {
 	l.NamespaceMatchers = matchers
 	return l
 }
 
-// validate checks the required connection and every namespace matcher.
+// validate checks the single required parent and every namespace matcher.
 func (l *listToolSetBindingsFilters) validate() error {
-	if l.ConnectionIdVal.IsNil() {
-		return errors.New("toolset binding list requires a connection id")
-	}
-
-	if err := l.ConnectionIdVal.ValidatePrefix(apid.PrefixConnection); err != nil {
-		return fmt.Errorf("invalid connection id: %w", err)
+	switch {
+	case l.ConnectionIdVal.IsNil() == l.ToolSetIdVal.IsNil():
+		return errors.New("toolset binding list requires exactly one of a connection id or toolset id")
+	case !l.ConnectionIdVal.IsNil():
+		if err := l.ConnectionIdVal.ValidatePrefix(apid.PrefixConnection); err != nil {
+			return fmt.Errorf("invalid connection id: %w", err)
+		}
+	default:
+		if err := validateToolSetID(l.ToolSetIdVal); err != nil {
+			return fmt.Errorf("invalid toolset id: %w", err)
+		}
 	}
 
 	for _, matcher := range l.NamespaceMatchers {
@@ -103,7 +120,7 @@ func (l *listToolSetBindingsFilters) validate() error {
 	return nil
 }
 
-// FetchPage reads one bounded page and advances past its last ToolSet. A lookahead
+// FetchPage reads one bounded page and advances past its last row. A lookahead
 // row reports more results and produces a cursor for the next page.
 func (l *listToolSetBindingsFilters) FetchPage(ctx context.Context) pagination.PageResult[ToolSetBindingListing] {
 	if err := l.validate(); err != nil {
@@ -122,17 +139,23 @@ func (l *listToolSetBindingsFilters) FetchPage(ctx context.Context) pagination.P
 		Join(ToolSetsTable + " t ON t.id = b.tool_set_id").
 		Join(ConnectionsTable + " c ON c.id = b.connection_id").
 		Where(sq.Eq{
-			"b.connection_id": l.ConnectionIdVal,
-			"b.deleted_at":    nil,
-			"t.deleted_at":    nil,
-			"c.deleted_at":    nil,
+			"b.deleted_at": nil,
+			"t.deleted_at": nil,
+			"c.deleted_at": nil,
 		}).
 		Where(toolNamespaceScope("t.namespace", l.NamespaceMatchers)).
-		OrderBy("b.tool_set_id ASC").
 		Limit(l.LimitVal + 1)
 
-	if !l.AfterToolSetId.IsNil() {
-		q = q.Where(sq.Gt{"b.tool_set_id": l.AfterToolSetId})
+	if !l.ConnectionIdVal.IsNil() {
+		q = q.Where(sq.Eq{"b.connection_id": l.ConnectionIdVal}).OrderBy("b.tool_set_id ASC")
+		if !l.AfterToolSetId.IsNil() {
+			q = q.Where(sq.Gt{"b.tool_set_id": l.AfterToolSetId})
+		}
+	} else {
+		q = q.Where(sq.Eq{"b.tool_set_id": l.ToolSetIdVal}).OrderBy("b.connection_id ASC")
+		if !l.AfterConnectionId.IsNil() {
+			q = q.Where(sq.Gt{"b.connection_id": l.AfterConnectionId})
+		}
 	}
 
 	rows, err := q.RunWith(l.s.db).QueryContext(ctx)
@@ -159,7 +182,12 @@ func (l *listToolSetBindingsFilters) FetchPage(ctx context.Context) pagination.P
 		items = items[:l.LimitVal]
 	}
 	if len(items) > 0 {
-		l.AfterToolSetId = items[len(items)-1].ToolSetId
+		last := items[len(items)-1]
+		if !l.ConnectionIdVal.IsNil() {
+			l.AfterToolSetId = last.ToolSetId
+		} else {
+			l.AfterConnectionId = last.ConnectionId
+		}
 	}
 
 	cursor := ""
@@ -195,7 +223,7 @@ func (l *listToolSetBindingsFilters) Enumerate(
 	return err
 }
 
-// ListToolSetBindingsBuilder starts a listing of one connection's assignments.
+// ListToolSetBindingsBuilder starts a listing of one parent's assignments.
 func (s *service) ListToolSetBindingsBuilder() ListToolSetBindingsBuilder {
 	return &listToolSetBindingsFilters{s: s, LimitVal: defaultToolListLimit}
 }
@@ -208,7 +236,7 @@ func (s *service) ListToolSetBindingsFromCursor(ctx context.Context, cursor stri
 	}
 
 	// Every continuation follows a returned binding, so a position must exist.
-	if parsed.AfterToolSetId.IsNil() {
+	if parsed.AfterToolSetId.IsNil() && parsed.AfterConnectionId.IsNil() {
 		return nil, errors.New("invalid toolset binding list cursor position")
 	}
 
