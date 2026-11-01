@@ -11,37 +11,19 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	httpmock "github.com/rmorlok/authproxy/internal/httpf/mock"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
-	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
-	"github.com/rmorlok/authproxy/internal/tools/javascript"
-	"github.com/rmorlok/authproxy/internal/tools/render"
-	"github.com/rmorlok/authproxy/internal/tools/validation"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
-
-// toolHTTPPolicy supplies explicit operator ceilings for every executor layer.
-func toolHTTPPolicy() httpexec.Limits {
-	return httpexec.Limits{
-		Render: render.Limits{MaxBytes: 32768, MaxDepth: 32, MaxSteps: 10000},
-		Validation: validation.Limits{MaxInputBytes: 16384, MaxOutputBytes: 16384,
-			MaxDepth: 32, MaxValues: 10000, MaxNumberDigits: 128},
-		Response: httpcodec.ResponseLimits{MaxSourceBytes: 4096, MaxResponseBytes: 16384,
-			MaxOutputBytes: 16384, MaxEncodedResultBytes: 32768,
-			Transform: javascript.Limits{MaxSourceBytes: 4096, MaxInputBytes: 32768,
-				MaxOutputBytes: 16384, MaxDepth: 32, MaxNodes: 10000, MaxStackDepth: 128, Timeout: time.Second}},
-		HTTP: httphost.Limits{Timeout: 2 * time.Second, MaxRequests: 1,
-			MaxResponseBytes: 16384, MaxStreamBytes: 16384, MaxHeaderBytes: 4096},
-	}
-}
 
 // expectHTTPToolDefinition freezes the fixture's edited definition as captured ciphertext.
 func expectHTTPToolDefinition(t *testing.T, f *toolAuthorizationFixture) {
@@ -146,7 +128,7 @@ func TestInvokeHTTPToolCapturedExecution(t *testing.T) {
 			})
 
 			// A Tool grant without proxy permission is sufficient; the captured revision is returned.
-			result, err := f.service.invokeHTTPTool(context.Background(), auth, f.snapshot.Revision.ToolId, util.ToPtr(uint64(7)), common.RawJSON(`{"id":"contact/42"}`), toolHTTPPolicy())
+			result, err := f.service.invokeHTTPTool(context.Background(), auth, f.snapshot.Revision.ToolId, util.ToPtr(uint64(7)), common.RawJSON(`{"id":"contact/42"}`))
 			require.NoError(t, err)
 			require.NoError(t, result.Validate(nil))
 			require.False(t, result.IsError)
@@ -218,7 +200,7 @@ func TestInvokeHTTPToolPreSendFailures(t *testing.T) {
 			}
 
 			// No factory expectation permits accidental sends or eager credential setup.
-			result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant(verb), nil), f.snapshot.Revision.ToolId, expected, input, toolHTTPPolicy())
+			result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant(verb), nil), f.snapshot.Revision.ToolId, expected, input)
 			if wantErr != nil || name == "compile error" {
 				require.Error(t, err)
 				require.Nil(t, result)
@@ -257,7 +239,7 @@ func TestInvokeHTTPToolPreparationInterruption(t *testing.T) {
 				})
 
 			// The budget covers decryption; only caller cancellation escapes as a Go error.
-			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`), toolHTTPPolicy())
+			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			if canceled {
 				require.ErrorIs(t, err, context.Canceled)
 				require.Nil(t, result)
@@ -292,7 +274,7 @@ func TestInvokeHTTPToolTimeoutAfterSend(t *testing.T) {
 			})
 
 			// Only the policy deadline yields a result; neither interruption retries the call.
-			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`), toolHTTPPolicy())
+			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			require.Equal(t, 1, calls)
 			if name == "caller cancellation" {
 				require.ErrorIs(t, err, context.Canceled)
@@ -308,10 +290,12 @@ func TestInvokeHTTPToolTimeoutAfterSend(t *testing.T) {
 // TestInvokeHTTPToolInvalidContextAndPolicy rejects invalid internal inputs
 // without decrypting connection configuration or creating an HTTP client.
 func TestInvokeHTTPToolInvalidContextAndPolicy(t *testing.T) {
-	for _, name := range []string{"nil context", "already canceled", "zero timeout", "zero result limit", "invalid authored cap"} {
+	for _, name := range []string{"nil context", "already canceled", "zero timeout", "zero result limit", "zero request limit", "invalid authored cap"} {
 		t.Run(name, func(t *testing.T) {
 			f, _ := toolPreparationFixture(t)
-			ctx, policy := context.Background(), toolHTTPPolicy()
+			ctx := context.Background()
+			limits := &sconfig.ToolInvocationLimits{}
+			f.service.cfg = config.FromRoot(&sconfig.Root{Tools: &sconfig.Tools{Invocation: limits}})
 			switch name {
 			case "nil context":
 				ctx = nil
@@ -320,9 +304,11 @@ func TestInvokeHTTPToolInvalidContextAndPolicy(t *testing.T) {
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			case "zero timeout":
-				policy.HTTP.Timeout = 0
+				limits.Timeout = &sconfig.HumanDuration{}
 			case "zero result limit":
-				policy.Response.MaxEncodedResultBytes = 0
+				limits.MaxEncodedResultBytes = &sconfig.HumanByteSize{}
+			case "zero request limit":
+				limits.MaxRequests = util.ToPtr(0)
 			case "invalid authored cap":
 				f.definition.Limits = &toolschema.ExecutionLimits{MaxInputBytes: util.ToPtr(int64(0))}
 			}
@@ -331,7 +317,7 @@ func TestInvokeHTTPToolInvalidContextAndPolicy(t *testing.T) {
 			}
 
 			// Missing or canceled contexts cannot read the snapshot; bad policy stops after authorization.
-			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`), policy)
+			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			require.Error(t, err)
 			require.Nil(t, result)
 			if name == "already canceled" {

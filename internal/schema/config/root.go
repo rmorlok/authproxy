@@ -25,6 +25,7 @@ type Root struct {
 	AppMetrics      *AppMetrics     `json:"appMetrics,omitempty" yaml:"appMetrics,omitempty"`
 	Connections     *Connections    `json:"connections,omitempty" yaml:"connections,omitempty"`
 	Tasks           *Tasks          `json:"tasks,omitempty" yaml:"tasks,omitempty"`
+	Tools           *Tools          `json:"tools,omitempty" yaml:"tools,omitempty"`
 	Telemetry       *Telemetry      `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
 	DevSettings     *DevSettings    `json:"devSettings,omitempty" yaml:"devSettings,omitempty"`
 }
@@ -53,6 +54,10 @@ func (r *Root) Validate() error {
 	}
 
 	if err := r.Telemetry.Validate(vc.PushField("telemetry")); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	if err := r.Tools.Validate(vc.PushField("tools")); err != nil {
 		result = multierror.Append(result, err)
 	}
 

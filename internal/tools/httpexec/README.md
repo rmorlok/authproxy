@@ -176,10 +176,13 @@ request was sent; expiration after a possible send retains `mayHaveExecuted`.
 ## Integration boundary
 
 Core's private `invokeHTTPTool` helper connects authorization and connection
-preparation to this executor using explicit operator limits. It uses
+preparation to this executor using the server's `tools.invocation` configuration
+and finite defaults. It uses
 `ResolveLimits` and `ErrorResult` to return bounded readiness failures before
-compilation, and supplies one deadline for preparation and execution. Operator
-configuration and the public invocation endpoint are still separate work.
+compilation, and supplies one deadline for preparation and execution. The
+[configuration reference](../../../docs/src/content/docs/reference/configuration.md#tool-invocation-limits)
+describes the defaults and independent allowances. The public invocation
+endpoint remains separate work.
 
 The caller must authorize the Tool aliases for the connection, check readiness
 and any expected revision, and capture the same revision/configuration for the
