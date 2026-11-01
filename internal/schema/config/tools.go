@@ -88,10 +88,13 @@ func (l *ToolInvocationLimits) Validate(vc *common.ValidationContext) error {
 	if vc == nil {
 		vc = &common.ValidationContext{Path: "$"}
 	}
+
 	var result *multierror.Error
+
 	if l.Timeout != nil && l.Timeout.Duration <= 0 {
 		result = multierror.Append(result, vc.NewErrorForField("timeout", "must be positive"))
 	}
+
 	for _, field := range []struct {
 		name  string
 		value *HumanByteSize
@@ -106,10 +109,12 @@ func (l *ToolInvocationLimits) Validate(vc *common.ValidationContext) error {
 		{"maxResponseHeaderBytes", l.MaxResponseHeaderBytes},
 		{"maxResponseSourceBytes", l.MaxResponseSourceBytes},
 	} {
-		if field.value != nil && (field.value.Value() == 0 || field.value.Value() > uint64(math.MaxInt)) {
+		if field.value != nil &&
+			(field.value.Value() == 0 || field.value.Value() > uint64(math.MaxInt)) {
 			result = multierror.Append(result, vc.NewErrorfForField(field.name, "must be between 1 and %d bytes", math.MaxInt))
 		}
 	}
+
 	for _, field := range []struct {
 		name  string
 		value *int
@@ -125,8 +130,10 @@ func (l *ToolInvocationLimits) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.NewErrorForField(field.name, "must be positive"))
 		}
 	}
+
 	if l.MaxNumberDigits != nil && *l.MaxNumberDigits > 4096 {
 		result = multierror.Append(result, vc.NewErrorForField("maxNumberDigits", "must not exceed 4096"))
 	}
+	
 	return result.ErrorOrNil()
 }
