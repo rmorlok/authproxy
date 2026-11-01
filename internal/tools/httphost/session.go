@@ -144,6 +144,7 @@ func NewWithDeadline(
 	timed, stopTimeout := context.WithTimeoutCause(ctx, limits.Timeout, ErrTimeout)
 	stopTimer := stopTimeout
 	currentDeadline, hasDeadline := timed.Deadline()
+
 	if !deadline.IsZero() && (!hasDeadline || deadline.Before(currentDeadline)) {
 		// Do not duplicate an equal caller deadline with a policy timer: its
 		// callback could win the race and misclassify caller expiration.
@@ -154,6 +155,7 @@ func NewWithDeadline(
 			stopTimeout()
 		}
 	}
+
 	run, cancel := context.WithCancelCause(timed)
 
 	return &Session{
