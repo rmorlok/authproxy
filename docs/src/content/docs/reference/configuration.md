@@ -17,6 +17,7 @@ The development configuration demonstrates the full server shape at
 | `database`, `redis` | Primary database and distributed state |
 | `appMetrics` | Request-event, resource-metric, and optional blob storage |
 | `tasks` | Task retention and worker behavior |
+| `tools` | Tool invocation time, request, data, and processing limits |
 | `telemetry` | OTLP exporter, signals, sampling, and label projection |
 
 Fields can use AuthProxy value sources such as direct development values,
@@ -40,6 +41,65 @@ YAML files.
 
 Once an instance is removed, it no longer appears in workflow monitoring, and
 polling its task returns `404`.
+
+## Tool invocation limits
+
+Set `tools.invocation` to control the server's limits for each Tool call. For
+example, this allows 30 seconds, up to 10 logical requests, and 512 KiB of
+arguments:
+
+```yaml
+tools:
+  invocation:
+    timeout: 30s
+    maxRequests: 10
+    maxInputBytes: 512kib
+    maxResponseBytes: 8mib
+    maxOutputBytes: 8mib
+    maxEncodedResultBytes: 16mib
+```
+
+Omitted fields use the defaults below. Explicit values must be positive; zero
+does not mean unlimited. Sizes use strings such as `512kib` or `8mib` (binary
+units); `kb` and `mb` use decimal units. Per-Tool limits can lower the server's
+limits but cannot raise them. For example, a Tool with `timeoutMillis: 5000`
+gets five seconds under the configuration above.
+
+These settings currently govern the internal HTTP Tool invocation path. There
+is no public invocation endpoint yet; bounded schema evaluation remains a
+prerequisite. The declarative HTTP executor makes one logical request. Proxy
+credential recovery and redirects may make additional HTTP attempts under the
+existing proxy policy.
+
+| Field | Default | What it limits |
+|---|---|---|
+| `timeout` | `60s` | Preparation, compilation, and execution after authorization; response transforms share the remaining time |
+| `maxRequests` | `20` | Logical connection-client calls |
+| `maxInputBytes` | `1mib` | Raw argument JSON, including whitespace |
+| `maxResponseBytes` | `8mib` | Aggregate decoded response bytes |
+| `maxOutputBytes` | `8mib` | Result content, structured-output JSON, and transform output |
+| `maxEncodedResultBytes` | `16mib` | The complete JSON result, including metadata, escaping, and base64 |
+| `maxStackDepth` | `256` | Response-transform JavaScript function-call depth |
+| `maxRenderBytes` | `8mib` | Each copied invocation context, compiled request template, and rendered request |
+| `maxTransformInputBytes` | `16mib` | Serialized invocation context and response supplied to a transform |
+| `maxResponseStreamBytes` | `8mib` | Each response stream before Tool-host decoding; the HTTP transport may already have decompressed it |
+| `maxResponseHeaderBytes` | `64kib` | Each copied response header map, including line overhead |
+| `maxResponseSourceBytes` | `256kib` | Combined response-rule and transform source text |
+| `maxDepth` | `64` | Nesting of copied, rendered, validated, and transformed data |
+| `maxValues` | `1000000` | Values inspected per JSON validation or transform input/output conversion |
+| `maxRenderSteps` | `1000000` | Work per context copy, template compilation, or render |
+| `maxNumberDigits` | `4096` | Mantissa digits plus absolute decimal exponent for JSON validation; cannot exceed 4096 |
+
+The byte allowances are independent. Arguments may be small while connection
+configuration or a response makes the transform input large. Raising
+`maxResponseBytes` does not raise the stream, transform-input, output, or result
+limits. A 16 MiB result allowance fits base64 encoding of 8 MiB of binary content
+with room for metadata, but heavily escaped text can need more space.
+
+Nesting and value counts bound data processing; they do not count JavaScript
+instructions or JSON Schema evaluation steps. The timeout interrupts supported
+work and HTTP I/O, but cannot preempt synchronous schema-library evaluation.
+These limits are not a hard memory quota.
 
 ## Connector manifests
 

@@ -16,9 +16,9 @@ import (
 )
 
 // invokeHTTPTool authorizes, prepares, and executes the current captured HTTP
-// Tool revision under explicit operator policy. It is an internal composition
-// point, not a public API: policy configuration and bounded schema evaluation
-// must be in place before a route can expose it. No policy defaults are supplied.
+// Tool revision under the server's tools.invocation policy and finite defaults.
+// It is an internal composition point, not a public API: bounded schema
+// evaluation must be in place before a route can expose it.
 //
 // Authorization and expectedRevision errors remain Go errors. After authorization,
 // known readiness/capability failures return bounded notStarted ToolResults;
@@ -35,7 +35,6 @@ func (s *service) invokeHTTPTool(
 	id apid.ID,
 	expectedRevision *uint64,
 	arguments common.RawJSON,
-	policy httpexec.Limits,
 ) (*api.ToolResult, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("%w: invocation context is required", ErrInvalidArgument)
@@ -46,15 +45,14 @@ func (s *service) invokeHTTPTool(
 		return nil, err
 	}
 
-	limits, err := httpexec.ResolveLimits(policy, authorized.definition.Limits)
+	policy, err := s.toolHTTPInvocationPolicy()
 	if err != nil {
 		return nil, err
 	}
 
-	// These two allowances also govern failures that never compile an HTTP
-	// program. Remaining component policy is validated by the compiler below.
-	if limits.HTTP.Timeout <= 0 || limits.Response.MaxEncodedResultBytes <= 0 {
-		return nil, errors.New("HTTP Tool invocation requires positive timeout and result byte limits")
+	limits, err := httpexec.ResolveLimits(policy, authorized.definition.Limits)
+	if err != nil {
+		return nil, err
 	}
 
 	workCtx, stop := context.WithTimeoutCause(ctx, limits.HTTP.Timeout, httphost.ErrTimeout)
@@ -146,7 +144,7 @@ func (s *service) invokeHTTPTool(
 	}
 
 	invocation.Snapshot = prepared.snapshot
-	
+
 	// Keep caller cancellation separate from the policy deadline. Passing workCtx
 	// as the parent would make expiry look like caller cancellation and discard
 	// the executor's evidence that a target request may already have been sent.
