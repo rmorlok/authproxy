@@ -36,12 +36,14 @@ func ErrorResult(
 	}
 
 	base, err := resultIdentity(invocation, maxEncodedResultBytes)
+
 	if contextErr := ctx.Err(); contextErr != nil {
 		return nil, contextErr
 	}
 	if err != nil {
 		return nil, err
 	}
+
 	return errorResult(ctx, base, maxEncodedResultBytes, state, code, message)
 }
 
@@ -56,6 +58,7 @@ func resultIdentity(invocation Invocation, maxEncodedResultBytes int) (*api.Tool
 	if maxEncodedResultBytes <= 0 {
 		return nil, httpcodec.ErrEncodedResultLimit
 	}
+
 	input := invocation.Snapshot
 	remaining := maxEncodedResultBytes
 
@@ -115,6 +118,7 @@ func errorResult(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	result := *base
 	result.IsError = true
 	result.Error = &api.ToolResultError{
@@ -122,6 +126,7 @@ func errorResult(
 		Message:        message,
 		ExecutionState: state,
 	}
+
 	if err := result.Error.Validate(nil); err != nil {
 		return nil, ErrInvalidInvocation
 	}

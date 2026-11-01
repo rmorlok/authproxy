@@ -59,12 +59,15 @@ func (s *service) invokeHTTPTool(
 
 	workCtx, stop := context.WithTimeoutCause(ctx, limits.HTTP.Timeout, httphost.ErrTimeout)
 	defer stop()
+
 	deadline, _ := workCtx.Deadline()
 	captured := authorized.snapshot
+
 	invocation := httpexec.Invocation{
 		ID:        apid.New(apid.PrefixToolInvocation).String(),
 		Arguments: arguments,
 		Deadline:  deadline,
+
 		// A readiness failure still identifies the authorized revision and source,
 		// without needing to decrypt configuration or create a connection client.
 		Snapshot: render.Input{
@@ -91,8 +94,14 @@ func (s *service) invokeHTTPTool(
 			return nil, err
 		}
 
-		return httpexec.ErrorResult(ctx, invocation, limits.Response.MaxEncodedResultBytes,
-			api.ToolExecutionStateNotStarted, code, message)
+		return httpexec.ErrorResult(
+			ctx,
+			invocation,
+			limits.Response.MaxEncodedResultBytes,
+			api.ToolExecutionStateNotStarted,
+			code,
+			message,
+		)
 	}
 
 	if authorized.definition.ProxyHTTP == nil || authorized.definition.Javascript != nil {
@@ -103,17 +112,33 @@ func (s *service) invokeHTTPTool(
 	if err != nil {
 		switch {
 		case errors.Is(err, errToolConnectionUnavailable):
-			return failBeforeExecution(err, "CONNECTION_UNAVAILABLE", "The Tool connection is not configured.")
+			return failBeforeExecution(
+				err,
+				"CONNECTION_UNAVAILABLE",
+				"The Tool connection is not configured.",
+			)
 		case errors.Is(err, ErrProxyNotImplemented):
-			return failBeforeExecution(err, "UNSUPPORTED_CAPABILITY", "The Tool connection does not support HTTP requests.")
+			return failBeforeExecution(
+				err,
+				"UNSUPPORTED_CAPABILITY",
+				"The Tool connection does not support HTTP requests.",
+			)
 		default:
-			return failBeforeExecution(err, "", "")
+			return failBeforeExecution(
+				err,
+				"", // code
+				"", // message
+			)
 		}
 	}
 
 	program, err := httpexec.Compile(authorized.definition, limits)
 	if err != nil {
-		return failBeforeExecution(fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err), "", "")
+		return failBeforeExecution(
+			fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err),
+			"", // code
+			"", // message
+		)
 	}
 
 	if err := workCtx.Err(); err != nil {
@@ -121,6 +146,7 @@ func (s *service) invokeHTTPTool(
 	}
 
 	invocation.Snapshot = prepared.snapshot
+	
 	// Keep caller cancellation separate from the policy deadline. Passing workCtx
 	// as the parent would make expiry look like caller cancellation and discard
 	// the executor's evidence that a target request may already have been sent.
