@@ -77,8 +77,10 @@ Responses with an `application/json` content type populate `bodyJson`. Other res
 ### Target-send evidence
 
 The wrapped endpoint includes `sendEvidence` in its response envelope and in
-AuthProxy error bodies. It describes all target attempts made for that logical
-request, including redirects and a retry after credential recovery:
+AuthProxy error bodies. The raw endpoint carries the same evidence in the
+`X-AuthProxy-Send-Evidence` response header. It describes all target attempts
+made for that logical request, including redirects and a retry after
+credential recovery:
 
 | Value | Meaning |
 |---|---|
@@ -107,10 +109,10 @@ on the failure cause, backoff requirements, and the provider's idempotency
 contract. Neither `sent` nor `mayHaveSent` makes a non-idempotent request safe
 to repeat automatically.
 
-Treat missing or unrecognized evidence as unknown. Older servers, failures
-before proxy routing, and infrastructure-generated errors may omit the field;
-a disconnected caller may receive no response at all. None of these outcomes
-proves `notSent`. This field is currently exposed on the wrapped endpoint.
+Treat a missing or unrecognized field or header as unknown. Older servers,
+global middleware rejections before proxy routing, panic recovery, and
+infrastructure-generated errors may omit evidence; a disconnected caller may
+receive no response at all. None of these outcomes proves `notSent`.
 
 ### JavaScript
 
@@ -159,7 +161,7 @@ See the [JavaScript/TypeScript SDK guide](/sdks/javascript/) for client configur
 The raw endpoint preserves streaming semantics in both directions. Send the upstream URL in `X-AuthProxy-Upstream-URL`; the HTTP method, body, and ordinary headers become the upstream request.
 
 ```bash
-curl --no-buffer \
+curl --include --no-buffer \
   "$AUTHPROXY_API_URL/api/v1/connections/$CONNECTION_ID/_proxyRaw" \
   --header "Authorization: Bearer $TOKEN" \
   --header "X-AuthProxy-Upstream-URL: https://api.example.com/v1/events" \
@@ -172,14 +174,43 @@ Requirements and behavior:
 - `X-AuthProxy-Upstream-URL` must be an absolute `http` or `https` URL.
 - Repeat `X-AuthProxy-Label: key=value` for multiple request labels.
 - AuthProxy strips its envelope headers, the caller's `Authorization` header, and hop-by-hop headers before forwarding.
-- The upstream response status, headers, body, and trailers stream back to the caller.
+- The upstream response status, body, and ordinary headers and trailers stream back to the caller.
+- AuthProxy reserves `X-AuthProxy-Send-Evidence`: caller and upstream headers or trailers cannot override its value.
+
+### Read evidence on raw responses
+
+Ordinary raw-proxy responses, including AuthProxy errors, carry exactly one
+`X-AuthProxy-Send-Evidence` header with `notSent`, `mayHaveSent`, or `sent`.
+These values have the same [target-send meaning](#target-send-evidence) as the
+wrapped field. Raw AuthProxy error JSON keeps its existing shape; read the
+header for evidence.
+
+The `--include` (`-i`) flag above prints response headers. For example, a target
+SSE response can begin with:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+X-AuthProxy-Send-Evidence: sent
+```
+
+AuthProxy commits the evidence header before streaming the body. For SSE and
+other streams, `sent` confirms that a target response was observed; it does not
+confirm stream completion. A later truncated body, read failure, or caller
+disconnect cannot revise the header already delivered.
+
+When CORS is enabled, the API service and a proxy-enabled public service expose
+this header to browser code through `Access-Control-Expose-Headers`, alongside
+configured exposed headers. This does not add allowed origins, methods, or
+request headers. Missing or unrecognized evidence remains unknown, including
+responses from older servers or failures outside the proxy handler.
 
 ### Use `ap proxy`
 
 The `ap` CLI signs the AuthProxy request and handles the raw-proxy envelope. One-shot mode is the shortest path for `curl` or `wget`:
 
 ```bash
-ap proxy --connection cxn_abc curl https://api.example.com/v1/widgets
+ap proxy --connection cxn_abc curl -i https://api.example.com/v1/widgets
 
 ap proxy --connection cxn_abc curl -N \
   https://api.example.com/v1/events \

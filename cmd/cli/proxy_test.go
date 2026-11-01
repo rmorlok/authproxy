@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -225,6 +228,144 @@ func TestRawProxyHandler_StreamsChunkedResponse(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestRawProxyHandler_ResponseBeforeUploadCompletes checks the CLI's HTTP/1 hop
+// forwards early evidence headers without draining or closing a pending upload.
+// Keeping the 64 KiB upload below net/http's automatic drain limit makes a
+// missing EnableFullDuplex call block on the deliberately withheld suffix.
+func TestRawProxyHandler_ResponseBeforeUploadCompletes(t *testing.T) {
+	for _, chunked := range []bool{false, true} {
+		name := "known length"
+		if chunked {
+			name = "chunked"
+		}
+		t.Run(name, func(t *testing.T) {
+			assertRawProxyResponseBeforeUploadCompletes(t, chunked)
+		})
+	}
+}
+
+// assertRawProxyResponseBeforeUploadCompletes gates the caller's upload until
+// response headers arrive, then checks that both complete bodies survive.
+func assertRawProxyResponseBeforeUploadCompletes(t *testing.T, chunked bool) {
+	t.Helper()
+	prefix := bytes.Repeat([]byte("p"), 16<<10)
+	suffix := bytes.Repeat([]byte("s"), 48<<10)
+	wantUpload := append(append([]byte(nil), prefix...), suffix...)
+	const responseBody = "complete response through the CLI proxy"
+	type upstreamResult struct {
+		body          []byte
+		contentLength int64
+		err           error
+	}
+	upstreamDone := make(chan upstreamResult, 1)
+	upstreamHeaders := make(chan struct{}, 1)
+	authproxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Model the AuthProxy server returning evidence while the upload is open.
+		result := upstreamResult{contentLength: r.ContentLength}
+		defer func() { upstreamDone <- result }()
+		controller := http.NewResponseController(w)
+		if result.err = controller.EnableFullDuplex(); result.err != nil {
+			return
+		}
+		result.body = make([]byte, len(prefix))
+		if _, result.err = io.ReadFull(r.Body, result.body); result.err != nil {
+			return
+		}
+		w.Header().Set("X-AuthProxy-Send-Evidence", "sent")
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		if result.err = controller.Flush(); result.err != nil {
+			return
+		}
+		upstreamHeaders <- struct{}{}
+		var tail []byte
+		tail, result.err = io.ReadAll(r.Body)
+		result.body = append(result.body, tail...)
+		if result.err == nil {
+			_, result.err = io.WriteString(w, responseBody)
+		}
+	}))
+	defer authproxy.Close()
+	base, err := url.Parse("https://upstream.example.com")
+	require.NoError(t, err)
+	srv := httptest.NewServer(rawProxyHandler(authproxy.URL, "cxn_duplex", base, stubSigner("t")))
+	defer srv.Close()
+
+	// Send a prefix through a real client, withholding the rest until headers
+	// return. Cancellation and pipe closure bound cleanup on assertion failures.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	reader, writer := io.Pipe()
+	defer reader.Close()
+	defer writer.Close()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL+"/upload", reader)
+	require.NoError(t, err)
+	req.ContentLength = int64(len(wantUpload))
+	if chunked {
+		req.ContentLength = -1
+	}
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	defer unblock()
+	uploadDone := make(chan error, 1)
+	go func() {
+		_, err := writer.Write(prefix)
+		if err == nil {
+			select {
+			case <-release:
+				_, err = writer.Write(suffix)
+			case <-ctx.Done():
+				err = ctx.Err()
+			}
+		}
+		_ = writer.CloseWithError(err)
+		uploadDone <- err
+	}()
+	type responseResult struct {
+		response *http.Response
+		err      error
+	}
+	headerDone := make(chan responseResult, 1)
+	go func() {
+		resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+		headerDone <- responseResult{resp, err}
+	}()
+	select {
+	case <-upstreamHeaders:
+	case failed := <-upstreamDone:
+		t.Fatalf("AuthProxy fixture returned before flushing headers: %v", failed.err)
+	case <-time.After(3 * time.Second):
+		t.Fatal("AuthProxy fixture did not receive the prefix and flush headers")
+	}
+
+	// The remaining upload is still blocked, so these headers must not depend
+	// on a first response body byte or on draining the inbound request body.
+	var resp *http.Response
+	select {
+	case result := <-headerDone:
+		require.NoError(t, result.err)
+		resp = result.response
+		defer resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, []string{"sent"}, resp.Header.Values("X-AuthProxy-Send-Evidence"))
+	case <-time.After(3 * time.Second):
+		t.Fatal("CLI response headers waited for the unfinished request upload")
+	}
+	unblock()
+
+	// Once released, both framing modes must preserve every request and
+	// response byte; the known-length/chunked choice also reaches AuthProxy.
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, responseBody, string(body))
+	require.NoError(t, <-uploadDone)
+	completed := <-upstreamDone
+	require.NoError(t, completed.err)
+	assert.Equal(t, req.ContentLength, completed.contentLength)
+	assert.True(t, bytes.Equal(wantUpload, completed.body), "AuthProxy must receive the exact complete 64 KiB upload")
 }
 
 // TestRawProxyHandler_StripsHopByHopHeaders ensures we don't forward

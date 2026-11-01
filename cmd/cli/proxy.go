@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -22,7 +23,7 @@ import (
 )
 
 // rawProxyEnvelopeHeader is the upstream-URL header consumed by
-	// /_proxyRaw. Spelled in the API's display form; net/http canonicalises
+// /_proxyRaw. Spelled in the API's display form; net/http canonicalises
 // on read.
 const rawProxyEnvelopeHeader = "X-AuthProxy-Upstream-URL"
 
@@ -40,7 +41,7 @@ var hopByHopHeaders = map[string]struct{}{
 }
 
 // rawProxyHandler returns an http.Handler that forwards each inbound
-	// request through {apiBaseURL}/api/v1/connections/{connectionID}/_proxyRaw
+// request through {apiBaseURL}/api/v1/connections/{connectionID}/_proxyRaw
 // with the JWT signer attached and bodies streamed both directions.
 //
 // If upstreamBase is non-nil, the inbound path+query is appended to it
@@ -90,6 +91,16 @@ func rawProxyHandler(apiBaseURL string, connectionID string, upstreamBase *url.U
 		// framing decision propagates end-to-end. -1 means chunked.
 		outbound.ContentLength = req.ContentLength
 		signer.SignAuthHeader(outbound)
+
+		// AuthProxy can return response headers while this hop is still
+		// uploading. Disable HTTP/1's automatic request-body drain before
+		// forwarding so an early response flush cannot consume upload bytes
+		// owned by the outbound transport. HTTP/2 is already full duplex;
+		// test writers may not implement the optional capability.
+		if err := http.NewResponseController(w).EnableFullDuplex(); err != nil && !errors.Is(err, http.ErrNotSupported) {
+			http.Error(w, fmt.Sprintf("ap proxy: enable full duplex: %s", err), http.StatusInternalServerError)
+			return
+		}
 
 		resp, err := http.DefaultTransport.RoundTrip(outbound)
 		if err != nil {

@@ -737,6 +737,10 @@ type mockRoundTripper struct {
 }
 
 func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	// RoundTripper owns request-body closure, including error responses.
+	if req.Body != nil {
+		defer req.Body.Close()
+	}
 	io.ReadAll(req.Body) // Simulate request being consumed
 	return m.response, m.err
 }
