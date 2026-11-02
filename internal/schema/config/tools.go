@@ -134,6 +134,6 @@ func (l *ToolInvocationLimits) Validate(vc *common.ValidationContext) error {
 	if l.MaxNumberDigits != nil && *l.MaxNumberDigits > 4096 {
 		result = multierror.Append(result, vc.NewErrorForField("maxNumberDigits", "must not exceed 4096"))
 	}
-	
+
 	return result.ErrorOrNil()
 }

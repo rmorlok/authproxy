@@ -54,6 +54,21 @@ func evaluateExpression(t *testing.T, compiled *javascript.Expression, input jav
 	return result
 }
 
+func TestExpressionDisablesDynamicSourceMaps(t *testing.T) {
+	// Dynamic parsing must not try to read the authored source-map URL from disk.
+	for _, source := range []string{
+		`eval("7\n//# sourceMappingURL=file:///authproxy-do-not-load-source-map.json")`,
+		`(new Function("return 7\n//# sourceMappingURL=file:///authproxy-do-not-load-source-map.json"))()`,
+	} {
+		compiled := compileExpression(t, source)
+		input := javascript.Input{Context: expressionContext(t, render.Input{})}
+
+		// Both parsing paths finish normally without invoking a source-map loader.
+		result := evaluateExpression(t, compiled, input)
+		require.JSONEq(t, `7`, string(result))
+	}
+}
+
 func TestExpressionInvocationContext(t *testing.T) {
 	// Capture configuration, user input, and provenance independently from the response.
 	generation, catalog := uint64(7), uint64(11)
