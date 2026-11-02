@@ -10,8 +10,8 @@ import (
 
 // Evaluate runs execute(params, context) in a fresh runtime and converts its
 // fulfilled Promise value into detached JSON. The supplied input is copied
-// before connector initialization, so helper code can read cfg and the other
-// captured aliases. The caller owns argument-schema validation and admission.
+// before connector initialization; helpers called by execute can read cfg and
+// the other captured aliases. The caller owns schema validation and admission.
 //
 // This execution path supplies no I/O capabilities. Native Promise chains and
 // await work normally, but a pending Promise with no host work cannot make
@@ -28,42 +28,28 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 		return nil, ErrInvalidInput
 	}
 
-	var result common.RawJSON
-	err := withRuntime(ctx, p.limits, func(runCtx context.Context, vm *goja.Runtime) error {
-		// Capture conversion helpers before either source program can modify
-		// them, then bind the private input needed by connector initialization.
-		encoder := newOutputEncoder(vm, p.limits)
-		if err := bindInput(runCtx, vm, input, p.limits); err != nil {
-			return err
-		}
-
-		// Install rejection tracking before any authored initialization. This
-		// pure path admits no worker jobs; a future I/O host sets its own cap.
-		loop := newEventLoop(runCtx, vm, 0)
-		defer loop.close()
+	return evaluateJSON(ctx, p.limits, input, func(vm *goja.Runtime) (goja.Value, error) {
+		// Match publication validation by tracking initialization as well as
+		// the entry point. Goja drains Promise microtasks before calls return.
+		tracker := newPromiseTracker(vm)
+		defer tracker.close()
 		execute, err := p.Initialize(vm)
 		if err != nil {
-			return err
+			return nil, err
+		}
+		if err := tracker.checkRejections(); err != nil {
+			return nil, err
 		}
 		value, err := execute(goja.Undefined(), vm.Get("params"), vm.Get("context"))
 		if err != nil {
-			return runtimeEvaluationError(err)
+			return nil, runtimeEvaluationError(err)
 		}
 
 		// Check the native export type before Export: exporting an arbitrary
 		// authored object could traverse getters or allocate an unchecked graph.
 		if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
-			return ErrEvaluation
+			return nil, ErrEvaluation
 		}
-		settled, err := loop.await(value.Export().(*goja.Promise))
-		if err != nil {
-			return err
-		}
-		result, err = encoder.encode(runCtx, settled)
-		return err
+		return tracker.settledResult(value.Export().(*goja.Promise))
 	})
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }

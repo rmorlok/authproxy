@@ -6,7 +6,38 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
+
+// evaluateJSON binds a private input copy, runs authored code, and converts its
+// result under one runtime deadline. The callback owns evaluation and safe error
+// classification; callers validate the context, limits, and program beforehand.
+// Conversion intrinsics are captured before input binding or authored code can
+// change the VM. No output is returned if runtime cleanup observes cancellation
+// or any other failure, including one after conversion has finished.
+func evaluateJSON(
+	ctx context.Context,
+	limits Limits,
+	input Input,
+	run func(*goja.Runtime) (goja.Value, error),
+) (result common.RawJSON, err error) {
+	err = withRuntime(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) error {
+		encoder := newOutputEncoder(vm, limits)
+		if err := bindInput(runCtx, vm, input, limits); err != nil {
+			return err
+		}
+		value, err := run(vm)
+		if err != nil {
+			return err
+		}
+		result, err = encoder.encode(runCtx, value)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
 
 // withRuntime executes work in a fresh, stack-bounded runtime with a joined
 // interrupt watcher. Work and all ordinary VM access stay on the calling

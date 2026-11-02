@@ -148,29 +148,18 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 func (e *Expression) Evaluate(
 	ctx context.Context,
 	input Input,
-) (result common.RawJSON, err error) {
+) (common.RawJSON, error) {
 	if e == nil || e.program == nil || ctx == nil {
 		return nil, ErrInvalidInput
 	}
 
-	err = withRuntime(ctx, e.limits, func(runCtx context.Context, vm *goja.Runtime) error {
-		// Capture conversion intrinsics before authored code can replace globals
-		// or built-in methods. Bind the private input before evaluating source.
-		encoder := newOutputEncoder(vm, e.limits)
-		if err := bindInput(runCtx, vm, input, e.limits); err != nil {
-			return err
-		}
+	return evaluateJSON(ctx, e.limits, input, func(vm *goja.Runtime) (goja.Value, error) {
 		value, err := vm.RunProgram(e.program)
 		if err != nil {
-			return runtimeEvaluationError(err)
+			return nil, runtimeEvaluationError(err)
 		}
-		result, err = encoder.encode(runCtx, value)
-		return err
+		return value, nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 // expressionContextError distinguishes caller cancellation from the runtime's

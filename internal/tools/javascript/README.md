@@ -107,8 +107,8 @@ functions from the connector's compiled JavaScript library. For example, a
 connector can define a shared way to identify customer records:
 
 ```javascript
-function customerKey(id, tenant) {
-    return tenant + ":" + id;
+function customerKey(id) {
+    return cfg.tenant + ":" + id;
 }
 ```
 
@@ -116,7 +116,7 @@ A Tool uses that helper with its arguments and captured connection configuration
 
 ```javascript
 async function execute(params, context) {
-    return { customerKey: customerKey(params.customerId, context.cfg.tenant) };
+    return { customerKey: customerKey(params.customerId) };
 }
 ```
 
@@ -128,15 +128,15 @@ context by position.
 Compile and check initialization using the same `limits` policy as above:
 
 ```go
-library, err := apjs.CompileLibrary(`
-    function customerKey(id, tenant) { return tenant + ":" + id; }
+library, err := apjs.CompileAndValidateLibrary(`
+    function customerKey(id) { return cfg.tenant + ":" + id; }
 `)
 if err != nil {
     return err
 }
 tool, err := javascript.CompileTool(`
     async function execute(params, context) {
-        return { customerKey: customerKey(params.customerId, context.cfg.tenant) };
+        return { customerKey: customerKey(params.customerId) };
     }
 `, library, limits)
 if err != nil {
@@ -151,10 +151,16 @@ if err := tool.Validate(ctx); err != nil {
 the combined source size. It never runs authored code. `Validate` runs library
 initialization followed by Tool initialization in a fresh VM with no host
 capabilities or connection data. It checks that `execute` remains callable but
-does not call it. For example, `const prefix = "customer:"` is valid top-level
-initialization; a top-level `fetch(...)` fails because validation has no fetch
-host. Authored top-level code can itself call other functions, so initialization
-is covered by cancellation, timeout, and stack limits.
+does not call it. Publication has no `cfg`, `params`, or other invocation values:
+helpers must read them inside functions called during evaluation. For example,
+`const prefix = "customer:"` is valid top-level initialization, while
+`const tenant = cfg.tenant` fails validation. A top-level `fetch(...)` also fails
+because validation has no fetch host. Authored top-level code can itself call
+other functions, so initialization is covered by cancellation, timeout, and
+stack limits. Unhandled Promise rejections during initialization fail validation;
+rejections caught before its Promise jobs finish are allowed. Evaluation checks
+this same initialization boundary before calling `execute`, so its body cannot
+recover from an initialization rejection.
 
 Tool code uses strict JavaScript. Connector libraries keep their existing syntax
 rules. Both reserve global host names such as `fetch`, `context`, `params`,
@@ -162,8 +168,9 @@ rules. Both reserve global host names such as `fetch`, `context`, `params`,
 variables may reuse these names. Legacy unbraced conditional declarations, such
 as `if (ok) function fetch() {}`, are rejected anywhere in a library because
 they can reach the global object. Host globals are frozen before initialization,
-including absent capabilities whose value is `undefined`. Tool parsing and
-dynamic `eval`/`Function` parsing do not load source maps.
+including absent capabilities whose value is `undefined`. Host capabilities such
+as `fetch` are non-enumerable; existing captured input bindings remain enumerable.
+Tool parsing and dynamic `eval`/`Function` parsing do not load source maps.
 
 `Initialize(vm)` is the integration point for a future invocation host. That
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
@@ -175,14 +182,13 @@ and invocation-service integration remain separate work.
 
 ## Evaluate an async Tool
 
-`ToolProgram.Evaluate` calls `execute(params, context)` and waits for its native
-Promise. It gives connector initialization and the Tool the same private copy
-of the captured input. For example, helpers can read `cfg.tenant` at the top
-level, and `await` and Promise chains can compose their results:
+`ToolProgram.Evaluate` calls `execute(params, context)` and converts its fulfilled
+native Promise result into JSON. The Tool and its called helpers share a private
+copy of the captured input. `await` and Promise chains can compose their results:
 
 ```javascript
 async function execute(params, context) {
-    const key = await Promise.resolve(customerKey(params.customerId, context.cfg.tenant));
+    const key = await Promise.resolve(customerKey(params.customerId));
     return { customerKey: key };
 }
 ```
@@ -199,8 +205,8 @@ if err != nil {
 The fulfilled value becomes bounded JSON using the same rules as expressions.
 `Response` is optional and normally omitted for Tool functions. It is available
 for callers that already have prepared response data. Changing `params` or
-`context.cfg` changes only that evaluation's copy, including when a helper changes
-it during initialization. Reusing a compiled Tool starts fresh each time.
+`context.cfg` changes only that evaluation's copy, including changes made by called
+helpers. Reusing a compiled Tool starts fresh each time.
 
 Evaluation fails if `execute` throws or rejects, or another Promise remains
 rejected without a handler when work finishes. Rejections that are caught before
@@ -209,19 +215,11 @@ settling it fails immediately; for example, `await new Promise(() => {})` does
 not consume the whole timeout. A busy loop or endless Promise chain is interrupted
 by the timeout. Errors contain no thrown values, private input, or stack traces.
 
-The internal event loop keeps all Goja operations on the evaluation goroutine.
-Its worker interface passes detached Go data and a job identifier back to that
-goroutine, where the registered callback settles the Promise. Worker admission
-has an explicit pending-job cap. Successful evaluation waits for admitted jobs
-to finish; rejection or cancellation stops accepting completions. Shutdown cancels
-workers and drops their VM callbacks without waiting for uncooperative I/O. A
-late worker must close its own resources and discard its data; it cannot access
-the disposed VM. An invocation host that returns while I/O is outstanding must
-retain conservative execution uncertainty.
-
-`Evaluate` currently admits no worker jobs and supplies no I/O host. These loop
-rules prepare the connection-bound fetch adapter without exposing additional
-capabilities to pure expressions or publication validation.
+Evaluation runs synchronously on one Goja goroutine. Goja drains Promise jobs
+when authored calls finish, which supports `await` and Promise chains that can
+settle without a network or timer host. All JavaScript execution and Promise
+callbacks stay on that goroutine. A rejection tracker records abandoned
+rejections and removes them when a handler is attached.
 
 ## Results and errors
 

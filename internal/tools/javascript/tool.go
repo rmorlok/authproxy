@@ -194,14 +194,19 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 		if value == nil {
 			value = goja.Undefined()
 		}
+		enumerable := goja.FLAG_FALSE
+		switch name {
+		case "params", "context", "response", "cfg", "labels", "annotations":
+			// Preserve the shared input binder's already-frozen properties;
+			// capabilities such as fetch retain their non-enumerable contract.
+			enumerable = goja.FLAG_NOT_SET
+		}
 		if err := vm.GlobalObject().DefineDataProperty(
 			name,
 			value,
 			goja.FLAG_FALSE, // writeable
 			goja.FLAG_FALSE, // configurable
-			// Copied input bindings are already nonconfigurable and enumerable;
-			// preserve that attribute rather than attempting to redefine it.
-			goja.FLAG_NOT_SET, // enumerable
+			enumerable,
 		); err != nil {
 			return nil, ErrInvalidInput
 		}
@@ -226,6 +231,8 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // Validate checks top-level initialization in a fresh runtime under the Tool's
 // timeout and stack policy. It never supplies host capabilities, connection
 // values, or execute arguments, and never invokes the returned entry point.
+// Unhandled initialization rejections fail just as they do during evaluation;
+// helpers that need captured input must read it when called by execute.
 // Caller cancellation retains its context error; policy expiry or stack
 // exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
 // returning, and no runtime or pending authored state is reused by invocation.
@@ -234,7 +241,11 @@ func (p *ToolProgram) Validate(ctx context.Context) error {
 		return ErrInvalidInput
 	}
 	return withRuntime(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
-		_, err := p.Initialize(vm)
-		return err
+		tracker := newPromiseTracker(vm)
+		defer tracker.close()
+		if _, err := p.Initialize(vm); err != nil {
+			return err
+		}
+		return tracker.checkRejections()
 	})
 }

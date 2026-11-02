@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -22,7 +23,7 @@ func evaluateTool(t *testing.T, program *javascript.ToolProgram, input javascrip
 	return result
 }
 
-// TestToolEvaluateCapturedInput exercises entry-point arguments, aliases, and helper initialization together.
+// TestToolEvaluateCapturedInput exercises published helpers, entry-point arguments, and copied aliases together.
 func TestToolEvaluateCapturedInput(t *testing.T) {
 	generation, catalog := uint64(7), uint64(11)
 	input := javascript.Input{
@@ -41,11 +42,12 @@ func TestToolEvaluateCapturedInput(t *testing.T) {
 		}),
 		Response: common.RawJSON(`{"status":200,"body":{"id":"contact-1"}}`),
 	}
-	library := toolLibrary(t, `
-		const tenant = cfg.tenant;
+	// Publication initializes helpers without invocation data, so cfg is read only when called.
+	library, err := apjs.CompileAndValidateLibrary(`
 		let calls = 0;
-		function greet(name) { calls++; return name + "@" + tenant; }
+		function greet(name) { calls++; return name + "@" + cfg.tenant; }
 	`)
+	require.NoError(t, err)
 	program := compileTool(t, `
 		async function execute(args, snapshot) {
 			const result = {
@@ -65,6 +67,9 @@ func TestToolEvaluateCapturedInput(t *testing.T) {
 			return result;
 		}
 	`, library)
+
+	// The complete Tool must also validate before any connection snapshot is supplied.
+	require.NoError(t, program.Validate(context.Background()))
 
 	// Every invocation starts from the captured data and a fresh helper-library state.
 	for range 2 {
@@ -147,11 +152,34 @@ func TestToolEvaluateUnhandledRejections(t *testing.T) {
 	require.JSONEq(t, `42`, string(evaluateTool(t, program, javascript.Input{Context: expressionContext(t, render.Input{})})))
 }
 
+// TestToolEvaluateRejectsFailedInitialization enforces the same boundary as publication validation.
+func TestToolEvaluateRejectsFailedInitialization(t *testing.T) {
+	program := compileTool(t, `
+		const early = Promise.reject("private-initialization-rejection");
+		async function execute() {
+			early.catch(() => {});
+			return true;
+		}
+	`, nil)
+
+	// Publication rejects an abandoned initialization promise without invoking execute.
+	err := program.Validate(context.Background())
+	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+
+	// Invocation must reject that same initialization before execute can attach a handler.
+	input := javascript.Input{Context: expressionContext(t, render.Input{})}
+	result, err := program.Evaluate(context.Background(), input)
+	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+	require.Nil(t, result)
+}
+
 // TestToolEvaluateSanitizesErrors covers throws and rejections during each authored execution phase.
 func TestToolEvaluateSanitizesErrors(t *testing.T) {
 	for name, test := range map[string]struct{ source, library string }{
-		"helper throws":         {`async function execute() { return 1; }`, `throw new Error(cfg.private);`},
-		"initialization throws": {`throw new Error(cfg.private); async function execute() { return 1; }`, ""},
+		"helper throws":         {`async function execute() { return 1; }`, `throw new Error("private-initialization-value");`},
+		"initialization throws": {`throw new Error("private-initialization-value"); async function execute() { return 1; }`, ""},
 		"execute throws":        {`async function execute() { throw new Error(cfg.private); }`, ""},
 		"throws string":         {`async function execute() { throw cfg.private; }`, ""},
 		"throws object":         {`async function execute() { throw {toString() { throw cfg.private; }}; }`, ""},
