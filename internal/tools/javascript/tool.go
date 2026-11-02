@@ -42,7 +42,7 @@ var toolHostNames = []string{
 type ToolProgram struct {
 	program *goja.Program // Strict Tool script, including its execute declaration.
 	library *apjs.Library // Immutable connector helpers, preserving connector syntax.
-	limits  Limits        // Captured policy for source, stack, and validation timeout.
+	limits  Limits        // Captured source, execution, and input/output policy.
 }
 
 // CompileTool compiles a script with exactly one top-level async, non-generator
@@ -199,7 +199,9 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 			value,
 			goja.FLAG_FALSE, // writeable
 			goja.FLAG_FALSE, // configurable
-			goja.FLAG_FALSE, // enumerable
+			// Copied input bindings are already nonconfigurable and enumerable;
+			// preserve that attribute rather than attempting to redefine it.
+			goja.FLAG_NOT_SET, // enumerable
 		); err != nil {
 			return nil, ErrInvalidInput
 		}

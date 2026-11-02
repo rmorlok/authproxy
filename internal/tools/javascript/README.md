@@ -1,8 +1,8 @@
 # Tool JavaScript
 
-This package evaluates pure expressions and compiles JavaScript Tool entry points.
-It reuses connector helper libraries and checks Tool initialization with explicit
-time and stack limits. It installs no network or other I/O capabilities.
+This package evaluates pure expressions and async JavaScript Tool functions.
+It reuses connector helper libraries and bounds initialization, execution, and
+JSON conversion with explicit limits. It installs no network or other I/O capabilities.
 
 ## Pure expressions
 
@@ -116,11 +116,11 @@ A Tool uses that helper with its arguments and captured connection configuration
 
 ```javascript
 async function execute(params, context) {
-    return { customerKey: customerKey(params.id, context.cfg.tenant) };
+    return { customerKey: customerKey(params.customerId, context.cfg.tenant) };
 }
 ```
 
-With `params.id` equal to `"customer-42"` and the connection's `tenant` set to
+With `params.customerId` equal to `"customer-42"` and the connection's `tenant` set to
 `"acme"`, the returned promise resolves to `{ customerKey: "acme:customer-42" }`.
 Parameter names are the author's choice; invocation supplies arguments and
 context by position.
@@ -136,7 +136,7 @@ if err != nil {
 }
 tool, err := javascript.CompileTool(`
     async function execute(params, context) {
-        return { customerKey: customerKey(params.id, context.cfg.tenant) };
+        return { customerKey: customerKey(params.customerId, context.cfg.tenant) };
     }
 `, library, limits)
 if err != nil {
@@ -169,10 +169,61 @@ dynamic `eval`/`Function` parsing do not load source maps.
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start
-its own timeout. This package does not yet provide the asynchronous fetch loop,
-`ToolError`/`toolResult` implementations, or a complete JavaScript Tool executor.
+its own timeout. Most callers should use `Evaluate` for the complete bounded
+lifecycle described below. The fetch adapter, `ToolError`/`toolResult` helpers,
+and invocation-service integration remain separate work.
 
-## Expression results and errors
+## Evaluate an async Tool
+
+`ToolProgram.Evaluate` calls `execute(params, context)` and waits for its native
+Promise. It gives connector initialization and the Tool the same private copy
+of the captured input. For example, helpers can read `cfg.tenant` at the top
+level, and `await` and Promise chains can compose their results:
+
+```javascript
+async function execute(params, context) {
+    const key = await Promise.resolve(customerKey(params.customerId, context.cfg.tenant));
+    return { customerKey: key };
+}
+```
+
+With the compiled `tool` and captured `snapshot` from the examples above:
+
+```go
+result, err := tool.Evaluate(ctx, javascript.Input{Context: snapshot})
+if err != nil {
+    return err
+}
+```
+
+The fulfilled value becomes bounded JSON using the same rules as expressions.
+`Response` is optional and normally omitted for Tool functions. It is available
+for callers that already have prepared response data. Changing `params` or
+`context.cfg` changes only that evaluation's copy, including when a helper changes
+it during initialization. Reusing a compiled Tool starts fresh each time.
+
+Evaluation fails if `execute` throws or rejects, or another Promise remains
+rejected without a handler when work finishes. Rejections that are caught before
+then are allowed. A Promise that remains pending with no host work capable of
+settling it fails immediately; for example, `await new Promise(() => {})` does
+not consume the whole timeout. A busy loop or endless Promise chain is interrupted
+by the timeout. Errors contain no thrown values, private input, or stack traces.
+
+The internal event loop keeps all Goja operations on the evaluation goroutine.
+Its worker interface passes detached Go data and a job identifier back to that
+goroutine, where the registered callback settles the Promise. Worker admission
+has an explicit pending-job cap. Successful evaluation waits for admitted jobs
+to finish; rejection or cancellation stops accepting completions. Shutdown cancels
+workers and drops their VM callbacks without waiting for uncooperative I/O. A
+late worker must close its own resources and discard its data; it cannot access
+the disposed VM. An invocation host that returns while I/O is outstanding must
+retain conservative execution uncertainty.
+
+`Evaluate` currently admits no worker jobs and supplies no I/O host. These loop
+rules prepare the connection-bound fetch adapter without exposing additional
+capabilities to pure expressions or publication validation.
+
+## Results and errors
 
 Results can be null, booleans, finite numbers, strings, dense arrays, or ordinary
 objects containing those values. Arrays and objects retain their shape. A
@@ -211,7 +262,7 @@ recover digits that were already rounded.
 
 Failures return no partial output. Fixed error classifications distinguish
 invalid source, input, output, execution limits, and thrown JavaScript errors.
-Errors never contain expression source, thrown values, stack traces, private
+Errors never contain authored source, thrown values, stack traces, private
 configuration, or response data. Caller cancellation and deadlines remain Go
 context errors. The configured timeout returns `ErrLimitExceeded`, allowing an
 executor to report an execution-limit failure separately from a canceled
@@ -230,16 +281,17 @@ compilation; this package supplies no unlimited defaults.
 - `MaxNodes` bounds JSON values and object property inspections. Combined input
   and output each receive this allowance; it is not a JavaScript instruction count.
 - `MaxStackDepth` bounds JavaScript function-call recursion.
-- `Timeout` covers binding input, evaluating the expression, and converting its
-  result, or Tool initialization during `Validate`. An earlier caller deadline wins.
+- `Timeout` covers input binding, initialization, execution, Promise settlement,
+  and result conversion during `Evaluate`, or only initialization during
+  `Validate`. An earlier caller deadline wins.
 
-The JSON input/output limits apply to expressions; Tool validation receives no
-input and returns no result data.
+The JSON input/output limits apply to expression and Tool evaluation; Tool
+validation receives no input and returns no result data.
 
 A watcher interrupts busy JavaScript loops on cancellation and is joined before
 evaluation or validation returns. It uses only Goja's thread-safe interrupt
-method; all other runtime work stays on one goroutine. Fresh VMs prevent a late interrupt or a
-modified global from affecting the next call.
+method; all other runtime work stays on one goroutine. Fresh VMs prevent a late
+interrupt or a modified global from affecting the next call.
 
 These limits bound processing for trusted administrator code. They do not make
 the in-process runtime a hard memory-isolated sandbox. Native Goja built-ins

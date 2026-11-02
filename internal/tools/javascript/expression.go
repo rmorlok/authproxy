@@ -1,4 +1,4 @@
-// Package javascript compiles trusted Tool scripts and evaluates pure expressions
+// Package javascript evaluates trusted async Tool scripts and pure expressions
 // with native JavaScript copies of captured data. It installs no I/O capabilities.
 package javascript
 
@@ -28,8 +28,8 @@ var (
 
 // Limits contains resolved positive caps for a compiled expression or Tool.
 // Callers apply operator ceilings before compilation. Tool initialization uses
-// the source, stack, and timeout caps; expression evaluation also uses the JSON
-// input/output caps. These limits are not a hard memory quota.
+// the source, stack, and timeout caps; expression and Tool evaluation also use
+// the JSON input/output caps. These limits are not a hard memory quota.
 type Limits struct {
 	// MaxSourceBytes bounds authored UTF-8 source before parsing. For Tools,
 	// this includes both the entry-point script and connector helper library.
@@ -52,8 +52,8 @@ type Limits struct {
 	// MaxStackDepth bounds JavaScript function call depth, including recursion.
 	MaxStackDepth int
 
-	// Timeout covers input binding, expression execution, and result conversion
-	// in Evaluate, or top-level library and Tool initialization in Validate.
+	// Timeout covers input binding, initialization, execution, promise settlement,
+	// and result conversion in Evaluate, or just initialization in Validate.
 	// Initialize instead requires its caller to enforce a deadline.
 	// Expiry returns ErrLimitExceeded; caller cancellation/deadlines retain their
 	// context error. Native Goja built-ins cannot be preempted; cancellation is
