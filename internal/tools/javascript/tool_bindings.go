@@ -23,9 +23,11 @@ func hasReservedConditionalFunction(program *ast.Program) bool {
 	astPackage := reflect.TypeFor[ast.Program]().PkgPath()
 	pending := []reflect.Value{reflect.ValueOf(program)}
 	seen := make(map[any]struct{})
+
 	for len(pending) != 0 {
 		value := pending[len(pending)-1]
 		pending = pending[:len(pending)-1]
+
 		switch value.Kind() {
 		case reflect.Interface:
 			if !value.IsNil() {
@@ -63,5 +65,6 @@ func hasReservedConditionalFunction(program *ast.Program) bool {
 			}
 		}
 	}
+	
 	return false
 }

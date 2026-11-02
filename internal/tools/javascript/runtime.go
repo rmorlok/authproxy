@@ -12,7 +12,11 @@ import (
 // interrupt watcher. Work and all ordinary VM access stay on the calling
 // goroutine. It sanitizes runtime failures and gives caller cancellation priority
 // over the policy timeout, including cancellation during final conversion.
-func withRuntime(ctx context.Context, limits Limits, work func(context.Context, *goja.Runtime) error) (err error) {
+func withRuntime(
+	ctx context.Context,
+	limits Limits,
+	work func(context.Context, *goja.Runtime) error,
+) (err error) {
 	runCtx, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
 	if err := expressionContextError(ctx, runCtx); err != nil {
@@ -49,6 +53,7 @@ func withRuntime(ctx context.Context, limits Limits, work func(context.Context, 
 			err = contextErr
 		}
 	}()
+
 	return work(runCtx, vm)
 }
 

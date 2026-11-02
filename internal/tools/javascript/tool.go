@@ -15,9 +15,23 @@ import (
 // these names does not implement the corresponding capability: publication
 // validation leaves them undefined, and a later invocation host supplies them.
 var toolHostNames = []string{
-	"fetch", "URL", "URLSearchParams", "TextEncoder", "TextDecoder", "atob", "btoa",
-	"console", "ToolError", "toolResult", "params", "context", "cfg", "labels",
-	"annotations", "response", "data",
+	"fetch",
+	"URL",
+	"URLSearchParams",
+	"TextEncoder",
+	"TextDecoder",
+	"atob",
+	"btoa",
+	"console",
+	"ToolError",
+	"toolResult",
+	"params",
+	"context",
+	"cfg",
+	"labels",
+	"annotations",
+	"response",
+	"data",
 }
 
 // ToolProgram owns a compiled Tool entry point and its optional compiled
@@ -43,47 +57,82 @@ type ToolProgram struct {
 // unbraced conditional declarations of reserved names are rejected anywhere in
 // a library because they can reach the global object. A connector library cannot
 // declare execute because that entry point belongs to the Tool.
-func CompileTool(source string, library *apjs.Library, limits Limits) (*ToolProgram, error) {
+func CompileTool(
+	source string,
+	library *apjs.Library,
+	limits Limits,
+) (*ToolProgram, error) {
 	if err := limits.validate(); err != nil {
 		return nil, err
 	}
+
 	librarySource := library.Source()
 	if len(source) > limits.MaxSourceBytes || len(librarySource) > limits.MaxSourceBytes-len(source) {
 		return nil, ErrLimitExceeded
 	}
-	if !utf8.ValidString(source) || !utf8.ValidString(librarySource) || strings.TrimSpace(source) == "" {
+
+	if !utf8.ValidString(source) ||
+		!utf8.ValidString(librarySource) ||
+		strings.TrimSpace(source) == "" {
 		return nil, ErrInvalidSource
 	}
 
-	parsed, err := parser.ParseFile(nil, "tool.js", source, 0, parser.WithDisableSourceMaps)
+	parsed, err := parser.ParseFile(
+		nil, // fileSet
+		"tool.js",
+		source,
+		0, // mode
+		parser.WithDisableSourceMaps,
+	)
 	if err != nil {
 		return nil, ErrInvalidSource
 	}
+
 	entries := 0
 	for _, statement := range parsed.Body {
 		declaration, ok := statement.(*ast.FunctionDeclaration)
-		if !ok || declaration.Function.Name == nil || declaration.Function.Name.Name.String() != "execute" {
+		if !ok || declaration.Function.Name == nil ||
+			declaration.Function.Name.Name.String() != "execute" {
 			continue
 		}
+
 		if !declaration.Function.Async || declaration.Function.Generator {
 			return nil, ErrInvalidSource
 		}
+
 		entries++
 	}
+
 	if entries != 1 {
 		return nil, ErrInvalidSource
 	}
+
 	program, err := goja.CompileAST(parsed, true)
 	if err != nil {
 		return nil, ErrInvalidSource
 	}
-	if err := checkToolHostBindings(source, true, false); err != nil {
+
+	if err := checkToolHostBindings(
+		source,
+		true,  // strict
+		false, // reserveExecute
+	); err != nil {
 		return nil, err
 	}
-	if err := checkToolHostBindings(librarySource, false, true); err != nil {
+
+	if err := checkToolHostBindings(
+		librarySource,
+		false, // strict
+		true,  // reserveExecute
+	); err != nil {
 		return nil, err
 	}
-	return &ToolProgram{program: program, library: library, limits: limits}, nil
+
+	return &ToolProgram{
+		program: program,
+		library: library,
+		limits:  limits,
+	}, nil
 }
 
 // checkToolHostBindings uses the JavaScript compiler's own scope rules to find
@@ -95,16 +144,25 @@ func checkToolHostBindings(source string, strict, reserveExecute bool) error {
 	if reserveExecute {
 		names += ",execute"
 	}
-	parsed, err := parser.ParseFile(nil, "tool-bindings.js", source+"\n;let "+names+";", 0, parser.WithDisableSourceMaps)
+	parsed, err := parser.ParseFile(
+		nil, // fileSet
+		"tool-bindings.js",
+		source+"\n;let "+names+";",
+		0, // mode
+		parser.WithDisableSourceMaps,
+	)
 	if err != nil {
 		return ErrInvalidSource
 	}
+
 	if !strict && hasReservedConditionalFunction(parsed) {
 		return ErrInvalidSource
 	}
+
 	if _, err := goja.CompileAST(parsed, strict); err != nil {
 		return ErrInvalidSource
 	}
+
 	return nil
 }
 
@@ -125,29 +183,41 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	if p == nil || p.program == nil || vm == nil {
 		return nil, ErrInvalidInput
 	}
+
 	// Dynamic eval/Function parsing must not load authored source-map URLs from
 	// disk or a caller's loader. Existing precompiled library programs are reused.
 	vm.SetParserOptions(parser.WithDisableSourceMaps)
 	vm.SetMaxCallStackSize(p.limits.MaxStackDepth)
+
 	for _, name := range toolHostNames {
 		value := vm.Get(name)
 		if value == nil {
 			value = goja.Undefined()
 		}
-		if err := vm.GlobalObject().DefineDataProperty(name, value, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := vm.GlobalObject().DefineDataProperty(
+			name,
+			value,
+			goja.FLAG_FALSE, // writeable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return nil, ErrInvalidInput
 		}
 	}
+
 	if err := p.library.Run(vm); err != nil {
 		return nil, runtimeEvaluationError(err)
 	}
+
 	if _, err := vm.RunProgram(p.program); err != nil {
 		return nil, runtimeEvaluationError(err)
 	}
+
 	callable, ok := goja.AssertFunction(vm.Get("execute"))
 	if !ok {
 		return nil, ErrEvaluation
 	}
+
 	return callable, nil
 }
 
