@@ -719,6 +719,10 @@ type ListKeysExecutor interface {
 type ListKeysBuilder interface {
 	ListKeysExecutor
 	Limit(int32) ListKeysBuilder
+	// ResumeAfter pages in key order, continuing after a position taken from
+	// PageResult.Position; an empty position starts at the beginning. It cannot be
+	// combined with OrderBy.
+	ResumeAfter(position string) ListKeysBuilder
 	ForNamespaceMatcher(matcher string) ListKeysBuilder
 	ForNamespaceMatchers(matchers []string) ListKeysBuilder
 	ForName(name scommon.ResourceName) ListKeysBuilder
@@ -740,6 +744,9 @@ type listKeysFilters struct {
 	IncludeDeletedVal bool                  `json:"includeDeleted,omitempty"`
 	LabelSelectorVal  *string               `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error     `json:"-"`
+
+	// keysetWalk carries the key position of a key-ordered listing. See keysetWalk.
+	keysetWalk
 }
 
 func (l *listKeysFilters) addError(e error) ListKeysBuilder {
@@ -749,6 +756,12 @@ func (l *listKeysFilters) addError(e error) ListKeysBuilder {
 
 func (l *listKeysFilters) Limit(limit int32) ListKeysBuilder {
 	l.LimitVal = uint64(limit)
+	return l
+}
+
+// ResumeAfter selects key order, continuing after position.
+func (l *listKeysFilters) ResumeAfter(position string) ListKeysBuilder {
+	l.keysetWalk.resumeAfter(position)
 	return l
 }
 
@@ -848,7 +861,9 @@ func (l *listKeysFilters) applyRestrictions(ctx context.Context) sq.SelectBuilde
 
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
-	if l.OrderByFieldVal != nil {
+	if l.keysetWalk.Enabled {
+		q = l.keysetWalk.apply(q, "id")
+	} else if l.OrderByFieldVal != nil {
 		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
@@ -859,6 +874,10 @@ func (l *listKeysFilters) fetchPage(ctx context.Context) pagination.PageResult[K
 	var err error
 
 	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[Key]{Error: err}
+	}
+
+	if err = l.keysetWalk.validate(l.OrderByFieldVal != nil); err != nil {
 		return pagination.PageResult[Key]{Error: err}
 	}
 
@@ -880,10 +899,17 @@ func (l *listKeysFilters) fetchPage(ctx context.Context) pagination.PageResult[K
 		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + uint64(len(results)) - 1
+	hasMore := uint64(len(results)) > l.LimitVal
+	page := results[:util.MinUint64(l.LimitVal, uint64(len(results)))]
+
+	position := ""
+	if l.keysetWalk.Enabled {
+		position = advanceKeyset(&l.keysetWalk, page, func(k Key) string { return string(k.Id) })
+	} else {
+		l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
+	}
 
 	cursor := ""
-	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
@@ -892,9 +918,10 @@ func (l *listKeysFilters) fetchPage(ctx context.Context) pagination.PageResult[K
 	}
 
 	return pagination.PageResult[Key]{
-		HasMore: hasMore,
-		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
-		Cursor:  cursor,
+		HasMore:  hasMore,
+		Results:  page,
+		Cursor:   cursor,
+		Position: position,
 	}
 }
 
@@ -903,6 +930,9 @@ func (l *listKeysFilters) FetchPage(ctx context.Context) pagination.PageResult[K
 }
 
 func (l *listKeysFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[Key]) error {
+	// Key order keeps writes made during the walk from moving its position.
+	l.keysetWalk.enableForEnumerate(l.Offset, l.OrderByFieldVal != nil)
+
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true

@@ -519,6 +519,10 @@ type ListNamespacesExecutor interface {
 type ListNamespacesBuilder interface {
 	ListNamespacesExecutor
 	Limit(int32) ListNamespacesBuilder
+	// ResumeAfter pages in key order, continuing after a position taken from
+	// PageResult.Position; an empty position starts at the beginning. It cannot be
+	// combined with OrderBy.
+	ResumeAfter(position string) ListNamespacesBuilder
 	ForPathPrefix(path string) ListNamespacesBuilder
 	ForDepth(depth uint64) ListNamespacesBuilder
 	ForChildrenOf(path string) ListNamespacesBuilder
@@ -545,6 +549,9 @@ type listNamespacesFilters struct {
 	IncludeDeletedVal bool                   `json:"includeDeleted,omitempty"`
 	LabelSelectorVal  *string                `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error      `json:"-"`
+
+	// keysetWalk carries the key position of a key-ordered listing. See keysetWalk.
+	keysetWalk
 }
 
 func (l *listNamespacesFilters) addError(e error) ListNamespacesBuilder {
@@ -554,6 +561,12 @@ func (l *listNamespacesFilters) addError(e error) ListNamespacesBuilder {
 
 func (l *listNamespacesFilters) Limit(limit int32) ListNamespacesBuilder {
 	l.LimitVal = uint64(limit)
+	return l
+}
+
+// ResumeAfter selects key order, continuing after position.
+func (l *listNamespacesFilters) ResumeAfter(position string) ListNamespacesBuilder {
+	l.keysetWalk.resumeAfter(position)
 	return l
 }
 
@@ -694,7 +707,9 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 	// Always limit to one more than limit to check if there are more records
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
-	if l.OrderByFieldVal != nil {
+	if l.keysetWalk.Enabled {
+		q = l.keysetWalk.apply(q, "path")
+	} else if l.OrderByFieldVal != nil {
 		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
@@ -705,6 +720,10 @@ func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageRe
 	var err error
 
 	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[Namespace]{Error: err}
+	}
+
+	if err = l.keysetWalk.validate(l.OrderByFieldVal != nil); err != nil {
 		return pagination.PageResult[Namespace]{Error: err}
 	}
 
@@ -726,10 +745,17 @@ func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageRe
 		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
+	hasMore := uint64(len(results)) > l.LimitVal
+	page := results[:util.MinUint64(l.LimitVal, uint64(len(results)))]
+
+	position := ""
+	if l.keysetWalk.Enabled {
+		position = advanceKeyset(&l.keysetWalk, page, func(n Namespace) string { return n.Path })
+	} else {
+		l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
+	}
 
 	cursor := ""
-	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
@@ -738,9 +764,10 @@ func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageRe
 	}
 
 	return pagination.PageResult[Namespace]{
-		HasMore: hasMore,
-		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
-		Cursor:  cursor,
+		HasMore:  hasMore,
+		Results:  page,
+		Cursor:   cursor,
+		Position: position,
 	}
 }
 
@@ -749,6 +776,9 @@ func (l *listNamespacesFilters) FetchPage(ctx context.Context) pagination.PageRe
 }
 
 func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[Namespace]) error {
+	// Key order keeps writes made during the walk from moving its position.
+	l.keysetWalk.enableForEnumerate(l.Offset, l.OrderByFieldVal != nil)
+
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true

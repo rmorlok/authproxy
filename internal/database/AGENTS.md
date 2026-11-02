@@ -47,6 +47,17 @@ The re-encryption registry (`reencrypt_registry.go`) tracks which tables/columns
 3. Register the field in an `init()` function using `RegisterEncryptedField()`
 4. Update `cols()`, `fields()`, `values()` for both the encrypted column and `encrypted_at`
 
+## Key-Ordered Listings
+
+Offset paging skips rows when a walk updates or removes what it visits, because the remaining rows shift under the offset. Key-ordered listings (`keyset.go`) page by a unique, immutable key instead. The connection, namespace, key, rate limit, and actor listings support them:
+
+- **`Enumerate`** uses key order unless the caller set `OrderBy` or continued from an offset cursor, so walks that write are safe by default. Do not rely on any other visit order.
+- **`ResumeAfter(position)`** selects key order explicitly, for `FetchPage` or for continuing a walk from `PageResult.Position`. Combining it with `OrderBy` returns `ErrInvalidListQuery`.
+- **`FetchPage`** otherwise stays offset paged for API callers.
+- **Limits:** rows inserted behind the position are not seen until the next walk, and the core list wrappers do not carry `Position`.
+
+To add support, embed `keysetWalk` in the filters and follow an existing listing. The key column must be unique and immutable.
+
 ## Task Checkpoints
 
 Long-running background tasks save and resume progress with `TaskCheckpointer[T]` (`task_checkpoint.go`), rather than adding their own progress tables. Create one per run, `Load` once, `Save` as work completes, and `Clear` when finished. See `internal/database/tasks/task_reconcile_carry_forward_labels.go` for a complete example.
