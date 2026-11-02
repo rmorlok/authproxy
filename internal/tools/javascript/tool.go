@@ -34,6 +34,14 @@ var toolHostNames = []string{
 	"data",
 }
 
+// asyncFunctionPrototype reads the runtime's AsyncFunction.prototype intrinsic.
+// Initialize runs it before authored code, when the intrinsic cannot be disturbed.
+var asyncFunctionPrototype = goja.MustCompile(
+	"async-function-prototype.js",
+	`Object.getPrototypeOf(async function () {})`,
+	true, // strict
+)
+
 // ToolProgram owns a compiled Tool entry point and its optional compiled
 // connector library. It retains no runtime or invocation values and can be
 // initialized concurrently in separate, caller-owned Goja runtimes. Compilation
@@ -168,9 +176,11 @@ func checkToolHostBindings(source string, strict, reserveExecute bool) error {
 
 // Initialize runs connector initialization and then the Tool script in vm,
 // returning its callable execute binding without invoking it. Compilation checks
-// the async declaration; initialization checks that execute is still callable
-// after authored top-level code runs. The caller must
-// own a fresh runtime on one goroutine, install host capabilities and copied
+// the async declaration; because top-level code can reassign that binding,
+// initialization checks that execute is still an async function afterward. This
+// catches replacement by a synchronous function or noncallable value; it is a
+// contract check, not a sandbox, so code that deliberately spoofs the prototype
+// is not detected. The caller must own a fresh runtime on one goroutine, install host capabilities and copied
 // inputs first, and keep cancellation/time limits active through initialization
 // and subsequent calls. Only Goja's Interrupt may run on another goroutine.
 // The returned callable belongs exclusively to vm and must not outlive it.
@@ -188,6 +198,11 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	// disk or a caller's loader. Existing precompiled library programs are reused.
 	vm.SetParserOptions(parser.WithDisableSourceMaps)
 	vm.SetMaxCallStackSize(p.limits.MaxStackDepth)
+
+	asyncPrototype, err := vm.RunProgram(asyncFunctionPrototype)
+	if err != nil {
+		return nil, ErrInvalidInput
+	}
 
 	for _, name := range toolHostNames {
 		value := vm.Get(name)
@@ -213,8 +228,18 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 		return nil, runtimeEvaluationError(err)
 	}
 
-	callable, ok := goja.AssertFunction(vm.Get("execute"))
+	entry := vm.Get("execute")
+	callable, ok := goja.AssertFunction(entry)
 	if !ok {
+		return nil, ErrEvaluation
+	}
+
+	// A Proxy entry point can throw from its prototype trap; contain that here so
+	// the failure keeps its fixed classification instead of panicking the caller.
+	var async bool
+	if exception := vm.Try(func() {
+		async = entry.ToObject(vm).Prototype() == asyncPrototype.ToObject(vm)
+	}); exception != nil || !async {
 		return nil, ErrEvaluation
 	}
 
@@ -224,15 +249,33 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // Validate checks top-level initialization in a fresh runtime under the Tool's
 // timeout and stack policy. It never supplies host capabilities, connection
 // values, or execute arguments, and never invokes the returned entry point.
-// Caller cancellation retains its context error; policy expiry or stack
-// exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
-// returning, and no runtime or pending authored state is reused by invocation.
+// A promise left rejected without a handler once initialization settles fails
+// validation, so async top-level work cannot hide an error or a capability use
+// that would become real I/O at invocation. Caller cancellation retains its
+// context error; policy expiry or stack exhaustion returns ErrLimitExceeded. Any
+// interrupt watcher is joined before returning, and no runtime or pending
+// authored state is reused by invocation.
 func (p *ToolProgram) Validate(ctx context.Context) error {
 	if p == nil || p.program == nil || ctx == nil {
 		return ErrInvalidInput
 	}
 	return withRuntime(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
-		_, err := p.Initialize(vm)
-		return err
+		// Track by promise because a handler attached later clears its rejection.
+		unhandled := make(map[*goja.Promise]struct{})
+		vm.SetPromiseRejectionTracker(func(promise *goja.Promise, operation goja.PromiseRejectionOperation) {
+			if operation == goja.PromiseRejectionReject {
+				unhandled[promise] = struct{}{}
+			} else {
+				delete(unhandled, promise)
+			}
+		})
+
+		if _, err := p.Initialize(vm); err != nil {
+			return err
+		}
+		if len(unhandled) != 0 {
+			return ErrEvaluation
+		}
+		return nil
 	})
 }
