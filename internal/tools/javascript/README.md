@@ -150,11 +150,15 @@ if err := tool.Validate(ctx); err != nil {
 `CompileTool` checks syntax, the entry-point declaration, reserved names, and
 the combined source size. It never runs authored code. `Validate` runs library
 initialization followed by Tool initialization in a fresh VM with no host
-capabilities or connection data. It checks that `execute` remains callable but
-does not call it. For example, `const prefix = "customer:"` is valid top-level
-initialization; a top-level `fetch(...)` fails because validation has no fetch
-host. Authored top-level code can itself call other functions, so initialization
-is covered by cancellation, timeout, and stack limits.
+capabilities or connection data. It checks that `execute` is still an async
+function after top-level code runs but does not call it, so replacing the
+declaration with a synchronous function fails. For example,
+`const prefix = "customer:"` is valid top-level initialization; a top-level
+`fetch(...)` fails because validation has no fetch host. The same applies inside
+top-level async work: any promise still rejected without a handler once
+initialization settles fails validation. Authored top-level code can itself call
+other functions, so initialization is covered by cancellation, timeout, and stack
+limits.
 
 Tool code uses strict JavaScript. Connector libraries keep their existing syntax
 rules. Both reserve global host names such as `fetch`, `context`, `params`,
@@ -162,8 +166,9 @@ rules. Both reserve global host names such as `fetch`, `context`, `params`,
 variables may reuse these names. Legacy unbraced conditional declarations, such
 as `if (ok) function fetch() {}`, are rejected anywhere in a library because
 they can reach the global object. Host globals are frozen before initialization,
-including absent capabilities whose value is `undefined`. Tool parsing and
-dynamic `eval`/`Function` parsing do not load source maps.
+including absent capabilities whose value is `undefined`. Tool, expression, and
+connector library parsing, including dynamic `eval`/`Function` parsing, do not
+load source maps.
 
 `Initialize(vm)` is the integration point for a future invocation host. That
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
