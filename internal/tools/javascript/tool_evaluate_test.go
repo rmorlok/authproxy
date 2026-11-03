@@ -185,7 +185,11 @@ func TestToolEvaluateSanitizesErrors(t *testing.T) {
 		"throws object":         {`async function execute() { throw {toString() { throw cfg.private; }}; }`, ""},
 		"await rejection":       {`async function execute() { return await Promise.reject(cfg.private); }`, ""},
 		"sync replacement":      {`async function execute() {} execute = () => 1;`, ""},
-		"thenable replacement":  {`async function execute() {} execute = () => ({get then() { for (;;) {} }});`, ""},
+		// Spoof the async prototype so initialization passes and the result guard
+		// must reject the non-Promise without traversing its infinite getter.
+		"thenable replacement": {`async function execute() {}
+			execute = Object.setPrototypeOf(
+				() => ({get then() { for (;;) {} }}), Object.getPrototypeOf(execute));`, ""},
 	} {
 		t.Run(name, func(t *testing.T) {
 			// Neither JavaScript stacks nor configuration-derived exception details leave the VM.

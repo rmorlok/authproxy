@@ -150,9 +150,11 @@ if err := tool.Validate(ctx); err != nil {
 `CompileTool` checks syntax, the entry-point declaration, reserved names, and
 the combined source size. It never runs authored code. `Validate` runs library
 initialization followed by Tool initialization in a fresh VM with no host
-capabilities or connection data. It checks that `execute` remains callable but
-does not call it. Publication has no `cfg`, `params`, or other invocation values:
-helpers must read them inside functions called during evaluation. For example,
+capabilities or connection data. It checks that `execute` is still an async
+function after top-level code runs but does not call it; replacing the declaration
+with a synchronous function fails. Publication has no `cfg`, `params`, or other
+invocation values: helpers must read them inside functions called during
+evaluation. For example,
 `const prefix = "customer:"` is valid top-level initialization, while
 `const tenant = cfg.tenant` fails validation. A top-level `fetch(...)` also fails
 because validation has no fetch host. Authored top-level code can itself call
@@ -170,7 +172,8 @@ as `if (ok) function fetch() {}`, are rejected anywhere in a library because
 they can reach the global object. Host globals are frozen before initialization,
 including absent capabilities whose value is `undefined`. Host capabilities such
 as `fetch` are non-enumerable; existing captured input bindings remain enumerable.
-Tool parsing and dynamic `eval`/`Function` parsing do not load source maps.
+Tool, expression, and connector library parsing, including dynamic
+`eval`/`Function` parsing, do not load source maps.
 
 `Initialize(vm)` is the integration point for a future invocation host. That
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,

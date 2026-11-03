@@ -8,6 +8,31 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestLibraryParsingDoesNotLoadSourceMaps(t *testing.T) {
+	// The default parser fails on this missing file, so success proves it was never read.
+	const directive = `\n//# sourceMappingURL=file:///authproxy-do-not-load-source-map.json`
+	sourceMap := "\n//# sourceMappingURL=file:///authproxy-do-not-load-source-map.json"
+
+	// Static library and expression parsing ignore the directive.
+	library, err := CompileLibrary("const value = 7;" + sourceMap)
+	require.NoError(t, err)
+	require.NoError(t, ValidateExpressionSyntax("1 + 1;"+sourceMap))
+
+	// Dynamic parsing during library validation uses the same policy.
+	dynamic, err := CompileLibrary(`eval("1` + directive + `");`)
+	require.NoError(t, err)
+	require.NoError(t, dynamic.Validate())
+
+	// Expression source and its dynamic parsing also stay away from the filesystem.
+	jsctx := library.NewContext(nil)
+	matched, err := jsctx.EvaluateBoolean("value === 7;" + sourceMap)
+	require.NoError(t, err)
+	assert.True(t, matched)
+	matched, err = jsctx.EvaluateBoolean(`eval("value === 7` + directive + `")`)
+	require.NoError(t, err)
+	assert.True(t, matched)
+}
+
 func TestLibraryContextEvaluateBoolean(t *testing.T) {
 	library, err := CompileAndValidateLibrary(`
 		const PERSONAL_CALENDAR = "yes";

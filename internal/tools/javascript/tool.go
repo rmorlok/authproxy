@@ -34,6 +34,14 @@ var toolHostNames = []string{
 	"data",
 }
 
+// asyncFunctionPrototype reads the runtime's AsyncFunction.prototype intrinsic.
+// Initialize runs it before authored code, when the intrinsic cannot be disturbed.
+var asyncFunctionPrototype = goja.MustCompile(
+	"async-function-prototype.js",
+	`Object.getPrototypeOf(async function () {})`,
+	true, // strict
+)
+
 // ToolProgram owns a compiled Tool entry point and its optional compiled
 // connector library. It retains no runtime or invocation values and can be
 // initialized concurrently in separate, caller-owned Goja runtimes. Compilation
@@ -168,11 +176,14 @@ func checkToolHostBindings(source string, strict, reserveExecute bool) error {
 
 // Initialize runs connector initialization and then the Tool script in vm,
 // returning its callable execute binding without invoking it. Compilation checks
-// the async declaration; initialization checks that execute is still callable
-// after authored top-level code runs. The caller must
-// own a fresh runtime on one goroutine, install host capabilities and copied
-// inputs first, and keep cancellation/time limits active through initialization
-// and subsequent calls. Only Goja's Interrupt may run on another goroutine.
+// the async declaration; because top-level code can reassign that binding,
+// initialization checks that execute is still an async function afterward. This
+// catches replacement by a synchronous function or noncallable value; it is a
+// contract check, not a sandbox, so code that deliberately spoofs the prototype
+// is not detected. The caller must own a fresh runtime on one goroutine, install
+// host capabilities and copied inputs first, and keep cancellation/time limits
+// active through initialization and subsequent calls. Only Goja's Interrupt may
+// run on another goroutine.
 // The returned callable belongs exclusively to vm and must not outlive it.
 //
 // Host bindings are made nonwritable and nonconfigurable before authored code
@@ -188,6 +199,11 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	// disk or a caller's loader. Existing precompiled library programs are reused.
 	vm.SetParserOptions(parser.WithDisableSourceMaps)
 	vm.SetMaxCallStackSize(p.limits.MaxStackDepth)
+
+	asyncPrototype, err := vm.RunProgram(asyncFunctionPrototype)
+	if err != nil {
+		return nil, ErrInvalidInput
+	}
 
 	for _, name := range toolHostNames {
 		value := vm.Get(name)
@@ -220,8 +236,18 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 		return nil, runtimeEvaluationError(err)
 	}
 
-	callable, ok := goja.AssertFunction(vm.Get("execute"))
+	entry := vm.Get("execute")
+	callable, ok := goja.AssertFunction(entry)
 	if !ok {
+		return nil, ErrEvaluation
+	}
+
+	// A Proxy entry point can throw from its prototype trap; contain that here so
+	// the failure keeps its fixed classification instead of panicking the caller.
+	var async bool
+	if exception := vm.Try(func() {
+		async = entry.ToObject(vm).Prototype() == asyncPrototype.ToObject(vm)
+	}); exception != nil || !async {
 		return nil, ErrEvaluation
 	}
 
@@ -232,7 +258,8 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // timeout and stack policy. It never supplies host capabilities, connection
 // values, or execute arguments, and never invokes the returned entry point.
 // Unhandled initialization rejections fail just as they do during evaluation;
-// helpers that need captured input must read it when called by execute.
+// this also catches unavailable capabilities used by async top-level work.
+// Helpers that need captured input must read it when called by execute.
 // Caller cancellation retains its context error; policy expiry or stack
 // exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
 // returning, and no runtime or pending authored state is reused by invocation.

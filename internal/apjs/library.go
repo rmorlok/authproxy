@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"github.com/dop251/goja/parser"
 )
 
 var reservedRuntimeVars = map[string]struct{}{
@@ -22,6 +23,26 @@ type Library struct {
 	program *goja.Program
 }
 
+// compileSource compiles authored non-strict JavaScript without loading source
+// maps. Goja's default parser reads a trailing sourceMappingURL from disk, which
+// would give connector authors a server-side file read and existence oracle
+// through the returned parse error.
+func compileSource(name, source string) (*goja.Program, error) {
+	parsed, err := goja.Parse(name, source, parser.WithDisableSourceMaps)
+	if err != nil {
+		return nil, err
+	}
+	return goja.CompileAST(parsed, false)
+}
+
+// newRuntime creates a VM whose dynamic eval, Function, and RunString parsing
+// follows the same no-source-map policy as compileSource.
+func newRuntime() *goja.Runtime {
+	vm := goja.New()
+	vm.SetParserOptions(parser.WithDisableSourceMaps)
+	return vm
+}
+
 // CompileLibrary parses connector-level JavaScript into a reusable program.
 // It does not run the library; call Validate to check top-level execution.
 func CompileLibrary(source string) (*Library, error) {
@@ -29,7 +50,7 @@ func CompileLibrary(source string) (*Library, error) {
 		return &Library{}, nil
 	}
 
-	program, err := goja.Compile("connector.js", source, false)
+	program, err := compileSource("connector.js", source)
 	if err != nil {
 		return nil, fmt.Errorf("compile connector JavaScript library: %w", err)
 	}
@@ -60,7 +81,7 @@ func ValidateExpressionSyntax(expression string) error {
 	if strings.TrimSpace(expression) == "" {
 		return fmt.Errorf("expression is required")
 	}
-	if _, err := goja.Compile("expression.js", expression, false); err != nil {
+	if _, err := compileSource("expression.js", expression); err != nil {
 		return fmt.Errorf("compile JavaScript expression: %w", err)
 	}
 	return nil
@@ -82,7 +103,7 @@ func (l *Library) Validate() error {
 		return nil
 	}
 
-	vm := goja.New()
+	vm := newRuntime()
 	if err := l.Run(vm); err != nil {
 		return err
 	}

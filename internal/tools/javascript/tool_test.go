@@ -318,6 +318,68 @@ func TestToolValidationTracksRejections(t *testing.T) {
 	}
 }
 
+// TestToolEntrypointMustRemainAsync rejects initialization that swaps out the declaration.
+func TestToolEntrypointMustRemainAsync(t *testing.T) {
+	for name, source := range map[string]string{
+		"reassigned":     `async function execute() {} execute = function () { return 1; };`,
+		"var initialize": `var execute = function () { return 1; }; async function execute() {}`,
+		"arrow":          `async function execute() {} execute = () => 1;`,
+		"generator":      `async function execute() {} execute = function* () {};`,
+		"class":          `async function execute() {} execute = class {};`,
+		"in a job":       `async function execute() {} Promise.resolve().then(() => { execute = () => 1; });`,
+		"proxy trap": `async function execute() {}
+			execute = new Proxy(execute, { getPrototypeOf() { throw new Error("private-trap"); } });`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Each replacement is callable or nearly so, but breaks the Promise contract.
+			program := compileTool(t, source, nil)
+			err := program.Validate(context.Background())
+			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.NotContains(t, err.Error(), "private")
+		})
+	}
+
+	// Swapping in another async function still honors the Promise contract.
+	program := compileTool(t, `
+		async function execute() { return 1; }
+		execute = async () => 2;
+	`, nil)
+	entry, err := program.Initialize(goja.New())
+	require.NoError(t, err)
+	require.Equal(t, int64(2), toolValue(t, entry).ToInteger())
+}
+
+// TestToolValidationRejectsUnhandledRejections surfaces failures from async initialization.
+func TestToolValidationRejectsUnhandledRejections(t *testing.T) {
+	for name, test := range map[string]struct {
+		source  string
+		library string
+	}{
+		"direct rejection": {`Promise.reject(new Error("private")); async function execute() {}`, ""},
+		"async capability": {`(async () => { await fetch("https://example.invalid/private"); })(); async function execute() {}`, ""},
+		"helper rejection": {`async function execute() {}`, `(async () => { throw new Error("private"); })();`},
+		"chained failure":  {`Promise.resolve().then(() => { throw new Error("private"); }); async function execute() {}`, ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Async top-level failures reject after the script ends, without a sync throw.
+			program := compileTool(t, test.source, toolLibrary(t, test.library))
+			err := program.Validate(context.Background())
+			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.NotContains(t, err.Error(), "private")
+		})
+	}
+
+	// A rejection the author handles, even from a later job, is not a failure.
+	for _, source := range []string{
+		`Promise.reject(new Error("expected")).catch(() => {}); async function execute() {}`,
+		`const failed = Promise.reject(new Error("expected"));
+		 Promise.resolve().then(() => failed.catch(() => {}));
+		 async function execute() {}`,
+	} {
+		require.NoError(t, compileTool(t, source, nil).Validate(context.Background()))
+	}
+}
+
 // TestToolCombinedSourceBudget accounts for both programs and retains a private policy copy.
 func TestToolCombinedSourceBudget(t *testing.T) {
 	librarySource := `const prefix = "雪";`
