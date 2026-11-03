@@ -368,13 +368,13 @@ func TestToolSetNamespaceLabelPropagation(t *testing.T) {
 		require.Equal(t, toolSet.SelectorRevision, stored.SelectorRevision)
 		require.Equal(t, toolSet.ConnectionSelector, stored.ConnectionSelector)
 	}
-	_, err = db.ReconcileCarryForwardLabels(ctx, 1, nil)
+	_, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 1, nil)
 	require.NoError(t, err)
 	for _, toolSet := range toolSets {
 		_, err := rawDB.Exec(fmt.Sprintf("UPDATE tool_sets SET labels = '{\"local\":\"preserved\",\"apxy/ns/team\":\"drifted\"}' WHERE id = '%s'", toolSet.Id))
 		require.NoError(t, err)
 	}
-	corrected, err := db.ReconcileCarryForwardLabels(ctx, 1, nil)
+	corrected, err := db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 1, nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(len(toolSets)), corrected)
 	for _, toolSet := range toolSets {
@@ -386,7 +386,7 @@ func TestToolSetNamespaceLabelPropagation(t *testing.T) {
 		require.Equal(t, toolSet.SelectorRevision, stored.SelectorRevision)
 		require.Equal(t, toolSet.ConnectionSelector, stored.ConnectionSelector)
 	}
-	corrected, err = db.ReconcileCarryForwardLabels(ctx, 1, nil)
+	corrected, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 1, nil)
 	require.NoError(t, err)
 	require.Zero(t, corrected)
 }

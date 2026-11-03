@@ -738,6 +738,10 @@ type ListConnectionsExecutor interface {
 type ListConnectionsBuilder interface {
 	ListConnectionsExecutor
 	Limit(int32) ListConnectionsBuilder
+	// ResumeAfter pages in key order, continuing after a position taken from
+	// PageResult.Position; an empty position starts at the beginning. It cannot be
+	// combined with OrderBy.
+	ResumeAfter(position string) ListConnectionsBuilder
 	ForState(ConnectionState) ListConnectionsBuilder
 	ForStates([]ConnectionState) ListConnectionsBuilder
 	ForConnectorId(id apid.ID) ListConnectionsBuilder
@@ -753,20 +757,19 @@ type ListConnectionsBuilder interface {
 }
 
 type listConnectionsFilters struct {
-	s                   *service                `json:"-"`
-	LimitVal            uint64                  `json:"limit"`
-	Offset              uint64                  `json:"offset"`
-	StatesVal           []ConnectionState       `json:"states,omitempty"`
-	ConnectorIdsVal     []apid.ID               `json:"connectorIds,omitempty"`
-	NamespaceMatchers   []string                `json:"namespaceMatchers,omitempty"`
-	NameVal             *scommon.ResourceName   `json:"name,omitempty"`
-	OrderByFieldVal     *ConnectionOrderByField `json:"orderByField"`
-	OrderByVal          *pagination.OrderBy     `json:"orderBy"`
-	IncludeDeletedVal   bool                    `json:"includeDeleted,omitempty"`
-	LabelSelectorVal    *string                 `json:"labelSelector,omitempty"`
-	SetupStepNotNullVal bool                    `json:"setupStepNotNull,omitempty"`
-	UpdatedBeforeVal    *time.Time              `json:"updatedBefore,omitempty"`
-	Errors              *multierror.Error       `json:"-"`
+	s                   *service              `json:"-"`
+	StatesVal           []ConnectionState     `json:"states,omitempty"`
+	ConnectorIdsVal     []apid.ID             `json:"connectorIds,omitempty"`
+	NamespaceMatchers   []string              `json:"namespaceMatchers,omitempty"`
+	NameVal             *scommon.ResourceName `json:"name,omitempty"`
+	IncludeDeletedVal   bool                  `json:"includeDeleted,omitempty"`
+	LabelSelectorVal    *string               `json:"labelSelector,omitempty"`
+	SetupStepNotNullVal bool                  `json:"setupStepNotNull,omitempty"`
+	UpdatedBeforeVal    *time.Time            `json:"updatedBefore,omitempty"`
+	Errors              *multierror.Error     `json:"-"`
+
+	// listPaging owns the page size, order and position. See listPaging.
+	listPaging[ConnectionOrderByField]
 }
 
 func (l *listConnectionsFilters) addError(e error) ListConnectionsBuilder {
@@ -775,7 +778,13 @@ func (l *listConnectionsFilters) addError(e error) ListConnectionsBuilder {
 }
 
 func (l *listConnectionsFilters) Limit(limit int32) ListConnectionsBuilder {
-	l.LimitVal = uint64(limit)
+	l.listPaging.setLimit(limit)
+	return l
+}
+
+// ResumeAfter selects key order, continuing after position.
+func (l *listConnectionsFilters) ResumeAfter(position string) ListConnectionsBuilder {
+	l.listPaging.resumeAfter(position)
 	return l
 }
 
@@ -823,8 +832,7 @@ func (l *listConnectionsFilters) ForStates(states []ConnectionState) ListConnect
 
 func (l *listConnectionsFilters) OrderBy(field ConnectionOrderByField, by pagination.OrderBy) ListConnectionsBuilder {
 	if IsValidConnectionOrderByField(field) {
-		l.OrderByFieldVal = &field
-		l.OrderByVal = &by
+		l.listPaging.setOrder(field, by)
 	} else {
 		return l.addError(fmt.Errorf("invalid order by field: %v", field))
 	}
@@ -892,13 +900,6 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
-	}
-
-	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
 	if len(l.StatesVal) > 0 {
 		q = q.Where(sq.Eq{"state": l.StatesVal})
 	}
@@ -923,14 +924,10 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 		q = q.Where(sq.Lt{"updated_at": *l.UpdatedBeforeVal})
 	}
 
-	if l.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("%s %s", string(*l.OrderByFieldVal), l.OrderByVal.String()))
-	} else {
-		// A stable default is required for cursor pagination. In particular, do
-		// not rely on the physical scan order, which can change when indexes are
-		// added or the query planner changes its plan.
-		q = q.OrderBy("created_at ASC", "id ASC")
-	}
+	// A stable default is required for cursor pagination. In particular, do
+	// not rely on the physical scan order, which can change when indexes are
+	// added or the query planner changes its plan.
+	q = l.listPaging.apply(q, "id", "created_at ASC", "id ASC")
 
 	return q
 }
@@ -939,6 +936,10 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageR
 	var err error
 
 	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[Connection]{Error: err}
+	}
+
+	if err = l.listPaging.validate(); err != nil {
 		return pagination.PageResult[Connection]{Error: err}
 	}
 
@@ -960,10 +961,9 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageR
 		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
+	page, hasMore, position := nextPage(&l.listPaging, results, func(c Connection) string { return string(c.Id) })
 
 	cursor := ""
-	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
@@ -972,9 +972,10 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageR
 	}
 
 	return pagination.PageResult[Connection]{
-		HasMore: hasMore,
-		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
-		Cursor:  cursor,
+		HasMore:  hasMore,
+		Results:  page,
+		Cursor:   cursor,
+		Position: position,
 	}
 }
 
@@ -983,6 +984,9 @@ func (l *listConnectionsFilters) FetchPage(ctx context.Context) pagination.PageR
 }
 
 func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[Connection]) error {
+	// Key order keeps writes made during the walk from moving its position.
+	l.listPaging.startEnumerate()
+
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true
@@ -1300,15 +1304,13 @@ func (s *service) DeleteConnectionLabels(ctx context.Context, id apid.ID, keys [
 
 func (s *service) ListConnectionsBuilder() ListConnectionsBuilder {
 	return &listConnectionsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 }
 
 func (s *service) ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	b := &listConnectionsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 
 	return b.FromCursor(ctx, cursor)

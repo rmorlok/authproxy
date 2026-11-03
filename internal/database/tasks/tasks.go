@@ -41,6 +41,7 @@ func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypePropagateNamespaceLabels, th.propagateNamespaceLabels)
 	mux.HandleFunc(taskTypePropagateConnectorLabels, th.propagateConnectorLabels)
 	mux.HandleFunc(taskTypeReconcileCarryForwardLabels, th.reconcileCarryForwardLabels)
+	mux.HandleFunc(taskTypeCleanupExpiredTaskCheckpoints, th.cleanupExpiredTaskCheckpoints)
 }
 
 // GetCronTasks returns the cron task configurations for database maintenance.
@@ -70,6 +71,10 @@ func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 		{
 			Cronspec: "@daily",
 			Task:     newReconcileCarryForwardLabelsTask(),
+		},
+		{
+			Cronspec: "@daily",
+			Task:     newCleanupExpiredTaskCheckpointsTask(),
 		},
 	}
 }

@@ -3574,6 +3574,812 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/_proxyRaw:
+    delete:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
+    get:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
+    head:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
+    options:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
+    patch:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
+    post:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
+    put:
+      description: 'Forward the request method and body to X-AuthProxy-Upstream-URL
+        using the connection''s credentials. The upstream status, body, ordinary headers
+        and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned:
+        notSent means no target request was sent, mayHaveSent means a send is possible
+        without a confirmed response, and sent means a target HTTP response was observed,
+        regardless of its status. Evidence accumulates across redirects and credential
+        recovery; OAuth token traffic is excluded. The header is fixed before streaming
+        starts, including for empty responses, and later body errors cannot change
+        it. It does not imply business success or safe retry. Ordinary authentication,
+        validation and proxy errors also carry the header; older servers, global middleware,
+        panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH,
+        DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may
+        be handled by global middleware.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Absolute upstream http(s) URL
+        in: header
+        name: X-AuthProxy-Upstream-URL
+        required: true
+        type: string
+      - collectionFormat: multi
+        description: Repeated key=value request labels
+        in: header
+        items:
+          type: string
+        name: X-AuthProxy-Label
+        type: array
+      - description: Raw upstream request body
+        in: body
+        name: request
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Upstream response body; any upstream HTTP status is preserved
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "429":
+          description: Local rate limit or upstream response
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        default:
+          description: Upstream response with its original status and body
+          headers:
+            X-AuthProxy-Send-Evidence:
+              description: notSent | mayHaveSent | sent; cumulative target-send evidence,
+                fixed before the response body
+              type: string
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Stream a request through a connection
+      tags:
+      - proxy
   /connections/{id}/_reauth:
     post:
       consumes:

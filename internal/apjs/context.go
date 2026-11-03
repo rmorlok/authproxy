@@ -89,10 +89,10 @@ func (c Context) EvaluateObject(expression string) (map[string]any, error) {
 }
 
 func (c Context) runExpression(expression string) (goja.Value, error) {
-	vm := goja.New()
+	vm := newRuntime()
 
 	if c.library != nil {
-		if err := c.library.run(vm); err != nil {
+		if err := c.library.Run(vm); err != nil {
 			return nil, err
 		}
 		if err := validateReservedRuntimeVars(vm); err != nil {

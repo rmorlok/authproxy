@@ -6,6 +6,7 @@ package mock
 
 import (
 	context "context"
+	json "encoding/json"
 	reflect "reflect"
 	time "time"
 
@@ -619,6 +620,21 @@ func (mr *MockDBMockRecorder) DeleteExpiredNonces(ctx interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredNonces", reflect.TypeOf((*MockDB)(nil).DeleteExpiredNonces), ctx)
 }
 
+// DeleteExpiredTaskCheckpoints mocks base method.
+func (m *MockDB) DeleteExpiredTaskCheckpoints(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteExpiredTaskCheckpoints", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteExpiredTaskCheckpoints indicates an expected call of DeleteExpiredTaskCheckpoints.
+func (mr *MockDBMockRecorder) DeleteExpiredTaskCheckpoints(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredTaskCheckpoints", reflect.TypeOf((*MockDB)(nil).DeleteExpiredTaskCheckpoints), ctx)
+}
+
 // DeleteKey mocks base method.
 func (m *MockDB) DeleteKey(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
@@ -792,6 +808,20 @@ func (m *MockDB) DeleteStandaloneTool(ctx context.Context, id apid.ID, expectedR
 func (mr *MockDBMockRecorder) DeleteStandaloneTool(ctx, id, expectedRevision interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStandaloneTool", reflect.TypeOf((*MockDB)(nil).DeleteStandaloneTool), ctx, id, expectedRevision)
+}
+
+// DeleteTaskCheckpoint mocks base method.
+func (m *MockDB) DeleteTaskCheckpoint(ctx context.Context, key database.TaskCheckpointKey, revision string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteTaskCheckpoint", ctx, key, revision)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteTaskCheckpoint indicates an expected call of DeleteTaskCheckpoint.
+func (mr *MockDBMockRecorder) DeleteTaskCheckpoint(ctx, key, revision interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteTaskCheckpoint", reflect.TypeOf((*MockDB)(nil).DeleteTaskCheckpoint), ctx, key, revision)
 }
 
 // DeleteToolSet mocks base method.
@@ -1174,6 +1204,21 @@ func (m *MockDB) GetRecentProbeOutcomes(ctx context.Context, connectionId apid.I
 func (mr *MockDBMockRecorder) GetRecentProbeOutcomes(ctx, connectionId, probeId, limit interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecentProbeOutcomes", reflect.TypeOf((*MockDB)(nil).GetRecentProbeOutcomes), ctx, connectionId, probeId, limit)
+}
+
+// GetTaskCheckpoint mocks base method.
+func (m *MockDB) GetTaskCheckpoint(ctx context.Context, key database.TaskCheckpointKey) (*database.TaskCheckpoint, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTaskCheckpoint", ctx, key)
+	ret0, _ := ret[0].(*database.TaskCheckpoint)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTaskCheckpoint indicates an expected call of GetTaskCheckpoint.
+func (mr *MockDBMockRecorder) GetTaskCheckpoint(ctx, key interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTaskCheckpoint", reflect.TypeOf((*MockDB)(nil).GetTaskCheckpoint), ctx, key)
 }
 
 // GetTool mocks base method.
@@ -2033,18 +2078,18 @@ func (mr *MockDBMockRecorder) PutRateLimitLabels(ctx, id, labels interface{}) *g
 }
 
 // ReconcileCarryForwardLabels mocks base method.
-func (m *MockDB) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+func (m *MockDB) ReconcileCarryForwardLabels(ctx context.Context, checkpointer *database.ReconcileCheckpointer, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ReconcileCarryForwardLabels", ctx, batchSize, limiter)
+	ret := m.ctrl.Call(m, "ReconcileCarryForwardLabels", ctx, checkpointer, batchSize, limiter)
 	ret0, _ := ret[0].(int64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ReconcileCarryForwardLabels indicates an expected call of ReconcileCarryForwardLabels.
-func (mr *MockDBMockRecorder) ReconcileCarryForwardLabels(ctx, batchSize, limiter interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) ReconcileCarryForwardLabels(ctx, checkpointer, batchSize, limiter interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabels", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabels), ctx, batchSize, limiter)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabels", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabels), ctx, checkpointer, batchSize, limiter)
 }
 
 // RefreshConnectionsForConnector mocks base method.
@@ -2192,6 +2237,21 @@ func (m *MockDB) ResolveRateLimitReference(ctx context.Context, reference meta.O
 func (mr *MockDBMockRecorder) ResolveRateLimitReference(ctx, reference interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResolveRateLimitReference", reflect.TypeOf((*MockDB)(nil).ResolveRateLimitReference), ctx, reference)
+}
+
+// SaveTaskCheckpoint mocks base method.
+func (m *MockDB) SaveTaskCheckpoint(ctx context.Context, key database.TaskCheckpointKey, expectedRevision string, payload json.RawMessage, ttl time.Duration) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SaveTaskCheckpoint", ctx, key, expectedRevision, payload, ttl)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SaveTaskCheckpoint indicates an expected call of SaveTaskCheckpoint.
+func (mr *MockDBMockRecorder) SaveTaskCheckpoint(ctx, key, expectedRevision, payload, ttl interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveTaskCheckpoint", reflect.TypeOf((*MockDB)(nil).SaveTaskCheckpoint), ctx, key, expectedRevision, payload, ttl)
 }
 
 // SearchResources mocks base method.

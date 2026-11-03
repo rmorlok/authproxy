@@ -1,5 +1,5 @@
-// Package javascript evaluates trusted Tool expressions with native JavaScript
-// copies of captured invocation data. It exposes no I/O or application handles.
+// Package javascript evaluates trusted async Tool scripts and pure expressions
+// with native JavaScript copies of captured data. It installs no I/O capabilities.
 package javascript
 
 import (
@@ -19,18 +19,20 @@ import (
 // These errors classify failures without disclosing authored code, connection
 // configuration, thrown values, or JavaScript stacks to invocation callers.
 var (
-	ErrInvalidSource = errors.New("invalid JavaScript expression")
+	ErrInvalidSource = errors.New("invalid JavaScript source")
 	ErrInvalidInput  = errors.New("invalid JavaScript input")
 	ErrInvalidOutput = errors.New("JavaScript result is not a supported JSON value")
 	ErrLimitExceeded = errors.New("JavaScript execution limit exceeded")
-	ErrEvaluation    = errors.New("JavaScript expression failed")
+	ErrEvaluation    = errors.New("JavaScript execution failed")
 )
 
-// Limits contains resolved positive caps for one compiled expression. Callers
-// apply operator ceilings before compilation. These caps bound host processing
-// and interrupt JavaScript execution; they are not a hard memory quota.
+// Limits contains resolved positive caps for a compiled expression or Tool.
+// Callers apply operator ceilings before compilation. Tool initialization uses
+// the source, stack, and timeout caps; expression and Tool evaluation also use
+// the JSON input/output caps. These limits are not a hard memory quota.
 type Limits struct {
-	// MaxSourceBytes bounds the authored UTF-8 expression before parsing.
+	// MaxSourceBytes bounds authored UTF-8 source before parsing. For Tools,
+	// this includes both the entry-point script and connector helper library.
 	MaxSourceBytes int
 
 	// MaxInputBytes bounds serialized snapshot and response JSON together.
@@ -50,7 +52,9 @@ type Limits struct {
 	// MaxStackDepth bounds JavaScript function call depth, including recursion.
 	MaxStackDepth int
 
-	// Timeout covers input binding, expression execution, and result conversion.
+	// Timeout covers input binding, initialization, execution, promise settlement,
+	// and result conversion in Evaluate, or just initialization in Validate.
+	// Initialize instead requires its caller to enforce a deadline.
 	// Expiry returns ErrLimitExceeded; caller cancellation/deadlines retain their
 	// context error. Native Goja built-ins cannot be preempted; cancellation is
 	// checked again before any result is returned.
@@ -113,6 +117,7 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 		"tool-expression.js",
 		"(\n"+source+"\n)",
 		0, // mode
+		parser.WithDisableSourceMaps,
 	)
 	if err != nil || len(parsed.Body) != 1 {
 		return nil, ErrInvalidSource
@@ -143,71 +148,24 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 func (e *Expression) Evaluate(
 	ctx context.Context,
 	input Input,
-) (result common.RawJSON, err error) {
+) (common.RawJSON, error) {
 	if e == nil || e.program == nil || ctx == nil {
 		return nil, ErrInvalidInput
 	}
 
-	runCtx, cancel := context.WithTimeout(ctx, e.limits.Timeout)
-	defer cancel()
-
-	if err := expressionContextError(ctx, runCtx); err != nil {
-		return nil, err
-	}
-
-	vm := goja.New()
-	vm.SetMaxCallStackSize(e.limits.MaxStackDepth)
-
-	stop, stopped := make(chan struct{}), make(chan struct{})
-	go func() {
-		defer close(stopped)
-		select {
-		case <-runCtx.Done():
-			vm.Interrupt(runCtx.Err())
-		case <-stop:
+	return evaluateJSON(ctx, e.limits, input, func(vm *goja.Runtime) (goja.Value, error) {
+		value, err := vm.RunProgram(e.program)
+		if err != nil {
+			return nil, runtimeEvaluationError(err)
 		}
-	}()
-	defer func() {
-		// Join before discarding the VM, so no late interrupt can outlive this
-		// invocation. Fresh VMs avoid any need to clear or reuse interruption.
-		close(stop)
-		<-stopped
-		if recovered := recover(); recovered != nil {
-			switch recovered.(type) {
-			case *goja.InterruptedError:
-				result, err = nil, ErrEvaluation
-			case *goja.StackOverflowError:
-				result, err = nil, ErrLimitExceeded
-			default:
-				panic(recovered)
-			}
-		}
-		if contextErr := expressionContextError(ctx, runCtx); contextErr != nil {
-			result, err = nil, contextErr
-		}
-	}()
-
-	// Capture conversion intrinsics before authored code can replace globals or
-	// built-in methods. Input binding also runs before any author expression.
-	encoder := newOutputEncoder(vm, e.limits)
-	if err := bindInput(runCtx, vm, input, e.limits); err != nil {
-		return nil, err
-	}
-	value, err := vm.RunProgram(e.program)
-	if err != nil {
-		var stackErr *goja.StackOverflowError
-		if errors.As(err, &stackErr) {
-			return nil, ErrLimitExceeded
-		}
-		return nil, ErrEvaluation
-	}
-	return encoder.encode(runCtx, value)
+		return value, nil
+	})
 }
 
 // expressionContextError distinguishes caller cancellation from the runtime's
 // own execution-time limit. The caller's error wins when both contexts are done.
 // runCtx is private and only canceled independently by the configured timeout
-// until Evaluate's final cleanup, so its remaining error means a policy limit.
+// until runtime cleanup, so its remaining error means a policy limit.
 func expressionContextError(ctx, runCtx context.Context) error {
 	if runCtx.Err() != nil {
 		// Read the caller after observing the child: inherited cancellation

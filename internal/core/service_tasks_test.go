@@ -97,6 +97,10 @@ func (b *staticListConnectionsBuilder) Limit(int32) database.ListConnectionsBuil
 	return b
 }
 
+func (b *staticListConnectionsBuilder) ResumeAfter(string) database.ListConnectionsBuilder {
+	return b
+}
+
 func (b *staticListConnectionsBuilder) ForState(database.ConnectionState) database.ListConnectionsBuilder {
 	return b
 }

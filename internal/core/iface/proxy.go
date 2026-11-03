@@ -164,6 +164,11 @@ type Proxy interface {
 	// status codes do not trigger this recovery retry. See RawProxyRequest for
 	// ownership of the outgoing request body, including failure paths.
 	ProxyRequestStream(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest) (*http.Response, error)
+	// ProxyRequestRaw completes target sends and credential recovery before
+	// writing response headers to w, then streams the body and trailers. The
+	// response writer may use its first write as the settled-send boundary.
+	// It closes the response body even if copying fails; errors after a write
+	// cannot replace the already committed downstream response.
 	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest, w http.ResponseWriter) error
 	// HTTPClient builds the connection's middleware stack once for the given
 	// request type, labels, and actor, and returns a client whose Do shares the

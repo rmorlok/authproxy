@@ -76,7 +76,7 @@ func TestResolveLimitsAppliesIndependentCaps(t *testing.T) {
 			want := policy
 			test.want(&want)
 			originalCaps := test.caps.Clone()
-			got, err := resolveLimits(policy, &test.caps)
+			got, err := ResolveLimits(policy, &test.caps)
 			require.NoError(t, err)
 			require.Equal(t, want, got)
 			require.Equal(t, policyLimits(), policy)
@@ -99,7 +99,7 @@ func TestResolveLimitsPreservesOperatorCeilings(t *testing.T) {
 	} {
 		// Oversized positive caps must neither overflow nor increase any ceiling.
 		policy := policyLimits()
-		got, err := resolveLimits(policy, caps)
+		got, err := ResolveLimits(policy, caps)
 		require.NoError(t, err)
 		require.Equal(t, policy, got)
 	}
@@ -124,7 +124,7 @@ func TestResolveLimitsTimeoutPrecision(t *testing.T) {
 		// Only a representable smaller cap may change either timeout.
 		policy := policyLimits()
 		policy.HTTP.Timeout, policy.Response.Transform.Timeout = test.policy, test.policy
-		got, err := resolveLimits(policy, &toolschema.ExecutionLimits{TimeoutMillis: &test.millis})
+		got, err := ResolveLimits(policy, &toolschema.ExecutionLimits{TimeoutMillis: &test.millis})
 		require.NoError(t, err)
 		require.Equal(t, test.want, got.HTTP.Timeout)
 		require.Equal(t, test.want, got.Response.Transform.Timeout)

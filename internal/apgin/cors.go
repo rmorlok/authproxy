@@ -3,10 +3,35 @@ package apgin
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
+
+// WithExposedHeaders copies an enabled CORS configuration and adds response
+// headers for browser callers to read. It preserves the existing policy and
+// exposure list, avoids case-insensitive duplicates, and leaves nil disabled.
+func WithExposedHeaders(config *cors.Config, headers ...string) *cors.Config {
+	if config == nil {
+		return nil
+	}
+	updated := *config
+	updated.ExposeHeaders = append([]string(nil), config.ExposeHeaders...)
+	for _, header := range headers {
+		found := false
+		for _, existing := range updated.ExposeHeaders {
+			if strings.EqualFold(existing, header) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			updated.ExposeHeaders = append(updated.ExposeHeaders, header)
+		}
+	}
+	return &updated
+}
 
 // NewCorsMiddleware wraps gin-contrib/cors with logging that surfaces
 // rejected origins. The underlying library aborts non-matching CORS

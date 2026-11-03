@@ -361,7 +361,7 @@ func TestToolMetadataReconciliation(t *testing.T) {
 	require.NoError(t, db.DeleteNamespace(ctx, retired.Namespace))
 
 	// Drain unrelated initial drift before measuring only these Tool repairs.
-	_, err = db.ReconcileCarryForwardLabels(ctx, 1, nil)
+	_, err = db.ReconcileCarryForwardLabels(ctx, testReconcileCheckpointer(db), 1, nil)
 	require.NoError(t, err)
 	_, err = db.UpdateConnectionLabels(ctx, first.ConnectionId, map[string]string{"account": "updated"})
 	require.NoError(t, err)
@@ -379,7 +379,7 @@ func TestToolMetadataReconciliation(t *testing.T) {
 	beforeDeleted := readToolRowForTest(t, ctx, db, deleted.Id)
 	beforeRetired := readToolRowForTest(t, ctx, db, retired.Id)
 	repairedAt := apctx.GetClock(ctx).Now().Add(time.Hour)
-	fixed, err := db.ReconcileCarryForwardLabels(apctx.WithFixedClock(ctx, repairedAt), 1, nil)
+	fixed, err := db.ReconcileCarryForwardLabels(apctx.WithFixedClock(ctx, repairedAt), testReconcileCheckpointer(db), 1, nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(len(tools)), fixed)
 	for _, tool := range tools {
@@ -403,7 +403,7 @@ func TestToolMetadataReconciliation(t *testing.T) {
 	}
 	require.Equal(t, beforeDeleted, readToolRowForTest(t, ctx, db, deleted.Id))
 	require.Equal(t, beforeRetired, readToolRowForTest(t, ctx, db, retired.Id))
-	fixed, err = db.ReconcileCarryForwardLabels(apctx.WithFixedClock(ctx, repairedAt.Add(time.Hour)), 1, nil)
+	fixed, err = db.ReconcileCarryForwardLabels(apctx.WithFixedClock(ctx, repairedAt.Add(time.Hour)), testReconcileCheckpointer(db), 1, nil)
 	require.NoError(t, err)
 	require.Zero(t, fixed)
 	for _, tool := range tools {

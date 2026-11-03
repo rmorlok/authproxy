@@ -27,6 +27,9 @@ const (
 	// keys may contain `/` and other characters not safe inside an HTTP
 	// header value alongside comma delimiters.
 	HeaderLabel = "X-AuthProxy-Label"
+	// HeaderSendEvidence reports AuthProxy's cumulative knowledge of target
+	// sends. Caller and upstream values are reserved and cannot override it.
+	HeaderSendEvidence = "X-AuthProxy-Send-Evidence"
 )
 
 // Canonical-form variants used for switch comparisons after we've already
@@ -36,8 +39,9 @@ const (
 // don't compare equal to a canonical-form name. Defining these privately
 // keeps the public API spelling intact.
 var (
-	headerUpstreamURLCanonical = http.CanonicalHeaderKey(HeaderUpstreamURL)
-	headerLabelCanonical       = http.CanonicalHeaderKey(HeaderLabel)
+	headerUpstreamURLCanonical  = http.CanonicalHeaderKey(HeaderUpstreamURL)
+	headerLabelCanonical        = http.CanonicalHeaderKey(HeaderLabel)
+	headerSendEvidenceCanonical = http.CanonicalHeaderKey(HeaderSendEvidence)
 )
 
 // proxyRaw is the streaming raw-proxy handler. Parses the inbound
@@ -49,7 +53,30 @@ var (
 // Bound on the same `connections:proxy` verb as the wrapped /_proxy
 // route — both are "make a proxied call as this connection".
 //
-//	ANY /connections/{id}/_proxyRaw
+// @Summary Stream a request through a connection
+// @Description Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.
+// @Tags proxy
+// @Param id path string true "Connection UUID"
+// @Param X-AuthProxy-Upstream-URL header string true "Absolute upstream http(s) URL"
+// @Param X-AuthProxy-Label header []string false "Repeated key=value request labels" collectionFormat(multi)
+// @Param request body string false "Raw upstream request body"
+// @Success 200 {string} string "Upstream response body; any upstream HTTP status is preserved"
+// @Success default {string} string "Upstream response with its original status and body"
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Failure 429 {string} string "Local rate limit or upstream response"
+// @Failure 500 {object} ErrorResponse
+// @Header all {string} X-AuthProxy-Send-Evidence "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+// @Security BearerAuth
+// @Router /connections/{id}/_proxyRaw [get]
+// @Router /connections/{id}/_proxyRaw [post]
+// @Router /connections/{id}/_proxyRaw [put]
+// @Router /connections/{id}/_proxyRaw [patch]
+// @Router /connections/{id}/_proxyRaw [delete]
+// @Router /connections/{id}/_proxyRaw [head]
+// @Router /connections/{id}/_proxyRaw [options]
 func (r *ConnectionsProxyRoutes) proxyRaw(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -103,7 +130,23 @@ func (r *ConnectionsProxyRoutes) proxyRaw(gctx *gin.Context) {
 		Labels:   parsed.labels,
 	}
 
-	if err := conn.ProxyRequestRaw(ctx, httpf.RequestTypeProxy, rawReq, gctx.Writer); err != nil {
+	// Early response headers can arrive while the target is still reading an
+	// upload. Disable HTTP/1's automatic request-body drain at response commit
+	// so it cannot consume bytes owned by the outgoing transport. HTTP/2 is
+	// already full duplex; test writers may not implement this capability.
+	if err := http.NewResponseController(gctx.Writer).EnableFullDuplex(); err != nil && !errors.Is(err, http.ErrNotSupported) {
+		apgin.WriteErr(gctx, r.logger, err)
+		return
+	}
+
+	// Only the writer passed to the proxy can settle dispatch at the first
+	// response write. Error/panic renderers use gctx.Writer directly, so they
+	// cannot mistake an interrupted attempt for a completed notSent result.
+	ctx, complete := beginProxyDispatch(gctx)
+	writer := &rawProxyDispatchWriter{ResponseWriter: gctx.Writer, complete: complete}
+	err = conn.ProxyRequestRaw(ctx, httpf.RequestTypeProxy, rawReq, writer)
+	complete()
+	if err != nil {
 		// If headers haven't been flushed yet we can still surface a
 		// JSON error; once they are on the wire we can only log.
 		if !gctx.Writer.Written() {
@@ -187,7 +230,7 @@ func copyInboundHeadersForRawProxy(dst, src http.Header) {
 		switch canon {
 		case "Authorization":
 			continue
-		case headerUpstreamURLCanonical, headerLabelCanonical:
+		case headerUpstreamURLCanonical, headerLabelCanonical, headerSendEvidenceCanonical:
 			continue
 		case "Host", "Content-Length":
 			continue

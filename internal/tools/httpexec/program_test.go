@@ -203,3 +203,85 @@ func TestCompileAuthoredCapsLeaveUnusedTransformLimitsOptional(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, program)
 }
+
+// TestErrorResultBoundsCapturedFailure checks admission failures without compiling
+// a Tool, including exact encoded boundaries and independently owned provenance.
+func TestErrorResultBoundsCapturedFailure(t *testing.T) {
+	invocation := executionInvocation()
+	invocation.Snapshot.ToolSetGeneration = util.ToPtr(uint64(3))
+	invocation.Snapshot.CatalogRevision = util.ToPtr(uint64(2))
+	invocation.Arguments = common.RawJSON(`invalid JSON is not evaluated here`)
+	// Configuration and parameters cannot leak into a local failure envelope.
+	invocation.Snapshot.Cfg = map[string]any{"secret": "configuration-value"}
+	invocation.Snapshot.Params = map[string]any{"private": "argument-value"}
+	result, err := httpexec.ErrorResult(context.Background(), invocation, 4096,
+		api.ToolExecutionStateNotStarted, "CONNECTION_UNAVAILABLE", "The connection is not ready for Tool execution.")
+	require.NoError(t, err)
+	require.NoError(t, result.Validate(nil))
+	requireExecutionFailure(t, result, "CONNECTION_UNAVAILABLE", api.ToolExecutionStateNotStarted)
+	require.Equal(t, uint64(3), *result.Metadata.ToolSetGeneration)
+	require.Equal(t, uint64(2), *result.Metadata.CatalogRevision)
+	encoded, err := json.Marshal(result)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "configuration-value")
+	require.NotContains(t, string(encoded), "argument-value")
+	*invocation.Snapshot.ToolSetGeneration = 9
+	*invocation.Snapshot.CatalogRevision = 8
+	require.Equal(t, uint64(3), *result.Metadata.ToolSetGeneration)
+	require.Equal(t, uint64(2), *result.Metadata.CatalogRevision)
+
+	// Measure the compact fallback, then use that exact allowance for a longer error.
+	fallback, err := httpexec.ErrorResult(context.Background(), invocation, 4096,
+		api.ToolExecutionStateNotStarted, "OUTPUT_TOO_LARGE", "The encoded Tool result exceeds the result byte limit.")
+	require.NoError(t, err)
+	encoded, err = json.Marshal(fallback)
+	require.NoError(t, err)
+	result, err = httpexec.ErrorResult(context.Background(), invocation, len(encoded),
+		api.ToolExecutionStateNotStarted, "CONNECTION_UNAVAILABLE", strings.Repeat("safe message ", 100))
+	require.NoError(t, err)
+	require.Equal(t, fallback, result)
+
+	// One byte less cannot fit the fallback; no partial result escapes.
+	result, err = httpexec.ErrorResult(context.Background(), invocation, len(encoded)-1,
+		api.ToolExecutionStateNotStarted, "CONNECTION_UNAVAILABLE", strings.Repeat("safe message ", 100))
+	require.ErrorIs(t, err, httpcodec.ErrEncodedResultLimit)
+	require.Nil(t, result)
+}
+
+// TestErrorResultRejectsInvalidInputs keeps the standalone error builder subject
+// to the same identity contract as execution, with cancellation taking priority.
+func TestErrorResultRejectsInvalidInputs(t *testing.T) {
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, test := range []struct {
+		name    string
+		ctx     context.Context
+		change  func(*httpexec.Invocation)
+		limit   int
+		state   api.ToolExecutionState
+		code    string
+		message string
+		want    error
+	}{
+		{name: "nil context", limit: 4096, want: httpexec.ErrInvalidInvocation},
+		{name: "cancelled invalid input", ctx: cancelled, limit: -1, want: context.Canceled},
+		{name: "zero budget", ctx: context.Background(), limit: 0, want: httpcodec.ErrEncodedResultLimit},
+		{name: "negative budget", ctx: context.Background(), limit: -1, want: httpcodec.ErrEncodedResultLimit},
+		{name: "invalid identity", ctx: context.Background(), limit: 4096, change: func(i *httpexec.Invocation) { i.ID = "invalid" }, want: httpexec.ErrInvalidInvocation},
+		{name: "zero revision", ctx: context.Background(), limit: 4096, change: func(i *httpexec.Invocation) { i.Snapshot.Revision = 0 }, want: httpexec.ErrInvalidInvocation},
+		{name: "invalid state", ctx: context.Background(), limit: 4096, state: "invalid", code: "FAILED", message: "Safe failure.", want: httpexec.ErrInvalidInvocation},
+		{name: "blank code", ctx: context.Background(), limit: 4096, state: api.ToolExecutionStateNotStarted, message: "Safe failure.", want: httpexec.ErrInvalidInvocation},
+		{name: "blank message", ctx: context.Background(), limit: 4096, state: api.ToolExecutionStateNotStarted, code: "FAILED", want: httpexec.ErrInvalidInvocation},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Reject the malformed internal input without returning a usable result.
+			invocation := executionInvocation()
+			if test.change != nil {
+				test.change(&invocation)
+			}
+			result, err := httpexec.ErrorResult(test.ctx, invocation, test.limit, test.state, test.code, test.message)
+			require.ErrorIs(t, err, test.want)
+			require.Nil(t, result)
+		})
+	}
+}

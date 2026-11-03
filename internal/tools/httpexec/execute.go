@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/schema/api"
@@ -24,6 +25,12 @@ var ErrInvalidInvocation = errors.New("invalid HTTP Tool invocation")
 // connection. This is an internal input, not an API request type.
 type Invocation struct {
 	ID string // Captured tiv_ correlation identity.
+
+	// Deadline carries the absolute policy deadline established during admission,
+	// so preparation time consumes the same allowance as execution. A zero value
+	// starts the timeout when Execute begins. The compiled timeout and any earlier
+	// caller deadline still apply; this value cannot extend either of them.
+	Deadline time.Time
 
 	// Arguments is the JSON object supplied by the Tool caller for this call.
 	// For a contact lookup, it might be {"id":"contact-42","limit":10}.
@@ -102,7 +109,7 @@ func (p *Program) Execute(
 	// the credentials to the request. Each request will have the appropriate
 	// labels, etc. It tracks whether any requests made to the 3rd party to
 	// allow us to understand if the tool might have applied to the 3rd party.
-	session, err := httphost.New(ctx, client, p.limits.HTTP)
+	session, err := httphost.NewWithDeadline(ctx, client, p.limits.HTTP, invocation.Deadline)
 	if err != nil {
 		return nil, err
 	}

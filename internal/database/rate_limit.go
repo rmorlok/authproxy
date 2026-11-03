@@ -591,6 +591,10 @@ type ListRateLimitsExecutor interface {
 type ListRateLimitsBuilder interface {
 	ListRateLimitsExecutor
 	Limit(int32) ListRateLimitsBuilder
+	// ResumeAfter pages in key order, continuing after a position taken from
+	// PageResult.Position; an empty position starts at the beginning. It cannot be
+	// combined with OrderBy.
+	ResumeAfter(position string) ListRateLimitsBuilder
 	ForNamespaceMatcher(matcher string) ListRateLimitsBuilder
 	ForNamespaceMatchers(matchers []string) ListRateLimitsBuilder
 	ForName(name scommon.ResourceName) ListRateLimitsBuilder
@@ -600,16 +604,15 @@ type ListRateLimitsBuilder interface {
 }
 
 type listRateLimitsFilters struct {
-	s                 *service               `json:"-"`
-	LimitVal          uint64                 `json:"limit"`
-	Offset            uint64                 `json:"offset"`
-	NamespaceMatchers []string               `json:"namespaceMatchers,omitempty"`
-	NameVal           *scommon.ResourceName  `json:"name,omitempty"`
-	OrderByFieldVal   *RateLimitOrderByField `json:"orderByField"`
-	OrderByVal        *pagination.OrderBy    `json:"orderBy"`
-	IncludeDeletedVal bool                   `json:"includeDeleted,omitempty"`
-	LabelSelectorVal  *string                `json:"labelSelector,omitempty"`
-	Errors            *multierror.Error      `json:"-"`
+	s                 *service              `json:"-"`
+	NamespaceMatchers []string              `json:"namespaceMatchers,omitempty"`
+	NameVal           *scommon.ResourceName `json:"name,omitempty"`
+	IncludeDeletedVal bool                  `json:"includeDeleted,omitempty"`
+	LabelSelectorVal  *string               `json:"labelSelector,omitempty"`
+	Errors            *multierror.Error     `json:"-"`
+
+	// listPaging owns the page size, order and position. See listPaging.
+	listPaging[RateLimitOrderByField]
 }
 
 func (l *listRateLimitsFilters) addError(e error) ListRateLimitsBuilder {
@@ -618,7 +621,13 @@ func (l *listRateLimitsFilters) addError(e error) ListRateLimitsBuilder {
 }
 
 func (l *listRateLimitsFilters) Limit(limit int32) ListRateLimitsBuilder {
-	l.LimitVal = uint64(limit)
+	l.listPaging.setLimit(limit)
+	return l
+}
+
+// ResumeAfter selects key order, continuing after position.
+func (l *listRateLimitsFilters) ResumeAfter(position string) ListRateLimitsBuilder {
+	l.listPaging.resumeAfter(position)
 	return l
 }
 
@@ -649,8 +658,7 @@ func (l *listRateLimitsFilters) ForName(name scommon.ResourceName) ListRateLimit
 }
 
 func (l *listRateLimitsFilters) OrderBy(field RateLimitOrderByField, by pagination.OrderBy) ListRateLimitsBuilder {
-	l.OrderByFieldVal = &field
-	l.OrderByVal = &by
+	l.listPaging.setOrder(field, by)
 	return l
 }
 
@@ -689,10 +697,6 @@ func (l *listRateLimitsFilters) applyRestrictions(ctx context.Context) sq.Select
 		}
 	}
 
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
-	}
-
 	if !l.IncludeDeletedVal {
 		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
@@ -705,11 +709,7 @@ func (l *listRateLimitsFilters) applyRestrictions(ctx context.Context) sq.Select
 		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
-	if l.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
-	}
+	q = l.listPaging.apply(q, "id")
 
 	return q
 }
@@ -718,6 +718,10 @@ func (l *listRateLimitsFilters) fetchPage(ctx context.Context) pagination.PageRe
 	var err error
 
 	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[RateLimit]{Error: err}
+	}
+
+	if err = l.listPaging.validate(); err != nil {
 		return pagination.PageResult[RateLimit]{Error: err}
 	}
 
@@ -739,10 +743,9 @@ func (l *listRateLimitsFilters) fetchPage(ctx context.Context) pagination.PageRe
 		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + uint64(len(results)) - 1
+	page, hasMore, position := nextPage(&l.listPaging, results, func(r RateLimit) string { return string(r.Id) })
 
 	cursor := ""
-	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
@@ -751,9 +754,10 @@ func (l *listRateLimitsFilters) fetchPage(ctx context.Context) pagination.PageRe
 	}
 
 	return pagination.PageResult[RateLimit]{
-		HasMore: hasMore,
-		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
-		Cursor:  cursor,
+		HasMore:  hasMore,
+		Results:  page,
+		Cursor:   cursor,
+		Position: position,
 	}
 }
 
@@ -762,6 +766,9 @@ func (l *listRateLimitsFilters) FetchPage(ctx context.Context) pagination.PageRe
 }
 
 func (l *listRateLimitsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[RateLimit]) error {
+	// Key order keeps writes made during the walk from moving its position.
+	l.listPaging.startEnumerate()
+
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true
@@ -781,15 +788,13 @@ func (l *listRateLimitsFilters) Enumerate(ctx context.Context, callback paginati
 
 func (s *service) ListRateLimitsBuilder() ListRateLimitsBuilder {
 	return &listRateLimitsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 }
 
 func (s *service) ListRateLimitsFromCursor(ctx context.Context, cursor string) (ListRateLimitsExecutor, error) {
 	b := &listRateLimitsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 	return b.FromCursor(ctx, cursor)
 }

@@ -38,10 +38,14 @@ Integration tests use the `integration` build tag so they are excluded from `go 
 
 ### Proxy send evidence
 
-The wrapped proxy evidence suite uses real API HTTP listeners and an isolated,
-controllable upstream. It checks the JSON contract against independent upstream
+The wrapped and raw proxy evidence suites use real API HTTP listeners and an isolated,
+controllable upstream. They check the public contracts against independent upstream
 request recordings, including local rejections, transport failures, redirects,
-and concurrent requests. OAuth evidence scenarios additionally use the test
+and concurrent requests. Raw coverage checks the response header and unchanged
+error JSON, streaming header timing, truncation, and header/trailer spoofing.
+Response-first upload cases also verify complete request forwarding, byte counts,
+and captured bodies when response headers arrive before the upload finishes.
+OAuth evidence scenarios additionally use the test
 provider's separate token/resource recordings.
 
 After starting the infrastructure, run the focused suites against both database
@@ -50,17 +54,20 @@ providers from the repository root:
 ```bash
 AUTH_PROXY_TEST_DATABASE_PROVIDER=sqlite POSTGRES_TEST_PORT=5433 \
   go -C integration_tests test -tags integration -count=1 \
-  -run '^(TestWrappedProxySendEvidence_|TestProxySendEvidence_)' ./proxy ./oauth2
+  -run '^(TestWrappedProxySendEvidence_|TestRawProxySendEvidence_|TestProxySendEvidence_)' ./proxy ./oauth2
 AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres POSTGRES_TEST_PORT=5433 \
   go -C integration_tests test -tags integration -count=1 \
-  -run '^(TestWrappedProxySendEvidence_|TestProxySendEvidence_)' ./proxy ./oauth2
+  -run '^(TestWrappedProxySendEvidence_|TestRawProxySendEvidence_|TestProxySendEvidence_)' ./proxy ./oauth2
 ```
 
 See [wrapped scenario notes](proxy/wrapped_send_evidence_test.md) and
-[OAuth scenario notes](oauth2/proxy_send_evidence_test.md) for the assertions and
+[raw scenario notes](proxy/raw_send_evidence_test.md), plus
+[wrapped OAuth notes](oauth2/proxy_send_evidence_test.md) and
+[raw OAuth notes](oauth2/proxy_raw_send_evidence_test.md) for the assertions and
 limits. These tests run in the existing integration CI job. They do not call
 external third-party APIs. The shared upstream fixture lives in
-`helpers/controlled_upstream.go` and can also drive raw streaming scenarios.
+`helpers/controlled_upstream.go`; its channel gates make first-byte and in-flight
+assertions deterministic without arbitrary sleeps.
 
 The main database portion of the suite runs against either a fresh SQLite file
 or the PostgreSQL service above:

@@ -1357,6 +1357,1016 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "/connections/{id}/_proxyRaw": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            },
+            "options": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            },
+            "head": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Forward the request method and body to X-AuthProxy-Upstream-URL using the connection's credentials. The upstream status, body, ordinary headers and trailers are streamed back. X-AuthProxy-Send-Evidence is AuthProxy-owned: notSent means no target request was sent, mayHaveSent means a send is possible without a confirmed response, and sent means a target HTTP response was observed, regardless of its status. Evidence accumulates across redirects and credential recovery; OAuth token traffic is excluded. The header is fixed before streaming starts, including for empty responses, and later body errors cannot change it. It does not imply business success or safe retry. Ordinary authentication, validation and proxy errors also carry the header; older servers, global middleware, panic recovery or infrastructure failures may omit it. GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS, CONNECT and TRACE are accepted; CORS preflight may be handled by global middleware.",
+                "tags": [
+                    "proxy"
+                ],
+                "summary": "Stream a request through a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Absolute upstream http(s) URL",
+                        "name": "X-AuthProxy-Upstream-URL",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Repeated key=value request labels",
+                        "name": "X-AuthProxy-Label",
+                        "in": "header"
+                    },
+                    {
+                        "description": "Raw upstream request body",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Upstream response body; any upstream HTTP status is preserved",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Local rate limit or upstream response",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Upstream response with its original status and body",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "headers": {
+                            "X-AuthProxy-Send-Evidence": {
+                                "type": "string",
+                                "description": "notSent | mayHaveSent | sent; cumulative target-send evidence, fixed before the response body"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/connections/{id}/_reauth": {
             "post": {
                 "security": [

@@ -1,7 +1,13 @@
-# Pure Tool expressions
+# Tool JavaScript
 
-This package compiles a JavaScript expression once and evaluates it against a
-captured Tool invocation and prepared response data. For example, an HTTP Tool
+This package evaluates pure expressions and async JavaScript Tool functions.
+It reuses connector helper libraries and bounds initialization, execution, and
+JSON conversion with explicit limits. It installs no network or other I/O capabilities.
+
+## Pure expressions
+
+An expression is compiled once and evaluated against a captured Tool invocation
+and prepared response data. For example, an HTTP Tool
 can turn a provider's customer record into a smaller object:
 
 ```javascript
@@ -13,20 +19,21 @@ the expression. Evaluation provides native JavaScript copies of the input and
 returns a bounded JSON value. It does not send HTTP requests or produce the
 complete public `ToolResult` envelope.
 
-## Example
+### Example
 
 ```go
+limits := javascript.Limits{
+    MaxSourceBytes: 4096,
+    MaxInputBytes:  64 * 1024,
+    MaxOutputBytes: 16 * 1024,
+    MaxDepth:      32,
+    MaxNodes:      4096,
+    MaxStackDepth: 128,
+    Timeout:       100 * time.Millisecond,
+}
 program, err := javascript.CompileExpression(
     `({ customerId: response.body.id, tenant: context.cfg.tenant })`,
-    javascript.Limits{
-        MaxSourceBytes: 4096,
-        MaxInputBytes:  64 * 1024,
-        MaxOutputBytes: 16 * 1024,
-        MaxDepth:      32,
-        MaxNodes:      4096,
-        MaxStackDepth: 128,
-        Timeout:       100 * time.Millisecond,
-    },
+    limits,
 )
 if err != nil {
     return err
@@ -90,8 +97,132 @@ Only standard Goja language facilities are available. There is no `fetch`,
 timer, module loader, filesystem, process environment, or application logger.
 The [HTTP response mapper](../httpcodec/README.md#response-transforms) uses this
 runtime for `transformJavascript`, preparing the response object and converting
-the projection into a rich result. Asynchronous Tool entry points, connector
-helper libraries, `ToolError`, and `toolResult` remain separate work.
+the projection into a rich result. Expressions do not receive connector helper
+libraries. Tool entry points use the separate compilation path below.
+
+## Tool entry points and helper libraries
+
+A Tool script declares one top-level `async function execute`. It can call
+functions from the connector's compiled JavaScript library. For example, a
+connector can define a shared way to identify customer records:
+
+```javascript
+function customerKey(id) {
+    return cfg.tenant + ":" + id;
+}
+```
+
+A Tool uses that helper with its arguments and captured connection configuration:
+
+```javascript
+async function execute(params, context) {
+    return { customerKey: customerKey(params.customerId) };
+}
+```
+
+With `params.customerId` equal to `"customer-42"` and the connection's `tenant` set to
+`"acme"`, the returned promise resolves to `{ customerKey: "acme:customer-42" }`.
+Parameter names are the author's choice; invocation supplies arguments and
+context by position.
+
+Compile and check initialization using the same `limits` policy as above:
+
+```go
+library, err := apjs.CompileAndValidateLibrary(`
+    function customerKey(id) { return cfg.tenant + ":" + id; }
+`)
+if err != nil {
+    return err
+}
+tool, err := javascript.CompileTool(`
+    async function execute(params, context) {
+        return { customerKey: customerKey(params.customerId) };
+    }
+`, library, limits)
+if err != nil {
+    return err
+}
+if err := tool.Validate(ctx); err != nil {
+    return err
+}
+```
+
+`CompileTool` checks syntax, the entry-point declaration, reserved names, and
+the combined source size. It never runs authored code. `Validate` runs library
+initialization followed by Tool initialization in a fresh VM with no host
+capabilities or connection data. It checks that `execute` is still an async
+function after top-level code runs but does not call it; replacing the declaration
+with a synchronous function fails. Publication has no `cfg`, `params`, or other
+invocation values: helpers must read them inside functions called during
+evaluation. For example,
+`const prefix = "customer:"` is valid top-level initialization, while
+`const tenant = cfg.tenant` fails validation. A top-level `fetch(...)` also fails
+because validation has no fetch host. Authored top-level code can itself call
+other functions, so initialization is covered by cancellation, timeout, and
+stack limits. Unhandled Promise rejections during initialization fail validation;
+rejections caught before its Promise jobs finish are allowed. Evaluation checks
+this same initialization boundary before calling `execute`, so its body cannot
+recover from an initialization rejection.
+
+Tool code uses strict JavaScript. Connector libraries keep their existing syntax
+rules. Both reserve global host names such as `fetch`, `context`, `params`,
+`ToolError`, and `toolResult`; the library also reserves `execute`. Local helper
+variables may reuse these names. Legacy unbraced conditional declarations, such
+as `if (ok) function fetch() {}`, are rejected anywhere in a library because
+they can reach the global object. Host globals are frozen before initialization,
+including absent capabilities whose value is `undefined`. Host capabilities such
+as `fetch` are non-enumerable; existing captured input bindings remain enumerable.
+Tool, expression, and connector library parsing, including dynamic
+`eval`/`Function` parsing, do not load source maps.
+
+`Initialize(vm)` is the integration point for a future invocation host. That
+caller installs capabilities and copied input, owns a fresh VM on one goroutine,
+and keeps a deadline active through initialization and execution. The returned
+callable belongs to that VM. Initialization sets the stack cap but does not start
+its own timeout. Most callers should use `Evaluate` for the complete bounded
+lifecycle described below. The fetch adapter, `ToolError`/`toolResult` helpers,
+and invocation-service integration remain separate work.
+
+## Evaluate an async Tool
+
+`ToolProgram.Evaluate` calls `execute(params, context)` and converts its fulfilled
+native Promise result into JSON. The Tool and its called helpers share a private
+copy of the captured input. `await` and Promise chains can compose their results:
+
+```javascript
+async function execute(params, context) {
+    const key = await Promise.resolve(customerKey(params.customerId));
+    return { customerKey: key };
+}
+```
+
+With the compiled `tool` and captured `snapshot` from the examples above:
+
+```go
+result, err := tool.Evaluate(ctx, javascript.Input{Context: snapshot})
+if err != nil {
+    return err
+}
+```
+
+The fulfilled value becomes bounded JSON using the same rules as expressions.
+`Response` is optional and normally omitted for Tool functions. It is available
+for callers that already have prepared response data. Changing `params` or
+`context.cfg` changes only that evaluation's copy, including changes made by called
+helpers. Reusing a compiled Tool starts fresh each time.
+
+Evaluation fails if `execute` throws or rejects, or another Promise remains
+rejected without a handler when work finishes. Rejections that are caught before
+then are allowed. A Promise that remains pending with no host work capable of
+settling it fails immediately; for example, `await new Promise(() => {})` does
+not consume the whole timeout. A busy loop or endless Promise chain is interrupted
+by the timeout. Errors contain no thrown values, private input, or stack traces.
+
+Evaluation runs synchronously on one Goja goroutine. Goja drains Promise jobs
+when authored calls finish, which supports `await` and Promise chains that can
+settle without a network or timer host. All JavaScript execution and Promise
+callbacks stay on that goroutine. A rejection tracker records abandoned
+rejections and removes them when a handler is attached.
 
 ## Results and errors
 
@@ -132,7 +263,7 @@ recover digits that were already rounded.
 
 Failures return no partial output. Fixed error classifications distinguish
 invalid source, input, output, execution limits, and thrown JavaScript errors.
-Errors never contain expression source, thrown values, stack traces, private
+Errors never contain authored source, thrown values, stack traces, private
 configuration, or response data. Caller cancellation and deadlines remain Go
 context errors. The configured timeout returns `ErrLimitExceeded`, allowing an
 executor to report an execution-limit failure separately from a canceled
@@ -143,20 +274,25 @@ caller request. If both contexts have expired, the caller's error wins.
 Every limit must be positive. The caller resolves operator ceilings before
 compilation; this package supplies no unlimited defaults.
 
-- `MaxSourceBytes` bounds authored UTF-8 source before parsing.
+- `MaxSourceBytes` bounds authored UTF-8 source before parsing. For Tools, the
+  script and connector helper library share this allowance.
 - `MaxInputBytes` bounds the serialized snapshot and response together.
 - `MaxOutputBytes` bounds emitted JSON, including punctuation and escaping.
 - `MaxDepth` bounds nested JSON values, with the root at depth zero.
 - `MaxNodes` bounds JSON values and object property inspections. Combined input
   and output each receive this allowance; it is not a JavaScript instruction count.
 - `MaxStackDepth` bounds JavaScript function-call recursion.
-- `Timeout` covers binding input, evaluating the expression, and converting its
-  result. An earlier caller deadline wins.
+- `Timeout` covers input binding, initialization, execution, Promise settlement,
+  and result conversion during `Evaluate`, or only initialization during
+  `Validate`. An earlier caller deadline wins.
+
+The JSON input/output limits apply to expression and Tool evaluation; Tool
+validation receives no input and returns no result data.
 
 A watcher interrupts busy JavaScript loops on cancellation and is joined before
-evaluation returns. It uses only Goja's thread-safe interrupt method; all other
-runtime work stays on one goroutine. Fresh VMs prevent a late interrupt or a
-modified global from affecting the next call.
+evaluation or validation returns. It uses only Goja's thread-safe interrupt
+method; all other runtime work stays on one goroutine. Fresh VMs prevent a late
+interrupt or a modified global from affecting the next call.
 
 These limits bound processing for trusted administrator code. They do not make
 the in-process runtime a hard memory-isolated sandbox. Native Goja built-ins

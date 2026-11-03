@@ -7,12 +7,12 @@ import (
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 )
 
-// resolveLimits lowers operator policy with the definition's optional caps.
+// ResolveLimits lowers operator policy with the definition's optional caps.
 // It copies values without retaining authored pointers or changing either input.
 // Component compilers still validate the resolved policy: an authored cap cannot
 // repair a missing or invalid operator limit, and unused transform limits may
 // remain zero when the definition has no response transform.
-func resolveLimits(policy Limits, caps *toolschema.ExecutionLimits) (Limits, error) {
+func ResolveLimits(policy Limits, caps *toolschema.ExecutionLimits) (Limits, error) {
 	if err := caps.Validate(nil); err != nil {
 		return Limits{}, fmt.Errorf("HTTP Tool limits: %w", err)
 	}

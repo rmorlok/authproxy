@@ -26,6 +26,16 @@ type ControlledResponse struct {
 	// WaitFor gates the response after recording and notification. Cancellation
 	// also releases the handler, preventing cleanup from waiting indefinitely.
 	WaitFor <-chan struct{}
+	// FlushHeaders commits response headers before writing any body bytes.
+	FlushHeaders bool
+	// WaitForBody gates the first body write after headers are committed. Use
+	// with FlushHeaders to test header visibility on an open SSE response.
+	WaitForBody <-chan struct{}
+	// Trailers are declared before the response and supplied after its body.
+	Trailers http.Header
+	// LateTrailers use net/http's TrailerPrefix to send undeclared trailers.
+	// FlushHeaders must be true so they cannot become ordinary response headers.
+	LateTrailers http.Header
 }
 
 // ControlledRequest records independently observed upstream traffic. Body and
@@ -95,12 +105,31 @@ func NewControlledUpstream(t *testing.T) *ControlledUpstream {
 		if action.TruncateAfterHeaders {
 			w.Header().Set("Content-Length", strconv.Itoa(len(action.Body)+100))
 		}
+		for name := range action.Trailers {
+			w.Header().Add("Trailer", name)
+		}
 		status := action.Status
 		if status == 0 {
 			status = http.StatusOK
 		}
 		w.WriteHeader(status)
+		if action.FlushHeaders {
+			w.(http.Flusher).Flush()
+		}
+		if action.WaitForBody != nil {
+			select {
+			case <-action.WaitForBody:
+			case <-r.Context().Done():
+				return
+			}
+		}
 		_, _ = io.WriteString(w, action.Body)
+		for name, values := range action.Trailers {
+			w.Header()[name] = append([]string(nil), values...)
+		}
+		for name, values := range action.LateTrailers {
+			w.Header()[http.TrailerPrefix+name] = append([]string(nil), values...)
+		}
 	}))
 	t.Cleanup(u.server.Close)
 	return u
@@ -111,6 +140,8 @@ func (u *ControlledUpstream) Configure(path string, action ControlledResponse) {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	action.Headers = action.Headers.Clone()
+	action.Trailers = action.Trailers.Clone()
+	action.LateTrailers = action.LateTrailers.Clone()
 	u.actions[path] = action
 }
 
