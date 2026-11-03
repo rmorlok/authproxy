@@ -33,14 +33,21 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 		// the entry point. Goja drains Promise microtasks before calls return.
 		tracker := newPromiseTracker(vm)
 		defer tracker.close()
+
 		execute, err := p.Initialize(vm)
 		if err != nil {
 			return nil, err
 		}
+
 		if err := tracker.checkRejections(); err != nil {
 			return nil, err
 		}
-		value, err := execute(goja.Undefined(), vm.Get("params"), vm.Get("context"))
+
+		value, err := execute(
+			goja.Undefined(),
+			vm.Get("params"),
+			vm.Get("context"),
+		)
 		if err != nil {
 			return nil, runtimeEvaluationError(err)
 		}
@@ -50,6 +57,7 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 		if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
 			return nil, ErrEvaluation
 		}
+
 		return tracker.settledResult(value.Export().(*goja.Promise))
 	})
 }

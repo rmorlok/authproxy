@@ -28,8 +28,16 @@ func TestToolEvaluateCapturedInput(t *testing.T) {
 	generation, catalog := uint64(7), uint64(11)
 	input := javascript.Input{
 		Context: expressionContext(t, render.Input{
-			Params:              map[string]any{"name": "Ada", "count": 3},
-			Cfg:                 map[string]any{"tenant": "acme", "nested": map[string]any{"region": "us"}},
+			Params: map[string]any{
+				"name":  "Ada",
+				"count": 3,
+			},
+			Cfg: map[string]any{
+				"tenant": "acme",
+				"nested": map[string]any{
+					"region": "us",
+				},
+			},
 			Labels:              map[string]string{"team": "blue"},
 			Annotations:         map[string]string{"note": "captured"},
 			ConnectionID:        "cxn_example",
@@ -42,18 +50,25 @@ func TestToolEvaluateCapturedInput(t *testing.T) {
 		}),
 		Response: common.RawJSON(`{"status":200,"body":{"id":"contact-1"}}`),
 	}
+
 	// Publication initializes helpers without invocation data, so cfg is read only when called.
 	library, err := apjs.CompileAndValidateLibrary(`
 		let calls = 0;
 		function greet(name) { calls++; return name + "@" + cfg.tenant; }
 	`)
 	require.NoError(t, err)
+
 	program := compileTool(t, `
 		async function execute(args, snapshot) {
 			const result = {
-				greeting: greet(args.name), count: args.count, calls: calls,
-				connection: snapshot.connection, tool: snapshot.tool,
-				region: cfg.nested.region, label: labels.team, annotation: annotations.note,
+				greeting: greet(args.name), 
+                count: args.count, 
+                calls: calls,
+				connection: snapshot.connection, 
+                tool: snapshot.tool,
+				region: cfg.nested.region, 
+                label: labels.team, 
+                annotation: annotations.note,
 				responseID: response.body.id,
 				aliases: args === params && snapshot === context && cfg === context.cfg &&
 					labels === context.labels && annotations === context.annotations,
@@ -61,9 +76,14 @@ func TestToolEvaluateCapturedInput(t *testing.T) {
 				nativeObjects: Object.getPrototypeOf(args) === Object.prototype &&
 					Object.getPrototypeOf(cfg) === Object.prototype
 			};
-			args.name = "changed"; args.count = 99;
-			cfg.nested.region = "changed"; labels.team = "changed";
-			annotations.note = "changed"; response.body.id = "changed";
+
+			args.name = "changed"; 
+            args.count = 99;
+			cfg.nested.region = "changed"; 
+            labels.team = "changed";
+			annotations.note = "changed"; 
+            response.body.id = "changed";
+
 			return result;
 		}
 	`, library)
@@ -75,15 +95,33 @@ func TestToolEvaluateCapturedInput(t *testing.T) {
 	for range 2 {
 		result := evaluateTool(t, program, input)
 		require.JSONEq(t, `{
-			"greeting":"Ada@acme","count":3,"calls":1,
-			"connection":{"id":"cxn_example","namespace":"root.product.owner"},
-			"tool":{"id":"tol_example","revision":9,"toolSetId":"tls_example","toolSetGeneration":7,"catalogRevision":11},
-			"region":"us","label":"blue","annotation":"captured","responseID":"contact-1",
-			"aliases":true,"paramsSeparate":true,"nativeObjects":true
+			"greeting": "Ada@acme",
+            "count": 3,
+            "calls": 1,
+			"connection": {
+              "id": "cxn_example",
+              "namespace": "root.product.owner"
+             },
+			"tool": {
+               "id": "tol_example",
+               "revision": 9,
+               "toolSetId": "tls_example",
+               "toolSetGeneration": 7,
+               "catalogRevision": 11
+            },
+			"region": "us",
+            "label": "blue",
+            "annotation": "captured",
+            "responseID": "contact-1",
+			"aliases": true,
+            "paramsSeparate": true,
+            "nativeObjects": true
 		}`, string(result))
+
 		// Mutating returned bytes also cannot affect a later invocation.
 		result[0] = 'x'
 	}
+
 	require.JSONEq(t, `{"status":200,"body":{"id":"contact-1"}}`, string(input.Response))
 }
 

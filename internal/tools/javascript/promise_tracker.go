@@ -23,7 +23,10 @@ func newPromiseTracker(vm *goja.Runtime) *promiseTracker {
 }
 
 // trackRejection records rejection state without inspecting private reasons.
-func (t *promiseTracker) trackRejection(_ *goja.Promise, operation goja.PromiseRejectionOperation) {
+func (t *promiseTracker) trackRejection(
+	_ *goja.Promise,
+	operation goja.PromiseRejectionOperation,
+) {
 	switch operation {
 	case goja.PromiseRejectionHandle:
 		t.unhandled--
@@ -48,9 +51,11 @@ func (t *promiseTracker) settledResult(root *goja.Promise) (goja.Value, error) {
 	if root.State() != goja.PromiseStateFulfilled {
 		return nil, ErrEvaluation
 	}
+
 	if err := t.checkRejections(); err != nil {
 		return nil, err
 	}
+
 	return root.Result(), nil
 }
 
