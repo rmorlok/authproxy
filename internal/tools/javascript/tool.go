@@ -50,7 +50,7 @@ var asyncFunctionPrototype = goja.MustCompile(
 type ToolProgram struct {
 	program *goja.Program // Strict Tool script, including its execute declaration.
 	library *apjs.Library // Immutable connector helpers, preserving connector syntax.
-	limits  Limits        // Captured policy for source, stack, and validation timeout.
+	limits  Limits        // Captured source, execution, and input/output policy.
 }
 
 // CompileTool compiles a script with exactly one top-level async, non-generator
@@ -180,9 +180,10 @@ func checkToolHostBindings(source string, strict, reserveExecute bool) error {
 // initialization checks that execute is still an async function afterward. This
 // catches replacement by a synchronous function or noncallable value; it is a
 // contract check, not a sandbox, so code that deliberately spoofs the prototype
-// is not detected. The caller must own a fresh runtime on one goroutine, install host capabilities and copied
-// inputs first, and keep cancellation/time limits active through initialization
-// and subsequent calls. Only Goja's Interrupt may run on another goroutine.
+// is not detected. The caller must own a fresh runtime on one goroutine, install
+// host capabilities and copied inputs first, and keep cancellation/time limits
+// active through initialization and subsequent calls. Only Goja's Interrupt may
+// run on another goroutine.
 // The returned callable belongs exclusively to vm and must not outlive it.
 //
 // Host bindings are made nonwritable and nonconfigurable before authored code
@@ -209,12 +210,19 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 		if value == nil {
 			value = goja.Undefined()
 		}
+		enumerable := goja.FLAG_FALSE
+		switch name {
+		case "params", "context", "response", "cfg", "labels", "annotations":
+			// Preserve the shared input binder's already-frozen properties;
+			// capabilities such as fetch retain their non-enumerable contract.
+			enumerable = goja.FLAG_NOT_SET
+		}
 		if err := vm.GlobalObject().DefineDataProperty(
 			name,
 			value,
 			goja.FLAG_FALSE, // writeable
 			goja.FLAG_FALSE, // configurable
-			goja.FLAG_FALSE, // enumerable
+			enumerable,
 		); err != nil {
 			return nil, ErrInvalidInput
 		}
@@ -249,33 +257,22 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // Validate checks top-level initialization in a fresh runtime under the Tool's
 // timeout and stack policy. It never supplies host capabilities, connection
 // values, or execute arguments, and never invokes the returned entry point.
-// A promise left rejected without a handler once initialization settles fails
-// validation, so async top-level work cannot hide an error or a capability use
-// that would become real I/O at invocation. Caller cancellation retains its
-// context error; policy expiry or stack exhaustion returns ErrLimitExceeded. Any
-// interrupt watcher is joined before returning, and no runtime or pending
-// authored state is reused by invocation.
+// Unhandled initialization rejections fail just as they do during evaluation;
+// this also catches unavailable capabilities used by async top-level work.
+// Helpers that need captured input must read it when called by execute.
+// Caller cancellation retains its context error; policy expiry or stack
+// exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
+// returning, and no runtime or pending authored state is reused by invocation.
 func (p *ToolProgram) Validate(ctx context.Context) error {
 	if p == nil || p.program == nil || ctx == nil {
 		return ErrInvalidInput
 	}
 	return withRuntime(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
-		// Track by promise because a handler attached later clears its rejection.
-		unhandled := make(map[*goja.Promise]struct{})
-		vm.SetPromiseRejectionTracker(func(promise *goja.Promise, operation goja.PromiseRejectionOperation) {
-			if operation == goja.PromiseRejectionReject {
-				unhandled[promise] = struct{}{}
-			} else {
-				delete(unhandled, promise)
-			}
-		})
-
+		tracker := newPromiseTracker(vm)
+		defer tracker.close()
 		if _, err := p.Initialize(vm); err != nil {
 			return err
 		}
-		if len(unhandled) != 0 {
-			return ErrEvaluation
-		}
-		return nil
+		return tracker.checkRejections()
 	})
 }

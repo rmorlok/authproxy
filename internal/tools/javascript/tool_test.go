@@ -225,6 +225,13 @@ func TestToolInitializationPreservesHostBindings(t *testing.T) {
 	vm := goja.New()
 	calls := 0
 	require.NoError(t, vm.Set("fetch", func() string { calls++; return "host-response" }))
+	// Mirror captured input bindings: they are already immutable and enumerable.
+	inputNames := []string{"params", "context", "response", "cfg", "labels", "annotations"}
+	for _, name := range inputNames {
+		require.NoError(t, vm.GlobalObject().DefineDataProperty(
+			name, vm.NewObject(), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE,
+		))
+	}
 	library := toolLibrary(t, `delete globalThis.fetch; globalThis.fetch = () => "replacement";`)
 	program := compileTool(t, `async function execute() { return fetch(); }`, library)
 
@@ -234,6 +241,12 @@ func TestToolInitializationPreservesHostBindings(t *testing.T) {
 	require.Zero(t, calls)
 	require.Equal(t, "host-response", toolValue(t, execute).String())
 	require.Equal(t, 1, calls)
+
+	// Capabilities stay hidden from enumeration; existing input visibility is preserved.
+	require.NotContains(t, vm.GlobalObject().Keys(), "fetch")
+	for _, name := range inputNames {
+		require.Contains(t, vm.GlobalObject().Keys(), name)
+	}
 
 	// Host globals are immutable before either helper or Tool initialization runs.
 	_, err = vm.RunString(`"use strict"; fetch = () => "replacement";`)
@@ -263,6 +276,46 @@ func TestToolValidationHasNoIOAndDoesNotCallEntrypoint(t *testing.T) {
 	program = compileTool(t, `async function execute() {} execute = 42;`, nil)
 	err = program.Validate(context.Background())
 	require.ErrorIs(t, err, javascript.ErrEvaluation)
+}
+
+// TestToolValidationTracksRejections checks initialization promises without invoking the entry point.
+func TestToolValidationTracksRejections(t *testing.T) {
+	for name, test := range map[string]struct {
+		source, library string
+		wantErr         error
+	}{
+		"tool rejection":          {`Promise.reject("private-rejection");`, "", javascript.ErrEvaluation},
+		"library rejection":       {"", `Promise.reject("private-rejection");`, javascript.ErrEvaluation},
+		"tool reaction throws":    {`Promise.resolve().then(() => { throw "private-rejection"; });`, "", javascript.ErrEvaluation},
+		"library reaction throws": {"", `Promise.resolve().then(() => { throw "private-rejection"; });`, javascript.ErrEvaluation},
+		"tool catches":            {`Promise.reject("private-rejection").catch(() => {});`, "", nil},
+		"library catches":         {"", `Promise.reject("private-rejection").catch(() => {});`, nil},
+		"tool catches in microtask": {`const failure = Promise.reject("private-rejection");
+			Promise.resolve().then(() => failure.catch(() => {}));`, "", nil},
+		"library catches in microtask": {"", `const failure = Promise.reject("private-rejection");
+			Promise.resolve().then(() => failure.catch(() => {}));`, nil},
+		"entry point stays uncalled": {"", "", nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Only initialization executes; calling this body would introduce an unhandled rejection.
+			source := test.source + `
+				async function execute() {
+					Promise.reject("private-entry-point-rejection");
+					throw new Error("private-entry-point-error");
+				}
+			`
+			program := compileTool(t, source, toolLibrary(t, test.library))
+			err := program.Validate(context.Background())
+
+			// Rejections handled by the end of initialization are accepted; abandoned ones fail safely.
+			if test.wantErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, test.wantErr)
+				require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+			}
+		})
+	}
 }
 
 // TestToolEntrypointMustRemainAsync rejects initialization that swaps out the declaration.

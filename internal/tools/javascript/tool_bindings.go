@@ -65,6 +65,6 @@ func hasReservedConditionalFunction(program *ast.Program) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
