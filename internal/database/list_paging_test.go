@@ -52,7 +52,8 @@ type keysetListing struct {
 	enumerate func(db DB) pagination.EnumerateFunc[string]
 	// resume walks after position.
 	resume func(db DB, position string) pagination.EnumerateFunc[string]
-	// ordered attempts a resume position together with an explicit order.
+	// ordered attempts a resume position together with an explicit order. It is
+	// nil for a listing that offers no order.
 	ordered func(ctx context.Context, db DB) error
 }
 
@@ -63,6 +64,17 @@ func keysetListings() []keysetListing {
 	encryptionKey := func(k Key) string { return string(k.Id) }
 	rateLimitKey := func(r RateLimit) string { return string(r.Id) }
 	actorKey := func(a *Actor) string { return string(a.Id) }
+	bindingKey := func(b ToolSetBindingListing) string { return string(b.ConnectionId) }
+
+	// toolSet is the parent the binding rows share, created with the first row of
+	// each fresh database.
+	var toolSet *ToolSet
+	bindings := func(db DB) ListToolSetBindingsBuilder {
+		return db.ListToolSetBindingsBuilder().
+			ForToolSetId(toolSet.Id).
+			ForToolSetNamespaceMatchers([]string{"root.**"}).
+			Limit(keysetPageSize)
+	}
 
 	return []keysetListing{
 		{
@@ -186,6 +198,42 @@ func keysetListings() []keysetListing {
 					FetchPage(ctx).Error
 			},
 		},
+		{
+			// One ToolSet's bindings, keyed by connection. Deleting the connection takes
+			// its binding out of the listing.
+			name: "toolset bindings",
+			seed: func(t *testing.T, ctx context.Context, db DB, i int) string {
+				if i == 0 {
+					toolSet = toolSetForDatabaseTest("root", "keyset-tools")
+					require.NoError(t, db.CreateToolSet(ctx, toolSet))
+
+					// Reload for the stored selector revision bindings are created at.
+					stored, err := db.GetToolSet(ctx, toolSet.Id)
+					require.NoError(t, err)
+					toolSet = stored
+				}
+				id := apid.New(apid.PrefixConnection)
+				require.NoError(t, db.CreateConnection(ctx, &Connection{
+					Id:                  id,
+					Namespace:           "root",
+					ConnectorId:         apid.New(apid.PrefixConnector),
+					ConnectorGeneration: 1,
+					State:               ConnectionStateConfigured,
+				}))
+				_, err := db.CreateToolSetBinding(ctx, toolSet.Id, id, toolSet.SelectorRevision)
+				require.NoError(t, err)
+				return string(id)
+			},
+			remove: func(ctx context.Context, db DB, key string) error {
+				return db.DeleteConnection(ctx, apid.ID(key))
+			},
+			enumerate: func(db DB) pagination.EnumerateFunc[string] {
+				return asKeys(bindings(db).Enumerate, bindingKey)
+			},
+			resume: func(db DB, position string) pagination.EnumerateFunc[string] {
+				return asKeys(bindings(db).ResumeAfter(position).Enumerate, bindingKey)
+			},
+		},
 	}
 }
 
@@ -284,6 +332,9 @@ func TestResumeAfterContinuesFromPosition(t *testing.T) {
 func TestResumeAfterRejectsExplicitOrder(t *testing.T) {
 	for _, listing := range keysetListings() {
 		t.Run(listing.name, func(t *testing.T) {
+			if listing.ordered == nil {
+				t.Skip("listing offers no order")
+			}
 			_, db := MustApplyBlankTestDbConfig(t, nil)
 
 			// A key position means nothing in another order, so the listing refuses to run.

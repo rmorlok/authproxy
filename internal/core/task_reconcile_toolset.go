@@ -263,7 +263,8 @@ func (s *service) reconcileToolSetConnection(
 // reconcileToolSetRemovals retires bindings whose connection no longer matches,
 // along with their generated Tools. Storage rechecks membership against the
 // captured selector revision, so a stale pass cannot remove a current binding.
-// Keyset paging keeps removals from shifting the listing while it runs.
+// The binding listing pages by connection ID, so removing bindings during the walk
+// cannot shift the rows after them out of reach.
 func (s *service) reconcileToolSetRemovals(
 	ctx context.Context,
 	membership *toolSetMembership,
