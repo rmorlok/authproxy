@@ -673,10 +673,6 @@ type ListActorsBuilder interface {
 
 type listActorsFilters struct {
 	s                 *service              `json:"-"`
-	LimitVal          uint64                `json:"limit"`
-	Offset            uint64                `json:"offset"`
-	OrderByFieldVal   *ActorOrderByField    `json:"orderByField"`
-	OrderByVal        *pagination.OrderBy   `json:"orderBy"`
 	IncludeDeletedVal bool                  `json:"includeDeleted,omitempty"`
 	ExternalIdVal     *string               `json:"externalId,omitempty"`
 	NameVal           *scommon.ResourceName `json:"name,omitempty"`
@@ -684,25 +680,24 @@ type listActorsFilters struct {
 	LabelSelectorVal  *string               `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error     `json:"-"`
 
-	// keysetWalk carries the key position of a key-ordered listing. See keysetWalk.
-	keysetWalk
+	// listPaging owns the page size, order and position. See listPaging.
+	listPaging[ActorOrderByField]
 }
 
 func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
-	l.LimitVal = uint64(limit)
+	l.listPaging.setLimit(limit)
 	return l
 }
 
 // ResumeAfter selects key order, continuing after position.
 func (l *listActorsFilters) ResumeAfter(position string) ListActorsBuilder {
-	l.keysetWalk.resumeAfter(position)
+	l.listPaging.resumeAfter(position)
 	return l
 }
 
 func (l *listActorsFilters) OrderBy(field ActorOrderByField, by pagination.OrderBy) ListActorsBuilder {
 	if IsValidActorOrderByField(field) {
-		l.OrderByFieldVal = &field
-		l.OrderByVal = &by
+		l.listPaging.setOrder(field, by)
 	}
 	return l
 }
@@ -785,13 +780,6 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
-	}
-
-	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
 	}
@@ -804,16 +792,10 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
-	if l.keysetWalk.Enabled {
-		q = l.keysetWalk.apply(q, "id")
-	} else if l.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("%s %s", string(*l.OrderByFieldVal), l.OrderByVal.String()))
-	} else {
-		// A stable default is required for cursor pagination. In particular, do
-		// not rely on the physical scan order, which can change when indexes are
-		// added or the query planner changes its plan.
-		q = q.OrderBy("created_at ASC", "id ASC")
-	}
+	// A stable default is required for cursor pagination. In particular, do
+	// not rely on the physical scan order, which can change when indexes are
+	// added or the query planner changes its plan.
+	q = l.listPaging.apply(q, "id", "created_at ASC", "id ASC")
 
 	return q
 }
@@ -825,7 +807,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 		return pagination.PageResult[*Actor]{Error: err}
 	}
 
-	if err = l.keysetWalk.validate(l.OrderByFieldVal != nil); err != nil {
+	if err = l.listPaging.validate(); err != nil {
 		return pagination.PageResult[*Actor]{Error: err}
 	}
 
@@ -847,15 +829,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 		results = append(results, &r)
 	}
 
-	hasMore := uint64(len(results)) > l.LimitVal
-	page := results[:util.MinUint64(l.LimitVal, uint64(len(results)))]
-
-	position := ""
-	if l.keysetWalk.Enabled {
-		position = advanceKeyset(&l.keysetWalk, page, func(a *Actor) string { return string(a.Id) })
-	} else {
-		l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
-	}
+	page, hasMore, position := nextPage(&l.listPaging, results, func(a *Actor) string { return string(a.Id) })
 
 	cursor := ""
 	if hasMore {
@@ -879,7 +853,7 @@ func (l *listActorsFilters) FetchPage(ctx context.Context) pagination.PageResult
 
 func (l *listActorsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[*Actor]) error {
 	// Key order keeps writes made during the walk from moving its position.
-	l.keysetWalk.enableForEnumerate(l.Offset, l.OrderByFieldVal != nil)
+	l.listPaging.startEnumerate()
 
 	var err error
 	keepGoing := pagination.Continue
@@ -900,15 +874,13 @@ func (l *listActorsFilters) Enumerate(ctx context.Context, callback pagination.E
 
 func (s *service) ListActorsBuilder() ListActorsBuilder {
 	return &listActorsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 }
 
 func (s *service) ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	b := &listActorsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 
 	return b.FromCursor(ctx, cursor)

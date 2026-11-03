@@ -2,10 +2,12 @@ package database
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -385,5 +387,136 @@ func TestKeysetListingModes(t *testing.T) {
 			})
 		require.NoError(t, err)
 		require.Equal(t, []apid.ID{second, first}, ids)
+	})
+}
+
+// TestListPaging covers listPaging's mode selection, the SQL it adds, and how
+// nextPage advances, without a database.
+func TestListPaging(t *testing.T) {
+	// toSql renders the paging that p adds to a bare select.
+	toSql := func(t *testing.T, p *listPaging[ConnectionOrderByField], defaultOrder ...string) (string, []any) {
+		sqlStr, args, err := p.apply(sq.Select("*").From("t"), "id", defaultOrder...).ToSql()
+		require.NoError(t, err)
+		return sqlStr, args
+	}
+	// key reads a row's key; the rows in these tests are their own keys.
+	key := func(s string) string { return s }
+
+	t.Run("offset mode uses the default order and page size", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+
+		// An unset limit becomes the default, fetched one row over.
+		sqlStr, _ := toSql(t, &p, "created_at ASC", "id ASC")
+		require.Equal(t, "SELECT * FROM t ORDER BY created_at ASC, id ASC LIMIT 101 OFFSET 0", sqlStr)
+		require.Equal(t, uint64(defaultListPageSize), p.LimitVal)
+	})
+
+	t.Run("offset mode uses the caller's order", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setLimit(2)
+		p.setOrder(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
+
+		// The caller's order replaces the default.
+		sqlStr, _ := toSql(t, &p, "created_at ASC", "id ASC")
+		require.Equal(t, "SELECT * FROM t ORDER BY created_at DESC LIMIT 3 OFFSET 0", sqlStr)
+	})
+
+	t.Run("offset mode advances by the rows returned", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setLimit(2)
+
+		// A full page plus the extra row reports more and moves past the page only.
+		page, hasMore, position := nextPage(&p, []string{"a", "b", "c"}, key)
+		require.Equal(t, []string{"a", "b"}, page)
+		require.True(t, hasMore)
+		require.Empty(t, position)
+		require.Equal(t, uint64(2), p.Offset)
+
+		// The next query skips the rows already returned.
+		sqlStr, _ := toSql(t, &p)
+		require.Equal(t, "SELECT * FROM t LIMIT 3 OFFSET 2", sqlStr)
+
+		// A short final page reports no more.
+		page, hasMore, _ = nextPage(&p, []string{"c"}, key)
+		require.Equal(t, []string{"c"}, page)
+		require.False(t, hasMore)
+		require.Equal(t, uint64(3), p.Offset)
+	})
+
+	t.Run("key mode pages after the position", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setLimit(2)
+		p.resumeAfter("")
+
+		// The first query starts at the beginning in key order, ignoring the default.
+		sqlStr, args := toSql(t, &p, "created_at ASC", "id ASC")
+		require.Equal(t, "SELECT * FROM t ORDER BY id ASC LIMIT 3", sqlStr)
+		require.Empty(t, args)
+
+		// The page moves the position to its last row rather than the offset.
+		page, hasMore, position := nextPage(&p, []string{"a", "b", "c"}, key)
+		require.Equal(t, []string{"a", "b"}, page)
+		require.True(t, hasMore)
+		require.Equal(t, "b", position)
+		require.Zero(t, p.Offset)
+
+		// The next query restricts to rows after the position.
+		sqlStr, args = toSql(t, &p)
+		require.Equal(t, "SELECT * FROM t WHERE id > ? ORDER BY id ASC LIMIT 3", sqlStr)
+		require.Equal(t, []any{"b"}, args)
+
+		// An empty page keeps reporting the last position.
+		_, hasMore, position = nextPage(&p, []string(nil), key)
+		require.False(t, hasMore)
+		require.Equal(t, "b", position)
+	})
+
+	t.Run("startEnumerate picks key mode only for a fresh unordered walk", func(t *testing.T) {
+		// A fresh listing with no order switches to key mode.
+		var fresh listPaging[ConnectionOrderByField]
+		fresh.startEnumerate()
+		require.True(t, fresh.Keyset)
+
+		// A caller-chosen order is kept.
+		var ordered listPaging[ConnectionOrderByField]
+		ordered.setOrder(ConnectionOrderByCreatedAt, pagination.OrderByAsc)
+		ordered.startEnumerate()
+		require.False(t, ordered.Keyset)
+
+		// A listing partway through its pages by offset stays offset paged.
+		resumed := listPaging[ConnectionOrderByField]{Offset: 10}
+		resumed.startEnumerate()
+		require.False(t, resumed.Keyset)
+	})
+
+	t.Run("validate rejects key mode with a caller-chosen order", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setOrder(ConnectionOrderByCreatedAt, pagination.OrderByAsc)
+		require.NoError(t, p.validate())
+
+		// Adding a position to an ordered listing is rejected.
+		p.resumeAfter("b")
+		require.ErrorIs(t, p.validate(), ErrInvalidListQuery)
+	})
+
+	t.Run("embedded fields encode at the top level of the cursor", func(t *testing.T) {
+		var filters listConnectionsFilters
+		filters.setLimit(5)
+		filters.resumeAfter("b")
+
+		// The paging fields sit beside the listing's own filters, not under a nested key.
+		encoded, err := json.Marshal(&filters)
+		require.NoError(t, err)
+		var fields map[string]any
+		require.NoError(t, json.Unmarshal(encoded, &fields))
+		require.Equal(t, float64(5), fields["limit"])
+		require.Equal(t, true, fields["keyset"])
+		require.Equal(t, "b", fields["afterKey"])
+		require.NotContains(t, fields, "listPaging")
+
+		// Decoding restores the same paging state.
+		var decoded listConnectionsFilters
+		require.NoError(t, json.Unmarshal(encoded, &decoded))
+		require.Equal(t, filters.listPaging, decoded.listPaging)
 	})
 }

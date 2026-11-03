@@ -734,19 +734,15 @@ type ListKeysBuilder interface {
 
 type listKeysFilters struct {
 	s                 *service              `json:"-"`
-	LimitVal          uint64                `json:"limit"`
-	Offset            uint64                `json:"offset"`
 	StatesVal         []KeyState            `json:"states,omitempty"`
 	NamespaceMatchers []string              `json:"namespaceMatchers,omitempty"`
 	NameVal           *scommon.ResourceName `json:"name,omitempty"`
-	OrderByFieldVal   *KeyOrderByField      `json:"orderByField"`
-	OrderByVal        *pagination.OrderBy   `json:"orderBy"`
 	IncludeDeletedVal bool                  `json:"includeDeleted,omitempty"`
 	LabelSelectorVal  *string               `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error     `json:"-"`
 
-	// keysetWalk carries the key position of a key-ordered listing. See keysetWalk.
-	keysetWalk
+	// listPaging owns the page size, order and position. See listPaging.
+	listPaging[KeyOrderByField]
 }
 
 func (l *listKeysFilters) addError(e error) ListKeysBuilder {
@@ -755,13 +751,13 @@ func (l *listKeysFilters) addError(e error) ListKeysBuilder {
 }
 
 func (l *listKeysFilters) Limit(limit int32) ListKeysBuilder {
-	l.LimitVal = uint64(limit)
+	l.listPaging.setLimit(limit)
 	return l
 }
 
 // ResumeAfter selects key order, continuing after position.
 func (l *listKeysFilters) ResumeAfter(position string) ListKeysBuilder {
-	l.keysetWalk.resumeAfter(position)
+	l.listPaging.resumeAfter(position)
 	return l
 }
 
@@ -797,8 +793,7 @@ func (l *listKeysFilters) ForName(name scommon.ResourceName) ListKeysBuilder {
 }
 
 func (l *listKeysFilters) OrderBy(field KeyOrderByField, by pagination.OrderBy) ListKeysBuilder {
-	l.OrderByFieldVal = &field
-	l.OrderByVal = &by
+	l.listPaging.setOrder(field, by)
 	return l
 }
 
@@ -839,10 +834,6 @@ func (l *listKeysFilters) applyRestrictions(ctx context.Context) sq.SelectBuilde
 		}
 	}
 
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
-	}
-
 	if len(l.StatesVal) > 0 {
 		q = q.Where(sq.Eq{"state": l.StatesVal})
 	}
@@ -859,13 +850,7 @@ func (l *listKeysFilters) applyRestrictions(ctx context.Context) sq.SelectBuilde
 		q = q.Where(sq.Eq{"name": *l.NameVal})
 	}
 
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
-	if l.keysetWalk.Enabled {
-		q = l.keysetWalk.apply(q, "id")
-	} else if l.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
-	}
+	q = l.listPaging.apply(q, "id")
 
 	return q
 }
@@ -877,7 +862,7 @@ func (l *listKeysFilters) fetchPage(ctx context.Context) pagination.PageResult[K
 		return pagination.PageResult[Key]{Error: err}
 	}
 
-	if err = l.keysetWalk.validate(l.OrderByFieldVal != nil); err != nil {
+	if err = l.listPaging.validate(); err != nil {
 		return pagination.PageResult[Key]{Error: err}
 	}
 
@@ -899,15 +884,7 @@ func (l *listKeysFilters) fetchPage(ctx context.Context) pagination.PageResult[K
 		results = append(results, r)
 	}
 
-	hasMore := uint64(len(results)) > l.LimitVal
-	page := results[:util.MinUint64(l.LimitVal, uint64(len(results)))]
-
-	position := ""
-	if l.keysetWalk.Enabled {
-		position = advanceKeyset(&l.keysetWalk, page, func(k Key) string { return string(k.Id) })
-	} else {
-		l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
-	}
+	page, hasMore, position := nextPage(&l.listPaging, results, func(k Key) string { return string(k.Id) })
 
 	cursor := ""
 	if hasMore {
@@ -931,7 +908,7 @@ func (l *listKeysFilters) FetchPage(ctx context.Context) pagination.PageResult[K
 
 func (l *listKeysFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[Key]) error {
 	// Key order keeps writes made during the walk from moving its position.
-	l.keysetWalk.enableForEnumerate(l.Offset, l.OrderByFieldVal != nil)
+	l.listPaging.startEnumerate()
 
 	var err error
 	keepGoing := pagination.Continue
@@ -952,15 +929,13 @@ func (l *listKeysFilters) Enumerate(ctx context.Context, callback pagination.Enu
 
 func (s *service) ListKeysBuilder() ListKeysBuilder {
 	return &listKeysFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 }
 
 func (s *service) ListKeysFromCursor(ctx context.Context, cursor string) (ListKeysExecutor, error) {
 	b := &listKeysFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 
 	return b.FromCursor(ctx, cursor)
