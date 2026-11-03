@@ -28,7 +28,7 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 		return nil, ErrInvalidInput
 	}
 
-	return evaluateJSON(ctx, p.limits, input, func(vm *goja.Runtime) (goja.Value, error) {
+	return evaluateJSON(ctx, p.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
 		// Match publication validation by tracking initialization as well as
 		// the entry point. Goja drains Promise microtasks before calls return.
 		tracker := newPromiseTracker(vm)
@@ -43,21 +43,24 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 			return nil, err
 		}
 
-		value, err := execute(
-			goja.Undefined(),
-			vm.Get("params"),
-			vm.Get("context"),
-		)
+		root, err := callTool(vm, execute)
 		if err != nil {
-			return nil, runtimeEvaluationError(err)
+			return nil, err
 		}
-
-		// Check the native export type before Export: exporting an arbitrary
-		// authored object could traverse getters or allocate an unchecked graph.
-		if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
-			return nil, ErrEvaluation
-		}
-
-		return tracker.settledResult(value.Export().(*goja.Promise))
+		return tracker.settledResult(root)
 	})
+}
+
+// callTool invokes the initialized entry point and requires a native Promise.
+// Checking ExportType first avoids traversing an arbitrary returned object's
+// getters or allocating an unchecked graph while exporting it.
+func callTool(vm *goja.Runtime, execute goja.Callable) (*goja.Promise, error) {
+	value, err := execute(goja.Undefined(), vm.Get("params"), vm.Get("context"))
+	if err != nil {
+		return nil, runtimeEvaluationError(err)
+	}
+	if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
+		return nil, ErrEvaluation
+	}
+	return value.Export().(*goja.Promise), nil
 }
