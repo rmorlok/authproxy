@@ -64,6 +64,10 @@ func (s *service) CreateConnection(
 
 	connector := c.(*Connector)
 
+	// The new connection may already match ToolSets, which record a pending
+	// binding for it until setup completes.
+	s.enqueueConnectionToolSetReconcile(ctx, id)
+
 	logger.Info("created new connection",
 		"namespace", namespace,
 		"connector_id", c.GetId(),
@@ -128,6 +132,10 @@ func (s *service) UpdateConnection(
 		); err != nil {
 			return nil, err
 		}
+
+		// Labels decide ToolSet selection. The write has committed, so the pass is
+		// requested even if a later step of this update fails.
+		s.enqueueConnectionToolSetReconcile(ctx, id)
 	}
 	if patch.Metadata.Annotations != nil {
 		if _, err := s.db.UpdateConnectionAnnotations(

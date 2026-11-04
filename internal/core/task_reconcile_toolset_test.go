@@ -30,6 +30,7 @@ import (
 type toolSetReconcileTest struct {
 	ctx      context.Context
 	db       database.DB
+	encrypt  encrypt.E
 	service  *service
 	enqueued *[]*asynq.Task
 
@@ -49,7 +50,7 @@ func newToolSetReconcileTest(t *testing.T) *toolSetReconcileTest {
 	cfg, e := encrypt.NewTestEncryptService(cfg, db)
 
 	// Record every enqueued task so trigger tests can assert on them.
-	r := &toolSetReconcileTest{ctx: context.Background(), db: db, enqueued: &[]*asynq.Task{}}
+	r := &toolSetReconcileTest{ctx: context.Background(), db: db, encrypt: e, enqueued: &[]*asynq.Task{}}
 	ac := mock.NewMockClient(gomock.NewController(t))
 	ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
@@ -122,10 +123,23 @@ func (r *toolSetReconcileTest) toolSet(
 	templates ...toolsetschema.ToolTemplate,
 ) apid.ID {
 	t.Helper()
+	return r.toolSetIn(t, "root.team_a", name, state, templates...)
+}
+
+// toolSetIn creates a ToolSet like toolSet, owned by the supplied namespace and
+// selecting provider=calendar across that namespace's subtree.
+func (r *toolSetReconcileTest) toolSetIn(
+	t *testing.T,
+	namespace string,
+	name string,
+	state toolsetschema.ToolSetReleaseState,
+	templates ...toolsetschema.ToolTemplate,
+) apid.ID {
+	t.Helper()
 	created, err := r.service.CreateToolSet(r.ctx, &toolsetschema.ToolSet{
 		TypeMeta: meta.NewTypeMeta(toolsetschema.ToolSetKind),
 		Metadata: meta.ObjectMeta{
-			Namespace: "root.team_a",
+			Namespace: namespace,
 			Name:      scommon.ResourceName(name),
 		},
 		Spec: toolsetschema.ToolSetSpec{

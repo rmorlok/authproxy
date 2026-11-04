@@ -10,6 +10,7 @@ import (
 	"github.com/cschleiden/go-workflows/tester"
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apasynq"
+	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
@@ -41,10 +42,15 @@ func TestWorkflowDisconnectConnection(t *testing.T) {
 		encrypt := mockEncrypt.NewMockE(ctrl)
 		logger, _ := mockLog.NewTestLogger(t)
 
+		// Marking the connection disconnected requests a ToolSet membership pass.
+		ac := mockAsynq.NewMockClient(ctrl)
+		allowConnectionToolSetReconcile(ac)
+
 		return &service{
 			cfg:                 nil,
 			db:                  db,
 			encrypt:             encrypt,
+			ac:                  ac,
 			logger:              logger,
 			authMethodFactories: map[cschema.AuthType]auth_methods.Factory{},
 		}, db, encrypt, ctrl

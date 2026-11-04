@@ -292,7 +292,7 @@ func (s *service) reconcileToolSetRemovals(
 			func(page pagination.PageResult[database.ToolSetBindingListing]) (pagination.KeepGoing, error) {
 				for i := range page.Results {
 					binding := &page.Results[i]
-					if err := s.removeUnselectedToolSetBinding(ctx, membership, binding); err != nil {
+					if err := s.removeUnselectedToolSetBinding(ctx, membership, &binding.ToolSetBinding); err != nil {
 						failures.record(s, logical.Id, binding.ConnectionId, err)
 					}
 				}
@@ -306,7 +306,7 @@ func (s *service) reconcileToolSetRemovals(
 func (s *service) removeUnselectedToolSetBinding(
 	ctx context.Context,
 	membership *toolSetMembership,
-	binding *database.ToolSetBindingListing,
+	binding *database.ToolSetBinding,
 ) error {
 	connection, err := s.db.GetConnection(ctx, binding.ConnectionId)
 	if errors.Is(err, database.ErrNotFound) {

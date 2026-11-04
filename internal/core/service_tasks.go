@@ -16,6 +16,8 @@ func (s *service) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypeVerifyConnection, s.verifyConnection)
 	mux.HandleFunc(taskTypeProbeOutcomeCleanup, s.runProbeOutcomeCleanup)
 	mux.HandleFunc(taskTypeReconcileToolSet, s.reconcileToolSetTask)
+	mux.HandleFunc(taskTypeReconcileConnectionToolSets, s.reconcileConnectionToolSetsTask)
+	mux.HandleFunc(taskTypeSweepToolSets, s.sweepToolSetsTask)
 }
 
 func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
@@ -89,6 +91,13 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 			Cronspec: "@every 24h",
 		})
 	}
+
+	// Periodic ToolSet membership repair. It fans out one pass per live ToolSet,
+	// catching events that were missed or that no code path raises.
+	periodTasks = append(periodTasks, &asynq.PeriodicTaskConfig{
+		Task:     newSweepToolSetsTask(),
+		Cronspec: toolSetSweepCronspec,
+	})
 
 	return periodTasks
 }
