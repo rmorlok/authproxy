@@ -60,7 +60,11 @@ func newToolsTestSetup(t *testing.T) (*toolsTestSetup, map[string]*database.Conn
 	ctrl := gomock.NewController(t)
 	t.Cleanup(ctrl.Finish)
 
-	c := core.NewCoreService(cfg, db, e, rds, h, asynqmock.NewMockClient(ctrl), test_utils.NewTestLogger())
+	// ToolSet changes request background reconciliation, which these tests do not run.
+	ac := asynqmock.NewMockClient(ctrl)
+	ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	c := core.NewCoreService(cfg, db, e, rds, h, ac, test_utils.NewTestLogger())
 	require.NoError(t, c.Migrate(context.Background()))
 
 	r := apgin.ForTest(nil)

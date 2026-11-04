@@ -15,6 +15,7 @@ func (s *service) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypeProbe, s.runProbeForConnection)
 	mux.HandleFunc(taskTypeVerifyConnection, s.verifyConnection)
 	mux.HandleFunc(taskTypeProbeOutcomeCleanup, s.runProbeOutcomeCleanup)
+	mux.HandleFunc(taskTypeReconcileToolSet, s.reconcileToolSetTask)
 }
 
 func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {

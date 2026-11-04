@@ -215,8 +215,7 @@ func (s *service) resolveToolConnection(ctx context.Context, tool *toolschema.To
 
 // prepareToolDefinition validates and compiles the definition without
 // executing authored code or making requests, then serializes and encrypts it
-// for the Tool's namespace. The digest covers the canonical plaintext so it is
-// stable across randomized encryption and later key rotation.
+// for the Tool's namespace.
 func (s *service) prepareToolDefinition(ctx context.Context, tool *toolschema.Tool) (*preparedToolDefinition, error) {
 	definition := &tool.Spec.ToolDefinition
 	if err := compileToolDefinition(definition, "spec"); err != nil {
@@ -233,11 +232,17 @@ func (s *service) prepareToolDefinition(ctx context.Context, tool *toolschema.To
 		return nil, fmt.Errorf("failed to encrypt tool definition: %w", err)
 	}
 
-	digest := sha256.Sum256(plaintext)
 	return &preparedToolDefinition{
 		encrypted: encrypted,
-		digest:    hex.EncodeToString(digest[:]),
+		digest:    toolDefinitionDigest(plaintext),
 	}, nil
+}
+
+// toolDefinitionDigest hashes a definition's canonical plaintext, so the digest
+// stays stable across randomized encryption and later key rotation.
+func toolDefinitionDigest(plaintext []byte) string {
+	digest := sha256.Sum256(plaintext)
+	return hex.EncodeToString(digest[:])
 }
 
 // compileToolDefinition validates a Tool definition and compiles its executor

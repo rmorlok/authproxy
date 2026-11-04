@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 )
@@ -132,4 +133,73 @@ func TestListToolSetBindingsReportsInstallation(t *testing.T) {
 	require.Len(t, page.Results, 1)
 	require.NotNil(t, page.Results[0].AppliedGeneration)
 	require.Equal(t, fixture.request.Generation, *page.Results[0].AppliedGeneration)
+}
+
+// TestListToolSetBindingsForToolSet pages one ToolSet's assignments by connection
+// and keeps its position when bindings are removed between pages.
+func TestListToolSetBindingsForToolSet(t *testing.T) {
+	ctx, db, toolSet, connection := toolSetBindingParentsForTest(t)
+
+	// Bind three connections, the first being the shared fixture's.
+	connections := []*Connection{connection}
+	for _, name := range []string{"second", "third"} {
+		other := *connection
+		other.Id = apid.New(apid.PrefixConnection)
+		other.Name = common.ResourceName(name)
+		require.NoError(t, db.CreateConnection(ctx, &other))
+		connections = append(connections, &other)
+	}
+	for _, parent := range connections {
+		_, err := db.CreateToolSetBinding(ctx, toolSet.Id, parent.Id, toolSet.SelectorRevision)
+		require.NoError(t, err)
+	}
+
+	builder := db.ListToolSetBindingsBuilder().
+		ForToolSetId(toolSet.Id).
+		ForToolSetNamespaceMatchers([]string{toolSet.Namespace}).
+		Limit(1)
+
+	// The first page holds one binding and offers a continuation.
+	first := builder.FetchPage(ctx)
+	require.NoError(t, first.Error)
+	require.Len(t, first.Results, 1)
+	require.True(t, first.HasMore)
+
+	// Removing the listed binding must not make the next page skip a connection.
+	listed := first.Results[0]
+	_, err := db.UpdateConnectionLabels(ctx, listed.ConnectionId, map[string]string{"env": "staging"})
+	require.NoError(t, err)
+	require.NoError(t, db.DeleteToolSetBinding(ctx, listed.Id, listed.Epoch, toolSet.SelectorRevision))
+
+	// Continuing from the cursor visits both remaining connections exactly once.
+	// ID order follows the database's collation, so only membership is asserted.
+	resumed, err := db.ListToolSetBindingsFromCursor(ctx, first.Cursor)
+	require.NoError(t, err)
+	remaining := []apid.ID{}
+	require.NoError(t, resumed.Enumerate(ctx, func(page pagination.PageResult[ToolSetBindingListing]) (pagination.KeepGoing, error) {
+		for i := range page.Results {
+			remaining = append(remaining, page.Results[i].ConnectionId)
+		}
+		return pagination.Continue, nil
+	}))
+
+	expected := []apid.ID{}
+	for _, parent := range connections {
+		if parent.Id != listed.ConnectionId {
+			expected = append(expected, parent.Id)
+		}
+	}
+	require.ElementsMatch(t, expected, remaining)
+
+	// Choosing no parent, or both, is an invalid query.
+	neither := db.ListToolSetBindingsBuilder().
+		ForToolSetNamespaceMatchers([]string{"root.**"}).
+		FetchPage(ctx)
+	require.ErrorIs(t, neither.Error, ErrInvalidListQuery)
+	both := db.ListToolSetBindingsBuilder().
+		ForConnectionId(connection.Id).
+		ForToolSetId(toolSet.Id).
+		ForToolSetNamespaceMatchers([]string{"root.**"}).
+		FetchPage(ctx)
+	require.ErrorIs(t, both.Error, ErrInvalidListQuery)
 }
