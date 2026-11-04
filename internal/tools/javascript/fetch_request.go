@@ -26,26 +26,38 @@ import (
 // All VM access, including getters and Proxy traps, stays on the calling owner
 // goroutine. The host callback must use vm.Try to catch authored exceptions.
 // Returned errors contain no URL, header values, body, or authored diagnostics.
-func prepareFetchRequest(ctx context.Context, vm *goja.Runtime, call goja.FunctionCall, maxBytes int) (*http.Request, error) {
+func prepareFetchRequest(
+	ctx context.Context,
+	vm *goja.Runtime,
+	call goja.FunctionCall,
+	maxBytes int,
+) (*http.Request, error) {
 	if ctx == nil || vm == nil || maxBytes <= 0 || len(call.Arguments) > 2 {
 		return nil, ErrInvalidInput
 	}
-	budget := fetchRequestBudget{ctx: ctx, remaining: maxBytes}
+
+	budget := fetchRequestBudget{
+		ctx:       ctx,
+		remaining: maxBytes,
+	}
 	rawURL, err := budget.string(call.Argument(0))
 	if err != nil {
 		return nil, err
 	}
+
 	if !validFetchURL(rawURL) {
 		return nil, ErrInvalidInput
 	}
 
 	methodValue := vm.ToValue("GET")
 	var headersValue, bodyValue goja.Value
+
 	if initValue := call.Argument(1); !goja.IsUndefined(initValue) && !goja.IsNull(initValue) {
 		init, ok := initValue.(*goja.Object)
 		if !ok || init.ClassName() != "Object" || len(init.Symbols()) != 0 {
 			return nil, ErrInvalidInput
 		}
+
 		// Validate all names before evaluating getters so unsupported options
 		// cannot silently acquire a different meaning from browser fetch.
 		keys := init.GetOwnPropertyNames()
@@ -54,6 +66,7 @@ func prepareFetchRequest(ctx context.Context, vm *goja.Runtime, call goja.Functi
 				return nil, ErrInvalidInput
 			}
 		}
+
 		for _, key := range keys {
 			value := init.Get(key)
 			switch key {
@@ -68,32 +81,40 @@ func prepareFetchRequest(ctx context.Context, vm *goja.Runtime, call goja.Functi
 			}
 		}
 	}
+
 	method, err := budget.string(methodValue)
 	if err != nil {
 		return nil, err
 	}
+
 	if !tools.IsHTTPToken(method) {
 		return nil, ErrInvalidInput
 	}
+
 	headers, host, err := budget.headers(headersValue)
 	if err != nil {
 		return nil, err
 	}
+
 	body, err := budget.body(bodyValue)
 	if err != nil {
 		return nil, err
 	}
+
 	request, err := http.NewRequestWithContext(ctx, method, rawURL, body)
 	if err != nil {
 		return nil, ErrInvalidInput
 	}
+
 	request.Header = headers
 	if host != "" {
 		request.Host = host
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	return request, nil
 }
 
@@ -109,10 +130,13 @@ func (b *fetchRequestBudget) consume(size int) error {
 	if err := b.ctx.Err(); err != nil {
 		return err
 	}
+
 	if size > b.remaining {
 		return ErrLimitExceeded
 	}
+
 	b.remaining -= size
+
 	return nil
 }
 
@@ -124,9 +148,11 @@ func (b *fetchRequestBudget) string(value goja.Value) (string, error) {
 	if !ok {
 		return "", ErrInvalidInput
 	}
+
 	if s.Length() > b.remaining {
 		return "", ErrLimitExceeded
 	}
+
 	size := 0
 	for i := 0; i < s.Length(); i++ {
 		if err := b.ctx.Err(); err != nil {
@@ -149,13 +175,16 @@ func (b *fetchRequestBudget) string(value goja.Value) (string, error) {
 		default:
 			size += 3
 		}
+
 		if size > b.remaining {
 			return "", ErrLimitExceeded
 		}
 	}
+
 	if err := b.consume(size); err != nil {
 		return "", err
 	}
+
 	return s.String(), nil
 }
 
@@ -166,36 +195,56 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
 		return headers, "", nil
 	}
+
 	object, ok := value.(*goja.Object)
 	if !ok || object.ClassName() != "Object" || len(object.Symbols()) != 0 {
 		return nil, "", ErrInvalidInput
 	}
+
 	var host string
 	seen := make(map[string]bool)
+
 	for _, name := range object.Keys() {
 		if err := b.consume(len(name)); err != nil {
 			return nil, "", err
 		}
+
 		if !tools.IsHTTPToken(name) {
 			return nil, "", ErrInvalidInput
 		}
+
+		// Make sure header is capitalized in the standard way
 		canonical := http.CanonicalHeaderKey(name)
+
+		// Can't have the same header twice
 		if seen[canonical] {
 			return nil, "", ErrInvalidInput
 		}
 		seen[canonical] = true
+
 		switch canonical {
-		case "Content-Length", "Transfer-Encoding", "Trailer", "Trailers", "Connection", "Keep-Alive",
-			"Proxy-Authenticate", "Proxy-Authorization", "Te", "Upgrade":
+		case "Content-Length",
+			"Transfer-Encoding",
+			"Trailer",
+			"Trailers",
+			"Connection",
+			"Keep-Alive",
+			"Proxy-Authenticate",
+			"Proxy-Authorization",
+			"Te",
+			"Upgrade":
 			return nil, "", ErrInvalidInput
 		}
+
 		text, err := b.string(object.Get(name))
 		if err != nil {
 			return nil, "", err
 		}
+
 		if !httpguts.ValidHeaderFieldValue(text) {
 			return nil, "", ErrInvalidInput
 		}
+
 		if canonical == "Host" {
 			if !validFetchAuthority(text) {
 				return nil, "", ErrInvalidInput
@@ -205,6 +254,7 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 			headers.Set(canonical, text)
 		}
 	}
+
 	return headers, host, nil
 }
 
@@ -215,23 +265,29 @@ func (b *fetchRequestBudget) body(value goja.Value) (io.Reader, error) {
 	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
 		return nil, nil
 	}
+
 	if _, ok := value.(goja.String); ok {
 		text, err := b.string(value)
 		if err != nil {
 			return nil, err
 		}
+
 		return strings.NewReader(text), nil
 	}
+
 	if value.ExportType() != reflect.TypeFor[goja.ArrayBuffer]() {
 		return nil, ErrInvalidInput
 	}
+
 	buffer := value.Export().(goja.ArrayBuffer)
 	if buffer.Detached() {
 		return nil, ErrInvalidInput
 	}
+
 	if err := b.consume(len(buffer.Bytes())); err != nil {
 		return nil, err
 	}
+
 	return bytes.NewReader(bytes.Clone(buffer.Bytes())), nil
 }
 
@@ -244,8 +300,12 @@ func validFetchURL(raw string) bool {
 			return false
 		}
 	}
+
 	u, err := url.Parse(raw)
-	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Opaque == "" && validFetchAuthority(u.Host)
+	return err == nil &&
+		(u.Scheme == "http" || u.Scheme == "https") &&
+		u.Opaque == "" &&
+		validFetchAuthority(u.Host)
 }
 
 // validFetchAuthority applies net/url and net/http host validation to both
@@ -255,15 +315,18 @@ func validFetchAuthority(authority string) bool {
 	if authority == "" || strings.ContainsAny(authority, "/\\?#@") {
 		return false
 	}
+
 	u, err := url.Parse("http://" + authority)
 	if err != nil || u.Host != authority || u.Hostname() == "" {
 		return false
 	}
+
 	if port := u.Port(); port != "" {
 		if _, err := strconv.ParseUint(port, 10, 16); err != nil {
 			return false
 		}
 	}
+
 	ascii, err := httpguts.PunycodeHostPort(authority)
 	return err == nil && httpguts.ValidHostHeader(ascii)
 }

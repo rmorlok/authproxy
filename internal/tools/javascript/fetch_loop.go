@@ -38,15 +38,28 @@ type fetchLoop struct {
 
 // newFetchLoop captures pristine parsing and starts no work. Its caller closes
 // it before disposing the VM, including after an initialization failure.
-func newFetchLoop(ctx context.Context, vm *goja.Runtime, options FetchOptions, limits Limits) *fetchLoop {
+func newFetchLoop(
+	ctx context.Context,
+	vm *goja.Runtime,
+	options FetchOptions,
+	limits Limits,
+) *fetchLoop {
 	run, cancel := context.WithCancel(ctx)
+
 	parse, _ := goja.AssertFunction(vm.Get("JSON").ToObject(vm).Get("parse"))
+
 	if options.Logger == nil {
 		options.Logger = slog.Default()
 	}
+
 	return &fetchLoop{
-		ctx: run, cancel: cancel, vm: vm, options: options, limits: limits,
-		parseJSON: parse, pending: make(map[uint64]func(fetchCompletion) error),
+		ctx:       run,
+		cancel:    cancel,
+		vm:        vm,
+		options:   options,
+		limits:    limits,
+		parseJSON: parse,
+		pending:   make(map[uint64]func(fetchCompletion) error),
 		completed: make(chan fetchCompletion),
 	}
 }
@@ -61,13 +74,19 @@ func (l *fetchLoop) rejected(err error) goja.Value {
 
 // start reserves a worker slot before launching it. Work must capture Go data
 // only; convert and the Promise resolvers remain in the owner-only pending map.
-func (l *fetchLoop) start(work func() fetchCompletion, convert func(fetchCompletion) (goja.Value, error)) goja.Value {
+func (l *fetchLoop) start(
+	work func() fetchCompletion,
+	convert func(fetchCompletion) (goja.Value, error),
+) goja.Value {
 	if len(l.pending) >= l.options.MaxPendingOperations || l.ctx.Err() != nil {
 		return l.rejected(ErrLimitExceeded)
 	}
+
 	promise, resolve, reject := l.vm.NewPromise()
+
 	l.nextID++
 	id := l.nextID
+
 	l.pending[id] = func(done fetchCompletion) error {
 		value, err := convert(done)
 		if err != nil {
@@ -80,7 +99,9 @@ func (l *fetchLoop) start(work func() fetchCompletion, convert func(fetchComplet
 		}
 		return nil
 	}
+
 	go runFetchWorker(l.ctx, l.completed, l.options.Logger, id, work)
+
 	return l.vm.ToValue(promise)
 }
 
@@ -93,6 +114,7 @@ func (l *fetchLoop) settle(root *goja.Promise, tracker *promiseTracker) (goja.Va
 		if len(l.pending) == 0 {
 			return nil, ErrEvaluation
 		}
+
 		select {
 		case <-l.ctx.Done():
 			return nil, l.ctx.Err()
@@ -104,9 +126,11 @@ func (l *fetchLoop) settle(root *goja.Promise, tracker *promiseTracker) (goja.Va
 			}
 		}
 	}
+
 	if len(l.pending) != 0 {
 		return nil, ErrEvaluation
 	}
+
 	return tracker.settledResult(root)
 }
 
@@ -121,9 +145,20 @@ func (l *fetchLoop) close() {
 // runFetchWorker always reports a completion, including after panic or Goexit.
 // The unbuffered send transfers response ownership only to an active receiver;
 // a canceled/disposed owner cannot leave a body parked in an abandoned queue.
-func runFetchWorker(ctx context.Context, completed chan<- fetchCompletion, logger *slog.Logger, id uint64, work func() fetchCompletion) {
-	done := fetchCompletion{id: id, err: httphost.ErrTransport}
+func runFetchWorker(
+	ctx context.Context,
+	completed chan<- fetchCompletion,
+	logger *slog.Logger,
+	id uint64,
+	work func() fetchCompletion,
+) {
+	done := fetchCompletion{
+		id:  id,
+		err: httphost.ErrTransport,
+	}
+
 	returned := false
+
 	defer func() {
 		recovered := recover()
 		if !returned {
@@ -131,9 +166,15 @@ func runFetchWorker(ctx context.Context, completed chan<- fetchCompletion, logge
 			if recovered != nil {
 				kind = "panic"
 			}
-			logger.ErrorContext(ctx, "Tool fetch worker exited abnormally",
-				"kind", kind, "panic_type", fmt.Sprintf("%T", recovered), "stack", fetchWorkerStack())
+			logger.ErrorContext(
+				ctx,
+				"Tool fetch worker exited abnormally",
+				"kind", kind,
+				"panic_type", fmt.Sprintf("%T", recovered),
+				"stack", fetchWorkerStack(),
+			)
 		}
+
 		select {
 		case completed <- done:
 		case <-ctx.Done():
@@ -142,6 +183,7 @@ func runFetchWorker(ctx context.Context, completed chan<- fetchCompletion, logge
 			}
 		}
 	}()
+
 	done = work()
 	done.id = id
 	returned = true
@@ -167,9 +209,14 @@ func fetchWorkerStack() string {
 // Unexpected host errors never disclose their original text to authored code.
 func fetchErrorMessage(err error) string {
 	switch err {
-	case ErrInvalidInput, ErrLimitExceeded, httphost.ErrRequestLimit,
-		httphost.ErrResponseLimit, httphost.ErrStreamLimit, httphost.ErrHeaderLimit,
-		httphost.ErrEncoding, httphost.ErrCredentialsUnavailable:
+	case ErrInvalidInput,
+		ErrLimitExceeded,
+		httphost.ErrRequestLimit,
+		httphost.ErrResponseLimit,
+		httphost.ErrStreamLimit,
+		httphost.ErrHeaderLimit,
+		httphost.ErrEncoding,
+		httphost.ErrCredentialsUnavailable:
 		return err.Error()
 	default:
 		return "Tool fetch failed"

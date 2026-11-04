@@ -53,15 +53,21 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	input Input,
 	options FetchOptions,
 ) (common.RawJSON, error) {
-	if p == nil || p.program == nil || ctx == nil || options.Session == nil ||
-		options.Session.Context() == nil || options.MaxRequestBytes <= 0 ||
+	if p == nil ||
+		p.program == nil ||
+		ctx == nil ||
+		options.Session == nil ||
+		options.Session.Context() == nil ||
+		options.MaxRequestBytes <= 0 ||
 		options.MaxPendingOperations <= 0 {
 		return nil, ErrInvalidInput
 	}
+
 	// Closing the session synchronously gates late worker admission before the
 	// caller can sample send evidence. Canceling only a request context would
 	// leave a window while Session.Do's asynchronous cancellation hook runs.
 	defer options.Session.Close()
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -74,34 +80,47 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	parent, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(options.Session.Context(), cancel)
 	defer func() { stop(); cancel() }()
-	result, err := evaluateJSON(parent, p.limits, input, func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
-		loop := newFetchLoop(runCtx, vm, options, p.limits)
-		defer loop.close()
-		if err := vm.Set("fetch", loop.fetch); err != nil {
-			return nil, ErrInvalidInput
-		}
-		tracker := newPromiseTracker(vm)
-		defer tracker.close()
-		execute, err := p.Initialize(vm)
-		if err != nil {
-			return nil, err
-		}
-		if err := tracker.checkRejections(); err != nil {
-			return nil, err
-		}
-		loop.enabled = true
-		root, err := callTool(vm, execute)
-		if err != nil {
-			return nil, err
-		}
-		return loop.settle(root, tracker)
-	})
+
+	result, err := evaluateJSON(
+		parent,
+		p.limits,
+		input,
+		func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
+			loop := newFetchLoop(runCtx, vm, options, p.limits)
+			defer loop.close()
+
+			if err := vm.Set("fetch", loop.fetch); err != nil {
+				return nil, ErrInvalidInput
+			}
+
+			tracker := newPromiseTracker(vm)
+			defer tracker.close()
+
+			execute, err := p.Initialize(vm)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := tracker.checkRejections(); err != nil {
+				return nil, err
+			}
+
+			loop.enabled = true
+			root, err := callTool(vm, execute)
+
+			if err != nil {
+				return nil, err
+			}
+			return loop.settle(root, tracker)
+		},
+	)
 	if contextErr := ctx.Err(); contextErr != nil {
 		return nil, contextErr
 	}
 	if sessionErr := options.Session.Err(); sessionErr != nil {
 		return nil, sessionErr
 	}
+
 	return result, err
 }
 
