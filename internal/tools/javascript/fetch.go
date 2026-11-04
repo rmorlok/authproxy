@@ -43,9 +43,10 @@ type FetchOptions struct {
 // every exit without waiting for an uncooperative client or body. Inspect the
 // session's ExecutionState even on failure: cancellation cannot undo sends.
 //
-// A Tool must await its HTTP work. Finishing execute with outstanding operations
-// fails rather than reporting success while detached work may still run. A
-// pending root with no host work also fails. HTTP status errors resolve normally;
+// When execute settles, outstanding operations are canceled and late results
+// are discarded; they do not turn a successful race or caught failure into an
+// evaluation error. Already-observed unhandled rejections still fail. A pending
+// root with no host work also fails. HTTP status errors resolve normally;
 // transport/body errors reject with fixed messages. Caller cancellation takes
 // precedence over session failure, which takes precedence over runtime errors.
 func (p *ToolProgram) EvaluateWithHTTP(
@@ -53,6 +54,15 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	input Input,
 	options FetchOptions,
 ) (common.RawJSON, error) {
+	// Take ownership before checking any other input so rejected options do not
+	// leave an initialized session's timer running. A zero-value session has no
+	// context or timer and cannot be closed; reject it below without calling Close.
+	if options.Session != nil && options.Session.Context() != nil {
+		// Closing synchronously gates late admission before the caller can sample
+		// send evidence; request cancellation alone has an asynchronous handoff.
+		defer options.Session.Close()
+	}
+
 	if p == nil ||
 		p.program == nil ||
 		ctx == nil ||
@@ -62,11 +72,6 @@ func (p *ToolProgram) EvaluateWithHTTP(
 		options.MaxPendingOperations <= 0 {
 		return nil, ErrInvalidInput
 	}
-
-	// Closing the session synchronously gates late worker admission before the
-	// caller can sample send evidence. Canceling only a request context would
-	// leave a window while Session.Do's asynchronous cancellation hook runs.
-	defer options.Session.Close()
 
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -148,7 +153,7 @@ func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
 	// The worker captures only the session and detached request, never l or VM
 	// values. It can finish safely even after evaluation has disposed its runtime.
 	session := l.options.Session
-	return l.start(func() fetchCompletion {
+	promise, admitted := l.start(func() fetchCompletion {
 		response, err := session.Do(req)
 		return fetchCompletion{response: response, err: err}
 	}, func(done fetchCompletion) (goja.Value, error) {
@@ -157,4 +162,8 @@ func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
 		}
 		return l.responseValue(done.response)
 	})
+	if !admitted && req.Body != nil {
+		_ = req.Body.Close()
+	}
+	return promise
 }

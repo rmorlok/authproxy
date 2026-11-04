@@ -263,7 +263,7 @@ session, err := httphost.New(ctx, client, httphost.Limits{
 if err != nil {
     return err
 }
-defer session.Close() // Idempotent; also covers a rejected options configuration.
+defer session.Close() // Safe to repeat; evaluation also closes the session.
 
 result, err := tool.EvaluateWithHTTP(ctx, javascript.Input{Context: snapshot}, javascript.FetchOptions{
     Session:              session,
@@ -275,7 +275,8 @@ state := session.ExecutionState() // Inspect even when evaluation failed.
 ```
 
 Evaluation takes ownership of the dedicated session and closes it before
-returning. It cannot be reused. `ExecutionState` preserves cumulative send
+returning, including when arguments or options are invalid. It cannot be reused.
+`ExecutionState` preserves cumulative send
 evidence; cancellation or failure does not undo an earlier request. If a client
 ignores cancellation, an outstanding call remains conservatively uncertain.
 
@@ -284,10 +285,11 @@ The supported Fetch subset is explicit:
 | Surface | Behavior |
 | --- | --- |
 | `fetch(url, init)` | Absolute HTTP(S) URL string; optional own `method`, `headers`, and `body` fields. Unsupported fields are rejected. |
+| Request method | `DELETE`, `GET`, `HEAD`, `OPTIONS`, `POST`, and `PUT` are normalized to uppercase. `CONNECT`, `TRACE`, and `TRACK` are rejected regardless of case. Other methods retain their spelling. |
 | Request headers | Own enumerable string values. `Host` overrides the request host; framing and hop-by-hop headers remain transport-owned. |
 | Request body | String or `ArrayBuffer`, copied before dispatch. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
 | Response metadata | Read-only `status`, `ok`, `bodyUsed`, and `headers.get(name)`. Header lookup is case-insensitive and returns null for a missing or filtered header. |
-| Response body | Single-use async `text()`, `json()`, or `arrayBuffer()`. A second read rejects. Bodies are not read until one of these methods is called. |
+| Response body | Single-use async `text()`, `json()`, or `arrayBuffer()`. A second admitted read rejects. If worker admission is refused, `bodyUsed` stays false and the read can be retried after other work finishes. |
 
 There are no `Request`/`Headers` constructors, streaming readers, cloning,
 per-request abort signals, timers, or URL/text/base64 helpers in this slice.
@@ -303,9 +305,15 @@ exhausted session-wide response allowance or expired timeout.
 
 Fetch is disabled during initialization, including Promise jobs created while
 checking the entry point. Only `execute` and work it starts may send requests.
-Await all HTTP work before returning: a settled entry point with outstanding
-operations fails and cancels them. `Promise.all` supports parallel requests up to
-`MaxPendingOperations`; exceeding that cap rejects before launching a worker.
+When `execute` settles, remaining operations are canceled and their late results
+are discarded without running more JavaScript callbacks. This lets a caught
+`Promise.all` failure return a fallback, and lets `Promise.race` or `Promise.any`
+return a winner without waiting for other requests. Already-observed unhandled
+rejections still fail evaluation. Cancellation cannot undo an upstream effect;
+inspect `ExecutionState` even when the Tool returns successfully.
+
+Parallel requests share `MaxPendingOperations`; exceeding that cap rejects
+before launching a worker. Bodies are read only when a body method is admitted.
 `MaxRequestBytes` bounds each prepared request, while the session shares request
 count and decoded response allowances across the invocation.
 

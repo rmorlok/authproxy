@@ -74,12 +74,13 @@ func (l *fetchLoop) rejected(err error) goja.Value {
 
 // start reserves a worker slot before launching it. Work must capture Go data
 // only; convert and the Promise resolvers remain in the owner-only pending map.
+// The boolean reports worker admission, so a refused body read can stay unused.
 func (l *fetchLoop) start(
 	work func() fetchCompletion,
 	convert func(fetchCompletion) (goja.Value, error),
-) goja.Value {
+) (goja.Value, bool) {
 	if len(l.pending) >= l.options.MaxPendingOperations || l.ctx.Err() != nil {
-		return l.rejected(ErrLimitExceeded)
+		return l.rejected(ErrLimitExceeded), false
 	}
 
 	promise, resolve, reject := l.vm.NewPromise()
@@ -102,7 +103,7 @@ func (l *fetchLoop) start(
 
 	go runFetchWorker(l.ctx, l.completed, l.options.Logger, id, work)
 
-	return l.vm.ToValue(promise)
+	return l.vm.ToValue(promise), true
 }
 
 // settle drives host completions while execute is pending. Promise callbacks
@@ -127,10 +128,9 @@ func (l *fetchLoop) settle(root *goja.Promise, tracker *promiseTracker) (goja.Va
 		}
 	}
 
-	if len(l.pending) != 0 {
-		return nil, ErrEvaluation
-	}
-
+	// A caught fail-fast combinator or a winning race may leave siblings in
+	// flight. Root completion ends the Tool: deferred close cancels that work,
+	// and workers dispose late results without running more authored callbacks.
 	return tracker.settledResult(root)
 }
 

@@ -127,24 +127,67 @@ func fetchWait(t *testing.T, done <-chan struct{}) {
 func TestToolFetchOptionsRequirePositiveLimits(t *testing.T) {
 	program := compileTool(t, `async function execute() { return true; }`, nil)
 	input := fetchInput(t)
-	options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
-		return fetchResponse(http.StatusOK, http.NoBody), nil
-	}, fetchLimits())
 	for _, test := range []struct {
 		name   string
 		change func(*javascript.FetchOptions)
 	}{
 		{"session", func(o *javascript.FetchOptions) { o.Session = nil }},
+		{"uninitialized session", func(o *javascript.FetchOptions) { o.Session = &httphost.Session{} }},
 		{"request bytes", func(o *javascript.FetchOptions) { o.MaxRequestBytes = 0 }},
 		{"pending operations", func(o *javascript.FetchOptions) { o.MaxPendingOperations = 0 }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+				return fetchResponse(http.StatusOK, http.NoBody), nil
+			}, fetchLimits())
+			test.change(&options)
+
 			// Missing policy is an input error even when the source never calls fetch.
-			invalid := options
-			test.change(&invalid)
-			result, err := program.EvaluateWithHTTP(context.Background(), input, invalid)
+			result, err := program.EvaluateWithHTTP(context.Background(), input, options)
 			require.ErrorIs(t, err, javascript.ErrInvalidInput)
 			require.Nil(t, result)
+
+			// A valid transferred session is consumed even when another option is invalid.
+			if options.Session != nil && options.Session.Context() != nil {
+				require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			}
+		})
+	}
+}
+
+// TestToolFetchInvalidEvaluationClosesSession consumes a valid session on every early failure path.
+func TestToolFetchInvalidEvaluationClosesSession(t *testing.T) {
+	program := compileTool(t, `async function execute() { return true; }`, nil)
+	input := fetchInput(t)
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, test := range []struct {
+		name    string
+		program *javascript.ToolProgram
+		ctx     context.Context
+		input   javascript.Input
+		want    error
+	}{
+		{"nil program", nil, context.Background(), input, javascript.ErrInvalidInput},
+		{"uninitialized program", &javascript.ToolProgram{}, context.Background(), input, javascript.ErrInvalidInput},
+		{"nil context", program, nil, input, javascript.ErrInvalidInput},
+		{"invalid input", program, context.Background(), javascript.Input{}, javascript.ErrInvalidInput},
+		{"canceled context", program, canceled, input, context.Canceled},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var calls atomic.Int32
+			options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return fetchResponse(http.StatusOK, http.NoBody), nil
+			}, fetchLimits())
+
+			// Ownership transfers before validating the program, context, and captured input.
+			result, err := test.program.EvaluateWithHTTP(test.ctx, test.input, options)
+			require.ErrorIs(t, err, test.want)
+			require.Nil(t, result)
+			require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			require.Zero(t, calls.Load())
+			require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
 		})
 	}
 }
@@ -288,6 +331,35 @@ func TestToolFetchBodyIsSingleUse(t *testing.T) {
 			require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 		})
 	}
+}
+
+// TestToolFetchBodyReadCanRetryAfterPendingLimit leaves an unadmitted read unconsumed.
+func TestToolFetchBodyReadCanRetryAfterPendingLimit(t *testing.T) {
+	body := &fetchBody{reader: strings.NewReader("retained body")}
+	options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == "/body" {
+			return fetchResponse(http.StatusOK, body), nil
+		}
+		return fetchResponse(http.StatusOK, http.NoBody), nil
+	}, fetchLimits())
+	options.MaxPendingOperations = 1
+	program := compileTool(t, `async function execute() {
+		const response = await fetch("https://provider.example/body");
+		const other = fetch("https://provider.example/other");
+		let refused = false;
+		try { await response.text(); }
+		catch (err) { refused = err instanceof Error; }
+		const usedAfterRefusal = response.bodyUsed;
+		await other;
+		const text = await response.text();
+		return {refused, usedAfterRefusal, text, usedAfterRead: response.bodyUsed};
+	}`, nil)
+
+	// The other fetch occupies the only slot; refusing a reader must not claim its body.
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"refused":true,"usedAfterRefusal":false,"text":"retained body","usedAfterRead":true}`, string(result))
+	require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 }
 
 // TestToolFetchArrayBufferRequest transfers explicit bytes without serializing a Go object.
@@ -686,10 +758,10 @@ func TestToolFetchAbandonedRequestClosesLateBody(t *testing.T) {
 		return true;
 	}`, nil)
 
-	// A settled root cannot silently abandon an admitted operation or report complete success.
+	// A settled root preserves its result while cleanup cancels outstanding operations.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
-	require.Nil(t, result)
+	require.NoError(t, err)
+	require.JSONEq(t, `true`, string(result))
 	fetchWait(t, canceled)
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
@@ -697,6 +769,63 @@ func TestToolFetchAbandonedRequestClosesLateBody(t *testing.T) {
 	unblock()
 	require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 	require.Zero(t, body.reads.Load())
+}
+
+// TestToolFetchCombinatorsCancelRemainingRequests preserves authored early-settlement behavior.
+func TestToolFetchCombinatorsCancelRemainingRequests(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		source      string
+		winnerFails bool
+		want        string
+	}{
+		{"caught all failure", `
+			try { await Promise.all([fetch("https://provider.example/slow"), fetch("https://provider.example/winner")]); }
+			catch (err) { return {handled: err instanceof Error}; }
+		`, true, `{"handled":true}`},
+		{"race success", `
+			return (await Promise.race([fetch("https://provider.example/slow"), fetch("https://provider.example/winner")])).status;
+		`, false, `200`},
+		{"any success", `
+			return (await Promise.any([fetch("https://provider.example/slow"), fetch("https://provider.example/winner")])).status;
+		`, false, `200`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			started, canceled, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			var releaseOnce sync.Once
+			unblock := func() { releaseOnce.Do(func() { close(release) }) }
+			defer unblock()
+			body := &fetchBody{reader: strings.NewReader("late losing response")}
+			options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+				if request.URL.Path == "/slow" {
+					close(started)
+					<-request.Context().Done()
+					close(canceled)
+					<-release
+					return fetchResponse(http.StatusOK, body), nil
+				}
+				<-started
+				if test.winnerFails {
+					return nil, errors.New("private-winner-transport-failure")
+				}
+				return fetchResponse(http.StatusOK, http.NoBody), nil
+			}, fetchLimits())
+			program := compileTool(t, "async function execute() {"+test.source+"}", nil)
+
+			// The combinator settles while its losing request remains blocked in the transport.
+			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+			require.NoError(t, err)
+			require.JSONEq(t, test.want, string(result))
+			fetchWait(t, canceled)
+			require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
+
+			// Cleanup cancels without joining the loser and closes any body it returns later.
+			unblock()
+			require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
+			require.Zero(t, body.reads.Load())
+		})
+	}
 }
 
 // TestToolFetchAbnormalWorkerExit reports completion even when no transport result returns.

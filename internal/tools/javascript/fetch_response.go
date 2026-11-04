@@ -50,12 +50,11 @@ func (l *fetchLoop) responseValue(response *httphost.Response) (goja.Value, erro
 			if consumed {
 				return l.rejected(ErrInvalidInput)
 			}
-			consumed = true
 			// Session readers already enforce stream and aggregate decoded-byte
 			// limits. Read and close entirely off the VM goroutine; discard partial
 			// bytes on failure, including cancellation and malformed compression.
 			body := response.Body
-			return l.start(func() fetchCompletion {
+			promise, admitted := l.start(func() fetchCompletion {
 				defer body.Close()
 				data, err := io.ReadAll(body)
 				if err != nil {
@@ -68,6 +67,10 @@ func (l *fetchLoop) responseValue(response *httphost.Response) (goja.Value, erro
 				}
 				return l.decodeBody(format, done.body)
 			})
+			// A saturated worker allowance does not disturb an unread body. The
+			// caller can await other work and retry, without losing the response.
+			consumed = admitted
+			return promise
 		}
 		if err := fetchProperty(object, format, l.vm.ToValue(read)); err != nil {
 			return nil, err

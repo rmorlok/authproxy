@@ -20,6 +20,7 @@ import (
 // The URL must be a primitive absolute HTTP(S) string. The optional init object
 // supports only own method, headers, and body properties; headers use own
 // enumerable string properties, and body supports strings or native ArrayBuffers.
+// Methods follow Fetch normalization and its CONNECT/TRACE/TRACK exclusions.
 // JSON must be explicitly serialized by authored code. No credentials are added:
 // the connection's HTTP client retains final authentication precedence.
 //
@@ -89,6 +90,15 @@ func prepareFetchRequest(
 
 	if !tools.IsHTTPToken(method) {
 		return nil, ErrInvalidInput
+	}
+
+	// Fetch uppercases only these six methods; other valid tokens remain
+	// case-sensitive, including PATCH. Token validation makes this ASCII-only.
+	switch upper := strings.ToUpper(method); upper {
+	case "CONNECT", "TRACE", "TRACK":
+		return nil, ErrInvalidInput
+	case "DELETE", "GET", "HEAD", "OPTIONS", "POST", "PUT":
+		method = upper
 	}
 
 	headers, host, err := budget.headers(headersValue)

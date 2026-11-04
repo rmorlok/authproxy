@@ -100,6 +100,63 @@ func TestPrepareFetchRequestRecordSemantics(t *testing.T) {
 	}
 }
 
+// TestPrepareFetchRequestMethodNormalization applies Fetch's six-method rule while preserving other tokens.
+func TestPrepareFetchRequestMethodNormalization(t *testing.T) {
+	for _, test := range []struct {
+		authored string
+		want     string
+	}{
+		{"delete", "DELETE"},
+		{"DeLeTe", "DELETE"},
+		{"get", "GET"},
+		{"GeT", "GET"},
+		{"head", "HEAD"},
+		{"HeAd", "HEAD"},
+		{"options", "OPTIONS"},
+		{"OpTiOnS", "OPTIONS"},
+		{"post", "POST"},
+		{"PoSt", "POST"},
+		{"put", "PUT"},
+		{"PuT", "PUT"},
+		{"PATCH", "PATCH"},
+		{"patch", "patch"},
+		{"PaTcH", "PaTcH"},
+		{"Custom-Method", "Custom-Method"},
+	} {
+		t.Run(test.authored, func(t *testing.T) {
+			vm := goja.New()
+			call := fetchRequestCall(t, vm, `"https://example.test", {method: "`+test.authored+`"}`)
+
+			// Normalization changes the transmitted method, without changing its byte allowance.
+			request, err := prepareFetchRequest(context.Background(), vm, call, len("https://example.test")+len(test.authored))
+			require.NoError(t, err)
+			require.Equal(t, test.want, request.Method)
+		})
+	}
+}
+
+// TestPrepareFetchRequestForbiddenMethods rejects each Fetch-forbidden method regardless of case.
+func TestPrepareFetchRequestForbiddenMethods(t *testing.T) {
+	for _, method := range []string{
+		"CONNECT", "connect", "CoNnEcT",
+		"TRACE", "trace", "TrAcE",
+		"TRACK", "track", "TrAcK",
+	} {
+		t.Run(method, func(t *testing.T) {
+			vm := goja.New()
+			call := fetchRequestCall(t, vm, `"https://private.example.test", {
+				method: "`+method+`", headers: {get "X-Private"() {throw "private";}}
+			}`)
+
+			// Reject before copying header values or returning a request that could be dispatched.
+			request, err := prepareFetchRequest(context.Background(), vm, call, 1024)
+			require.ErrorIs(t, err, ErrInvalidInput)
+			require.NotContains(t, err.Error(), "private")
+			require.Nil(t, request)
+		})
+	}
+}
+
 // TestPrepareFetchRequestBounds charges all prepared fields and UTF-8 bytes together.
 func TestPrepareFetchRequestBounds(t *testing.T) {
 	for _, test := range []struct {
