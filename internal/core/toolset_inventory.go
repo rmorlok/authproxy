@@ -56,9 +56,12 @@ func newToolSetInstallPlan(
 		return nil, errToolSetSourceUnsupported
 	}
 
-	plan := &toolSetInstallPlan{generation: generation}
+	plan := &toolSetInstallPlan{
+		generation: generation,
+	}
 	for i := range definition.Source.Explicit.Tools {
 		template := &definition.Source.Explicit.Tools[i]
+
 		field := fmt.Sprintf("explicit.tools[%d].spec", i)
 		if err := compileToolDefinition(&template.Spec, field); err != nil {
 			return nil, err

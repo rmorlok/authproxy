@@ -48,11 +48,20 @@ func newReconcileToolSetTask(toolSetId apid.ID) (*asynq.Task, error) {
 func (s *service) enqueueToolSetReconcile(ctx context.Context, toolSetId apid.ID) {
 	task, err := newReconcileToolSetTask(toolSetId)
 	if err != nil {
-		s.logger.Error("failed to build toolset reconcile task", "toolset_id", toolSetId, "error", err)
+		s.logger.Error(
+			"failed to build toolset reconcile task",
+			"toolset_id", toolSetId,
+			"error", err,
+		)
 		return
 	}
+
 	if _, err := s.ac.EnqueueContext(ctx, task); err != nil {
-		s.logger.Error("failed to enqueue toolset reconcile task", "toolset_id", toolSetId, "error", err)
+		s.logger.Error(
+			"failed to enqueue toolset reconcile task",
+			"toolset_id", toolSetId,
+			"error", err,
+		)
 	}
 }
 
@@ -201,10 +210,12 @@ func (s *service) reconcileToolSetAdditions(
 				if !membership.selects(connection) {
 					continue
 				}
+
 				if err := s.reconcileToolSetConnection(ctx, membership, connection); err != nil {
 					failures.record(s, membership.logical.Id, connection.Id, err)
 				}
 			}
+
 			return pagination.Continue, ctx.Err()
 		},
 	)
@@ -304,6 +315,7 @@ func (s *service) removeUnselectedToolSetBinding(
 	if err != nil {
 		return err
 	}
+
 	if membership.selects(connection) {
 		return nil
 	}
@@ -313,6 +325,7 @@ func (s *service) removeUnselectedToolSetBinding(
 		errors.Is(err, database.ErrToolSetBindingMembershipConflict) {
 		return nil
 	}
+
 	return err
 }
 
@@ -325,7 +338,12 @@ type toolSetReconcileFailures struct {
 
 // record logs one connection's failure and adds it to the pass's total.
 func (f *toolSetReconcileFailures) record(s *service, toolSetId, connectionId apid.ID, err error) {
-	s.logger.Error("failed to reconcile toolset connection", "toolset_id", toolSetId, "connection_id", connectionId, "error", err)
+	s.logger.Error(
+		"failed to reconcile toolset connection",
+		"toolset_id", toolSetId,
+		"connection_id", connectionId,
+		"error", err,
+	)
 	f.count++
 	if f.first == nil {
 		f.first = err
