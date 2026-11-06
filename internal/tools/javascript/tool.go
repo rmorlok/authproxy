@@ -204,6 +204,7 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	if err != nil {
 		return nil, ErrInvalidInput
 	}
+	getPrototype, _ := goja.AssertFunction(vm.Get("Object").ToObject(vm).Get("getPrototypeOf"))
 
 	for _, name := range toolHostNames {
 		value := vm.Get(name)
@@ -242,12 +243,14 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 		return nil, ErrEvaluation
 	}
 
-	// A Proxy entry point can throw from its prototype trap; contain that here so
-	// the failure keeps its fixed classification instead of panicking the caller.
-	var async bool
-	if exception := vm.Try(func() {
-		async = entry.ToObject(vm).Prototype() == asyncPrototype.ToObject(vm)
-	}); exception != nil || !async {
+	// Calling the captured intrinsic also drains jobs created by a Proxy's
+	// prototype trap. Direct Object.Prototype access would leave those jobs
+	// queued until execute, after an invocation host has enabled network I/O.
+	prototype, err := getPrototype(goja.Undefined(), entry)
+	if err != nil {
+		return nil, runtimeEvaluationError(err)
+	}
+	if prototype != asyncPrototype {
 		return nil, ErrEvaluation
 	}
 

@@ -1,5 +1,6 @@
 // Package javascript evaluates trusted async Tool scripts and pure expressions
-// with native JavaScript copies of captured data. It installs no I/O capabilities.
+// with native JavaScript copies of captured data. I/O is available only when a
+// Tool caller explicitly supplies a captured connection's HTTP session.
 package javascript
 
 import (
@@ -153,7 +154,7 @@ func (e *Expression) Evaluate(
 		return nil, ErrInvalidInput
 	}
 
-	return evaluateJSON(ctx, e.limits, input, func(vm *goja.Runtime) (goja.Value, error) {
+	return evaluateJSON(ctx, e.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
 		value, err := vm.RunProgram(e.program)
 		if err != nil {
 			return nil, runtimeEvaluationError(err)

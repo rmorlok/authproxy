@@ -19,14 +19,14 @@ func evaluateJSON(
 	ctx context.Context,
 	limits Limits,
 	input Input,
-	run func(*goja.Runtime) (goja.Value, error),
+	run func(context.Context, *goja.Runtime) (goja.Value, error),
 ) (result common.RawJSON, err error) {
 	err = withRuntime(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) error {
 		encoder := newOutputEncoder(vm, limits)
 		if err := bindInput(runCtx, vm, input, limits); err != nil {
 			return err
 		}
-		value, err := run(vm)
+		value, err := run(runCtx, vm)
 		if err != nil {
 			return err
 		}

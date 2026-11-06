@@ -2,7 +2,9 @@
 
 This package evaluates pure expressions and async JavaScript Tool functions.
 It reuses connector helper libraries and bounds initialization, execution, and
-JSON conversion with explicit limits. It installs no network or other I/O capabilities.
+JSON conversion with explicit limits. Tools can opt into `fetch` through one
+captured connection's HTTP session. Pure expressions and ordinary Tool evaluation
+have no I/O capabilities.
 
 ## Pure expressions
 
@@ -179,9 +181,9 @@ Tool, expression, and connector library parsing, including dynamic
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start
-its own timeout. Most callers should use `Evaluate` for the complete bounded
-lifecycle described below. The fetch adapter, `ToolError`/`toolResult` helpers,
-and invocation-service integration remain separate work.
+its own timeout. Most callers should use `Evaluate` or `EvaluateWithHTTP` for the
+complete bounded lifecycle described below. `ToolError`/`toolResult` helpers and
+invocation-service integration remain separate work.
 
 ## Evaluate an async Tool
 
@@ -223,6 +225,105 @@ when authored calls finish, which supports `await` and Promise chains that can
 settle without a network or timer host. All JavaScript execution and Promise
 callbacks stay on that goroutine. A rejection tracker records abandoned
 rejections and removes them when a handler is attached.
+
+## Fetch through a connection
+
+`EvaluateWithHTTP` adds asynchronous `fetch` to Tool execution. For example,
+this Tool looks up a customer and updates that same customer's record:
+
+```javascript
+async function execute(params, context) {
+    const base = context.cfg.apiBase;
+    const lookup = await fetch(base + "/customers/" + encodeURIComponent(params.id));
+    if (!lookup.ok) return { updated: false, status: lookup.status };
+
+    const customer = await lookup.json();
+    const updated = await fetch(base + "/customers/" + encodeURIComponent(customer.id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: true })
+    });
+    return { updated: updated.ok, status: updated.status };
+}
+```
+
+Both requests use the session's captured connection and authentication. The
+caller authorizes the Tool and constructs the configured connection client
+before evaluation, as shown in [httphost](../httphost/README.md). Given that
+`client`, a compiled `tool`, and a captured `snapshot`:
+
+```go
+session, err := httphost.New(ctx, client, httphost.Limits{
+    Timeout:          30 * time.Second,
+    MaxRequests:      8,
+    MaxResponseBytes: 2 * 1024 * 1024,
+    MaxStreamBytes:   2 * 1024 * 1024,
+    MaxHeaderBytes:   32 * 1024,
+})
+if err != nil {
+    return err
+}
+defer session.Close() // Safe to repeat; evaluation also closes the session.
+
+result, err := tool.EvaluateWithHTTP(ctx, javascript.Input{Context: snapshot}, javascript.FetchOptions{
+    Session:              session,
+    MaxRequestBytes:      64 * 1024,
+    MaxPendingOperations: 4,
+    Logger:               logger,
+})
+state := session.ExecutionState() // Inspect even when evaluation failed.
+```
+
+Evaluation takes ownership of the dedicated session and closes it before
+returning, including when arguments or options are invalid. It cannot be reused.
+`ExecutionState` preserves cumulative send
+evidence; cancellation or failure does not undo an earlier request. If a client
+ignores cancellation, an outstanding call remains conservatively uncertain.
+
+The supported Fetch subset is explicit:
+
+| Surface | Behavior |
+| --- | --- |
+| `fetch(url, init)` | Absolute HTTP(S) URL string; optional own `method`, `headers`, and `body` fields. Unsupported fields are rejected. |
+| Request method | `DELETE`, `GET`, `HEAD`, `OPTIONS`, `POST`, and `PUT` are normalized to uppercase. `CONNECT`, `TRACE`, and `TRACK` are rejected regardless of case. Other methods retain their spelling. |
+| Request headers | Own enumerable string values. `Host` overrides the request host; framing and hop-by-hop headers remain transport-owned. |
+| Request body | String or `ArrayBuffer`, copied before dispatch. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
+| Response metadata | Read-only `status`, `ok`, `bodyUsed`, and `headers.get(name)`. Header lookup is case-insensitive and returns null for a missing or filtered header. |
+| Response body | Single-use async `text()`, `json()`, or `arrayBuffer()`. A second admitted read rejects. If worker admission is refused, `bodyUsed` stays false and the read can be retried after other work finishes. |
+
+There are no `Request`/`Headers` constructors, streaming readers, cloning,
+per-request abort signals, timers, or URL/text/base64 helpers in this slice.
+JSON parsing uses the captured native parser and the runtime's depth/node limits.
+Binary reads preserve bytes; text reads decode UTF-8 with replacement for invalid
+sequences. Known sensitive response headers are filtered by the HTTP session.
+
+Non-2xx statuses resolve normally so the Tool can inspect them without reading
+an unwanted body. Transport and body failures reject with fixed error messages;
+private upstream errors, URLs, and JavaScript stacks are never included. Catching
+a rejection can recover an individual request failure, but cannot restore an
+exhausted session-wide response allowance or expired timeout.
+
+Fetch is disabled during initialization, including Promise jobs created while
+checking the entry point. Only `execute` and work it starts may send requests.
+When `execute` settles, remaining operations are canceled and their late results
+are discarded without running more JavaScript callbacks. This lets a caught
+`Promise.all` failure return a fallback, and lets `Promise.race` or `Promise.any`
+return a winner without waiting for other requests. Already-observed unhandled
+rejections still fail evaluation. Cancellation cannot undo an upstream effect;
+inspect `ExecutionState` even when the Tool returns successfully.
+
+Parallel requests share `MaxPendingOperations`; exceeding that cap rejects
+before launching a worker. Bodies are read only when a body method is admitted.
+`MaxRequestBytes` bounds each prepared request, while the session shares request
+count and decoded response allowances across the invocation.
+
+HTTP workers exchange detached Go data with a single VM-owning goroutine.
+Cancellation interrupts busy JavaScript and pending I/O. Cleanup initiates body
+closure without waiting for an uncooperative transport; late workers cannot
+resume a disposed VM. Worker panics and `runtime.Goexit` produce a completion
+failure and a Go-side diagnostic with call locations, omitting the panic value
+and request/response data. This internal API is not yet wired to public Tool
+invocation or JavaScript Tool publication.
 
 ## Results and errors
 
