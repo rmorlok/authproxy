@@ -19,8 +19,8 @@ func evaluateTool(t *testing.T, program *javascript.ToolProgram, input javascrip
 	t.Helper()
 	result, err := program.Evaluate(context.Background(), input)
 	require.NoError(t, err)
-	require.True(t, json.Valid(result))
-	return result
+	require.True(t, json.Valid(result.StructuredContent))
+	return result.StructuredContent
 }
 
 // TestToolEvaluateCapturedInput exercises published helpers, entry-point arguments, and copied aliases together.

@@ -258,7 +258,7 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 }
 
 // Validate checks top-level initialization in a fresh runtime under the Tool's
-// timeout and stack policy. It never supplies host capabilities, connection
+// timeout and stack policy. It never supplies I/O capabilities, connection
 // values, or execute arguments, and never invokes the returned entry point.
 // Unhandled initialization rejections fail just as they do during evaluation;
 // this also catches unavailable capabilities used by async top-level work.
@@ -271,6 +271,9 @@ func (p *ToolProgram) Validate(ctx context.Context) error {
 		return ErrInvalidInput
 	}
 	return withRuntime(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
+		if _, err := newResultEncoder(vm, p.limits); err != nil {
+			return err
+		}
 		tracker := newPromiseTracker(vm)
 		defer tracker.close()
 		if _, err := p.Initialize(vm); err != nil {

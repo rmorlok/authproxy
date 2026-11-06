@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/dop251/goja"
-	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
@@ -53,7 +52,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	ctx context.Context,
 	input Input,
 	options FetchOptions,
-) (common.RawJSON, error) {
+) (*Result, error) {
 	// Take ownership before checking any other input so rejected options do not
 	// leave an initialized session's timer running. A zero-value session has no
 	// context or timer and cannot be closed; reject it below without calling Close.
@@ -86,7 +85,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	stop := context.AfterFunc(options.Session.Context(), cancel)
 	defer func() { stop(); cancel() }()
 
-	result, err := evaluateJSON(
+	result, err := evaluateResult(
 		parent,
 		p.limits,
 		input,
