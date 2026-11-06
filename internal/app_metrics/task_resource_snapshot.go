@@ -14,16 +14,25 @@ import (
 )
 
 const (
-	taskTypeResourceSnapshot  = "app_metrics:resource_snapshot"
+	taskTypeResourceSnapshot = "app_metrics:resource_snapshot"
+	// resourceSnapshotBatchSize is the default number of rows read and stored per page.
 	resourceSnapshotBatchSize = 1000
 )
 
 // ResourceSnapshotTaskHandler snapshots live resources into app_metrics storage.
+//
+// Each resource type is read with its listing's Enumerate, which walks in key order
+// (id, or path for namespaces) rather than by offset. A run therefore reads each row
+// once, and its cost grows linearly with the number of resources rather than with the
+// square of it.
 type ResourceSnapshotTaskHandler struct {
 	db     database.DB
 	store  ResourceSampleStore
 	cfg    *sconfig.AppMetrics
 	logger *slog.Logger
+	// batchSize is the number of rows read and stored per page. Zero selects
+	// resourceSnapshotBatchSize; tests lower it to span several pages.
+	batchSize int32
 }
 
 func NewResourceSnapshotTaskHandler(
@@ -143,11 +152,19 @@ func (h *ResourceSnapshotTaskHandler) SnapshotResources(ctx context.Context, at 
 	return nil
 }
 
+// pageSize returns the number of rows to read and store per page.
+func (h *ResourceSnapshotTaskHandler) pageSize() int32 {
+	if h.batchSize > 0 {
+		return h.batchSize
+	}
+	return resourceSnapshotBatchSize
+}
+
 func (h *ResourceSnapshotTaskHandler) snapshotConnections(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
 	err := h.db.ListConnectionsBuilder().
 		WithDeletedHandling(database.DeletedHandlingExclude).
-		Limit(resourceSnapshotBatchSize).
+		Limit(h.pageSize()).
 		Enumerate(ctx, func(page pagination.PageResult[database.Connection]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectionResourceSample, 0, len(page.Results))
 			for _, conn := range page.Results {
@@ -182,7 +199,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnections(ctx context.Context, s
 func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
 	err := h.db.ListConnectorsBuilder().
-		Limit(resourceSnapshotBatchSize).
+		Limit(h.pageSize()).
 		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectorResourceSample, 0, len(page.Results))
 			for _, connector := range page.Results {
@@ -215,7 +232,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectors(ctx context.Context, sa
 func (h *ResourceSnapshotTaskHandler) snapshotConnectorGenerations(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
 	err := h.db.ListConnectorGenerationsBuilder().
-		Limit(resourceSnapshotBatchSize).
+		Limit(h.pageSize()).
 		Enumerate(ctx, func(page pagination.PageResult[database.ConnectorWithDefinition]) (pagination.KeepGoing, error) {
 			samples := make([]*ConnectorGenerationResourceSample, 0, len(page.Results))
 			for _, connectorGeneration := range page.Results {
@@ -248,7 +265,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotConnectorGenerations(ctx context.C
 func (h *ResourceSnapshotTaskHandler) snapshotNamespaces(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
 	err := h.db.ListNamespacesBuilder().
-		Limit(resourceSnapshotBatchSize).
+		Limit(h.pageSize()).
 		Enumerate(ctx, func(page pagination.PageResult[database.Namespace]) (pagination.KeepGoing, error) {
 			samples := make([]*NamespaceResourceSample, 0, len(page.Results))
 			for _, ns := range page.Results {
@@ -280,7 +297,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotNamespaces(ctx context.Context, sa
 func (h *ResourceSnapshotTaskHandler) snapshotRateLimits(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
 	err := h.db.ListRateLimitsBuilder().
-		Limit(resourceSnapshotBatchSize).
+		Limit(h.pageSize()).
 		Enumerate(ctx, func(page pagination.PageResult[database.RateLimit]) (pagination.KeepGoing, error) {
 			samples := make([]*RateLimitResourceSample, 0, len(page.Results))
 			for _, rateLimit := range page.Results {
@@ -312,7 +329,7 @@ func (h *ResourceSnapshotTaskHandler) snapshotRateLimits(ctx context.Context, sa
 func (h *ResourceSnapshotTaskHandler) snapshotActors(ctx context.Context, sampledAt time.Time) (int, error) {
 	total := 0
 	err := h.db.ListActorsBuilder().
-		Limit(resourceSnapshotBatchSize).
+		Limit(h.pageSize()).
 		Enumerate(ctx, func(page pagination.PageResult[*database.Actor]) (pagination.KeepGoing, error) {
 			samples := make([]*ActorResourceSample, 0, len(page.Results))
 			for _, actor := range page.Results {

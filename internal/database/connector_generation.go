@@ -646,6 +646,10 @@ type ListConnectorGenerationsExecutor interface {
 type ListConnectorGenerationsBuilder interface {
 	ListConnectorGenerationsExecutor
 	Limit(int32) ListConnectorGenerationsBuilder
+	// ResumeAfter pages in key order (generation row id), continuing after a position
+	// taken from PageResult.Position; an empty position starts at the beginning. It
+	// cannot be combined with OrderBy.
+	ResumeAfter(position string) ListConnectorGenerationsBuilder
 	ForId(apid.ID) ListConnectorGenerationsBuilder
 	ForGeneration(uint64) ListConnectorGenerationsBuilder
 	ForState(ConnectorGenerationState) ListConnectorGenerationsBuilder
@@ -658,20 +662,23 @@ type ListConnectorGenerationsBuilder interface {
 	ForLabelSelector(selector string) ListConnectorGenerationsBuilder
 }
 
+// listConnectorGenerationsFilters is the state of a connector generation listing: its
+// filters and its paging. Each row is one generation joined with its connector. It is
+// serialized into encrypted cursors, so field JSON names are part of the cursor format.
 type listConnectorGenerationsFilters struct {
-	s                 *service                         `json:"-"`
-	LimitVal          uint64                           `json:"limit"`
-	Offset            uint64                           `json:"offset"`
-	StatesVal         []ConnectorGenerationState       `json:"states,omitempty"`
-	NamespaceMatchers []string                         `json:"namespaceMatchers,omitempty"`
-	IdsVal            []apid.ID                        `json:"ids,omitempty"`
-	GenerationsVal    []uint64                         `json:"generations,omitempty"`
-	NameVal           *scommon.ResourceName            `json:"name,omitempty"`
-	OrderByFieldVal   *ConnectorGenerationOrderByField `json:"orderByField"`
-	OrderByVal        *pagination.OrderBy              `json:"orderBy"`
-	IncludeDeletedVal bool                             `json:"includeDeleted,omitempty"`
-	LabelSelectorVal  *string                          `json:"labelSelector,omitempty"`
-	Errors            *multierror.Error                `json:"-"`
+	s                 *service                   `json:"-"`
+	StatesVal         []ConnectorGenerationState `json:"states,omitempty"`
+	NamespaceMatchers []string                   `json:"namespaceMatchers,omitempty"`
+	// IdsVal restricts to generations of these connectors.
+	IdsVal            []apid.ID             `json:"ids,omitempty"`
+	GenerationsVal    []uint64              `json:"generations,omitempty"`
+	NameVal           *scommon.ResourceName `json:"name,omitempty"`
+	IncludeDeletedVal bool                  `json:"includeDeleted,omitempty"`
+	LabelSelectorVal  *string               `json:"labelSelector,omitempty"`
+	Errors            *multierror.Error     `json:"-"`
+
+	// listPaging owns the page size, order and position. See listPaging.
+	listPaging[ConnectorGenerationOrderByField]
 }
 
 func (l *listConnectorGenerationsFilters) addError(e error) ListConnectorGenerationsBuilder {
@@ -680,7 +687,13 @@ func (l *listConnectorGenerationsFilters) addError(e error) ListConnectorGenerat
 }
 
 func (l *listConnectorGenerationsFilters) Limit(limit int32) ListConnectorGenerationsBuilder {
-	l.LimitVal = uint64(limit)
+	l.listPaging.setLimit(limit)
+	return l
+}
+
+// ResumeAfter selects key order by generation row id, continuing after position.
+func (l *listConnectorGenerationsFilters) ResumeAfter(position string) ListConnectorGenerationsBuilder {
+	l.listPaging.resumeAfter(position)
 	return l
 }
 
@@ -734,8 +747,7 @@ func (l *listConnectorGenerationsFilters) ForName(name scommon.ResourceName) Lis
 
 func (l *listConnectorGenerationsFilters) OrderBy(field ConnectorGenerationOrderByField, by pagination.OrderBy) ListConnectorGenerationsBuilder {
 	if IsValidConnectorGenerationOrderByField(field) {
-		l.OrderByFieldVal = &field
-		l.OrderByVal = &by
+		l.listPaging.setOrder(field, by)
 	}
 	return l
 }
@@ -776,10 +788,6 @@ func (l *listConnectorGenerationsFilters) applyRestrictions(ctx context.Context)
 		}
 	}
 
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
-	}
-
 	if len(l.IdsVal) > 0 {
 		q = q.Where(sq.Eq{"dv.connector_id": l.IdsVal})
 	}
@@ -804,34 +812,45 @@ func (l *listConnectorGenerationsFilters) applyRestrictions(ctx context.Context)
 		q = q.Where(sq.Eq{"c.deleted_at": nil, "dv.deleted_at": nil})
 	}
 
-	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
-	if l.OrderByFieldVal != nil {
-		orderCol := "dv." + string(*l.OrderByFieldVal)
-		if *l.OrderByFieldVal == ConnectorGenerationOrderById {
-			orderCol = "c.id"
-		}
-		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
-		if *l.OrderByFieldVal != ConnectorGenerationOrderById {
-			q = q.OrderBy(fmt.Sprintf("c.id %s", l.OrderByVal.String()))
-		}
-		if *l.OrderByFieldVal != ConnectorGenerationOrderByGeneration {
-			q = q.OrderBy(fmt.Sprintf("dv.generation %s", l.OrderByVal.String()))
-		}
-	}
+	// The key is the generation row's own id, which is unique and never changes.
+	q = l.listPaging.applyOrdered(q, "dv.id", connectorGenerationOrderClauses)
 
 	return q
+}
+
+// connectorGenerationOrderClauses maps a caller-chosen order field to ORDER BY
+// clauses over the generation listing's query, where dv is the generation and c its
+// connector. The id field means the connector id. Connector id and generation number
+// break ties, in the same direction, so the order is total.
+func connectorGenerationOrderClauses(field ConnectorGenerationOrderByField, direction string) []string {
+	orderCol := "dv." + string(field)
+	if field == ConnectorGenerationOrderById {
+		orderCol = "c.id"
+	}
+	clauses := []string{fmt.Sprintf("%s %s", orderCol, direction)}
+	if field != ConnectorGenerationOrderById {
+		clauses = append(clauses, fmt.Sprintf("c.id %s", direction))
+	}
+	if field != ConnectorGenerationOrderByGeneration {
+		clauses = append(clauses, fmt.Sprintf("dv.generation %s", direction))
+	}
+	return clauses
 }
 
 func (l *listConnectorGenerationsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorWithDefinition] {
 	var err error
 
+	if err = l.listPaging.validate(); err != nil {
+		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
+	}
+
+	// applyRestrictions can record label selector errors, so check them after it.
+	q := l.applyRestrictions(ctx)
 	if err = l.Errors.ErrorOrNil(); err != nil {
 		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 	}
 
-	rows, err := l.applyRestrictions(ctx).
+	rows, err := q.
 		RunWith(l.s.db).
 		Query()
 	if err != nil {
@@ -848,11 +867,15 @@ func (l *listConnectorGenerationsFilters) fetchPage(ctx context.Context) paginat
 		}
 		results = append(results, r)
 	}
+	if err = rows.Err(); err != nil {
+		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
+	}
 
-	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
+	page, hasMore, position := nextPage(&l.listPaging, results, func(r ConnectorWithDefinition) string {
+		return string(r.DefinitionGenerationId)
+	})
 
 	cursor := ""
-	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
@@ -861,9 +884,10 @@ func (l *listConnectorGenerationsFilters) fetchPage(ctx context.Context) paginat
 	}
 
 	return pagination.PageResult[ConnectorWithDefinition]{
-		HasMore: hasMore,
-		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
-		Cursor:  cursor,
+		HasMore:  hasMore,
+		Results:  page,
+		Cursor:   cursor,
+		Position: position,
 	}
 }
 
@@ -871,7 +895,13 @@ func (l *listConnectorGenerationsFilters) FetchPage(ctx context.Context) paginat
 	return l.fetchPage(ctx)
 }
 
+// Enumerate walks every page, calling callback for each. Unless the caller chose an
+// order or continued from an offset cursor, it walks in generation row id order, so
+// writes made during the walk, such as archiving the generations it visits, do not
+// make it skip or repeat generations.
 func (l *listConnectorGenerationsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[ConnectorWithDefinition]) error {
+	l.listPaging.startEnumerate()
+
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true
@@ -891,15 +921,13 @@ func (l *listConnectorGenerationsFilters) Enumerate(ctx context.Context, callbac
 
 func (s *service) ListConnectorGenerationsBuilder() ListConnectorGenerationsBuilder {
 	return &listConnectorGenerationsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 }
 
 func (s *service) ListConnectorGenerationsFromCursor(ctx context.Context, cursor string) (ListConnectorGenerationsExecutor, error) {
 	b := &listConnectorGenerationsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 
 	return b.FromCursor(ctx, cursor)

@@ -93,6 +93,22 @@ func (p *listPaging[F]) validate() error {
 // caller chose none, and skips Offset rows. defaultOrder may be empty, though a
 // listing without a stable order can repeat or skip rows across pages.
 func (p *listPaging[F]) apply(q sq.SelectBuilder, keyColumn string, defaultOrder ...string) sq.SelectBuilder {
+	return p.applyOrdered(q, keyColumn, func(field F, direction string) []string {
+		return []string{fmt.Sprintf("%s %s", string(field), direction)}
+	}, defaultOrder...)
+}
+
+// applyOrdered is apply for a listing whose order fields do not name a column of the
+// query directly, such as one that joins tables or orders by a computed expression.
+// In offset mode with a caller-chosen order, it orders by the clauses orderClauses
+// returns for the field and its direction ("ASC" or "DESC"), which may add
+// tie-breakers. Key mode and the default order behave as in apply.
+func (p *listPaging[F]) applyOrdered(
+	q sq.SelectBuilder,
+	keyColumn string,
+	orderClauses func(field F, direction string) []string,
+	defaultOrder ...string,
+) sq.SelectBuilder {
 	if p.LimitVal == 0 {
 		p.LimitVal = defaultListPageSize
 	}
@@ -106,7 +122,7 @@ func (p *listPaging[F]) apply(q sq.SelectBuilder, keyColumn string, defaultOrder
 	}
 
 	if p.OrderByFieldVal != nil {
-		q = q.OrderBy(fmt.Sprintf("%s %s", string(*p.OrderByFieldVal), p.OrderByVal.String()))
+		q = q.OrderBy(orderClauses(*p.OrderByFieldVal, p.OrderByVal.String())...)
 	} else if len(defaultOrder) > 0 {
 		q = q.OrderBy(defaultOrder...)
 	}
