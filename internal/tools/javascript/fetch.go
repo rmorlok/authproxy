@@ -139,12 +139,14 @@ func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
 	if len(l.pending) >= l.options.MaxPendingOperations {
 		return l.rejected(ErrLimitExceeded)
 	}
+
 	var req *http.Request
 	var err error
 	if exception := l.vm.Try(func() {
 		req, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes)
 	}); exception != nil {
 		return l.rejected(ErrInvalidInput)
+
 	}
 	if err != nil {
 		return l.rejected(err)
@@ -162,8 +164,10 @@ func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
 		}
 		return l.responseValue(done.response)
 	})
+
 	if !admitted && req.Body != nil {
 		_ = req.Body.Close()
 	}
+
 	return promise
 }
