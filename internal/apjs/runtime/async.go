@@ -76,6 +76,7 @@ func CompileAsync(
 	if err != nil {
 		return nil, err
 	}
+
 	// Reserve the optional built-in capability before source and library checks.
 	// Existing adapters may already include it in their host policy.
 	hasFetch := false
@@ -90,6 +91,7 @@ func CompileAsync(
 	if !hasFetch {
 		bindings = append(bindings, HostBinding{Name: "fetch"})
 	}
+
 	librarySource := ""
 	if library != nil {
 		librarySource = library.Source()

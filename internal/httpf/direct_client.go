@@ -41,16 +41,25 @@ type DirectClient struct {
 // the middleware stack. Client creation snapshots actor/user labels and keeps
 // the original factory reusable. Invalid options return a fixed safe error.
 func NewDirectClient(factory F, options DirectClientOptions) (*DirectClient, error) {
-	if factory == nil || options.Namespace == "" || options.RequestType.Validate() != nil {
+	if factory == nil ||
+		options.Namespace == "" ||
+		options.RequestType.Validate() != nil {
 		return nil, aphttp.ErrInvalidInput
 	}
-	client := factory.ForRequestInfo(RequestInfo{
-		Namespace: options.Namespace,
-		Type:      options.RequestType,
-	}).ForActor(options.Actor).ForLabels(options.Labels).NewHTTPClient()
+
+	client := factory.
+		ForRequestInfo(RequestInfo{
+			Namespace: options.Namespace,
+			Type:      options.RequestType,
+		}).
+		ForActor(options.Actor).
+		ForLabels(options.Labels).
+		NewHTTPClient()
+
 	if client == nil {
 		return nil, aphttp.ErrInvalidInput
 	}
+
 	return &DirectClient{client: client}, nil
 }
 
@@ -66,7 +75,9 @@ func (c *DirectClient) Do(req *http.Request) (*http.Response, aphttp.SendState, 
 		}
 		return nil, aphttp.SendStateNotSent, aphttp.ErrInvalidInput
 	}
+
 	response, observed, err := DoWithSendState(c.client, req)
+
 	state := aphttp.SendStateMayHaveSent
 	switch observed {
 	case SendStateNotSent:
@@ -74,8 +85,10 @@ func (c *DirectClient) Do(req *http.Request) (*http.Response, aphttp.SendState, 
 	case SendStateSent:
 		state = aphttp.SendStateSent
 	}
+
 	if err != nil {
 		err = aphttp.ErrTransport
 	}
+
 	return response, state, err
 }

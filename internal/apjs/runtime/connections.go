@@ -235,7 +235,11 @@ func (i *AsyncInvocation) PrepareInput(
 			return err
 		}
 		if err := vm.GlobalObject().DefineDataProperty(
-			"fetch", vm.ToValue(fetch), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE,
+			"fetch",
+			vm.ToValue(fetch),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
 		); err != nil {
 			return ErrInvalidInput
 		}
