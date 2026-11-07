@@ -5,6 +5,9 @@ title: Design notes
 These pages preserve implementation plans, migrations, and known product gaps.
 They are contributor context, not stable user-facing contracts.
 
+- [Shared bounded JavaScript execution](/development/design/bounded-javascript/) —
+  proposed reusable `internal/apjs` runtime, supplied connection capabilities,
+  optional direct HTTP, shared budgets, and domain result adapters.
 - [Tools, ToolSets, and agent access](/development/design/tools-and-toolsets/) —
   proposed connection-bound execution, published ToolSet generations, live MCP
   catalogs, agent discovery and CLI, and Python LangGraph integration.

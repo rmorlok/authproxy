@@ -18,12 +18,19 @@ at `d9daebe4`. Standards and industry research was checked on October 3–4, 202
 The behavior below is the proposed implementation contract; exact field and
 command names remain subject to implementation review. Examples use fake IDs.
 
+The November 6, 2026 amendment moves generic JavaScript execution into the
+[shared bounded JavaScript design](/development/design/bounded-javascript/).
+That design owns the reusable runtime and HTTP contracts; this page defines
+the Tool adapter and its single-connection policy. The amendment is a target
+contract, not a claim that the package migration or new JavaScript API has shipped.
+
 ## Scope and decisions
 
 | Area | Decision |
 | --- | --- |
 | Tool authoring | Trusted administrators define tools, execution code, and permission mappings. Agents consume them. |
-| Execution | One Tool belongs to one connection. JavaScript may make multiple requests through that connection. |
+| Execution | One Tool belongs to one connection. JavaScript receives exactly one connection object and may make multiple requests through its `fetch` method. Direct global `fetch` is unavailable to Tools. |
+| Shared JavaScript | Generic execution and HTTP budgets live under `internal/apjs`. Other callers may supply multiple connections or explicitly enable direct HTTP; the Tool adapter enables neither. |
 | Authorization | Any one declared tool verb can authorize invocation on the connection. The `proxy` verb is neither required nor implicitly granted. |
 | ToolSets | Multiple ToolSets can attach to a connection, each pinned independently to a published generation. |
 | Rollout | Publishing leaves existing assignments pinned. Individual migration actions move one connection's ToolSet assignment. Bulk orchestration remains a host responsibility. |
@@ -41,7 +48,7 @@ command names remain subject to implementation review. Examples use fake IDs.
 
 AuthProxy acts as an MCP **client** when importing remote tools. Serving MCP to
 agents is explicitly outside this iteration. Also excluded are cross-connection
-scripts, tool-to-tool workflow orchestration, user-authored untrusted code,
+Tool scripts, tool-to-tool workflow orchestration, user-authored untrusted code,
 automatic canary promotion, and admin/marketplace UI changes. Resource APIs,
 `ap`, `ap-agent`, and the Python adapter provide the initial interfaces.
 
@@ -257,8 +264,9 @@ spec:
     additionalProperties: false
   javascript: |
     async function execute(params, context) {
-      const base = `https://${context.cfg.apiHost}`;
-      const lookup = await fetch(
+      const [connection] = context.connections;
+      const base = `https://${connection.cfg.apiHost}`;
+      const lookup = await connection.fetch(
         `${base}/v1/teams?name=${encodeURIComponent(params.team)}`
       );
       if (!lookup.ok) {
@@ -267,7 +275,7 @@ spec:
         });
       }
       const team = await lookup.json();
-      const members = await fetch(
+      const members = await connection.fetch(
         `${base}/v1/teams/${encodeURIComponent(team.id)}/members`
       );
       if (!members.ok) {
@@ -279,9 +287,11 @@ spec:
     }
 ```
 
-Both requests use the same bound connection. `fetch` supplies the familiar
-request/response interface while the host routes every request through
-AuthProxy's authenticated proxy. Credentials are not JavaScript variables.
+Both requests use the sole connection supplied by Tool admission.
+`connection.fetch` supplies the request/response interface while the host routes
+each request through that connection's authenticated proxy. The method remains
+bound to that connection even if JavaScript changes its copied metadata.
+Credentials are not JavaScript variables. Tools have no global `fetch`.
 
 ### Explicit ToolSet
 
@@ -524,11 +534,14 @@ standalone update or catalog switch affects new admissions immediately;
 already admitted executions finish their captured definition and configuration.
 Credentials may still refresh through the existing proxy lifecycle.
 
-All HTTP calls use `iface.Connection` and the existing proxy/httpf orchestration
-so auth injection, OAuth refresh behavior, rate limits, request events,
-redaction, and telemetry remain centralized. The tool invocation path performs
-the tool ACL check and calls the internal proxy; it does not call the public
-`_proxy` route and does not demand that route's `proxy` permission.
+Admission prepares one configured connection HTTP client through `core/iface`
+and adapts it to the shared HTTP host's narrow client/evidence contract. The
+generic runtime does not resolve connections or perform ACL checks. Existing
+proxy/httpf orchestration retains auth injection, OAuth refresh behavior, rate
+limits, request events, redaction, and telemetry. The Tool path performs the
+Tool ACL check and uses the internal client; it does not call the public
+`_proxy` route or demand that route's `proxy` permission. It supplies exactly one
+connection capability and never enables the shared runtime's direct HTTP client.
 
 Keep ordinary transport cancellation tied to the inbound context. Bound total
 execution time, request count, response bytes, input/output bytes, and JavaScript
@@ -538,6 +551,14 @@ operator-configured ceilings and smaller per-tool overrides. Encoded envelopes
 need a separate limit that accounts for base64 expansion. These are tuning
 defaults, not protocol limits. Each pagination request counts against the tool's
 budget; internal credential recovery remains governed by proxy policy.
+
+The shared runtime owns one execution-wide deadline and HTTP allowance, not an
+independent allowance per client. Every request, response read, and pending
+worker uses that shared accounting. Tool metadata and the supplied connection's
+configuration share the input budget. The generic host reports cumulative
+target-send evidence; the Tool adapter maps that evidence into execution state
+and determines whether the complete Tool action succeeded. A later unsent
+request cannot erase an earlier possible effect.
 
 Do not introduce general automatic retries of tool invocations. The existing
 proxy's credential-recovery retry remains in place and must be documented for
@@ -555,7 +576,7 @@ values as runtime mutations. Defaults must be authored in request construction
 or code. Validate successful structured output when `outputSchema` exists;
 error results are not validated against the success schema.
 
-Each invocation receives immutable JSON-compatible copies of:
+Each invocation captures detached JSON-compatible data for these Tool scopes:
 
 | Context | Meaning |
 | --- | --- |
@@ -565,12 +586,24 @@ Each invocation receives immutable JSON-compatible copies of:
 | `connection` | Safe identity fields needed for execution, including ID and namespace. |
 | `tool` | ID, revision, and source generation/catalog identifiers. |
 
-JavaScript receives these through `context`; `params` is its first argument.
-Keep existing `cfg`, `labels`, and `annotations` globals available to reused
-connector libraries. They refer to the same copied context. Neither credentials
-nor signing keys are injected. Mutating a JavaScript object does not persist
-connection configuration. Privileged authors can access configuration values;
-discovery, errors, and default invocation logging must not disclose that map.
+Mustache retains these named scopes. JavaScript uses the shared
+`execute(params, context)` contract: `params` is its first argument and
+`context.connections` contains exactly one connection object. That object
+exposes safe identity, `cfg`, labels, annotations, and its bound `fetch` method.
+The Tool adapter adds `context.tool` for captured Tool identity and provenance.
+
+For reused connector libraries, retain `cfg`, `labels`, and `annotations`
+globals and the corresponding `context` properties as aliases to the sole
+connection's copied values. Retain `context.connection` as a data-only safe
+identity view. These are Tool adapter conventions; the generic multi-connection
+runner does not choose an implicit connection or load every supplied
+connection's helper library.
+
+Neither credentials nor signing keys are injected. JavaScript may mutate its
+local data without changing persistent configuration, the captured host
+identity, or another invocation. Privileged authors can access configuration
+values; discovery, errors, and default invocation logging must not disclose
+that map.
 
 ### Mustache and typed requests
 
@@ -617,33 +650,33 @@ the proxy rather than allowing templates to replace injected credentials.
 
 ### JavaScript host
 
-Build a tool execution host around the existing Goja dependency. Goja supplies
-the language engine, while AuthProxy must supply the event loop, asynchronous
-I/O, and bounded cancellation. Its [runtime documentation](https://github.com/dop251/goja)
-specifies single-goroutine runtime access and host-provided asynchronous
-facilities. An in-process trusted-code runtime is not a hard memory-isolated
-tenant sandbox; untrusted code execution remains outside this design.
+Use the [shared bounded JavaScript runtime](/development/design/bounded-javascript/)
+for compilation, fresh VMs, async `execute(params, context)`, data conversion,
+HTTP request/response objects, budgets, and cancellation. Its capability,
+ownership, output, and no-I/O initialization rules apply here. This remains an
+in-process trusted-code runtime, not a hard memory-isolated tenant sandbox.
 
-Require one callable `async function execute(params, context)`. Provide:
+`internal/tools/javascript` supplies the Tool-specific policy:
 
-- A connection-bound `fetch(url, init)` with method, headers, JSON/text/binary
-  body support, `ok`, `status`, `headers`, `json()`, `text()`, and bounded
-  `arrayBuffer()` response access. This is a documented subset of Web Fetch,
-  not Node.js compatibility. HTTP error statuses resolve responses as normal;
-  transport failures reject. Timeout/cancellation also interrupts pending I/O.
-- `URL`, `URLSearchParams`, text/base64 helpers, and a structured diagnostic
-  logger. No modules, package loading, environment, filesystem, subprocess,
-  database, arbitrary network clients, or other-connection handles.
-- `ToolError(code, message, details)` and a `toolResult(...)` host helper for
-  rich content. No automatic conversion of arbitrary thrown objects into public
-  errors containing privileged context.
+- Require exactly one admitted entry in `context.connections`. Its
+  `connection.fetch(url, init)` retains the shared Fetch subset and the
+  authenticated proxy's destination and credential precedence rules. Global
+  direct `fetch` is absent, including when a connection request fails.
+- Select the bound connector's compiled helper library and install the Tool
+  context aliases. The generic runtime owns reusable utility hosts; it receives
+  no authority to discover additional connections or access credentials.
+- Install `ToolError(code, message, details)` and `toolResult(...)` through the
+  trusted extension contract. These helpers, API content validation, and public
+  error/result semantics belong to the Tool adapter.
+- Keep request labels subject to the shared request-label contract when
+  implemented, including size limits and protected-label rules. They require a
+  separate client-support implementation slice; they cannot change the admitted actor,
+  connection, request type, or trusted invocation attribution.
 
-Reuse compiled connector helper libraries where applicable, then compile the
-tool entry point and run each invocation in a fresh VM. Reserve host-global
-names and reject collisions. Marshal asynchronous completions onto one runtime
-goroutine; never access Goja values from HTTP worker goroutines. Interrupt the
-VM on timeout and cap host-side allocations and I/O. Do not execute author code
-with real network access during publication validation.
+Compile and validate before publication without live connection capabilities or
+direct HTTP. Initialization and any queued initialization microtasks must finish
+without outbound I/O. Reusing connector libraries does not change their existing
+behavior in other AuthProxy execution contexts.
 
 JSON-compatible ordinary returns become `structuredContent`. Strings also
 produce a text block; objects/arrays need not be duplicated as serialized text
@@ -651,14 +684,24 @@ inside the canonical envelope. Reject `undefined`, cyclic values, functions,
 non-finite numbers, or other non-JSON values as output translation errors.
 `toolResult(...)` returns explicit typed blocks and optional structured content.
 
+The adapter installs helpers before authored initialization and interprets the
+settled value while the runtime's deadline and bounded encoder remain active.
+No Goja value escapes for conversion after runtime cleanup. The generic default
+result remains JSON and does not depend on Tool content schemas. Only explicitly
+recognized Tool errors can expose authored details; arbitrary thrown objects
+and unrelated unhandled Promise rejections remain sanitized failures. Tool
+schema checks and the complete serialized result-envelope limit remain the
+invocation layer's responsibility.
+
 An HTTP response transform is a pure JavaScript expression evaluated with
 `params`, copied connection context, and
 `response = { status, headers, body, mediaType }`. JSON bodies are decoded;
-text remains text; binary is represented explicitly. It has no network access.
-Its result follows the same return conversion. Status mappings run before a
-success transform; by default any non-2xx HTTP response becomes a tool error.
-Exact status rules take precedence over class/default rules. Conflicting rules
-are rejected on validation.
+text remains text; binary is represented explicitly. It receives data-only
+scopes, no connection methods, direct `fetch`, or Tool result helpers. Its bounded
+JSON result is converted into Tool structured content and optional text by the
+Tool HTTP adapter. Status mappings run before a success transform; by default
+any non-2xx HTTP response becomes a Tool error. Exact status rules take precedence
+over class/default rules. Conflicting rules are rejected on validation.
 
 ## Rich results and errors
 
@@ -1231,8 +1274,11 @@ Document any retained payload behavior alongside current request logging.
 | `internal/schema/api`, `api/v1alpha1`, `api/openapi` | Usage descriptors, invocation/actions, binding/import diagnostics, Swagger-only projections. |
 | `internal/database` | Tables/interfaces/builders, matching provider migrations, transactions, encrypted-column registration, mocks. |
 | `internal/core` and `core/iface` | CRUD, definition compilation, discovery predicate, invocation orchestration, per-binding migration and reconciliation. |
-| `internal/apjs`, `aptmpl` | Separate tool runtime, cancellation, typed rendering, response transforms; retain existing connector behavior. |
-| New `internal/tools` subpackages | HTTP plan/encoder, OpenAPI compiler, MCP adapter, result/error normalization; depend on `core/iface`, not concrete core. |
+| `internal/apjs/runtime` | Generic bounded VM lifecycle, expressions, async execution, JSON conversion, connection objects, and HTTP completion loop. No Tool schema dependencies. |
+| `internal/apjs/http` | Go-only HTTP budgets, response ownership, safe failures, and cumulative send evidence, shared by JavaScript and declarative HTTP Tools. |
+| `internal/apjs`, `aptmpl` | Preserve existing connector-library/expression and template behavior while adopting shared primitives in deliberate migration slices. |
+| `internal/tools/javascript` | Tool context and sole-connection adapter, connector helpers, `ToolError`/`toolResult`, and Tool-specific result conversion. |
+| Other `internal/tools` subpackages | Typed rendering, HTTP plan/encoder, OpenAPI compiler, MCP adapter, and result/error normalization. Connection adapters depend on `core/iface`, not concrete core. |
 | `internal/proxy`, `httpf` | Reusable internal streaming response transport for MCP, connection-bound host I/O, invocation correlation. |
 | `internal/routes`, service registration | Management/discovery/action routes on appropriate existing API services; no new MCP server or service port. |
 | `internal/apasynq`, core tasks/workflows | Membership sweep, per-binding MCP refresh, individual migration, missed-event repair. |
@@ -1256,6 +1302,14 @@ exporters and injected clocks.
 ## Implementation sequence and acceptance
 
 Implement in reviewable stages against this complete design:
+
+Before extending the remaining JavaScript Tool helpers and invocation wiring,
+extract the generic runtime and HTTP contracts described in the
+[shared JavaScript migration sequence](/development/design/bounded-javascript/).
+Migrate existing expression and HTTP Tool consumers without changing their
+public behavior, then layer Tool result/error semantics onto the shared runtime.
+Mechanical relocations and new capability logic should be separate PRs. Updating
+implementation tickets follows approval of this design amendment.
 
 1. **Contracts and persistence:** Tool/ToolSet schemas, IDs, registry/apply
    integration, generation lifecycle, bindings/revisions, matching database
@@ -1286,9 +1340,13 @@ Readiness to ship the full feature includes the following tests:
   unauthorized results cannot leak through counts, cursors, caches, or errors.
 - **Rendering/runtime:** tenant configuration reaches Mustache and JavaScript;
   typed booleans/null/arrays survive; path/query/JSON escaping and missing values
-  behave consistently; multiple requests use one connection; timeout, thrown
-  errors, output-schema failure, byte limits, and cancellation preserve outcome
-  uncertainty; response projection cannot make network calls.
+  behave consistently; Tools receive exactly one connection and all their
+  requests use it; metadata changes cannot retarget its methods; global direct
+  `fetch` is absent. Timeout, thrown errors, output-schema failure, byte limits,
+  and cancellation preserve outcome uncertainty; publication validation and
+  response projection cannot make network calls. Shared-runtime tests cover
+  zero/one/multiple connections, aggregate accounting across clients, and direct
+  HTTP's explicit enablement without granting those capabilities to Tools.
 - **Reconciliation:** new bindings pin primary; publication leaves existing pins;
   multiple ToolSets coexist; default subtree selection works; lost matches are
   removed; standalone Tools survive unrelated cleanup; stale refresh/migration
