@@ -58,8 +58,10 @@ type AsyncProgram struct {
 // unbraced conditional declarations of reserved names are rejected anywhere in
 // a library because they can reach the global object. A helper library cannot
 // declare execute because that entry point belongs to the main program. The
-// caller supplies the complete host binding policy; this primitive adds no
-// domain-specific names. Malformed binding options return ErrInvalidInput.
+// caller supplies domain-specific host bindings. The shared fetch name is always
+// reserved, even when direct HTTP is disabled; an explicit fetch descriptor may
+// repeat that default but cannot preserve enumerability. Malformed binding
+// options return ErrInvalidInput.
 func CompileAsync(
 	source string,
 	library CompiledLibrary,
@@ -74,6 +76,22 @@ func CompileAsync(
 	if err != nil {
 		return nil, err
 	}
+
+	// Reserve the optional built-in capability before source and library checks.
+	// Existing adapters may already include it in their host policy.
+	hasFetch := false
+	for _, binding := range bindings {
+		if binding.Name == "fetch" {
+			if binding.PreserveEnumerable {
+				return nil, ErrInvalidInput
+			}
+			hasFetch = true
+		}
+	}
+	if !hasFetch {
+		bindings = append(bindings, HostBinding{Name: "fetch"})
+	}
+
 	librarySource := ""
 	if library != nil {
 		librarySource = library.Source()
