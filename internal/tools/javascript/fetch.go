@@ -102,15 +102,15 @@ func (p *ToolProgram) EvaluateWithHTTP(
 				return nil, apjsruntime.ErrInvalidInput
 			}
 
-			tracker := newPromiseTracker(vm)
-			defer tracker.close()
+			tracker := apjsruntime.NewPromiseTracker(vm)
+			defer tracker.Close()
 
 			execute, err := p.Initialize(vm)
 			if err != nil {
 				return nil, err
 			}
 
-			if err := tracker.checkRejections(); err != nil {
+			if err := tracker.CheckRejections(); err != nil {
 				return nil, err
 			}
 

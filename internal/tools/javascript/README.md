@@ -7,9 +7,10 @@ captured connection's HTTP session. Pure expressions and ordinary Tool evaluatio
 have no I/O capabilities.
 
 The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
-lifecycle, pure-expression compilation/evaluation, execution limits, and bounded
-native JSON input/output conversion. This package supplies Tool snapshots and
-aliases, async compilation, connector helpers, and the async HTTP host. Its
+lifecycle, expression evaluation, async compilation/initialization, Promise
+tracking, execution limits, and bounded native JSON conversion. This package
+supplies Tool snapshots and aliases, its reserved host names, connector-library
+selection, and async invocation/HTTP orchestration. Its
 `Limits` type refers to the shared policy. Callers reference error classifications
 directly from `internal/apjs/runtime`.
 
@@ -156,8 +157,9 @@ if err := tool.Validate(ctx); err != nil {
 }
 ```
 
-`CompileTool` checks syntax, the entry-point declaration, reserved names, and
-the combined source size. It never runs authored code. `Validate` runs library
+`CompileTool` supplies the Tool host policy to the shared compiler, which checks
+syntax, the entry-point declaration, reserved names, and combined source size.
+It never runs authored code. `Validate` runs library
 initialization followed by Tool initialization in a fresh VM with no host
 capabilities or connection data. It checks that `execute` is still an async
 function after top-level code runs but does not call it; replacing the declaration
@@ -184,7 +186,7 @@ as `fetch` are non-enumerable; existing captured input bindings remain enumerabl
 Tool, expression, and connector library parsing, including dynamic
 `eval`/`Function` parsing, do not load source maps.
 
-`Initialize(vm)` is the integration point for a future invocation host. That
+`Initialize(vm)` delegates to the shared async initializer. The invocation
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start

@@ -22,8 +22,8 @@ var (
 // These limits bound host work and execution time, not the VM's heap usage.
 type Limits struct {
 	// MaxSourceBytes bounds authored UTF-8 source before parsing, including any
-	// helper libraries. CompileExpression enforces it for pure expressions;
-	// adapters compiling other program types apply the same source allowance.
+	// helper libraries. CompileExpression and CompileAsync enforce it; adapters
+	// compiling other program types apply the same source allowance.
 	MaxSourceBytes int
 
 	// MaxInputBytes bounds combined serialized input. The input adapter shares
