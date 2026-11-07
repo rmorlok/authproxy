@@ -184,6 +184,88 @@ encoding share one deadline. Callers receive only detached JSON; failure or
 cancellation discards the result. Hosts return safe errors unchanged, while
 authored exceptions and rejection values remain private.
 
+## HTTP bindings
+
+`HTTPHost` supplies request conversion, native response objects, and the worker
+completion loop. It installs no globals and selects no clients. An adapter binds
+each fetch function to a trusted dispatcher using `BindFetch`, then chooses where
+JavaScript can access it. Creating a host alone gives JavaScript no HTTP access.
+
+For example, reserve a `customerFetch` binding when compiling this program:
+
+```javascript
+async function execute() {
+    const response = await customerFetch("https://api.example.test/customers/42");
+    const customer = await response.json();
+    return { name: customer.name };
+}
+```
+
+Given an already-authorized `handle` from an
+[apjs/http session](../http/README.md), prepare its host in `Evaluate`:
+
+```go
+result, err := program.Evaluate(ctx, func(
+    runCtx context.Context, vm *goja.Runtime, invocation *runtime.AsyncInvocation,
+) error {
+    invocation.Params = goja.Undefined()
+    invocation.Context = goja.Undefined()
+    host, err := runtime.NewHTTPHost(runCtx, vm, runtime.HTTPOptions{
+        MaxRequestBytes: 64 << 10,
+        MaxPendingOperations: 8,
+    }, limits)
+    if err != nil {
+        return err
+    }
+    // Register cleanup before another VM operation can be interrupted.
+    invocation.Close = host.Close
+    invocation.Start = host.Start
+    invocation.Await = host.Await
+    fetch, err := host.BindFetch(func(request *http.Request) (*aphttp.Response, error) {
+        response, _, err := handle.Do(request)
+        return response, err
+    })
+    if err != nil {
+        return err
+    }
+    if err := vm.Set("customerFetch", fetch); err != nil {
+        return runtime.ErrInvalidInput
+    }
+    return nil
+})
+```
+
+Here `http` is Go's standard HTTP package and `aphttp` is `internal/apjs/http`.
+The adapter owns the session: close it on every exit, link its cancellation to
+the context passed to `Evaluate` so HTTP expiry or exhaustion interrupts busy
+JavaScript, and map its final error and send evidence into the caller's outcome.
+`HTTPHost.Close` cancels its requests and body reads without waiting for workers;
+it does not close the session or its clients. Register cleanup immediately after
+construction, including when later preparation might fail.
+
+One host can bind several dispatchers. Each function permanently captures its
+dispatcher; borrowing the function does not retarget it. Bind handles from the
+same HTTP session so requests share its deadline, response-byte allowance, and
+send evidence. Fetch calls and body reads across every binding also share the
+host's `MaxPendingOperations`. A refused read leaves `bodyUsed` false, allowing a
+retry after other work finishes. Nothing dispatches before `Start`, which the
+async evaluator calls only after initialization and its Promise jobs succeed.
+
+Fetch accepts an absolute HTTP(S) URL and optional `method`, `headers`, and `body`.
+Headers are a string record; `Host` sets the request's host override. Bodies are
+strings or native `ArrayBuffer` values. The combined request fields must fit
+`MaxRequestBytes`; unsupported options fail without dispatch. Responses expose
+`status`, `ok`, `headers.get(name)`, `bodyUsed`, and single-use async `text()`,
+`json()`, and `arrayBuffer()` readers. HTTP status errors resolve normally.
+
+Dispatchers run off the VM goroutine and must capture only detached Go state.
+They take request-body ownership and return bounded responses whose bodies honor
+request cancellation. On failure they close any partial response and return only
+an error. The shared HTTP handles already meet this contract. Workers transfer
+only owned Go data; the VM goroutine settles Promises and decodes JSON. Late
+responses are closed without touching the VM. Worker panics and `Goexit` reject
+safely and log only fixed classifications and Go source locations, never payloads.
+
 ## Copying JSON into the runtime
 
 Create a `JSONDecoder` before authored code or libraries run. It captures the

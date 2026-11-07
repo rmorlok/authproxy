@@ -8,9 +8,10 @@ have no I/O capabilities.
 
 The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
 lifecycle, expression evaluation, async compilation and execution, Promise
-tracking, execution limits, and bounded native JSON conversion. This package
+tracking, execution limits, bounded native JSON conversion, and the HTTP host's
+request conversion, workers, and response readers. This package
 supplies Tool snapshots and aliases, its reserved host names, connector-library
-selection, and the HTTP host's workers and response readers. Its
+selection, and connection-session ownership and error precedence. Its
 `Limits` type refers to the shared policy. Callers reference error classifications
 directly from `internal/apjs/runtime`.
 

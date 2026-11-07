@@ -1,4 +1,4 @@
-package javascript
+package runtime
 
 import (
 	"bytes"
@@ -12,8 +12,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/dop251/goja"
-	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
-	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"golang.org/x/net/http/httpguts"
 )
 
@@ -23,7 +21,7 @@ import (
 // enumerable string properties, and body supports strings or native ArrayBuffers.
 // Methods follow Fetch normalization and its CONNECT/TRACE/TRACK exclusions.
 // JSON must be explicitly serialized by authored code. No credentials are added:
-// the connection's HTTP client retains final authentication precedence.
+// the selected HTTP client retains final authentication precedence.
 //
 // All VM access, including getters and Proxy traps, stays on the calling owner
 // goroutine. The host callback must use vm.Try to catch authored exceptions.
@@ -35,7 +33,7 @@ func prepareFetchRequest(
 	maxBytes int,
 ) (*http.Request, error) {
 	if ctx == nil || vm == nil || maxBytes <= 0 || len(call.Arguments) > 2 {
-		return nil, apjsruntime.ErrInvalidInput
+		return nil, ErrInvalidInput
 	}
 
 	budget := fetchRequestBudget{
@@ -48,7 +46,7 @@ func prepareFetchRequest(
 	}
 
 	if !validFetchURL(rawURL) {
-		return nil, apjsruntime.ErrInvalidInput
+		return nil, ErrInvalidInput
 	}
 
 	methodValue := vm.ToValue("GET")
@@ -57,7 +55,7 @@ func prepareFetchRequest(
 	if initValue := call.Argument(1); !goja.IsUndefined(initValue) && !goja.IsNull(initValue) {
 		init, ok := initValue.(*goja.Object)
 		if !ok || init.ClassName() != "Object" || len(init.Symbols()) != 0 {
-			return nil, apjsruntime.ErrInvalidInput
+			return nil, ErrInvalidInput
 		}
 
 		// Validate all names before evaluating getters so unsupported options
@@ -65,7 +63,7 @@ func prepareFetchRequest(
 		keys := init.GetOwnPropertyNames()
 		for _, key := range keys {
 			if key != "method" && key != "headers" && key != "body" {
-				return nil, apjsruntime.ErrInvalidInput
+				return nil, ErrInvalidInput
 			}
 		}
 
@@ -89,15 +87,15 @@ func prepareFetchRequest(
 		return nil, err
 	}
 
-	if !tools.IsHTTPToken(method) {
-		return nil, apjsruntime.ErrInvalidInput
+	if !httpguts.ValidHeaderFieldName(method) {
+		return nil, ErrInvalidInput
 	}
 
 	// Fetch uppercases only these six methods; other valid tokens remain
 	// case-sensitive, including PATCH. Token validation makes this ASCII-only.
 	switch upper := strings.ToUpper(method); upper {
 	case "CONNECT", "TRACE", "TRACK":
-		return nil, apjsruntime.ErrInvalidInput
+		return nil, ErrInvalidInput
 	case "DELETE", "GET", "HEAD", "OPTIONS", "POST", "PUT":
 		method = upper
 	}
@@ -114,7 +112,7 @@ func prepareFetchRequest(
 
 	request, err := http.NewRequestWithContext(ctx, method, rawURL, body)
 	if err != nil {
-		return nil, apjsruntime.ErrInvalidInput
+		return nil, ErrInvalidInput
 	}
 
 	request.Header = headers
@@ -143,7 +141,7 @@ func (b *fetchRequestBudget) consume(size int) error {
 	}
 
 	if size > b.remaining {
-		return apjsruntime.ErrLimitExceeded
+		return ErrLimitExceeded
 	}
 
 	b.remaining -= size
@@ -157,11 +155,11 @@ func (b *fetchRequestBudget) consume(size int) error {
 func (b *fetchRequestBudget) string(value goja.Value) (string, error) {
 	s, ok := value.(goja.String)
 	if !ok {
-		return "", apjsruntime.ErrInvalidInput
+		return "", ErrInvalidInput
 	}
 
 	if s.Length() > b.remaining {
-		return "", apjsruntime.ErrLimitExceeded
+		return "", ErrLimitExceeded
 	}
 
 	size := 0
@@ -178,17 +176,17 @@ func (b *fetchRequestBudget) string(value goja.Value) (string, error) {
 		case unit >= 0xd800 && unit <= 0xdbff:
 			i++
 			if i >= s.Length() || s.CharAt(i) < 0xdc00 || s.CharAt(i) > 0xdfff {
-				return "", apjsruntime.ErrInvalidInput
+				return "", ErrInvalidInput
 			}
 			size += 4
 		case unit >= 0xdc00 && unit <= 0xdfff:
-			return "", apjsruntime.ErrInvalidInput
+			return "", ErrInvalidInput
 		default:
 			size += 3
 		}
 
 		if size > b.remaining {
-			return "", apjsruntime.ErrLimitExceeded
+			return "", ErrLimitExceeded
 		}
 	}
 
@@ -209,7 +207,7 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 
 	object, ok := value.(*goja.Object)
 	if !ok || object.ClassName() != "Object" || len(object.Symbols()) != 0 {
-		return nil, "", apjsruntime.ErrInvalidInput
+		return nil, "", ErrInvalidInput
 	}
 
 	var host string
@@ -220,8 +218,8 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 			return nil, "", err
 		}
 
-		if !tools.IsHTTPToken(name) {
-			return nil, "", apjsruntime.ErrInvalidInput
+		if !httpguts.ValidHeaderFieldName(name) {
+			return nil, "", ErrInvalidInput
 		}
 
 		// Make sure header is capitalized in the standard way
@@ -229,7 +227,7 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 
 		// Can't have the same header twice
 		if seen[canonical] {
-			return nil, "", apjsruntime.ErrInvalidInput
+			return nil, "", ErrInvalidInput
 		}
 		seen[canonical] = true
 
@@ -244,7 +242,7 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 			"Proxy-Authorization",
 			"Te",
 			"Upgrade":
-			return nil, "", apjsruntime.ErrInvalidInput
+			return nil, "", ErrInvalidInput
 		}
 
 		text, err := b.string(object.Get(name))
@@ -253,12 +251,12 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 		}
 
 		if !httpguts.ValidHeaderFieldValue(text) {
-			return nil, "", apjsruntime.ErrInvalidInput
+			return nil, "", ErrInvalidInput
 		}
 
 		if canonical == "Host" {
 			if !validFetchAuthority(text) {
-				return nil, "", apjsruntime.ErrInvalidInput
+				return nil, "", ErrInvalidInput
 			}
 			host = text
 		} else {
@@ -287,12 +285,12 @@ func (b *fetchRequestBudget) body(value goja.Value) (io.Reader, error) {
 	}
 
 	if value.ExportType() != reflect.TypeFor[goja.ArrayBuffer]() {
-		return nil, apjsruntime.ErrInvalidInput
+		return nil, ErrInvalidInput
 	}
 
 	buffer := value.Export().(goja.ArrayBuffer)
 	if buffer.Detached() {
-		return nil, apjsruntime.ErrInvalidInput
+		return nil, ErrInvalidInput
 	}
 
 	if err := b.consume(len(buffer.Bytes())); err != nil {

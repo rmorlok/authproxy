@@ -3,7 +3,6 @@ package javascript
 import (
 	"context"
 	"log/slog"
-	"net/http"
 
 	"github.com/dop251/goja"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
@@ -93,17 +92,25 @@ func (p *ToolProgram) EvaluateWithHTTP(
 			if err := p.prepareInvocation(runCtx, vm, invocation, input); err != nil {
 				return err
 			}
-			loop, err := newFetchLoop(runCtx, vm, options, p.limits)
+			host, err := apjsruntime.NewHTTPHost(runCtx, vm, apjsruntime.HTTPOptions{
+				MaxRequestBytes:      options.MaxRequestBytes,
+				MaxPendingOperations: options.MaxPendingOperations,
+				Logger:               options.Logger,
+			}, p.limits)
 			if err != nil {
 				return err
 			}
 			// Register cleanup before touching the VM again: preparation can be
 			// interrupted after creating the host but before returning it.
-			invocation.Close = loop.close
-			invocation.Start = func() { loop.enabled = true }
-			invocation.Await = loop.await
+			invocation.Close = host.Close
+			invocation.Start = host.Start
+			invocation.Await = host.Await
 
-			if err := vm.Set("fetch", loop.fetch); err != nil {
+			fetch, err := host.BindFetch(options.Session.Do)
+			if err != nil {
+				return err
+			}
+			if err := vm.Set("fetch", fetch); err != nil {
 				return apjsruntime.ErrInvalidInput
 			}
 			return nil
@@ -117,47 +124,4 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	}
 
 	return common.RawJSON(result), err
-}
-
-// fetch validates and detaches authored request values on the VM goroutine.
-// Even malformed input becomes a rejected Promise, with no private exception
-// text. No worker is launched before initialization and admission complete.
-func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
-	if !l.enabled {
-		return l.rejected(apjsruntime.ErrEvaluation)
-	}
-	if len(l.pending) >= l.options.MaxPendingOperations {
-		return l.rejected(apjsruntime.ErrLimitExceeded)
-	}
-
-	var req *http.Request
-	var err error
-	if exception := l.vm.Try(func() {
-		req, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes)
-	}); exception != nil {
-		return l.rejected(apjsruntime.ErrInvalidInput)
-
-	}
-	if err != nil {
-		return l.rejected(err)
-	}
-
-	// The worker captures only the session and detached request, never l or VM
-	// values. It can finish safely even after evaluation has disposed its runtime.
-	session := l.options.Session
-	promise, admitted := l.start(func() fetchCompletion {
-		response, err := session.Do(req)
-		return fetchCompletion{response: response, err: err}
-	}, func(done fetchCompletion) (goja.Value, error) {
-		if done.err != nil {
-			return nil, done.err
-		}
-		return l.responseValue(done.response)
-	})
-
-	if !admitted && req.Body != nil {
-		_ = req.Body.Close()
-	}
-
-	return promise
 }
