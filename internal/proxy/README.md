@@ -59,8 +59,9 @@ label map stable during the call. Create a new configured client to pick up
 later metadata or policy changes.
 
 The client does not impose a label-byte budget. A bounded execution host must
-account for request data before calling it. JavaScript `connection.fetch` does
-not yet accept `init.labels`; its binding and byte accounting are a separate step.
+account for request data before calling it. JavaScript `connection.fetch` copies
+and validates `init.labels` before worker dispatch and counts their keys and
+values toward the request-byte allowance.
 
 ## Other proxy entry points
 

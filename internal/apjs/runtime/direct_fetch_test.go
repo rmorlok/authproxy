@@ -56,7 +56,13 @@ func directFetchInput(t *testing.T, owner *aphttp.Session, direct, connection ap
 		input.DirectDispatch = bind(direct)
 	}
 	if connection != nil {
-		input.Connections = []jsruntime.ConnectionInput{{Snapshot: json.RawMessage(`{"id":"captured"}`), Dispatch: bind(connection)}}
+		dispatch := bind(connection)
+		input.Connections = []jsruntime.ConnectionInput{{
+			Snapshot: json.RawMessage(`{"id":"captured"}`),
+			Dispatcher: connectionTestDispatcher{dispatch: func(request *http.Request, _ map[string]string) (*aphttp.Response, error) {
+				return dispatch(request)
+			}},
+		}}
 	}
 	return input
 }
@@ -142,7 +148,9 @@ func TestDirectFetchUsesOnlyItsSuppliedClient(t *testing.T) {
 		const failed = await context.connections[0].fetch("https://example.test/connection").then(() => false, () => true);
 		let protectedGlobal = false;
 		try { fetch = () => {}; } catch (e) { protectedGlobal = e instanceof TypeError; }
-		const unsupported = await fetch("https://example.test/labels", {labels:{purpose:"authored"}}).then(() => false, () => true);
+		const unsupported = (await Promise.all([{}, null, undefined, {purpose:"authored"}].map(
+			labels => fetch("https://example.test/labels", {labels}).then(() => false, () => true)
+		))).every(Boolean);
 		const response = await fetch("https://example.test/direct", {headers:{Authorization:"authored", Host:"tenant.example.test"}});
 		return {failed, protectedGlobal, unsupported, text:await response.text(), visible:Object.keys(globalThis).includes("fetch")};
 	}`)

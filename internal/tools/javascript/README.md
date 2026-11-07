@@ -272,6 +272,26 @@ Both requests use the session's captured connection and authentication. Global
 `fetch` remains undefined. A borrowed `connection.fetch` function keeps its
 original client even when called with a different `this` value.
 
+Add `labels` to distinguish individual requests for rate limits, request events,
+and telemetry:
+
+```javascript
+const response = await connection.fetch(base + "/customers", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(params),
+    labels: {operation: "write", workload: "customer-sync"}
+});
+```
+
+These user labels override matching connection/client user labels for this
+request and its retries/redirects. They do not change `connection.labels` or its
+aliases. The map is copied before a worker starts; concurrent calls have separate
+overrides. Invalid label keys/values and protected `apxy/` keys reject before
+dispatch and cannot replace the captured actor or connection identity. Omitting
+labels (or supplying null/undefined) adds no overrides. Label keys and values
+count toward `MaxRequestBytes` along with the URL, method, headers, and body.
+
 Connection fields `id`, `name`, `namespace`, `cfg`, `labels`, `annotations`, and
 `fetch` cannot be replaced. The connections array and its membership are also
 read-only. Nested configuration and metadata remain mutable private copies;

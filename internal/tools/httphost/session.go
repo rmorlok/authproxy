@@ -5,6 +5,7 @@ package httphost
 import (
 	"context"
 	"errors"
+	"maps"
 	"net/http"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 // Session supplies Tool execution-state interpretation around the shared HTTP
@@ -24,8 +26,9 @@ type Session struct {
 	// Keep it private so the budget owner cannot diverge from client's captured owner.
 	session *aphttp.Session
 
-	// client pins the Tool's only admitted connection to the shared budget owner.
-	client *aphttp.ClientHandle
+	// client is the Tool's only admitted connection. Each call binds this same
+	// captured client, with its own labels, to the shared budget owner.
+	client iface.HTTPClient
 }
 
 // New captures the already admitted connection client and starts the invocation
@@ -48,12 +51,7 @@ func NewWithDeadline(ctx context.Context, client iface.HTTPClient, limits aphttp
 	if err != nil {
 		return nil, err
 	}
-	bound, err := session.Bind(configuredClient{client: client})
-	if err != nil {
-		session.Close()
-		return nil, err
-	}
-	return &Session{session: session, client: bound}, nil
+	return &Session{session: session, client: client}, nil
 }
 
 // Context returns the invocation's deadline and identity context. An
@@ -83,10 +81,39 @@ func (s *Session) SendState() aphttp.SendState { return s.session.SendState() }
 // validation rejects the call, and transfers every successful response body to
 // the caller. The configured client retains credential recovery and attribution.
 func (s *Session) Do(req *http.Request) (*aphttp.Response, error) {
-	var client *aphttp.ClientHandle
-	if s != nil {
-		client = s.client
+	return s.DoWithLabels(req, nil)
+}
+
+// ValidateLabels checks user labels without I/O or consuming request allowance.
+// Authored input cannot replace protected apxy/ attribution. Runtime adapters call
+// it before worker admission; DoWithLabels repeats the check for direct Go callers.
+// Invalid labels or an uninitialized adapter return one fixed error without data.
+func (s *Session) ValidateLabels(labels map[string]string) error {
+	if s == nil || s.session == nil || s.client == nil || meta.ValidateUserLabels(labels) != nil {
+		return aphttp.ErrInvalidInput
 	}
+	return nil
+}
+
+// DoWithLabels copies validated labels for this call without changing the
+// configured client. Keep the supplied map stable during the call. Each bound
+// handle uses the same execution owner, so labels cannot reset request/response
+// budgets, deadlines, or evidence. It takes request-body ownership on every path.
+func (s *Session) DoWithLabels(req *http.Request, labels map[string]string) (*aphttp.Response, error) {
+	transferred := false
+	defer func() {
+		if !transferred && req != nil && req.Body != nil {
+			_ = req.Body.Close()
+		}
+	}()
+	if err := s.ValidateLabels(labels); err != nil {
+		return nil, err
+	}
+	client, err := s.session.Bind(configuredClient{client: s.client, labels: maps.Clone(labels)})
+	if err != nil {
+		return nil, err
+	}
+	transferred = true
 	response, _, err := client.Do(req)
 	return response, err
 }
@@ -108,6 +135,8 @@ func (s *Session) ExecutionState() api.ToolExecutionState {
 type configuredClient struct {
 	// client captures the connection, actor, labels, and request attribution.
 	client iface.HTTPClient
+	// labels is one call's private user-label override, detached before handoff.
+	labels map[string]string
 }
 
 // Do observes one logical configured-client call, including its redirect and
@@ -116,7 +145,13 @@ type configuredClient struct {
 // diagnostics are discarded. Raw response/body ownership stays with the caller.
 func (c configuredClient) Do(req *http.Request) (*http.Response, aphttp.SendState, error) {
 	ctx, observation := httpf.ObserveSends(req.Context())
-	response, err := c.client.Do(req.WithContext(ctx))
+	var response *http.Response
+	var err error
+	if len(c.labels) == 0 {
+		response, err = c.client.Do(req.WithContext(ctx))
+	} else {
+		response, err = c.client.DoWithLabels(req.WithContext(ctx), c.labels)
+	}
 	state := aphttp.SendStateMayHaveSent
 	switch observation.State() {
 	case httpf.SendStateNotSent:

@@ -68,7 +68,7 @@ func (p *ToolProgram) prepareInvocation(
 		if err != nil {
 			return apjsruntime.ErrInvalidInput
 		}
-		prepared.Connections = []apjsruntime.ConnectionInput{{Snapshot: metadata, Dispatch: session.Do}}
+		prepared.Connections = []apjsruntime.ConnectionInput{{Snapshot: metadata, Dispatcher: session}}
 	}
 
 	// Include response in the same batch even though it is exposed only as a

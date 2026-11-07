@@ -31,10 +31,10 @@ func connectionInputs(t *testing.T, snapshots ...string) ([]jsruntime.Connection
 		require.NoError(t, err)
 		inputs[index] = jsruntime.ConnectionInput{
 			Snapshot: json.RawMessage(snapshot),
-			Dispatch: func(request *http.Request) (*aphttp.Response, error) {
+			Dispatcher: connectionTestDispatcher{dispatch: func(request *http.Request, _ map[string]string) (*aphttp.Response, error) {
 				response, _, err := handle.Do(request)
 				return response, err
-			},
+			}},
 		}
 	}
 	return inputs, requests
@@ -231,7 +231,7 @@ func TestAsyncInputRejectsInvalidShapes(t *testing.T) {
 	connections, requests := connectionInputs(t, `{"id":"one"}`)
 	err := invocation.PrepareInput(context.Background(), vm, jsruntime.AsyncInput{Connections: connections}, runtimeLimits(), nil)
 	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
-	connections[0].Dispatch = nil
+	connections[0].Dispatcher = nil
 	result, err := evaluateConnections(t, `async function execute() { return true; }`, jsruntime.AsyncInput{Connections: connections}, runtimeLimits())
 	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
 	require.Nil(t, result)
