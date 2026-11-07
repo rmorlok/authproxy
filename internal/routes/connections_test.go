@@ -142,6 +142,9 @@ func TestConnections(t *testing.T) {
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
+		// Connection writes request ToolSet membership passes, which these route
+		// tests do not run.
+		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
 		rs := mock.NewMockClient(ctrl)
 		rs.EXPECT().Incr(gomock.Any(), gomock.Any()).Return(redis.NewIntCmd(context.Background())).AnyTimes()
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
