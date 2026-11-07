@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
@@ -20,7 +21,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
@@ -58,7 +58,7 @@ func executionLimits() httpexec.Limits {
 				Timeout:        time.Second,
 			},
 		},
-		HTTP: httphost.Limits{
+		HTTP: aphttp.Limits{
 			Timeout:          2 * time.Second,
 			MaxRequests:      1,
 			MaxResponseBytes: 16384,

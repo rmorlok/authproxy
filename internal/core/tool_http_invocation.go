@@ -7,10 +7,10 @@ import (
 
 	authcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -55,7 +55,7 @@ func (s *service) invokeHTTPTool(
 		return nil, err
 	}
 
-	workCtx, stop := context.WithTimeoutCause(ctx, limits.HTTP.Timeout, httphost.ErrTimeout)
+	workCtx, stop := context.WithTimeoutCause(ctx, limits.HTTP.Timeout, aphttp.ErrTimeout)
 	defer stop()
 
 	deadline, _ := workCtx.Deadline()
@@ -83,7 +83,7 @@ func (s *service) invokeHTTPTool(
 			return nil, callerErr
 		}
 
-		if errors.Is(context.Cause(workCtx), httphost.ErrTimeout) {
+		if errors.Is(context.Cause(workCtx), aphttp.ErrTimeout) {
 			code = "EXECUTION_LIMIT_EXCEEDED"
 			message = "The Tool invocation exceeded its time limit."
 		}

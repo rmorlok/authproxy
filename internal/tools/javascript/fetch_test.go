@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -87,15 +88,15 @@ func (b *fetchBlockedCloseBody) Close() error {
 }
 
 // fetchLimits gives normal examples enough room without disabling any host policy.
-func fetchLimits() httphost.Limits {
-	return httphost.Limits{
+func fetchLimits() aphttp.Limits {
+	return aphttp.Limits{
 		Timeout: 10 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192,
 		MaxStreamBytes: 8192, MaxHeaderBytes: 4096,
 	}
 }
 
 // fetchOptions creates a dedicated invocation session with idempotent fallback cleanup.
-func fetchOptions(t *testing.T, ctx context.Context, client fetchClient, limits httphost.Limits) javascript.FetchOptions {
+func fetchOptions(t *testing.T, ctx context.Context, client fetchClient, limits aphttp.Limits) javascript.FetchOptions {
 	t.Helper()
 	session, err := httphost.New(ctx, client, limits)
 	require.NoError(t, err)
@@ -150,7 +151,7 @@ func TestToolFetchOptionsRequirePositiveLimits(t *testing.T) {
 
 			// A valid transferred session is consumed even when another option is invalid.
 			if options.Session != nil && options.Session.Context() != nil {
-				require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+				require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			}
 		})
 	}
@@ -186,7 +187,7 @@ func TestToolFetchInvalidEvaluationClosesSession(t *testing.T) {
 			result, err := test.program.EvaluateWithHTTP(test.ctx, test.input, options)
 			require.ErrorIs(t, err, test.want)
 			require.Nil(t, result)
-			require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			require.Zero(t, calls.Load())
 			require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
 		})
@@ -240,11 +241,11 @@ func TestToolFetchSequentialRequests(t *testing.T) {
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
 	// Evaluation closes the dedicated session before returning, preventing late admissions.
-	require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+	require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 	request, err := http.NewRequest(http.MethodGet, "https://provider.example/late", nil)
 	require.NoError(t, err)
 	response, err := options.Session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrClosed)
+	require.ErrorIs(t, err, aphttp.ErrClosed)
 	require.Nil(t, response)
 	require.Equal(t, int32(2), calls.Load())
 }
@@ -630,7 +631,7 @@ func TestToolFetchLimits(t *testing.T) {
 
 		// Catching a body rejection cannot recover an exhausted invocation-wide budget.
 		result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-		require.ErrorIs(t, err, httphost.ErrResponseLimit)
+		require.ErrorIs(t, err, aphttp.ErrResponseLimit)
 		require.Nil(t, result)
 		require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 	})
@@ -681,7 +682,7 @@ func TestToolFetchCancellation(t *testing.T) {
 
 				// Session policy and caller cancellation keep their distinct classifications.
 				if policy {
-					require.ErrorIs(t, evaluationErr, httphost.ErrTimeout)
+					require.ErrorIs(t, evaluationErr, aphttp.ErrTimeout)
 				} else {
 					require.ErrorIs(t, evaluationErr, context.Canceled)
 				}
@@ -752,7 +753,7 @@ func TestToolFetchCleanupDoesNotWaitForBlockedClose(t *testing.T) {
 	fetchWait(t, done)
 	require.NoError(t, evaluationErr)
 	require.JSONEq(t, `200`, string(result))
-	require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+	require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
 	// Release the deliberately uncooperative transport after all result assertions.
@@ -843,7 +844,7 @@ func TestToolFetchCombinatorsCancelRemainingRequests(t *testing.T) {
 			require.NoError(t, err)
 			require.JSONEq(t, test.want, string(result))
 			fetchWait(t, canceled)
-			require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
 			// Cleanup cancels without joining the loser and closes any body it returns later.

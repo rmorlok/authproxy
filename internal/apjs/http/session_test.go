@@ -1,4 +1,4 @@
-package httphost_test
+package http_test
 
 import (
 	"context"
@@ -12,10 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/schema/api"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,22 +20,28 @@ import (
 // invocation, without coupling session tests to a client's proxy internals.
 type sessionTestClient struct {
 	do func(*http.Request) (*http.Response, error)
+	// doWithState supplies explicit transport evidence for evidence-specific cases.
+	doWithState func(*http.Request) (*http.Response, aphttp.SendState, error)
 }
 
 // Do delegates to the scenario's observed client behavior.
-func (c *sessionTestClient) Do(req *http.Request) (*http.Response, error) {
-	return c.do(req)
+func (c *sessionTestClient) Do(req *http.Request) (*http.Response, aphttp.SendState, error) {
+	if c.doWithState != nil {
+		return c.doWithState(req)
+	}
+	response, err := c.do(req)
+	return response, aphttp.SendStateMayHaveSent, err
 }
 
 // sessionTestLimits leaves room for ordinary responses while bounding every policy.
-func sessionTestLimits() httphost.Limits {
-	return httphost.Limits{Timeout: 30 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192, MaxStreamBytes: 8192, MaxHeaderBytes: 4096}
+func sessionTestLimits() aphttp.Limits {
+	return aphttp.Limits{Timeout: 30 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192, MaxStreamBytes: 8192, MaxHeaderBytes: 4096}
 }
 
 // sessionTestNew constructs an invocation and guarantees its timer is released.
-func sessionTestNew(t *testing.T, ctx context.Context, client iface.HTTPClient, limits httphost.Limits) *httphost.Session {
+func sessionTestNew(t *testing.T, ctx context.Context, client aphttp.Client, limits aphttp.Limits) *aphttp.Session {
 	t.Helper()
-	session, err := httphost.New(ctx, client, limits)
+	session, err := aphttp.New(ctx, client, limits)
 	require.NoError(t, err)
 	t.Cleanup(session.Close)
 	return session
@@ -98,37 +101,37 @@ func TestSessionConstructor(t *testing.T) {
 	client := &sessionTestClient{}
 	for _, test := range []struct {
 		name   string
-		change func(*httphost.Limits)
+		change func(*aphttp.Limits)
 	}{
-		{"timeout", func(l *httphost.Limits) { l.Timeout = 0 }},
-		{"requests", func(l *httphost.Limits) { l.MaxRequests = 0 }},
-		{"response bytes", func(l *httphost.Limits) { l.MaxResponseBytes = 0 }},
-		{"stream bytes", func(l *httphost.Limits) { l.MaxStreamBytes = 0 }},
-		{"header bytes", func(l *httphost.Limits) { l.MaxHeaderBytes = 0 }},
-		{"negative policy", func(l *httphost.Limits) { l.MaxRequests = -1 }},
+		{"timeout", func(l *aphttp.Limits) { l.Timeout = 0 }},
+		{"requests", func(l *aphttp.Limits) { l.MaxRequests = 0 }},
+		{"response bytes", func(l *aphttp.Limits) { l.MaxResponseBytes = 0 }},
+		{"stream bytes", func(l *aphttp.Limits) { l.MaxStreamBytes = 0 }},
+		{"header bytes", func(l *aphttp.Limits) { l.MaxHeaderBytes = 0 }},
+		{"negative policy", func(l *aphttp.Limits) { l.MaxRequests = -1 }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// A zero or negative value cannot silently disable a guard.
 			limits := sessionTestLimits()
 			test.change(&limits)
-			session, err := httphost.New(context.Background(), client, limits)
-			require.ErrorIs(t, err, httphost.ErrInvalidInput)
+			session, err := aphttp.New(context.Background(), client, limits)
+			require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 			require.Nil(t, session)
 		})
 	}
-	_, err := httphost.New(nil, client, sessionTestLimits())
-	require.ErrorIs(t, err, httphost.ErrInvalidInput)
-	_, err = httphost.New(context.Background(), nil, sessionTestLimits())
-	require.ErrorIs(t, err, httphost.ErrInvalidInput)
+	_, err := aphttp.New(nil, client, sessionTestLimits())
+	require.ErrorIs(t, err, aphttp.ErrInvalidInput)
+	_, err = aphttp.New(context.Background(), nil, sessionTestLimits())
+	require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 
 	// No work starts when the admitted caller was already canceled.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	session, err := httphost.New(ctx, client, sessionTestLimits())
+	session, err := aphttp.New(ctx, client, sessionTestLimits())
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, session)
 	session = sessionTestNew(t, context.Background(), client, sessionTestLimits())
-	require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateNotSent, session.SendState())
 	require.NoError(t, session.Context().Err())
 	require.NoError(t, session.Err())
 	_, hasDeadline := session.Context().Deadline()
@@ -162,59 +165,65 @@ func TestSessionLocalRejectionOwnsRequestBody(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			request, body := sessionTestRequest(context.Background())
 			test.change(request)
-			response, err := session.Do(request)
-			require.ErrorIs(t, err, httphost.ErrInvalidInput)
+			response, state, err := session.Do(request)
+			require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 			require.Nil(t, response)
+			require.Equal(t, aphttp.SendStateNotSent, state)
 			require.EqualValues(t, 1, body.closes.Load())
 			require.Zero(t, body.reads.Load())
-			require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
+			require.Equal(t, aphttp.SendStateNotSent, session.SendState())
 		})
 	}
-	response, err := session.Do(nil)
-	require.ErrorIs(t, err, httphost.ErrInvalidInput)
+	response, state, err := session.Do(nil)
+	require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 	require.Nil(t, response)
+	require.Equal(t, aphttp.SendStateNotSent, state)
 
 	// An already canceled request also closes locally without spending a call.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	request, body := sessionTestRequest(ctx)
-	response, err = session.Do(request)
+	response, state, err = session.Do(request)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, response)
+	require.Equal(t, aphttp.SendStateNotSent, state)
 	require.EqualValues(t, 1, body.closes.Load())
 	require.Zero(t, calls.Load())
 
 	// The one allowed handoff remains available after all local rejections.
 	request, body = sessionTestRequest(context.Background())
-	response, err = session.Do(request)
+	response, state, err = session.Do(request)
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())
+	require.Equal(t, aphttp.SendStateMayHaveSent, state)
 	require.EqualValues(t, 1, calls.Load())
 	require.EqualValues(t, 1, body.closes.Load())
-	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 }
 
 // TestSessionUnusableSessionOwnsRequestBody extends entry ownership to nil,
 // zero-valued, and already closed sessions without invoking the client.
 func TestSessionUnusableSessionOwnsRequestBody(t *testing.T) {
-	for _, session := range []*httphost.Session{nil, {}} {
+	for _, session := range []*aphttp.Session{nil, {}} {
 		request, body := sessionTestRequest(context.Background())
-		response, err := session.Do(request)
-		require.ErrorIs(t, err, httphost.ErrInvalidInput)
+		response, state, err := session.Do(request)
+		require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 		require.Nil(t, response)
+		require.Equal(t, aphttp.SendStateNotSent, state)
 		require.EqualValues(t, 1, body.closes.Load())
 	}
 	client := &sessionTestClient{}
 	session := sessionTestNew(t, context.Background(), client, sessionTestLimits())
 	session.Close()
 	session.Close()
-	require.ErrorIs(t, session.Err(), httphost.ErrClosed)
+	require.ErrorIs(t, session.Err(), aphttp.ErrClosed)
 	request, body := sessionTestRequest(context.Background())
-	response, err := session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrClosed)
+	response, state, err := session.Do(request)
+	require.ErrorIs(t, err, aphttp.ErrClosed)
 	require.Nil(t, response)
+	require.Equal(t, aphttp.SendStateNotSent, state)
 	require.EqualValues(t, 1, body.closes.Load())
-	require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateNotSent, session.SendState())
 }
 
 // sessionTestIdentityKey distinguishes admitted identity from request-local values.
@@ -249,7 +258,7 @@ func TestSessionClientContract(t *testing.T) {
 		responseBodies = append(responseBodies, body)
 		return &http.Response{StatusCode: 201, Header: http.Header{"X-Upstream": {"first", "second"}}, Body: body}, nil
 	}}
-	session, err := httphost.New(parent, client, sessionTestLimits())
+	session, err := aphttp.New(parent, client, sessionTestLimits())
 	require.NoError(t, err)
 	t.Cleanup(session.Close)
 	require.Equal(t, "admitted identity", session.Context().Value(sessionTestIdentityKey{}))
@@ -263,7 +272,7 @@ func TestSessionClientContract(t *testing.T) {
 			replays++
 			return io.NopCloser(strings.NewReader("request payload")), nil
 		}
-		response, err := session.Do(request)
+		response, _, err := session.Do(request)
 		require.NoError(t, err)
 		require.Equal(t, 201, response.StatusCode)
 		require.Equal(t, []string{"first", "second"}, response.Header["X-Upstream"])
@@ -277,7 +286,7 @@ func TestSessionClientContract(t *testing.T) {
 	}
 	require.Equal(t, 2, calls)
 	require.Equal(t, 2, replays)
-	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 }
 
 // TestSessionClientDeadlinePrecedence exposes the earliest effective deadline to
@@ -324,7 +333,7 @@ func TestSessionClientDeadlinePrecedence(t *testing.T) {
 			// Do preserves exactly the earlier timestamp and leaves the shared
 			// invocation's deadline and lifetime unchanged after the body closes.
 			request, _ := sessionTestRequest(requestCtx)
-			response, err := session.Do(request)
+			response, _, err := session.Do(request)
 			require.NoError(t, err)
 			require.NoError(t, response.Body.Close())
 			deadline, ok := session.Context().Deadline()
@@ -349,27 +358,27 @@ func TestSessionTransportFailureConsumesCall(t *testing.T) {
 	limits.MaxRequests = 1
 	session := sessionTestNew(t, context.Background(), client, limits)
 	request, body := sessionTestRequest(context.Background())
-	response, err := session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrTransport)
+	response, _, err := session.Do(request)
+	require.ErrorIs(t, err, aphttp.ErrTransport)
 	require.NotContains(t, err.Error(), "private-")
 	require.Nil(t, response)
 	require.EqualValues(t, 1, calls.Load())
 	require.EqualValues(t, 1, body.closes.Load())
 	require.EqualValues(t, 1, upstreamBody.closes.Load())
-	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 
 	// Failed transport spends its slot; the next body is rejected and closed locally.
 	request, body = sessionTestRequest(context.Background())
-	response, err = session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrRequestLimit)
+	response, _, err = session.Do(request)
+	require.ErrorIs(t, err, aphttp.ErrRequestLimit)
 	require.Nil(t, response)
 	require.EqualValues(t, 1, body.closes.Load())
 	require.EqualValues(t, 1, calls.Load())
-	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 }
 
 // TestSessionStatusesDoNotTriggerHostRetries leaves credential recovery and
-// status interpretation to the existing proxy and higher-level Tool executor.
+// status interpretation to the supplied client and higher-level executor.
 func TestSessionStatusesDoNotTriggerHostRetries(t *testing.T) {
 	for _, status := range []int{401, 429, 503} {
 		var calls int
@@ -382,7 +391,7 @@ func TestSessionStatusesDoNotTriggerHostRetries(t *testing.T) {
 		}}
 		session := sessionTestNew(t, context.Background(), client, sessionTestLimits())
 		request, _ := sessionTestRequest(context.Background())
-		response, err := session.Do(request)
+		response, _, err := session.Do(request)
 		require.NoError(t, err)
 		require.Equal(t, status, response.StatusCode)
 		require.Equal(t, 1, calls)
@@ -424,7 +433,7 @@ func TestSessionConcurrentRequestLimit(t *testing.T) {
 		bodies = append(bodies, body)
 		workers.Go(func() {
 			<-start
-			response, err := session.Do(request)
+			response, _, err := session.Do(request)
 			if response != nil {
 				_ = response.Body.Close()
 			}
@@ -441,7 +450,7 @@ func TestSessionConcurrentRequestLimit(t *testing.T) {
 			t.Fatal("allowed proxy calls did not enter")
 		}
 	}
-	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 	unblock()
 	done := make(chan struct{})
 	go func() { workers.Wait(); close(done) }()
@@ -454,7 +463,7 @@ func TestSessionConcurrentRequestLimit(t *testing.T) {
 		if err == nil {
 			succeeded++
 		} else {
-			require.ErrorIs(t, err, httphost.ErrRequestLimit)
+			require.ErrorIs(t, err, aphttp.ErrRequestLimit)
 			rejected++
 		}
 	}
@@ -502,9 +511,9 @@ func TestSessionPendingRequestCancellation(t *testing.T) {
 				want = context.DeadlineExceeded
 			case "policy timeout":
 				limits.Timeout = 100 * time.Millisecond
-				want = httphost.ErrTimeout
+				want = aphttp.ErrTimeout
 			case "close":
-				want = httphost.ErrClosed
+				want = aphttp.ErrClosed
 			}
 			entered := make(chan struct{})
 			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
@@ -516,10 +525,10 @@ func TestSessionPendingRequestCancellation(t *testing.T) {
 			}}
 			session := sessionTestNew(t, parent, client, limits)
 			request, body := sessionTestRequest(requestCtx)
-			var response *httphost.Response
+			var response *aphttp.Response
 			var err error
 			done := make(chan struct{})
-			go func() { response, err = session.Do(request); close(done) }()
+			go func() { response, _, err = session.Do(request); close(done) }()
 			sessionTestWait(t, entered, session.Close)
 			switch kind {
 			case "parent cancel", "parent custom cause":
@@ -536,7 +545,7 @@ func TestSessionPendingRequestCancellation(t *testing.T) {
 			require.NotContains(t, err.Error(), "private-")
 			require.Nil(t, response)
 			require.EqualValues(t, 1, body.closes.Load())
-			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+			require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 			if strings.HasPrefix(kind, "request ") {
 				require.NoError(t, session.Context().Err())
 				require.NoError(t, session.Err())
@@ -557,13 +566,13 @@ func TestSessionTimeoutIncludesIdleTime(t *testing.T) {
 
 	// Observe the actual policy deadline instead of sleeping for a guessed delay.
 	sessionTestWait(t, session.Context().Done(), session.Close)
-	require.ErrorIs(t, session.Err(), httphost.ErrTimeout)
+	require.ErrorIs(t, session.Err(), aphttp.ErrTimeout)
 	request, body := sessionTestRequest(context.Background())
-	response, err := session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrTimeout)
+	response, _, err := session.Do(request)
+	require.ErrorIs(t, err, aphttp.ErrTimeout)
 	require.Nil(t, response)
 	require.EqualValues(t, 1, body.closes.Load())
-	require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateNotSent, session.SendState())
 }
 
 // sessionTestBlockingBody models a transport read that unblocks only when its
@@ -606,7 +615,7 @@ func TestSessionCancellationClosesActiveResponse(t *testing.T) {
 			}}
 			session := sessionTestNew(t, parent, client, sessionTestLimits())
 			request, _ := sessionTestRequest(requestCtx)
-			response, err := session.Do(request)
+			response, _, err := session.Do(request)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = response.Body.Close() })
 			var n int
@@ -622,7 +631,7 @@ func TestSessionCancellationClosesActiveResponse(t *testing.T) {
 				cancelRequest()
 			case "close":
 				session.Close()
-				want = httphost.ErrClosed
+				want = aphttp.ErrClosed
 			}
 			sessionTestWait(t, done, session.Close)
 
@@ -633,7 +642,7 @@ func TestSessionCancellationClosesActiveResponse(t *testing.T) {
 			require.EqualValues(t, 1, body.closes.Load())
 			_ = response.Body.Close()
 			require.EqualValues(t, 1, body.closes.Load())
-			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+			require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 		})
 	}
 }
@@ -662,7 +671,7 @@ func TestSessionRequestCancellationDoesNotPoisonInvocation(t *testing.T) {
 	request, _ := sessionTestRequest(ctx)
 	var firstErr error
 	done := make(chan struct{})
-	go func() { _, firstErr = session.Do(request); close(done) }()
+	go func() { _, _, firstErr = session.Do(request); close(done) }()
 	sessionTestWait(t, entered, session.Close)
 	cancel()
 	sessionTestWait(t, done, session.Close)
@@ -671,12 +680,12 @@ func TestSessionRequestCancellationDoesNotPoisonInvocation(t *testing.T) {
 
 	// A later call still succeeds, but the canceled handoff consumed its slot.
 	request, _ = sessionTestRequest(context.Background())
-	response, err := session.Do(request)
+	response, _, err := session.Do(request)
 	require.NoError(t, err)
 	require.NoError(t, response.Body.Close())
 	request, body := sessionTestRequest(context.Background())
-	response, err = session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrRequestLimit)
+	response, _, err = session.Do(request)
+	require.ErrorIs(t, err, aphttp.ErrRequestLimit)
 	require.Nil(t, response)
 	require.EqualValues(t, 1, body.closes.Load())
 	require.Equal(t, 2, calls)
@@ -712,7 +721,7 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	// A fully consumed result uses two bytes and remains caller-owned data.
 	request, _ := sessionTestRequest(context.Background())
 	request.URL.Path = "/completed"
-	completed, err := session.Do(request)
+	completed, _, err := session.Do(request)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = completed.Body.Close() })
 	completedData, err := io.ReadAll(completed.Body)
@@ -722,7 +731,7 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	// Start another response read and wait until its transport is blocked.
 	request, _ = sessionTestRequest(context.Background())
 	request.URL.Path = "/pending"
-	pending, err := session.Do(request)
+	pending, _, err := session.Do(request)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pending.Body.Close() })
 	var pendingBytes int
@@ -735,18 +744,18 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	// Its accepted prefix is partial data, accompanied by the aggregate failure.
 	request, _ = sessionTestRequest(context.Background())
 	request.URL.Path = "/overflow"
-	overflow, err := session.Do(request)
+	overflow, _, err := session.Do(request)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = overflow.Body.Close() })
 	partial, err := io.ReadAll(overflow.Body)
-	require.ErrorIs(t, err, httphost.ErrResponseLimit)
+	require.ErrorIs(t, err, aphttp.ErrResponseLimit)
 	require.Equal(t, "ab", string(partial))
-	require.ErrorIs(t, session.Err(), httphost.ErrResponseLimit)
+	require.ErrorIs(t, session.Err(), aphttp.ErrResponseLimit)
 
 	// Exceeding the shared cap closes the other stream and unblocks its read.
 	sessionTestWait(t, pendingDone, session.Close)
 	require.Zero(t, pendingBytes)
-	require.ErrorIs(t, pendingErr, httphost.ErrResponseLimit)
+	require.ErrorIs(t, pendingErr, aphttp.ErrResponseLimit)
 	require.EqualValues(t, 1, pendingBody.closes.Load())
 	require.EqualValues(t, 1, overflowBody.closes.Load())
 
@@ -754,8 +763,8 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	// their terminal EOF remain intact. Upstream effects stay conservatively known.
 	request, rejectedBody := sessionTestRequest(context.Background())
 	request.URL.Path = "/later"
-	response, err := session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrResponseLimit)
+	response, _, err := session.Do(request)
+	require.ErrorIs(t, err, aphttp.ErrResponseLimit)
 	require.Nil(t, response)
 	require.EqualValues(t, 1, rejectedBody.closes.Load())
 	require.EqualValues(t, 3, calls.Load())
@@ -764,43 +773,41 @@ func TestSessionResponseOverflowCancelsOtherReads(t *testing.T) {
 	require.Zero(t, n)
 	require.ErrorIs(t, err, io.EOF)
 	require.EqualValues(t, 1, completedBody.closes.Load())
-	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 }
 
 // TestSessionConcurrentSendEvidence keeps outstanding calls uncertain and only
-// returns to notStarted when every completed call is explicitly proven unsent.
+// returns to notSent when every completed call is explicitly proven unsent.
 func TestSessionConcurrentSendEvidence(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		report bool
-		sent   bool
-		want   api.ToolExecutionState
+		name  string
+		state aphttp.SendState
+		want  aphttp.SendState
 	}{
-		{"all unsent", true, false, api.ToolExecutionStateNotStarted},
-		{"possible send", true, true, api.ToolExecutionStateMayHaveExecuted},
-		{"unknown client", false, false, api.ToolExecutionStateMayHaveExecuted},
+		{"all unsent", aphttp.SendStateNotSent, aphttp.SendStateNotSent},
+		{"possible send", aphttp.SendStateMayHaveSent, aphttp.SendStateMayHaveSent},
+		{"confirmed send", aphttp.SendStateSent, aphttp.SendStateSent},
+		{"unknown client", 0, aphttp.SendStateMayHaveSent},
+		{"invalid evidence", aphttp.SendState(255), aphttp.SendStateMayHaveSent},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Hold one call in flight while another finishes with no target send.
 			entered, release := make(chan struct{}), make(chan struct{})
 			unblock := sync.OnceFunc(func() { close(release) })
 			t.Cleanup(unblock)
-			client := &sessionTestClient{do: func(req *http.Request) (*http.Response, error) {
+			client := &sessionTestClient{doWithState: func(req *http.Request) (*http.Response, aphttp.SendState, error) {
 				_ = req.Body.Close()
+				state := aphttp.SendStateNotSent
 				if req.URL.Path == "/slow" {
 					close(entered)
 					select {
 					case <-release:
 					case <-req.Context().Done():
-						return nil, req.Context().Err()
+						return nil, aphttp.SendStateMayHaveSent, req.Context().Err()
 					}
-					if tc.report {
-						httpf.ReportSendEvidence(req.Context(), tc.sent)
-					}
-				} else {
-					httpf.ReportSendEvidence(req.Context(), false)
+					state = tc.state
 				}
-				return &http.Response{StatusCode: http.StatusTooManyRequests, Body: http.NoBody}, nil
+				return &http.Response{StatusCode: http.StatusTooManyRequests, Body: http.NoBody}, state, nil
 			}}
 			limits := sessionTestLimits()
 			limits.MaxRequests = 3
@@ -808,42 +815,47 @@ func TestSessionConcurrentSendEvidence(t *testing.T) {
 			request, _ := sessionTestRequest(context.Background())
 			request.URL.Path = "/slow"
 			var slowErr error
+			var slowState aphttp.SendState
 			done := make(chan struct{})
 			go func() {
-				response, err := session.Do(request)
-				slowErr = err
+				response, state, err := session.Do(request)
+				slowState, slowErr = state, err
 				if response != nil {
 					_ = response.Body.Close()
 				}
 				close(done)
 			}()
 			sessionTestWait(t, entered, session.Close)
-			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+			require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 
 			// One completed local rejection cannot hide the still-running call.
 			fast, _ := sessionTestRequest(context.Background())
-			response, err := session.Do(fast)
+			response, state, err := session.Do(fast)
 			require.NoError(t, err)
+			require.Equal(t, aphttp.SendStateNotSent, state)
 			require.NoError(t, response.Body.Close())
-			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
+			require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 			unblock()
 			sessionTestWait(t, done, session.Close)
 			require.NoError(t, slowErr)
-			require.Equal(t, tc.want, session.ExecutionState())
+			require.Equal(t, tc.want, slowState)
+			require.Equal(t, tc.want, session.SendState())
 
-			// Later known-unsent calls cannot erase an earlier possible send or
-			// unknown outcome. Every handoff still spends its request allowance.
+			// Later known-unsent calls cannot erase earlier evidence. Every
+			// handoff still spends its request allowance independently of sends.
 			fast, _ = sessionTestRequest(context.Background())
-			response, err = session.Do(fast)
+			response, state, err = session.Do(fast)
 			require.NoError(t, err)
+			require.Equal(t, aphttp.SendStateNotSent, state)
 			require.NoError(t, response.Body.Close())
-			require.Equal(t, tc.want, session.ExecutionState())
+			require.Equal(t, tc.want, session.SendState())
 			rejected, body := sessionTestRequest(context.Background())
-			response, err = session.Do(rejected)
-			require.ErrorIs(t, err, httphost.ErrRequestLimit)
+			response, state, err = session.Do(rejected)
+			require.ErrorIs(t, err, aphttp.ErrRequestLimit)
+			require.Equal(t, aphttp.SendStateNotSent, state)
 			require.Nil(t, response)
 			require.EqualValues(t, 1, body.closes.Load())
-			require.Equal(t, tc.want, session.ExecutionState())
+			require.Equal(t, tc.want, session.SendState())
 		})
 	}
 }

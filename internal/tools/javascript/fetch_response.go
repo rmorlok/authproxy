@@ -6,14 +6,14 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
 // responseValue builds native response metadata without reading its body. The
 // closure's consumed flag is VM-owned; workers only receive the Go body reader.
 // No upstream request, credentials, or reflected Go response enters the VM.
-func (l *fetchLoop) responseValue(response *httphost.Response) (goja.Value, error) {
+func (l *fetchLoop) responseValue(response *aphttp.Response) (goja.Value, error) {
 	object, headers := l.vm.NewObject(), l.vm.NewObject()
 
 	get := func(call goja.FunctionCall) goja.Value {

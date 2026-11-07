@@ -3,11 +3,11 @@ package core
 import (
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
@@ -75,7 +75,7 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 				Timeout:        timeout,
 			},
 		},
-		HTTP: httphost.Limits{
+		HTTP: aphttp.Limits{
 			Timeout:          timeout,
 			MaxRequests:      toolPolicyInt(settings.MaxRequests, 20),
 			MaxResponseBytes: int64(responseBytes),

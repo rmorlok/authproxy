@@ -1,21 +1,24 @@
-# Connection-bound HTTP execution
+# Tool HTTP adapter
 
-A Tool can make several requests to complete one action, such as finding a CRM
-contact and then updating it. `httphost.Session` sends those requests through one
-captured connection's configured HTTP client. The requests share a timeout, a
-logical request allowance, and an aggregate decoded response allowance.
+This package connects a Tool's configured AuthProxy client to the shared
+[HTTP session](../../apjs/http/README.md). The shared package owns deadlines,
+request and response budgets, header filtering, lazy body decoding, and cleanup.
+This adapter supplies two AuthProxy-specific translations:
 
-The existing connection proxy still supplies credentials, credential recovery,
-rate limiting, and request instrumentation. The host receives prepared
-`http.Request` values; [httpcodec](../httpcodec/README.md) can produce them from
-Tool templates and map their responses to rich results.
+- Configured-client send observations and trusted credential failures become
+  neutral HTTP evidence and error categories.
+- Aggregate send evidence becomes a Tool's `notStarted` or `mayHaveExecuted`
+  execution state.
 
-## Send requests through the captured connection
+The existing connection client still owns credentials, recovery, rate limiting,
+request events, and telemetry. This package does not select connections, check
+permissions, render requests, validate schemas, or build Tool results.
 
-The following helper reads an account response. `conn` is the connection already
-selected and authorized by the invocation caller. The limits below are examples;
-the caller must resolve effective policy before creating a session. `ctx` carries
-the actor admitted for this invocation.
+## Use an admitted connection
+
+For example, read an account through a connection already selected and authorized
+by the caller. The policy values below are examples; the caller resolves operator
+ceilings and authored caps before creating the session.
 
 ```go
 func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
@@ -26,7 +29,7 @@ func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
     if err != nil {
         return nil, err
     }
-    session, err := httphost.New(ctx, client, httphost.Limits{
+    session, err := httphost.New(ctx, client, aphttp.Limits{
         Timeout:          30 * time.Second,
         MaxRequests:      3,
         MaxResponseBytes: 2 * 1024 * 1024,
@@ -51,7 +54,6 @@ func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
     }
     defer response.Body.Close()
     if response.StatusCode != http.StatusOK {
-        // A status rule can reject a response without reading its body.
         return nil, errors.New("account lookup failed")
     }
     body, err := io.ReadAll(response.Body)
@@ -62,154 +64,57 @@ func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
 }
 ```
 
-The module imports are `internal/apauth/core` (aliased as `authcore`),
-`internal/core/iface`, and `internal/tools/httphost` under
-`github.com/rmorlok/authproxy`; the other imports are from the Go standard library.
-For a multi-request action, keep one session alive around the entire action.
-Creating a session for each page would reset the allowances and timeout.
+The AuthProxy imports are `internal/apauth/core` (aliased as `authcore`),
+`internal/apjs/http` (aliased as `aphttp`), `internal/core/iface`, and
+`internal/tools/httphost`. Other imports are from Go's standard library.
+Use `aphttp.Limits`, `aphttp.Response`, and the shared HTTP error sentinels
+directly; this adapter supplies the configured-client session and Tool state.
 
-The client captures actor attribution, request type, and labels and uses the
-connection's existing streaming proxy for credentials and recovery. Every client
-requires an explicit actor choice. Construction fails if `ActingAs` has no valid
-actor; background work with no initiating actor can choose `iface.WithoutActor()`.
-A session context carrying an actor must match the client's configured actor.
-Create a client per invocation so its captured labels and rate-limit configuration
-are current. `Session` only requires its `Do` method. The invocation caller must
-supply a client configured from the admitted connection; the host does not select
-a connection or configure attribution itself.
+The client's explicit actor choice must match any actor in the session context.
+Background work without an initiating actor can use `iface.WithoutActor()`.
+Create a client per invocation to capture current labels and rate-limit policy.
+Keep one session around a whole multi-request action so pagination or a second
+endpoint does not reset its allowances. `NewWithDeadline` can include admission
+and preparation time in that same policy deadline.
 
-`Do` takes ownership of the outgoing body immediately, even when a canceled
-context or exhausted budget prevents a proxy call. After handoff, the existing
-proxy owns that body, including any fresh replay readers supplied by `GetBody`.
-Caller-provided headers, URL, and host overrides retain existing proxy behavior.
+`Do` owns the outgoing body even on local rejection. The caller owns the returned
+body and must close it, including when discarding a status without reading it.
+The shared session never closes or reconfigures the supplied client. A response
+contains only status, captured content type, filtered copied headers, and a
+bounded body; it does not expose a credential-bearing `http.Response.Request`.
+Pass `Response.ContentType` to response mapping because filtering can remove the
+original header. See the shared package for decoding and accounting details.
 
-The returned response contains only status, captured content type, copied headers,
-and a bounded body. It does not expose the proxy's credential-bearing
-`http.Response.Request`.
-Known authentication and cookie headers, including `Set-Cookie` and
-`Authentication-Info`, are removed. Hop-by-hop headers and every field nominated
-by `Connection` are also removed. Other end-to-end metadata such as `Retry-After`
-and rate-limit headers remains available. All raw headers count toward the header
-limit and are validated before filtering; decoding instructions are captured
-before their headers can be removed.
-This filter does not identify secrets in arbitrary provider-specific headers or
-bodies. Trusted Tool definitions still control what data reaches the caller.
+## Errors and send evidence
 
-`Response.ContentType` preserves the original media type and its parameters,
-even if `Connection` names `Content-Type` or the caller changes `Response.Header`.
-Pass this field to `httpcodec.ResponseInput.ContentType` when mapping the body;
-reading the content type from the filtered header map could misclassify JSON as
-binary data.
+The adapter calls the configured client once, collecting its existing `httpf`
+observation across redirects and credential-recovery attempts. OAuth token
+requests stay separate from target evidence. A trusted
+`auth_methods.ErrCredentialsUnavailable` marker becomes
+`aphttp.ErrCredentialsUnavailable`; other client errors become
+`aphttp.ErrTransport`. Neither error retains private diagnostics. Caller
+cancellation and policy failures keep the shared session's precedence.
 
-`Do` does not read the response body, including a gzip header. Callers can inspect
-status and close an unwanted response without draining it. A caller that needs
-the body must read it and handle errors before transforming the result.
+For example, a missing API-key row is unavailable, while failure to decrypt an
+existing key is a transport/operational failure. Error text or a 401/403 status
+alone does not establish missing credentials. Failed credential recovery still
+returns the original upstream 401 response, and local rate limiting still
+returns a normal 429 response. See the
+[authentication error contract](../../auth_methods/README.md#error-contract).
 
-## Allowances and cancellation
+The embedded session retains `notSent`, `mayHaveSent`, and `sent` evidence.
+`ExecutionState()` maps only `notSent` to the Tool state `notStarted`. Both a
+possible send and a confirmed target response map to `mayHaveExecuted`: neither
+proves that a multi-request Tool action finished successfully.
 
-All limit fields must be positive:
+For example, a local rate-limit rejection before any target attempt is
+`notStarted`. A target 401 followed by a local rejection during recovery is
+`mayHaveExecuted`. Every logical client handoff still consumes request budget,
+including a proven pre-send rejection.
 
-| Limit | What it counts |
-| --- | --- |
-| `Timeout` | The entire session lifetime, including rendering and time between requests. |
-| `MaxRequests` | Logical client calls, including calls that fail after handoff. |
-| `MaxResponseBytes` | Decoded bytes read across all responses, including partial bodies later discarded. |
-| `MaxStreamBytes` | Bytes from each proxy response body before decoding performed by this host. |
-| `MaxHeaderBytes` | Each copied response header map's names, values, and field-line overhead. |
-
-Credential recovery, redirects, and credential refresh can cause extra HTTP
-attempts within a logical client call. The host adds no retries. It never refunds
-consumed requests or response bytes after a failure.
-
-Response reads support identity and gzip encoding, including the legacy `x-gzip`
-alias defined in [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.4.1.3).
-Go's HTTP transport sometimes decompresses gzip itself; the host recognizes that
-case and does not decode twice. When the host decodes gzip, its returned headers
-omit `Content-Encoding` and `Content-Length`. Bodyless responses such as `HEAD`, `204`, and `304` retain
-their representation metadata and return EOF without decoding. Other encodings
-fail when a response body is read. The stream cap
-is not a wire-byte measurement because the transport may already have decoded it.
-
-Concurrent calls share synchronized accounting. Each body lazily allocates a
-32 KiB scratch buffer when reading content and reuses it for subsequent reads,
-charging each decoded chunk before returning it. Terminal reads release the
-buffer; inspecting status without reading does not allocate it. Reads already
-in flight can consume an extra chunk each when another read exhausts the budget;
-those excess bytes are never returned. An exact-limit body can require a
-one-byte probe to distinguish EOF from excess. These limits bound host processing
-and exposed data; they are not a hard memory quota for the transport or process.
-
-Exceeding the aggregate decoded allowance cancels the whole session. The read
-that detects excess fails with `ErrResponseLimit`, and cancellation interrupts
-other pending requests and reads with that same error. Future requests are
-rejected too. Catching the first error does not restore the invocation's budget.
-Fully returned responses remain usable, but partial bodies
-must not be treated as complete responses. Cancellation does not undo upstream
-side effects.
-
-The session context preserves the admitted actor and other context values;
-the configured client fixes request attribution and rejects a conflicting actor.
-Each request's context can cancel that request sooner but cannot replace the
-session's identity. Caller cancellation returns `context.Canceled` or
-`context.DeadlineExceeded`; the configured session timeout returns `ErrTimeout`.
-`Session.Err()` makes the same distinction for work between requests.
-Closing a session cancels outstanding I/O and releases its timer. Closing a
-response releases its request without canceling other calls in the session.
-
-## Errors and execution uncertainty
-
-Proxy and body failures return fixed error classifications, without URLs,
-credential text, response bodies, or upstream error messages. Callers can use
-`errors.Is` and map them to Tool error results. A returned proxy error explicitly
-marked with `auth_methods.ErrCredentialsUnavailable` becomes
-`httphost.ErrCredentialsUnavailable`. The marker identifies credentials known to
-be missing or unusable; see the [authentication failure contract](../../auth_methods/README.md#error-contract).
-The host discards the underlying private cause. Cancellation takes precedence,
-and other proxy errors remain `ErrTransport`.
-
-For example, a missing API-key row produces `ErrCredentialsUnavailable`, while
-failure to decrypt an existing key produces `ErrTransport`. Neither an error's
-text nor a 401/403 status alone is enough to infer missing credentials or advise
-reconnecting. The error category also does not establish retry safety: check the
-invocation's independent `ExecutionState()` for possible earlier effects.
-
-Failed credential recovery still returns the original upstream 401 response,
-including when the refresh error was marked unavailable. The response remains
-available to status rules. Local rate-limit rejections likewise remain normal
-429 responses, not Go errors.
-
-`ExecutionState()` starts as `notStarted`. While any `Do` call is outstanding,
-the answer is provisional and reports `mayHaveExecuted`. It can return to
-`notStarted` once all outstanding calls finish with proof they were unsent.
-Canceling or closing the session does not wait for calls to return. To capture
-the settled invocation state, stop starting requests and wait for every `Do`
-to return. A timeout result emitted before then must keep its conservative
-state; a later observation does not revise that already-emitted result.
-
-Once calls return, the session uses the proxy's send evidence:
-
-| What happened | State after the call |
-| --- | --- |
-| Connection client initialization failed before any proxy request. | `notStarted` |
-| Credentials could not be resolved before any target attempt. | `notStarted` |
-| A local rate limiter returned 429 before any target attempt. | `notStarted` |
-| The target transport was entered, even if DNS, TLS, or the request later failed. | `mayHaveExecuted` |
-| The client or transport did not supply reliable evidence. | `mayHaveExecuted` |
-
-These examples assume no earlier call may have executed. A possible send stays
-recorded for the rest of the session. For example, a target 401 followed by a
-local 429 during the credential retry remains `mayHaveExecuted`. Redirects also
-retain earlier attempts. OAuth token requests do not count as target requests.
-Every client handoff still consumes a logical request, including a proven
-pre-send rejection; execution state does not refund the allowance.
-
-This evidence records entry into the target transport, not proof that the
-provider received or completed a request. A successful HTTP response also does
-not establish completion of the whole logical action. A higher-level executor
-decides when the Tool action is complete. Unknown clients and recovered client
-panics remain conservative.
-
-This package does not load Tool revisions, check permissions, validate input or
-output schemas, render requests, or build Tool results. The invocation layer must
-authorize the captured Tool and connection before creating a session. Existing
-public proxy permission checks are unchanged.
+Outstanding calls remain uncertain. Once all return with proof they were unsent,
+the aggregate can return to `notStarted`; earlier possible or confirmed sends
+remain recorded. Closing the session does not wait for outstanding clients. A
+result returned while work is pending must keep its conservative state rather
+than revise it from late evidence. Unknown clients and recovered client panics
+also remain conservative.
