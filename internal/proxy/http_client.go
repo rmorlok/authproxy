@@ -10,8 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
-// proxyHTTPClient is a connection HTTP client whose middleware stack is built
-// once from captured attribution and reused for calls without extra labels.
+// proxyHTTPClient is a connection HTTP client whose factory captures attribution.
+// Its middleware stack is built lazily and reused for calls without extra labels.
 // Labeled calls derive a private stack from that same snapshot. Neither path
 // rereads actor or connection metadata, so concurrent calls cannot change one
 // another's attribution. Clients are intended to be short-lived.
@@ -25,19 +25,16 @@ type proxyHTTPClient struct {
 	// actor is the validated attribution choice used to check request contexts.
 	actor iface.HTTPClientActor
 
-	// client wraps the connection's middleware stack, built once at construction.
-	client *http.Client
-
 	// factory retains the resolved connection, actor, policy, and base labels.
 	// Per-call labels derive another factory rather than mutating this snapshot
 	// or resolving attribution again from live connection/actor objects.
 	factory httpf.F
 }
 
-// HTTPClient validates options and captures attribution in a baseline middleware
-// stack. Calls with extra labels derive their own stack from the same snapshot.
-// Construction performs no I/O: credentials are resolved per request. The
-// returned client is safe for concurrent use.
+// HTTPClient validates options and captures attribution in a factory. Middleware
+// is built on demand; calls with extra labels derive their own stack from that
+// snapshot. Construction performs no I/O: credentials are resolved per request.
+// The returned client is safe for concurrent use.
 func (p *proxy) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, error) {
 	// Normalize captures the actor's id here, immediately before ForActor
 	// snapshots the same actor, so Do's agreement check compares against the
@@ -64,12 +61,11 @@ func (p *proxy) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, e
 		proxy:       p,
 		requestType: options.RequestType,
 		actor:       options.Actor,
-		client:      factory.NewHTTPClient(),
 		factory:     factory,
 	}, nil
 }
 
-// Do sends req through the prebuilt middleware stack with the request's own
+// Do sends req through the factory's cached middleware stack with the request's own
 // context for cancellation and deadlines. It owns req.Body on every path,
 // including validation and actor-mismatch failures that happen before send.
 func (c *proxyHTTPClient) Do(req *http.Request) (*http.Response, error) {
@@ -78,8 +74,8 @@ func (c *proxyHTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 // DoWithLabels validates per-call user labels before resolving credentials and
 // sends through a private middleware stack derived from captured attribution.
-// The same stack handles every retry/redirect of this request. Empty labels reuse
-// the prebuilt client; labeled stacks are not cached or shared with other calls.
+// The same client handles every retry/redirect of this request. Empty labels reuse
+// the factory's cached stack; labeled stacks are not shared with other calls.
 func (c *proxyHTTPClient) DoWithLabels(req *http.Request, labels map[string]string) (*http.Response, error) {
 	if req == nil {
 		return nil, errors.New("connection HTTP client requires a request")
@@ -105,13 +101,11 @@ func (c *proxyHTTPClient) DoWithLabels(req *http.Request, labels map[string]stri
 		return nil, iface.ErrHTTPClientInvalidLabels
 	}
 
-	client := c.client
-	if len(labels) > 0 {
-		// ForLabels detaches and merges the map before middleware can observe
-		// it. Reusing this client through streamWithClient also pins the label
-		// snapshot across credential recovery and ordinary HTTP redirects.
-		client = c.factory.ForLabels(labels).NewHTTPClient()
-	}
+	// ForLabels copies and merges nonempty labels, or returns the same factory
+	// for empty labels. NewHTTPClient reuses that factory's cached transport, so
+	// only the lightweight client wrapper is new on each unlabeled call. Keep
+	// one client for the entire logical request, including recovery/redirects.
+	client := c.factory.ForLabels(labels).NewHTTPClient()
 
 	return c.proxy.streamWithClient(req.Context(), c.requestType, client, req)
 }

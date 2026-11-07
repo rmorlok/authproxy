@@ -49,11 +49,14 @@ replace the captured actor, connection, or request type. The outgoing body is
 closed and send evidence records that the rejected call did not send.
 
 The proxy captures connection and actor metadata when it builds the configured
-client. The core connection wrapper defers that build until first use. Labeled
-calls copy and merge their labels into that captured snapshot, then build a
-private middleware stack; they do not reread live metadata or mutate shared
-clients. Concurrent calls remain independent. Keep a supplied label map stable
-during the call. Create a new client to pick up later metadata or policy changes.
+client's factory. The core connection wrapper defers that step until first use.
+Each request creates a lightweight HTTP client from the factory. Calls without
+extra labels share the factory's lazily built middleware stack and pooled
+connections. Labeled calls copy and merge their labels into the captured
+snapshot, then build a private stack. Neither path rereads live metadata or
+mutates shared clients. Concurrent calls remain independent. Keep a supplied
+label map stable during the call. Create a new configured client to pick up
+later metadata or policy changes.
 
 The client does not impose a label-byte budget. A bounded execution host must
 account for request data before calling it. JavaScript `connection.fetch` does

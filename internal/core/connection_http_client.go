@@ -11,9 +11,9 @@ import (
 )
 
 // connectionHTTPClient defers resolving the connection's proxy until the first
-// request, then delegates every call to one proxy-level client whose baseline
-// middleware stack is built once. Per-request labels derive from that same
-// snapshot. No context or response state is shared between calls.
+// request, then delegates every call to one proxy-level client whose factory
+// captures attribution once and builds middleware on demand. Per-request labels
+// derive from that snapshot. No context or response state is shared between calls.
 type connectionHTTPClient struct {
 	// connection is the only destination capability available to this client.
 	connection *connection
@@ -43,7 +43,7 @@ func (c *connection) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClie
 }
 
 // Do resolves the connection proxy on first use, then sends through its
-// prebuilt client. It owns req.Body on every path, including initialization
+// captured client. It owns req.Body on every path, including initialization
 // failures before send. Nil requests fail before any initialization.
 func (c *connectionHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return c.DoWithLabels(req, nil)

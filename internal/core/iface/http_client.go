@@ -34,10 +34,11 @@ var (
 // proxy's credentials, recovery, rate limiting, and instrumentation. They do
 // not check caller permissions.
 //
-// A client snapshots the actor's labels and the connection's labels and
-// rate-limit configuration when its middleware stack is built. It is meant to
-// be short-lived (one invocation or one inbound request); create a new client
-// to observe later label or configuration changes.
+// A proxy-level client snapshots the actor's labels and the connection's labels
+// and rate-limit configuration when its factory is configured. The core connection
+// wrapper defers that step until first use; middleware is then built on demand.
+// Clients are meant to be short-lived (one invocation or one inbound request);
+// create a new client to observe later label or configuration changes.
 type HTTPClient interface {
 	// Do returns headers and a streaming body without consuming the response.
 	// It takes ownership of the outgoing body, including on errors before send.

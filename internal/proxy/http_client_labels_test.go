@@ -86,8 +86,9 @@ func TestProxyHTTPClientLabelsSnapshot(t *testing.T) {
 		RequestType: httpf.RequestTypeProbe, Actor: iface.ActingAs(actor), Labels: baseLabels,
 	})
 	require.NoError(t, err)
+	require.Zero(t, middleware.builds)
 
-	// Changes to the original objects cannot alter subsequent derived stacks.
+	// Changes after capture cannot alter even the first lazily built stack.
 	actor.Id, actor.Labels["team"] = apid.New(apid.PrefixActor), "red"
 	conn.Id, conn.ConnectorId, conn.ConnectorGeneration = apid.New(apid.PrefixConnection), apid.New(apid.PrefixConnector), 8
 	conn.Namespace, conn.Labels["region"], baseLabels["job"] = "root.changed", "east", "changed"
@@ -160,7 +161,7 @@ func TestProxyHTTPClientLabelsRejected(t *testing.T) {
 		require.Zero(t, body.reads.Load())
 		require.Equal(t, httpf.SendStateNotSent, observation.State())
 	}
-	require.Equal(t, 1, middleware.builds)
+	require.Zero(t, middleware.builds)
 	require.Empty(t, middleware.attempts)
 	require.Zero(t, atomic.LoadInt32(&auth.resolveN))
 }
@@ -240,7 +241,7 @@ func TestProxyHTTPClientLabelsRecoveryAndRedirect(t *testing.T) {
 	// credentials. The redirect retains the recovered credentials on this host.
 	require.Equal(t, http.StatusOK, response.StatusCode)
 	require.Equal(t, []string{"Bearer attempt-1", "Bearer attempt-2", "Bearer attempt-2"}, credentials)
-	require.Equal(t, 2, middleware.builds)
+	require.Equal(t, 1, middleware.builds)
 	require.Len(t, middleware.attempts, 3)
 	for _, info := range middleware.attempts {
 		require.Equal(t, "sync", info.Labels["operation"])
