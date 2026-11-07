@@ -301,7 +301,9 @@ type DB interface {
 	// EnumerateOAuth2TokensExpiringWithin enumerates OAuth2 tokens that are expiring within a specified time interval
 	// of now. This includes tokens that are already expired. It also includes tokens whose refresh token is due for
 	// a proactive refresh (refresh_token_refresh_at has passed) regardless of access-token expiry. Deleted tokens are
-	// not considered, nor are tokens tied to a deleted connection.
+	// not considered, nor are tokens tied to a deleted connection. Tokens are visited in id order, each at most once,
+	// even when they are refreshed or deleted while the scan runs; a token that starts matching mid-scan may be seen
+	// only by the next scan.
 	EnumerateOAuth2TokensExpiringWithin(
 		ctx context.Context,
 		duration time.Duration,
