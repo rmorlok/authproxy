@@ -1,7 +1,8 @@
-package javascript
+package runtime
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"reflect"
 	"strconv"
@@ -9,7 +10,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/dop251/goja"
-	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 // This file deals with taking output from Goja in a safe way. Return values
@@ -132,7 +132,7 @@ type outputState struct {
 func (e *outputEncoder) encode(
 	ctx context.Context,
 	value goja.Value,
-) (common.RawJSON, error) {
+) (json.RawMessage, error) {
 	state := &outputState{
 		encoder: e,
 		ctx:     ctx,
@@ -150,7 +150,7 @@ func (e *outputEncoder) encode(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	return common.RawJSON(state.bytes), nil
+	return json.RawMessage(state.bytes), nil
 }
 
 // value appends one JSON value after checking cancellation and structural

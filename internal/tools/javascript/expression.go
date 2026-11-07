@@ -5,76 +5,30 @@ package javascript
 
 import (
 	"context"
-	"errors"
 	"strings"
-	"time"
 	"unicode/utf8"
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/parser"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
-// These errors classify failures without disclosing authored code, connection
-// configuration, thrown values, or JavaScript stacks to invocation callers.
+// These aliases retain existing caller classifications while the generic
+// execution and conversion policy moves into apjs/runtime.
 var (
-	ErrInvalidSource = errors.New("invalid JavaScript source")
-	ErrInvalidInput  = errors.New("invalid JavaScript input")
-	ErrInvalidOutput = errors.New("JavaScript result is not a supported JSON value")
-	ErrLimitExceeded = errors.New("JavaScript execution limit exceeded")
-	ErrEvaluation    = errors.New("JavaScript execution failed")
+	ErrInvalidSource = apjsruntime.ErrInvalidSource
+	ErrInvalidInput  = apjsruntime.ErrInvalidInput
+	ErrInvalidOutput = apjsruntime.ErrInvalidOutput
+	ErrLimitExceeded = apjsruntime.ErrLimitExceeded
+	ErrEvaluation    = apjsruntime.ErrEvaluation
 )
 
-// Limits contains resolved positive caps for a compiled expression or Tool.
-// Callers apply operator ceilings before compilation. Tool initialization uses
-// the source, stack, and timeout caps; expression and Tool evaluation also use
-// the JSON input/output caps. These limits are not a hard memory quota.
-type Limits struct {
-	// MaxSourceBytes bounds authored UTF-8 source before parsing. For Tools,
-	// this includes both the entry-point script and connector helper library.
-	MaxSourceBytes int
-
-	// MaxInputBytes bounds serialized snapshot and response JSON together.
-	MaxInputBytes int
-
-	// MaxOutputBytes bounds the emitted JSON, including quotes and escaping.
-	// A later result envelope needs its own serialized byte allowance.
-	MaxOutputBytes int
-
-	// MaxDepth bounds JSON value nesting; the root is depth zero.
-	MaxDepth int
-
-	// MaxNodes bounds JSON values and object property inspections, separately
-	// for the combined input and output. It does not count JavaScript bytecode.
-	MaxNodes int
-
-	// MaxStackDepth bounds JavaScript function call depth, including recursion.
-	MaxStackDepth int
-
-	// Timeout covers input binding, initialization, execution, promise settlement,
-	// and result conversion in Evaluate, or just initialization in Validate.
-	// Initialize instead requires its caller to enforce a deadline.
-	// Expiry returns ErrLimitExceeded; caller cancellation/deadlines retain their
-	// context error. Native Goja built-ins cannot be preempted; cancellation is
-	// checked again before any result is returned.
-	Timeout time.Duration
-}
-
-// validate disallows omitted or unlimited policy values.
-func (l Limits) validate() error {
-	if l.MaxSourceBytes <= 0 ||
-		l.MaxInputBytes <= 0 ||
-		l.MaxOutputBytes <= 0 ||
-		l.MaxDepth <= 0 ||
-		l.MaxNodes <= 0 ||
-		l.MaxStackDepth <= 0 ||
-		l.Timeout <= 0 {
-		return ErrInvalidInput
-	}
-	return nil
-}
+// Limits is the shared execution and JSON conversion policy. Tool callers still
+// resolve operator ceilings and authored caps before compiling their programs.
+type Limits = apjsruntime.Limits
 
 // Input supplies a captured safe invocation snapshot and optional response data.
 // Neither field exposes a connection handle, credentials, or arbitrary Go objects.
@@ -103,7 +57,7 @@ type Expression struct {
 // statements cannot escape the expression wrapper. Syntax failures are safe
 // classifications rather than parser messages containing source text.
 func CompileExpression(source string, limits Limits) (*Expression, error) {
-	if err := limits.validate(); err != nil {
+	if err := limits.Validate(); err != nil {
 		return nil, err
 	}
 	if len(source) > limits.MaxSourceBytes {
@@ -161,22 +115,4 @@ func (e *Expression) Evaluate(
 		}
 		return value, nil
 	})
-}
-
-// expressionContextError distinguishes caller cancellation from the runtime's
-// own execution-time limit. The caller's error wins when both contexts are done.
-// runCtx is private and only canceled independently by the configured timeout
-// until runtime cleanup, so its remaining error means a policy limit.
-func expressionContextError(ctx, runCtx context.Context) error {
-	if runCtx.Err() != nil {
-		// Read the caller after observing the child: inherited cancellation
-		// must already be visible there, even if it arrived during this check.
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		return ErrLimitExceeded
-	}
-
-	// The caller can be canceled before that cancellation reaches its child.
-	return ctx.Err()
 }

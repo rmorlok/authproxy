@@ -70,7 +70,7 @@ func CompileTool(
 	library *apjs.Library,
 	limits Limits,
 ) (*ToolProgram, error) {
-	if err := limits.validate(); err != nil {
+	if err := limits.Validate(); err != nil {
 		return nil, err
 	}
 
