@@ -100,7 +100,7 @@ func (l *fetchLoop) start(
 			err = resolve(value)
 		}
 		if err != nil {
-			return runtimeEvaluationError(err)
+			return apjsruntime.EvaluationError(err)
 		}
 		return nil
 	}
@@ -110,32 +110,23 @@ func (l *fetchLoop) start(
 	return l.vm.ToValue(promise), true
 }
 
-// settle drives host completions while execute is pending. Promise callbacks
-// may admit additional work; each settlement drains its Goja microtask queue.
-// We wait to check detached rejections until execution finishes, allowing a
-// handler to be installed after an awaited operation, as normal Promise code can.
-func (l *fetchLoop) settle(root *goja.Promise, tracker *apjsruntime.PromiseTracker) (goja.Value, error) {
-	for root.State() == goja.PromiseStatePending {
-		if len(l.pending) == 0 {
-			return nil, apjsruntime.ErrEvaluation
-		}
-
-		select {
-		case <-l.ctx.Done():
-			return nil, l.ctx.Err()
-		case done := <-l.completed:
-			callback := l.pending[done.id]
-			delete(l.pending, done.id)
-			if err := callback(done); err != nil {
-				return nil, err
-			}
-		}
+// await processes one host completion on the VM goroutine. Resolving its Promise
+// drains Goja jobs, which may admit more work. The shared runtime decides whether
+// the root still needs another completion; a winning race never drains siblings.
+// With no pending host work, an unresolved root cannot make progress.
+func (l *fetchLoop) await() error {
+	if len(l.pending) == 0 {
+		return apjsruntime.ErrEvaluation
 	}
 
-	// A caught fail-fast combinator or a winning race may leave siblings in
-	// flight. Root completion ends the Tool: deferred close cancels that work,
-	// and workers dispose late results without running more authored callbacks.
-	return tracker.SettledResult(root)
+	select {
+	case <-l.ctx.Done():
+		return l.ctx.Err()
+	case done := <-l.completed:
+		callback := l.pending[done.id]
+		delete(l.pending, done.id)
+		return callback(done)
+	}
 }
 
 // close cancels requests; the session's cancellation callbacks close received

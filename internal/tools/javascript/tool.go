@@ -34,7 +34,7 @@ var toolHostBindings = []apjsruntime.HostBinding{
 // ToolProgram adapts a shared async program to Tool inputs and optional connector
 // helpers. It retains no invocation state and may serve concurrent evaluations.
 type ToolProgram struct {
-	// program owns compilation, initialization, and no-I/O validation.
+	// program owns compilation, validation, and bounded async execution.
 	program *apjsruntime.AsyncProgram
 
 	// limits is the same copied policy used to bind Tool inputs and HTTP hosts.

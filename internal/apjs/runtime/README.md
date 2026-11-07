@@ -1,10 +1,10 @@
 # Bounded JavaScript runtime primitives
 
-This package compiles pure expressions and async JavaScript programs, validates
-initialization, and runs trusted Go adapters in fresh Goja VMs. It owns the
+This package compiles and evaluates pure expressions and async JavaScript
+programs in fresh Goja VMs. It owns the
 execution deadline, stack limit, interrupt watcher, JSON conversion, and Promise
-rejection tracking. Tool expressions use the shared expression type; async Tool
-execution composes the shared compiler and runtime primitives.
+rejection tracking. Adapters supply native input and optional host capabilities;
+the runtime initializes the program, calls it, and waits for its result.
 
 `CompileExpression` prepares one strict expression without running it. The
 compiled expression can serve concurrent calls, each with its own VM. For
@@ -69,8 +69,7 @@ choose bindings such as `params`, `response`, or aliases that share copied data.
 execution. Its callback returns a Goja value directly to the private output
 encoder. Use `Run` for bounded work with no output, such as initialization
 validation. These callbacks also own their input/source bounds and host setup;
-they must keep VM values inside the callback. Async invocation and host-completion
-orchestration remain in the Tool adapter for now.
+they must keep VM values inside the callback.
 
 ## Async compilation and initialization
 
@@ -126,8 +125,64 @@ Install one before authored initialization and defer `Close`. Call
 `CheckRejections` after initialization, and `SettledResult` after the host has
 driven the root Promise to settlement or determined it cannot progress. Pending
 or rejected roots and unrelated unhandled rejections fail safely. The returned
-value stays inside the owning runtime for bounded conversion. `Validate` manages
-this lifecycle itself and never calls the entry point.
+value stays inside the owning runtime for bounded conversion. `Validate` and
+`Evaluate` manage tracking themselves; validation never calls the entry point.
+
+## Evaluating an async program
+
+`AsyncProgram.Evaluate` calls `execute(params, context)` and returns the fulfilled
+value as bounded JSON. The preparation callback supplies both arguments. For the
+program above, passing `{"id":"42"}` produces the JSON string `"item:42"`:
+
+```go
+return program.Evaluate(ctx, func(
+    runCtx context.Context, vm *goja.Runtime, invocation *runtime.AsyncInvocation,
+) error {
+    decoder, err := runtime.NewJSONDecoder(vm)
+    if err != nil {
+        return err
+    }
+    values, err := decoder.Decode(runCtx, runtime.JSONLimits{
+        MaxBytes: limits.MaxInputBytes,
+        MaxDepth: limits.MaxDepth,
+        MaxNodes: limits.MaxNodes,
+    }, json.RawMessage(`{"id":"42"}`), json.RawMessage(`{}`))
+    if err != nil {
+        return err
+    }
+    invocation.Params = values[0]
+    invocation.Context = values[1]
+    return nil
+})
+```
+
+The runtime adds no global aliases or context fields. An adapter can bind aliases
+to the same native values during preparation. Use `goja.Undefined()` for an
+argument that is not needed. Preparation is required and must bound all copied
+input, honor `runCtx`, and keep VM values inside this evaluation.
+
+An adapter that supplies asynchronous hosts also fills three optional callbacks:
+
+- `Start` enables host I/O after initialization and its Promise jobs succeed.
+  Bound host functions must refuse I/O before this point.
+- `Await` waits for and applies one host completion on the VM goroutine. Workers
+  exchange detached Go data; only this callback settles their JavaScript Promises.
+  It must honor `runCtx` and return `ErrEvaluation` if no work can progress.
+- `Close` cancels outstanding work on every exit, including preparation errors
+  and panics. Register it immediately after acquiring resources. It runs before
+  result encoding and must not wait for uncooperative workers or run authored code.
+
+These callbacks are trusted Go integration code. An evaluation without them can
+use `await` and Promise chains, but a root that remains pending fails promptly.
+With a host, the runtime calls `Await` only while the root is pending. A winning
+`Promise.race` ends execution and cancels unfinished siblings without applying
+their late completions. Unhandled rejections are checked at initialization and
+final settlement, allowing handlers installed after an awaited operation.
+
+Preparation, initialization, invocation, host completion, cleanup, and output
+encoding share one deadline. Callers receive only detached JSON; failure or
+cancellation discards the result. Hosts return safe errors unchanged, while
+authored exceptions and rejection values remain private.
 
 ## Copying JSON into the runtime
 

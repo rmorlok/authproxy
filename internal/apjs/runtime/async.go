@@ -35,10 +35,10 @@ var asyncFunctionPrototype = goja.MustCompile(
 )
 
 // AsyncProgram owns a compiled async entry point and its optional compiled
-// helper library. It retains no runtime or invocation values and can be
-// initialized concurrently in separate, caller-owned Goja runtimes. Compilation
-// runs no authored code; validation runs initialization without host capabilities
-// and does not call the returned execute binding.
+// helper library. It retains no runtime or invocation values and can serve
+// concurrent evaluations, each in a fresh VM. Compilation runs no authored code;
+// validation runs initialization without host capabilities and does not invoke
+// execute. Evaluate owns the complete bounded invocation and JSON conversion.
 type AsyncProgram struct {
 	program  *goja.Program   // Strict async script, including its execute declaration.
 	library  CompiledLibrary // Trusted immutable helpers, preserving their compilation mode.
