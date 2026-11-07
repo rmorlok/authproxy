@@ -84,7 +84,12 @@ func bindInput(
 		}
 	}
 
-	if err := bindToolGlobals(vm, rootObject.Get("params"), contextObject, responseValue); err != nil {
+	if err := bindToolGlobals(
+		vm,
+		rootObject.Get("params"),
+		contextObject,
+		responseValue,
+	); err != nil {
 		return err
 	}
 	return ctx.Err()
@@ -93,20 +98,27 @@ func bindInput(
 // inputJSON bounds snapshot serialization before allocating raw JSON fields for
 // either the expression or async input adapter. The response and snapshot share
 // this byte allowance; the subsequent decoder bounds their combined traversal.
-func inputJSON(ctx context.Context, input Input, limits Limits) (json.RawMessage, json.RawMessage, error) {
+func inputJSON(
+	ctx context.Context,
+	input Input,
+	limits Limits,
+) (json.RawMessage, json.RawMessage, error) {
 	if ctx == nil || input.Context == nil {
 		return nil, nil, apjsruntime.ErrInvalidInput
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
+
 	response := input.Response
 	if response == nil {
 		response = []byte("{}")
 	}
+
 	if len(response) >= limits.MaxInputBytes {
 		return nil, nil, apjsruntime.ErrLimitExceeded
 	}
+
 	snapshot, err := input.Context.SnapshotJSON(ctx, render.Limits{
 		MaxBytes: limits.MaxInputBytes - len(response),
 		MaxDepth: limits.MaxDepth,
@@ -118,12 +130,18 @@ func inputJSON(ctx context.Context, input Input, limits Limits) (json.RawMessage
 		}
 		return nil, nil, apjsruntime.ErrLimitExceeded
 	}
+
 	return json.RawMessage(snapshot), json.RawMessage(response), nil
 }
 
 // bindToolGlobals installs protected aliases to already copied native values.
 // Aliases share their context objects and incur no second input copy or charge.
-func bindToolGlobals(vm *goja.Runtime, params goja.Value, contextObject *goja.Object, response *goja.Object) error {
+func bindToolGlobals(
+	vm *goja.Runtime,
+	params goja.Value,
+	contextObject *goja.Object,
+	response *goja.Object,
+) error {
 	globals := []struct {
 		name  string
 		value goja.Value
@@ -140,9 +158,9 @@ func bindToolGlobals(vm *goja.Runtime, params goja.Value, contextObject *goja.Ob
 		if err := vm.GlobalObject().DefineDataProperty(
 			global.name,
 			global.value,
-			goja.FLAG_FALSE,
-			goja.FLAG_FALSE,
-			goja.FLAG_TRUE,
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_TRUE,  // enumerable
 		); err != nil {
 			return apjsruntime.ErrInvalidInput
 		}
