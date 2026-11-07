@@ -435,6 +435,31 @@ func TestToolFetchJSONUsesPristineParser(t *testing.T) {
 	require.JSONEq(t, `{"n":7}`, string(result))
 }
 
+// TestToolFetchJSONBudgetsAreSeparate keeps response conversion independent of initial inputs and other bodies.
+func TestToolFetchJSONBudgetsAreSeparate(t *testing.T) {
+	// Each body exceeds the initial-input byte cap, but fits the HTTP allowance.
+	// Two bodies together exceed one traversal allowance; each must get its own.
+	body := `["` + strings.Repeat("x", 512) + `"` + strings.Repeat(`,null`, 20) + `]`
+	options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader(body))), nil
+	}, fetchLimits())
+	limits := expressionLimits()
+	limits.MaxInputBytes = 256
+	limits.MaxNodes = 32
+	limits.MaxDepth = 1
+	program, err := javascript.CompileTool(`async function execute() {
+		const first = await (await fetch("https://provider.example/first")).json();
+		const second = await (await fetch("https://provider.example/second")).json();
+		return [first.length, second.length];
+	}`, nil, limits)
+	require.NoError(t, err)
+
+	// Shared JSON conversion preserves the HTTP host's per-response traversal policy.
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+	require.NoError(t, err)
+	require.JSONEq(t, `[21,21]`, string(result))
+}
+
 // TestToolFetchInvalidJSONSanitizesParserErrors keeps response content out of JavaScript errors.
 func TestToolFetchInvalidJSONSanitizesParserErrors(t *testing.T) {
 	body := &fetchBody{reader: strings.NewReader(`private-malformed-response`)}

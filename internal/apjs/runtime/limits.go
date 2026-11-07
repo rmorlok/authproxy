@@ -1,4 +1,4 @@
-// Package runtime provides a bounded Goja lifecycle and JSON output conversion
+// Package runtime provides a bounded Goja lifecycle and native JSON conversion
 // for trusted host adapters. It has no Tool, connection, schema, or HTTP policy.
 package runtime
 

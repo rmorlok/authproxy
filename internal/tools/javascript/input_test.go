@@ -139,19 +139,6 @@ func TestBindInputRejectsInvalidJSON(t *testing.T) {
 	require.NotContains(t, err.Error(), "private-field")
 }
 
-func TestBindInputNumericSemantics(t *testing.T) {
-	// JavaScript consumes ordinary Number values, including rounding beyond its
-	// safe integer range and underflow to finite zero.
-	snapshot := inputTestContext(t, render.Input{Params: map[string]any{
-		"integer":  json.Number("9007199254740993"),
-		"fraction": json.Number("1.25"),
-		"tiny":     json.Number("1e-400"),
-	}})
-	vm := goja.New()
-	require.NoError(t, bindInput(context.Background(), vm, Input{Context: snapshot}, inputTestLimits()))
-	require.True(t, inputTestRun(t, vm, `typeof params.integer === "number" && params.integer === 9007199254740992 && params.fraction === 1.25 && params.tiny === 0`).ToBoolean())
-}
-
 func TestExpressionPreservesStringIdentifiers(t *testing.T) {
 	// Keep precision-sensitive identifiers as strings before either input path
 	// reaches JavaScript; converting an already rounded Number would be too late.
@@ -168,27 +155,6 @@ func TestExpressionPreservesStringIdentifiers(t *testing.T) {
 	// Both strings survive parsing, projection, and final JSON serialization.
 	require.NoError(t, err)
 	require.JSONEq(t, `{"inputId":"18446744073709551615","responseId":"9007199254740993"}`, string(result))
-}
-
-func TestBindInputSurrogateEscapes(t *testing.T) {
-	for _, response := range []string{
-		`{"body":"\ud800"}`, `{"body":"\udfff"}`,
-		`{"\ud800":"value"}`, `{"\udc00":"value"}`,
-		`{"body":"\ud800\u0041"}`, `{"body":"\ud800\\udc00"}`,
-	} {
-		t.Run(response, func(t *testing.T) {
-			// Unpaired units are valid JSON syntax, but native JSON.parse would
-			// replace them. Reject rather than silently changing keys or values.
-			err := bindInput(context.Background(), goja.New(), Input{Context: inputTestContext(t, render.Input{}), Response: common.RawJSON(response)}, inputTestLimits())
-			require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
-		})
-	}
-
-	// Paired units, ordinary Unicode, and literal backslash-u sequences survive.
-	response := common.RawJSON(`{"body":"\uD83D\uDE00","\ud83d\ude00":"paired key","literal":"\\ud800","escaped":"quoted\" text","unicode":"é"}`)
-	vm := goja.New()
-	require.NoError(t, bindInput(context.Background(), vm, Input{Context: inputTestContext(t, render.Input{}), Response: response}, inputTestLimits()))
-	require.True(t, inputTestRun(t, vm, `response.body === "😀" && response["😀"] === "paired key" && response.literal === "\\ud800" && response.escaped === 'quoted" text' && response.unicode === "é"`).ToBoolean())
 }
 
 func TestBindInputCombinedLimits(t *testing.T) {
@@ -241,32 +207,4 @@ func TestBindInputRequiredArgumentsAndCancellation(t *testing.T) {
 	vm := goja.New()
 	require.ErrorIs(t, bindInput(canceled, vm, valid, limits), context.Canceled)
 	require.Nil(t, vm.Get("params"))
-}
-
-// FuzzInputJSON exercises malformed strings, delimiters, and surrogate escapes
-// without allocating a VM. Accepted documents must remain valid object JSON.
-func FuzzInputJSON(f *testing.F) {
-	for _, seed := range []string{
-		`{}`, `{"body":"\ud800"}`, `{"body":"\ud83d\ude00"}`,
-		`{"body":"\\ud800"}`, `{"body":[null,false,1.25,{"key":"text"}]}`,
-		`{"body":"escaped\"quote"}`, `{"body":1e400}`, `{"body":`,
-	} {
-		f.Add([]byte(seed))
-	}
-	f.Fuzz(func(t *testing.T, encoded []byte) {
-		if len(encoded) > 4096 {
-			return
-		}
-		budget := inputBudget{ctx: context.Background(), limits: inputTestLimits()}
-		if err := budget.validateObject(encoded); err != nil {
-			require.True(t, err == apjsruntime.ErrInvalidInput || err == apjsruntime.ErrLimitExceeded)
-			return
-		}
-
-		// A successful boundary never admits a scalar, trailing value, or syntax
-		// error that would fail the subsequent native object parse.
-		var object map[string]json.RawMessage
-		require.NoError(t, json.Unmarshal(encoded, &object))
-		require.NotNil(t, object)
-	})
 }

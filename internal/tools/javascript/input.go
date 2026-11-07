@@ -1,12 +1,8 @@
 package javascript
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
-	"math"
-	"unicode/utf8"
 
 	"github.com/dop251/goja"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
@@ -52,32 +48,28 @@ func bindInput(
 		return apjsruntime.ErrLimitExceeded
 	}
 
-	// Count values across both documents before JSON.parse constructs its
-	// object graph. The snapshot encoder already bounds its own traversal.
-	budget := inputBudget{ctx: ctx, limits: limits}
-	if err := budget.validateObject(snapshot); err != nil {
+	// The shared decoder charges both documents before constructing native
+	// values. Tool-specific object shapes and aliases remain this adapter's job.
+	decoder, err := apjsruntime.NewJSONDecoder(vm)
+	if err != nil {
 		return err
 	}
-	if err := budget.validateObject(response); err != nil {
+	values, err := decoder.Decode(ctx, apjsruntime.JSONLimits{
+		MaxBytes: limits.MaxInputBytes,
+		MaxDepth: limits.MaxDepth,
+		MaxNodes: limits.MaxNodes,
+	}, json.RawMessage(snapshot), json.RawMessage(response))
+	if err != nil {
 		return err
 	}
-
-	parse, ok := goja.AssertFunction(vm.Get("JSON").ToObject(vm).Get("parse"))
-	if !ok {
+	rootObject, ok := values[0].(*goja.Object)
+	if !ok || rootObject.ClassName() != "Object" {
 		return apjsruntime.ErrInvalidInput
 	}
-
-	root, err := parse(goja.Undefined(), vm.ToValue(string(snapshot)))
-	if err != nil {
-		return inputParseError(ctx)
+	responseValue, ok := values[1].(*goja.Object)
+	if !ok || responseValue.ClassName() != "Object" {
+		return apjsruntime.ErrInvalidInput
 	}
-
-	responseValue, err := parse(goja.Undefined(), vm.ToValue(string(response)))
-	if err != nil {
-		return inputParseError(ctx)
-	}
-
-	rootObject := root.ToObject(vm)
 
 	// A zero render.Context has no captured scopes. Only snapshots created by
 	// render.NewContext supply every required object, including empty scopes.
@@ -140,164 +132,4 @@ func bindInput(
 	}
 
 	return ctx.Err()
-}
-
-// inputParseError preserves cancellation while withholding native JSON parser
-// diagnostics, which can contain private configuration keys or response text.
-func inputParseError(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return apjsruntime.ErrInvalidInput
-}
-
-// inputBudget validates the two encoded input documents with shared accounting.
-// Each JSON value, including a container, and each object property name consumes
-// one node. Document roots have depth zero; property names do not add depth.
-type inputBudget struct {
-	ctx    context.Context
-	limits Limits
-	nodes  int
-}
-
-// validateObject requires exactly one UTF-8 object document and validates its
-// values without retaining a second decoded Go object graph.
-func (b *inputBudget) validateObject(encoded []byte) error {
-	if !utf8.Valid(encoded) {
-		return apjsruntime.ErrInvalidInput
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(encoded))
-	decoder.UseNumber()
-
-	if err := b.value(decoder, 0, true); err != nil {
-		return err
-	}
-
-	if _, err := decoder.Token(); err != io.EOF {
-		return apjsruntime.ErrInvalidInput
-	}
-
-	if err := validateInputSurrogates(b.ctx, encoded); err != nil {
-		return err
-	}
-
-	return b.ctx.Err()
-}
-
-// validateInputSurrogates rejects unpaired escaped UTF-16 surrogate units in
-// already validated JSON strings and keys. Goja's native JSON.parse uses Go's
-// JSON decoder, which would silently replace those units with U+FFFD. Rejecting
-// them avoids changing input values; valid pairs and literal backslash-u text
-// retain ordinary JSON behavior. This scan does not parse JSON structure.
-func validateInputSurrogates(ctx context.Context, encoded []byte) error {
-	inString := false
-	for i := 0; i < len(encoded); i++ {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if encoded[i] == '"' {
-			inString = !inString
-			continue
-		}
-		if !inString || encoded[i] != '\\' {
-			continue
-		}
-		i++
-		if encoded[i] != 'u' {
-			continue
-		}
-		unit := inputHexUnit(encoded[i+1 : i+5])
-		i += 4
-		if unit >= 0xdc00 && unit <= 0xdfff {
-			return apjsruntime.ErrInvalidInput
-		}
-		if unit < 0xd800 || unit > 0xdbff {
-			continue
-		}
-		if i+6 >= len(encoded) || encoded[i+1] != '\\' || encoded[i+2] != 'u' {
-			return apjsruntime.ErrInvalidInput
-		}
-		low := inputHexUnit(encoded[i+3 : i+7])
-		if low < 0xdc00 || low > 0xdfff {
-			return apjsruntime.ErrInvalidInput
-		}
-		i += 6
-	}
-	return nil
-}
-
-// inputHexUnit reads four known hexadecimal digits from validated JSON syntax.
-func inputHexUnit(digits []byte) uint16 {
-	var value uint16
-	for _, digit := range digits {
-		value <<= 4
-		switch {
-		case digit >= '0' && digit <= '9':
-			value += uint16(digit - '0')
-		case digit >= 'a' && digit <= 'f':
-			value += uint16(digit-'a') + 10
-		default:
-			value += uint16(digit-'A') + 10
-		}
-	}
-	return value
-}
-
-// value consumes one JSON value, enforcing work/depth limits before descending.
-// Finite JSON numbers use ordinary JavaScript Number precision when parsed.
-func (b *inputBudget) value(
-	decoder *json.Decoder,
-	depth int,
-	objectRoot bool,
-) error {
-	if err := b.ctx.Err(); err != nil {
-		return err
-	}
-	if depth > b.limits.MaxDepth || b.nodes >= b.limits.MaxNodes {
-		return apjsruntime.ErrLimitExceeded
-	}
-	b.nodes++
-	token, err := decoder.Token()
-	if err != nil {
-		return apjsruntime.ErrInvalidInput
-	}
-	if objectRoot && token != json.Delim('{') {
-		return apjsruntime.ErrInvalidInput
-	}
-
-	switch token := token.(type) {
-	case json.Number:
-		number, err := token.Float64()
-		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
-			return apjsruntime.ErrInvalidInput
-		}
-	case json.Delim:
-		if token != '{' && token != '[' {
-			return apjsruntime.ErrInvalidInput
-		}
-		for decoder.More() {
-			if token == '{' {
-				if err := b.ctx.Err(); err != nil {
-					return err
-				}
-				if b.nodes >= b.limits.MaxNodes {
-					return apjsruntime.ErrLimitExceeded
-				}
-				b.nodes++
-				key, err := decoder.Token()
-				if _, ok := key.(string); err != nil || !ok {
-					return apjsruntime.ErrInvalidInput
-				}
-			}
-			if err := b.value(decoder, depth+1, false); err != nil {
-				return err
-			}
-		}
-		closing, err := decoder.Token()
-		if err != nil || (token == '{' && closing != json.Delim('}')) || (token == '[' && closing != json.Delim(']')) {
-			return apjsruntime.ErrInvalidInput
-		}
-	}
-	return nil
 }
