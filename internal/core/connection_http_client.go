@@ -7,12 +7,13 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
 // connectionHTTPClient defers resolving the connection's proxy until the first
-// Do, then delegates every call to one proxy-level client whose middleware stack
-// is built once. Construction therefore stays I/O-free while repeated calls do
-// not rebuild middleware. No context or response state is shared between calls.
+// request, then delegates every call to one proxy-level client whose baseline
+// middleware stack is built once. Per-request labels derive from that same
+// snapshot. No context or response state is shared between calls.
 type connectionHTTPClient struct {
 	// connection is the only destination capability available to this client.
 	connection *connection
@@ -45,8 +46,23 @@ func (c *connection) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClie
 // prebuilt client. It owns req.Body on every path, including initialization
 // failures before send. Nil requests fail before any initialization.
 func (c *connectionHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return c.DoWithLabels(req, nil)
+}
+
+// DoWithLabels validates user labels before resolving the proxy, then delegates
+// to its captured client. Nil or empty labels reuse the ordinary Do path. Invalid
+// labels release the outgoing body and report no send without initializing or
+// changing the client; valid labels affect only this logical request.
+func (c *connectionHTTPClient) DoWithLabels(req *http.Request, labels map[string]string) (*http.Response, error) {
 	if req == nil {
 		return nil, errors.New("connection HTTP client requires a request")
+	}
+	if err := meta.ValidateUserLabels(labels); err != nil {
+		httpf.ReportSendEvidence(req.Context(), false)
+		if req.Body != nil {
+			_ = req.Body.Close()
+		}
+		return nil, iface.ErrHTTPClientInvalidLabels
 	}
 
 	c.once.Do(func() {
@@ -67,5 +83,8 @@ func (c *connectionHTTPClient) Do(req *http.Request) (*http.Response, error) {
 		return nil, c.err
 	}
 
-	return c.client.Do(req)
+	if len(labels) == 0 {
+		return c.client.Do(req)
+	}
+	return c.client.DoWithLabels(req, labels)
 }

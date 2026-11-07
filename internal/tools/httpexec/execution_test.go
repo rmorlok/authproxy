@@ -101,6 +101,14 @@ type executionClient func(*http.Request) (*http.Response, error)
 // Do transfers the request to the behavior selected by the current scenario.
 func (c executionClient) Do(request *http.Request) (*http.Response, error) { return c(request) }
 
+// DoWithLabels makes unexpected label support explicit in this unlabeled fixture.
+func (c executionClient) DoWithLabels(request *http.Request, labels map[string]string) (*http.Response, error) {
+	if len(labels) != 0 {
+		panic("executionClient does not support request labels")
+	}
+	return c.Do(request)
+}
+
 // executionBody records response ownership and reads, including discarded errors.
 type executionBody struct {
 	reader io.Reader

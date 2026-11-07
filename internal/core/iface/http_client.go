@@ -21,11 +21,15 @@ var (
 	// actor that disagrees with the client's configured actor. The outgoing
 	// body is closed and nothing is sent.
 	ErrHTTPClientActorMismatch = errors.New("request context actor does not match the connection HTTP client actor")
+
+	// ErrHTTPClientInvalidLabels rejects malformed or protected per-request
+	// labels before credential resolution or sending. It contains no label data.
+	ErrHTTPClientInvalidLabels = errors.New("connection HTTP client requires valid user labels")
 )
 
-// HTTPClient sends requests through one captured connection using the standard
+// HTTPClient sends requests through one captured connection. Do uses the standard
 // HTTP client method signature. Connection.HTTPClient fixes the request type,
-// labels, and actor attribution for every request; each request's context only
+// base labels, and actor attribution for every request; each request's context only
 // supplies cancellation and deadlines. Implementations retain the connection
 // proxy's credentials, recovery, rate limiting, and instrumentation. They do
 // not check caller permissions.
@@ -45,6 +49,17 @@ type HTTPClient interface {
 	// actor, or any actor when the client was built WithoutActor, fails with
 	// ErrHTTPClientActorMismatch. A context without an actor is accepted.
 	Do(*http.Request) (*http.Response, error)
+
+	// DoWithLabels has the same request/body, actor, and recovery contract as Do,
+	// adding user labels for this logical request and all its retries/redirects.
+	// Per-call values override the captured connection and client user labels.
+	// Invalid keys/values and protected apxy/ keys fail before sending with
+	// ErrHTTPClientInvalidLabels; system attribution cannot be overridden.
+	//
+	// Labels are copied before dispatch without changing the client or connection
+	// snapshot. Keep the supplied map stable during the call. Nil/empty labels
+	// behave like Do. Concurrent calls keep independent label snapshots.
+	DoWithLabels(*http.Request, map[string]string) (*http.Response, error)
 }
 
 // HTTPClientActor is the explicit attribution choice for a connection HTTP

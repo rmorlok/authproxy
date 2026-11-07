@@ -116,11 +116,18 @@ func (f *clientFactory) ForConnection(c Connection) F {
 	}
 
 	if rlp, ok := c.(RateLimitConfigProvider); ok {
-		ri.RateLimiting = rlp.GetRateLimitConfig()
+		// Derived request-label factories must retain this policy snapshot even
+		// when the caller later edits the connector definition.
+		ri.RateLimiting = rlp.GetRateLimitConfig().Clone()
 	}
 
 	if tpp, ok := c.(TracePropagationProvider); ok {
-		ri.PropagateTraceContext = tpp.PropagateTraceContext()
+		if override := tpp.PropagateTraceContext(); override != nil {
+			value := *override
+			ri.PropagateTraceContext = &value
+		} else {
+			ri.PropagateTraceContext = nil
+		}
 	}
 
 	return fp.ForRequestInfo(ri)

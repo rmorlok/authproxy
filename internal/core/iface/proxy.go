@@ -170,9 +170,9 @@ type Proxy interface {
 	// It closes the response body even if copying fails; errors after a write
 	// cannot replace the already committed downstream response.
 	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest, w http.ResponseWriter) error
-	// HTTPClient builds the connection's middleware stack once for the given
-	// request type, labels, and actor, and returns a client whose Do shares the
-	// ProxyRequestStream semantics. It fails with ErrHTTPClientActorRequired for
-	// invalid options and performs no I/O.
+	// HTTPClient captures request type, base labels, and actor in a reusable
+	// middleware stack. DoWithLabels derives a private stack from that snapshot;
+	// both request methods share ProxyRequestStream semantics. Construction fails
+	// with ErrHTTPClientActorRequired for invalid options and performs no I/O.
 	HTTPClient(options HTTPClientOptions) (HTTPClient, error)
 }

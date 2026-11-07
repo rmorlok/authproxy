@@ -30,20 +30,31 @@ type connectionHTTPClientTestProxy struct {
 	err error
 	// do handles each request sent through a built client.
 	do func(*http.Request) (*http.Response, error)
+	// doWithLabels handles explicitly labeled requests without rebuilding a client.
+	doWithLabels func(*http.Request, map[string]string) (*http.Response, error)
 }
 
 // HTTPClient records the options and returns a client delegating to do.
 func (p *connectionHTTPClientTestProxy) HTTPClient(options iface.HTTPClientOptions) (iface.HTTPClient, error) {
 	p.builds.Add(1)
 	p.options = options
-	return connectionHTTPClientTestDoer(p.do), p.err
+	return connectionHTTPClientTestDoer{do: p.do, doWithLabels: p.doWithLabels}, p.err
 }
 
-// connectionHTTPClientTestDoer adapts a function to iface.HTTPClient.
-type connectionHTTPClientTestDoer func(*http.Request) (*http.Response, error)
+// connectionHTTPClientTestDoer adapts fixture callbacks to iface.HTTPClient.
+type connectionHTTPClientTestDoer struct {
+	do           func(*http.Request) (*http.Response, error)
+	doWithLabels func(*http.Request, map[string]string) (*http.Response, error)
+}
 
 // Do delegates to the fixture function.
-func (f connectionHTTPClientTestDoer) Do(r *http.Request) (*http.Response, error) { return f(r) }
+func (f connectionHTTPClientTestDoer) Do(r *http.Request) (*http.Response, error) { return f.do(r) }
+
+// DoWithLabels delegates to the labeled fixture function; an unexpected call
+// panics rather than silently discarding labels a scenario did not configure.
+func (f connectionHTTPClientTestDoer) DoWithLabels(r *http.Request, labels map[string]string) (*http.Response, error) {
+	return f.doWithLabels(r, labels)
+}
 
 // connectionHTTPClientTestBody tracks ownership and eager consumption without
 // involving authentication, network transport, or response buffering fixtures.
@@ -289,4 +300,100 @@ func TestConnectionHTTPClientConcurrentCalls(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.EqualValues(t, 1, proxy.builds.Load())
+}
+
+// TestConnectionHTTPClientRequestLabelsRejectBeforeInitialization prevents
+// invalid request metadata from resolving a connection or consuming its body.
+func TestConnectionHTTPClientRequestLabelsRejectBeforeInitialization(t *testing.T) {
+	for _, labels := range []map[string]string{
+		{"apxy/act/-/id": "forged"},
+		{"invalid key": "value"},
+		{"valid-key": "invalid value"},
+	} {
+		// An unwired connection would fail if label validation initialized it.
+		conn := &connection{}
+		client, err := conn.HTTPClient(iface.HTTPClientOptions{Actor: iface.WithoutActor()})
+		require.NoError(t, err)
+		ctx, observation := httpf.ObserveSends(context.Background())
+		body := &connectionHTTPClientTestBody{reader: strings.NewReader("request data")}
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://provider.example/items", body)
+		require.NoError(t, err)
+
+		response, err := client.DoWithLabels(request, labels)
+		require.ErrorIs(t, err, iface.ErrHTTPClientInvalidLabels)
+		require.Nil(t, response)
+		require.Equal(t, httpf.SendStateNotSent, observation.State())
+		require.EqualValues(t, 1, body.closes.Load())
+		require.Zero(t, body.reads.Load())
+
+		// Rejection neither initializes nor poisons the lazy client's state.
+		untouched := false
+		conn.proxyImplOnce.Do(func() { untouched = true })
+		require.True(t, untouched)
+	}
+}
+
+// TestConnectionHTTPClientRequestLabelsRemainPerCall forwards concurrent labels
+// through one initialized proxy client without replacing its baseline options.
+func TestConnectionHTTPClientRequestLabelsRemainPerCall(t *testing.T) {
+	const count = 16
+	proxy := &connectionHTTPClientTestProxy{
+		do: func(*http.Request) (*http.Response, error) {
+			return &http.Response{StatusCode: http.StatusNoContent, Body: http.NoBody}, nil
+		},
+		doWithLabels: func(r *http.Request, labels map[string]string) (*http.Response, error) {
+			if labels["operation"] != r.Header.Get("X-Operation") {
+				return nil, errors.New("request used another call's labels")
+			}
+			return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
+		},
+	}
+	baseline := map[string]string{"operation": "baseline"}
+	client, err := connectionHTTPClientTestConnection(proxy).HTTPClient(iface.HTTPClientOptions{
+		Actor: iface.WithoutActor(), Labels: baseline,
+	})
+	require.NoError(t, err)
+
+	// Concurrent first use builds one proxy client; each call carries its own map.
+	results := make(chan error, count)
+	var workers sync.WaitGroup
+	for index := range count {
+		operation := fmt.Sprintf("operation-%d", index)
+		request, err := http.NewRequest(http.MethodGet, "https://provider.example/items", nil)
+		require.NoError(t, err)
+		request.Header.Set("X-Operation", operation)
+		workers.Go(func() {
+			response, err := client.DoWithLabels(request, map[string]string{"operation": operation})
+			if response != nil {
+				_ = response.Body.Close()
+				if err == nil && response.StatusCode != http.StatusOK {
+					err = errors.New("labeled request used the baseline path")
+				}
+			}
+			results <- err
+		})
+	}
+	workers.Wait()
+	close(results)
+	for err := range results {
+		require.NoError(t, err)
+	}
+
+	// Omitted and empty labels preserve the baseline path after labeled calls.
+	for _, labels := range []map[string]string{nil, {}} {
+		request, err := http.NewRequest(http.MethodGet, "https://provider.example/items", nil)
+		require.NoError(t, err)
+		response, err := client.DoWithLabels(request, labels)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNoContent, response.StatusCode)
+		require.NoError(t, response.Body.Close())
+	}
+	require.EqualValues(t, 1, proxy.builds.Load())
+	require.Equal(t, baseline, proxy.options.Labels)
+	request, err := http.NewRequest(http.MethodGet, "https://provider.example/items", nil)
+	require.NoError(t, err)
+	response, err := client.Do(request)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNoContent, response.StatusCode)
+	require.NoError(t, response.Body.Close())
 }
