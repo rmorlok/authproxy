@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -55,21 +54,6 @@ func evaluateExpression(t *testing.T, compiled *javascript.Expression, input jav
 	return result
 }
 
-func TestExpressionDisablesDynamicSourceMaps(t *testing.T) {
-	// Dynamic parsing must not try to read the authored source-map URL from disk.
-	for _, source := range []string{
-		`eval("7\n//# sourceMappingURL=file:///authproxy-do-not-load-source-map.json")`,
-		`(new Function("return 7\n//# sourceMappingURL=file:///authproxy-do-not-load-source-map.json"))()`,
-	} {
-		compiled := compileExpression(t, source)
-		input := javascript.Input{Context: expressionContext(t, render.Input{})}
-
-		// Both parsing paths finish normally without invoking a source-map loader.
-		result := evaluateExpression(t, compiled, input)
-		require.JSONEq(t, `7`, string(result))
-	}
-}
-
 func TestExpressionInvocationContext(t *testing.T) {
 	// Capture configuration, user input, and provenance independently from the response.
 	generation, catalog := uint64(7), uint64(11)
@@ -114,85 +98,12 @@ func TestExpressionInvocationContext(t *testing.T) {
 	}`, string(evaluateExpression(t, compiled, input)))
 }
 
-func TestExpressionOptionalResponseAndJSONValues(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		source string
-		want   string
-	}{
-		{"missing response is empty", `response`, `{}`},
-		{"object", `({name: "Ada", enabled: true, empty: null})`, `{"name":"Ada","enabled":true,"empty":null}`},
-		{"array", `[1, "two", false, null]`, `[1,"two",false,null]`},
-		{"string", `"line\n雪"`, `"line\n雪"`},
-		{"number", `6 * 7`, `42`},
-		{"boolean", `false`, `false`},
-		{"null", `null`, `null`},
-		{"standard number precision", `9007199254740993`, `9007199254740992`},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			// Expression results retain JSON value kinds, with JavaScript number semantics.
-			compiled := compileExpression(t, test.source)
-			input := javascript.Input{Context: expressionContext(t, render.Input{})}
-			require.JSONEq(t, test.want, string(evaluateExpression(t, compiled, input)))
-		})
-	}
-}
-
-func TestExpressionCompileValidation(t *testing.T) {
-	for _, source := range []string{
-		"", " ", "({", "const value = 1; value", "1; 2", "return 1",
-		`1); (() => { throw new Error("private"); })(); (2`,
-		string([]byte{'"', 0xff, '"'}),
-	} {
-		t.Run(source, func(t *testing.T) {
-			// Invalid syntax and multiple statements must never become an executable plan.
-			compiled, err := javascript.CompileExpression(source, expressionLimits())
-			require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
-			require.Nil(t, compiled)
-		})
-	}
-
-	// Compiling valid but throwing code must not execute any authored JavaScript.
-	compiled := compileExpression(t, `(() => { throw new Error("private-source-marker"); })()`)
-	result, err := compiled.Evaluate(context.Background(), javascript.Input{Context: expressionContext(t, render.Input{})})
-	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
-	require.NotContains(t, err.Error(), "private-source-marker")
-	require.Nil(t, result)
-}
-
-func TestExpressionLimitsMustBePositive(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		change func(*javascript.Limits)
-	}{
-		{"source bytes", func(l *javascript.Limits) { l.MaxSourceBytes = 0 }},
-		{"input bytes", func(l *javascript.Limits) { l.MaxInputBytes = 0 }},
-		{"output bytes", func(l *javascript.Limits) { l.MaxOutputBytes = 0 }},
-		{"depth", func(l *javascript.Limits) { l.MaxDepth = 0 }},
-		{"nodes", func(l *javascript.Limits) { l.MaxNodes = 0 }},
-		{"stack depth", func(l *javascript.Limits) { l.MaxStackDepth = 0 }},
-		{"timeout", func(l *javascript.Limits) { l.Timeout = 0 }},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			// A missing policy value cannot accidentally disable an execution guard.
-			limits := expressionLimits()
-			test.change(&limits)
-			compiled, err := javascript.CompileExpression(`1`, limits)
-			require.Error(t, err)
-			require.Nil(t, compiled)
-		})
-	}
-
-	// Source accounting is byte-based and accepts the exact configured boundary.
-	source := `"雪"`
-	limits := expressionLimits()
-	limits.MaxSourceBytes = len(source)
-	_, err := javascript.CompileExpression(source, limits)
-	require.NoError(t, err)
-	limits.MaxSourceBytes--
-	compiled, err := javascript.CompileExpression(source, limits)
-	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
-	require.Nil(t, compiled)
+// TestExpressionOptionalResponse keeps the Tool adapter's omitted-response default.
+func TestExpressionOptionalResponse(t *testing.T) {
+	// A missing response remains an empty object after shared evaluation.
+	compiled := compileExpression(t, `response`)
+	input := javascript.Input{Context: expressionContext(t, render.Input{})}
+	require.JSONEq(t, `{}`, string(evaluateExpression(t, compiled, input)))
 }
 
 func TestExpressionErrorsDoNotExposeInvocationData(t *testing.T) {
@@ -211,48 +122,6 @@ func TestExpressionErrorsDoNotExposeInvocationData(t *testing.T) {
 			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.NotContains(t, err.Error(), "private-connection-value")
 			require.NotContains(t, err.Error(), source)
-			require.Nil(t, result)
-		})
-	}
-}
-
-func TestExpressionHostFeaturesAreAbsent(t *testing.T) {
-	// Pure expressions have ordinary language intrinsics but no injected host capability.
-	compiled := compileExpression(t, `({
-		fetch: typeof fetch, require: typeof require, process: typeof process,
-		Deno: typeof Deno, Bun: typeof Bun, console: typeof console,
-		setTimeout: typeof setTimeout, XMLHttpRequest: typeof XMLHttpRequest,
-		WebSocket: typeof WebSocket, Buffer: typeof Buffer,
-		math: Math.max(3, 5), json: JSON.parse('{"answer":42}').answer
-	})`)
-	result := evaluateExpression(t, compiled, javascript.Input{Context: expressionContext(t, render.Input{})})
-	require.JSONEq(t, `{
-		"fetch":"undefined","require":"undefined","process":"undefined",
-		"Deno":"undefined","Bun":"undefined","console":"undefined",
-		"setTimeout":"undefined","XMLHttpRequest":"undefined",
-		"WebSocket":"undefined","Buffer":"undefined","math":5,"json":42
-	}`, string(result))
-}
-
-func TestExpressionRejectsNonJSONResults(t *testing.T) {
-	for _, source := range []string{
-		`undefined`, `(() => {})`, `NaN`, `Infinity`, `-Infinity`,
-		`1n`, `Symbol("value")`, `({[Symbol("key")]: 1})`,
-		`({value: undefined})`, `[undefined]`, `({value() { return 1; }})`,
-		`(() => { const value = {}; value.self = value; return value; })()`,
-		`new Date(0)`, `/example/`, `new Map([["value", 1]])`, `new Set([1])`,
-		`new Uint8Array([1, 2])`, `Promise.resolve(1)`, `(async () => 1)()`,
-		`({ get answer() { throw new Error("private-getter-value"); } })`,
-		`({ get answer() { while (true) {} } })`,
-		`new Proxy({}, {get() { throw new Error("private-proxy-value"); }})`,
-	} {
-		t.Run(source, func(t *testing.T) {
-			// Returning a non-JSON value must fail instead of silently dropping or coercing it.
-			input := javascript.Input{Context: expressionContext(t, render.Input{})}
-			ctx, cancel := context.WithCancel(context.Background())
-			result, err := evaluateWithWatchdog(t, ctx, cancel, compileExpression(t, source), input)
-			require.ErrorIs(t, err, apjsruntime.ErrInvalidOutput)
-			require.NotContains(t, err.Error(), "private-")
 			require.Nil(t, result)
 		})
 	}
@@ -298,20 +167,6 @@ func TestExpressionFreshNativeCopiesAndReadonlyGlobals(t *testing.T) {
 			require.Nil(t, result)
 		})
 	}
-}
-
-func TestExpressionOutputIgnoresModifiedIntrinsics(t *testing.T) {
-	// Authored mutations to standard objects must not replace the host's JSON traversal.
-	compiled := compileExpression(t, `(() => {
-		Object.keys = () => [];
-		Object.getOwnPropertyDescriptor = () => ({value: "forged"});
-		Object.getOwnPropertyDescriptors = () => ({});
-		Array.isArray = () => false;
-		JSON.stringify = () => '"forged"';
-		return {actual: [42, {name: "Ada"}]};
-	})()`)
-	input := javascript.Input{Context: expressionContext(t, render.Input{})}
-	require.JSONEq(t, `{"actual":[42,{"name":"Ada"}]}`, string(evaluateExpression(t, compiled, input)))
 }
 
 func TestExpressionConcurrentEvaluations(t *testing.T) {
@@ -458,57 +313,6 @@ func TestExpressionConcurrentCallerCancellation(t *testing.T) {
 
 	// Cancellation of concurrent calls leaves the shared compiled plan usable.
 	require.JSONEq(t, `42`, string(evaluateExpression(t, compiled, input)))
-}
-
-func TestExpressionTimeout(t *testing.T) {
-	// The runtime's execution policy remains distinct from the caller's lifetime.
-	limits := expressionLimits()
-	limits.Timeout = 100 * time.Millisecond
-	compiled, err := javascript.CompileExpression(`(() => { if (params.busy) { while (true) {} } return 42; })()`, limits)
-	require.NoError(t, err)
-	for _, callerDeadline := range []bool{false, true} {
-		t.Run(fmt.Sprint("caller deadline=", callerDeadline), func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			if callerDeadline {
-				cancel()
-				ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
-			}
-			input := javascript.Input{Context: expressionContext(t, render.Input{Params: map[string]any{"busy": true}})}
-			result, err := evaluateWithWatchdog(t, ctx, cancel, compiled, input)
-
-			// The expression hit its policy limit while the caller remains active.
-			require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
-			require.NotErrorIs(t, err, context.DeadlineExceeded)
-			require.NoError(t, ctx.Err())
-			require.Nil(t, result)
-
-			// A timed-out evaluation cannot poison a later call on the same program.
-			input.Context = expressionContext(t, render.Input{Params: map[string]any{"busy": false}})
-			require.JSONEq(t, `42`, string(evaluateExpression(t, compiled, input)))
-		})
-	}
-}
-
-func TestExpressionStackAndOutputLimits(t *testing.T) {
-	// Recursive authored code trips the configured stack bound before its time budget.
-	compiled := compileExpression(t, `(() => { function recurse() { return recurse(); } return recurse(); })()`)
-	input := javascript.Input{Context: expressionContext(t, render.Input{})}
-	result, err := compiled.Evaluate(context.Background(), input)
-	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
-	require.Nil(t, result)
-
-	// Byte limits apply to the encoded JSON result, including escaping and quotes.
-	limits := expressionLimits()
-	limits.MaxOutputBytes = len(`"\n"`)
-	compiled, err = javascript.CompileExpression(`"\n"`, limits)
-	require.NoError(t, err)
-	require.Equal(t, `"\n"`, string(evaluateExpression(t, compiled, input)))
-	limits.MaxOutputBytes--
-	compiled, err = javascript.CompileExpression(`"\n"`, limits)
-	require.NoError(t, err)
-	result, err = compiled.Evaluate(context.Background(), input)
-	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
-	require.Nil(t, result)
 }
 
 func TestExpressionInvalidArguments(t *testing.T) {

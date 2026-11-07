@@ -1,13 +1,13 @@
 # Bounded JavaScript runtime primitives
 
-This package runs trusted Go adapters in a fresh Goja VM and converts their
-results into bounded JSON. It owns the execution deadline, stack limit,
-interrupt watcher, JSON input decoder, and output encoder. Tool expression and
-async evaluation use these primitives through their own adapters.
+This package compiles pure JavaScript expressions and runs trusted Go adapters
+in fresh Goja VMs. It owns the execution deadline, stack limit, interrupt watcher,
+JSON input decoder, and bounded output encoder. Tool expressions delegate to the
+shared expression type; async Tool evaluation uses the lower-level primitives.
 
-`EvaluateJSON` keeps conversion inside the runtime's deadline. For example, an
-adapter can copy `{"price":6,"quantity":7}` into `params`, evaluate an expression,
-and receive `{"total":42}`:
+`CompileExpression` prepares one strict expression without running it. The
+compiled expression can serve concurrent calls, each with its own VM. For
+example, copy `{"price":6,"quantity":7}` into `params` and receive `{"total":42}`:
 
 ```go
 limits := runtime.Limits{
@@ -19,15 +19,17 @@ limits := runtime.Limits{
     MaxStackDepth: 128,
     Timeout: time.Second,
 }
-source := `({total: params.price * params.quantity})`
-input := json.RawMessage(`{"price":6,"quantity":7}`)
-if len(source) > limits.MaxSourceBytes {
-    return nil, runtime.ErrLimitExceeded
+expression, err := runtime.CompileExpression(
+    `({total: params.price * params.quantity})`, limits,
+)
+if err != nil {
+    return nil, err
 }
-return runtime.EvaluateJSON(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
+input := json.RawMessage(`{"price":6,"quantity":7}`)
+return expression.Evaluate(ctx, func(runCtx context.Context, vm *goja.Runtime) error {
     decoder, err := runtime.NewJSONDecoder(vm)
     if err != nil {
-        return nil, err
+        return err
     }
     values, err := decoder.Decode(runCtx, runtime.JSONLimits{
         MaxBytes: limits.MaxInputBytes,
@@ -35,33 +37,39 @@ return runtime.EvaluateJSON(ctx, limits, func(runCtx context.Context, vm *goja.R
         MaxNodes: limits.MaxNodes,
     }, input)
     if err != nil {
-        return nil, err
+        return err
     }
     if err := vm.Set("params", values[0]); err != nil {
-        return nil, runtime.ErrInvalidInput
+        return runtime.ErrInvalidInput
     }
-    value, err := vm.RunString(source)
-    return value, runtime.EvaluationError(err)
+    return nil
 })
 ```
 
 Here `runtime` refers to `internal/apjs/runtime`, not Go's standard-library
-package. Dynamic parsing in this VM has source-map loading disabled. An adapter
-can instead reuse an already compiled program, provided its compiler applies
-the source-size and no-source-map policies.
+package. Compilation enforces the source-byte cap, rejects statements that
+escape the single-expression wrapper, and disables source-map loading. Dynamic
+parsing through `eval` or `Function` also has source-map loading disabled.
 
-The callback is trusted integration code. It installs bounded native input and
-runs authored JavaScript on the calling goroutine. It must honor `runCtx` during
-Go work and must not retain the VM or its values. The callback's returned value
-goes directly to the private encoder; the caller receives detached
-`json.RawMessage` bytes and no partial result on failure. Concurrent evaluations
-use independent VMs.
+The preparation callback is trusted integration code. It binds copied JSON and
+any selected pure helpers on the calling goroutine, using the same limits passed
+to compilation. It must honor `runCtx`, return safe errors, and retain no VM
+values. Input preparation, expression execution, and result conversion all use
+the same deadline. A preparation error prevents the expression from running.
+Pass `nil` for an expression that needs no input. Callers receive detached
+`json.RawMessage` bytes and no partial result on failure.
 
-Use `Run` for bounded work with no output, such as initialization validation.
-Neither entry point installs network access, connection objects, Tool helpers,
-or domain context. Callers choose input names and shapes. Source compilation and
-async host behavior remain caller responsibilities; shared expression and async
-APIs will be extracted separately.
+Expressions have no network hosts, connection lookup, or Tool result helpers;
+preparation callbacks must preserve that pure profile. Returning a Promise is
+an unsupported JSON result, even if it has already settled. Domain adapters
+choose bindings such as `params`, `response`, or aliases that share copied data.
+
+`EvaluateJSON` is the lower-level entry point for adapters that own program
+execution. Its callback returns a Goja value directly to the private output
+encoder. Use `Run` for bounded work with no output, such as initialization
+validation. These callbacks also own their input/source bounds and host setup;
+they must keep VM values inside the callback. Shared async APIs will be
+extracted separately.
 
 ## Copying JSON into the runtime
 
@@ -92,7 +100,8 @@ under the same execution deadline.
 
 ## Limits and errors
 
-All limit fields must be positive. Compiling adapters enforce source bytes;
+All limit fields must be positive. `CompileExpression` enforces source bytes;
+adapters that compile other program types enforce their own source cap. All
 input adapters submit their complete batch with the effective JSON limits. The
 decoder enforces those byte/depth/node caps. The runtime enforces timeout, stack
 depth, and the final output's byte/depth/node limits. Input and output have
@@ -100,8 +109,9 @@ separate traversal allowances; a later domain envelope needs its own byte cap.
 These are not heap or JavaScript instruction quotas, and native built-ins cannot
 always be interrupted immediately.
 
-The timeout covers the callback and output conversion. A caller cancellation or
-deadline retains its context error; policy expiry returns `ErrLimitExceeded`.
+The timeout covers preparation, authored execution, and output conversion. A
+caller cancellation or deadline retains its context error; policy expiry returns
+`ErrLimitExceeded`.
 The interrupt watcher is joined and cancellation checked again before a result
 is returned. `Run` does not hide unrelated Go panics.
 
