@@ -22,7 +22,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List actors with optional filtering and pagination",
+                "description": "List actors with optional filtering and pagination. Results are ordered by id unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -72,7 +72,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'created_at:asc')",
+                        "description": "Order by id, namespace, external_id, created_at, updated_at, or deleted_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id.",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -585,7 +585,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List connections with optional filtering and pagination",
+                "description": "List connections with optional filtering and pagination. Results are ordered by id unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -641,7 +641,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'created_at:asc')",
+                        "description": "Order by id, namespace, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id.",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -2828,7 +2828,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List connectors with optional filtering and pagination",
+                "description": "List connectors with optional filtering and pagination. Results are ordered by id unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2878,7 +2878,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'created_at:asc')",
+                        "description": "Order by id, namespace, type, state, generation, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id.",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -3290,7 +3290,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List all generations of a specific connector",
+                "description": "List all generations of a specific connector, oldest first unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3347,7 +3347,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'generation desc')",
+                        "description": "Order by id, generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'generation desc'). Defaults to generation ascending (oldest first).",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -3704,7 +3704,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List keys with optional filtering and pagination",
+                "description": "List keys with optional filtering and pagination. Results are ordered by id unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3754,7 +3754,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'state:asc')",
+                        "description": "Order by id, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'state desc'). Defaults to id.",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -4385,7 +4385,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List namespaces with optional filtering and pagination",
+                "description": "List namespaces with optional filtering and pagination. Results are ordered by path unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4441,7 +4441,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'path:asc')",
+                        "description": "Order by path, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'path desc'). Defaults to path.",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -4891,7 +4891,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List rate limits with optional filtering and pagination",
+                "description": "List rate limits with optional filtering and pagination. Results are ordered by id unless orderBy is set.",
                 "consumes": [
                     "application/json"
                 ],
@@ -4935,7 +4935,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by field (e.g., 'created_at:desc')",
+                        "description": "Order by id, namespace, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id.",
                         "name": "orderBy",
                         "in": "query"
                     }
@@ -6244,7 +6244,7 @@ const docTemplateadmin_api = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "List a ToolSet's generations, newest first by default. Each projects the current shared connection selector.",
+                "description": "List a ToolSet's generations, oldest first by default. Each projects the current shared connection selector.",
                 "consumes": [
                     "application/json"
                 ],
@@ -6277,7 +6277,7 @@ const docTemplateadmin_api = `{
                     },
                     {
                         "type": "string",
-                        "description": "Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to newest generation first.",
+                        "description": "Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to generation ascending (oldest first).",
                         "name": "orderBy",
                         "in": "query"
                     }

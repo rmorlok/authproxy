@@ -927,7 +927,7 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 	// A stable default is required for cursor pagination. In particular, do
 	// not rely on the physical scan order, which can change when indexes are
 	// added or the query planner changes its plan.
-	q = l.listPaging.apply(q, "id", "created_at ASC", "id ASC")
+	q = l.listPaging.apply(q, "id")
 
 	return q
 }

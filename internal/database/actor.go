@@ -27,6 +27,7 @@ import (
 type ActorOrderByField string
 
 const (
+	ActorOrderById         ActorOrderByField = "id"
 	ActorOrderByCreatedAt  ActorOrderByField = "created_at"
 	ActorOrderByUpdatedAt  ActorOrderByField = "updated_at"
 	ActorOrderByNamespace  ActorOrderByField = "namespace"
@@ -70,7 +71,8 @@ func (p *Permissions) Scan(value interface{}) error {
 // IsValidActorOrderByField checks if the given value is a valid ActorOrderByField.
 func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
 	switch ActorOrderByField(field) {
-	case ActorOrderByCreatedAt,
+	case ActorOrderById,
+		ActorOrderByCreatedAt,
 		ActorOrderByUpdatedAt,
 		ActorOrderByNamespace,
 		ActorOrderByExternalId,
@@ -795,7 +797,7 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 	// A stable default is required for cursor pagination. In particular, do
 	// not rely on the physical scan order, which can change when indexes are
 	// added or the query planner changes its plan.
-	q = l.listPaging.apply(q, "id", "created_at ASC", "id ASC")
+	q = l.listPaging.apply(q, "id")
 
 	return q
 }

@@ -320,7 +320,12 @@ func (l *listConnectorsFilters) orderClauses(field ConnectorOrderByField, direct
 	default:
 		orderCol = "c." + orderCol
 	}
-	return []string{fmt.Sprintf("%s %s", orderCol, direction)}
+	clauses := []string{fmt.Sprintf("%s %s", orderCol, direction)}
+	// Connector id breaks ties, in the same direction, so the order is total.
+	if field != ConnectorOrderById {
+		clauses = append(clauses, fmt.Sprintf("c.id %s", direction))
+	}
+	return clauses
 }
 
 // fetchPage runs one page of the listing and advances its paging past the returned
@@ -412,7 +417,8 @@ c.deleted_at as deleted_at
 		q = q.Where(sq.Eq{"c.deleted_at": nil})
 	}
 
-	// The key is the connector id: one row per connector, and it never changes.
+	// The key is the connector id: one row per connector, and it never changes. With no
+	// order chosen, connectors are listed by id.
 	q = l.listPaging.applyOrdered(q, "c.id", l.orderClauses)
 
 	sqlStr, sqlArgs, sqlErr := q.ToSql()

@@ -812,8 +812,10 @@ func (l *listConnectorGenerationsFilters) applyRestrictions(ctx context.Context)
 		q = q.Where(sq.Eq{"c.deleted_at": nil, "dv.deleted_at": nil})
 	}
 
-	// The key is the generation row's own id, which is unique and never changes.
-	q = l.listPaging.applyOrdered(q, "dv.id", connectorGenerationOrderClauses)
+	// The key is the generation row's own id, which is unique and never changes. With
+	// no order chosen, each connector's generations are listed oldest first, grouped
+	// by connector id.
+	q = l.listPaging.applyOrdered(q, "dv.id", connectorGenerationOrderClauses, "c.id ASC", "dv.generation ASC")
 
 	return q
 }

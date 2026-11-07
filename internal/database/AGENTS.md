@@ -47,6 +47,10 @@ The re-encryption registry (`reencrypt_registry.go`) tracks which tables/columns
 3. Register the field in an `init()` function using `RegisterEncryptedField()`
 4. Update `cols()`, `fields()`, `values()` for both the encrypted column and `encrypted_at`
 
+## Default List Order
+
+Every listing has a total, stable order so offset pages neither repeat nor skip rows. `listPaging.apply` orders by the listing's key column ascending when the caller sets no `OrderBy`, and breaks ties in a caller-chosen order with the key in the same direction. Pass a default order to `apply`/`applyOrdered` only when it differs from key order, as connector generations do (`c.id`, then `generation` ascending). Generation and revision listings default to generation ascending. The public defaults are documented in `docs/src/content/docs/reference/api.md` (List order and pagination); update that table when a listing's default changes.
+
 ## Key-Ordered Listings
 
 Offset paging skips rows when a walk updates or removes what it visits, because the remaining rows shift under the offset. Key-ordered listings page by a unique, immutable key instead. `listPaging[F]` (`list_paging.go`) owns a listing's page size, order and position in both modes. The connection, namespace, key, rate limit, actor, connector, and connector generation listings support them. Namespaces key by `path`, connector generations by the generation row's `id`, and the rest by `id`:
