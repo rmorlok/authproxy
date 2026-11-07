@@ -151,7 +151,8 @@ type DB interface {
 	ListToolSetsBuilder() ListToolSetsBuilder
 	ListToolSetsFromCursor(ctx context.Context, cursor string) (ListToolSetsExecutor, error)
 
-	// ListToolSetGenerationsBuilder pages through one live ToolSet's generations, newest first.
+	// ListToolSetGenerationsBuilder pages through one live ToolSet's generations, oldest first
+	// unless OrderBy selects another order.
 	ListToolSetGenerationsBuilder() ListToolSetGenerationsBuilder
 	ListToolSetGenerationsFromCursor(ctx context.Context, cursor string) (ListToolSetGenerationsExecutor, error)
 

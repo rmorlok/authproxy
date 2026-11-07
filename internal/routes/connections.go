@@ -394,7 +394,7 @@ type ListConnectionRequestQuery struct {
 }
 
 // @Summary		List connections
-// @Description	List connections with optional filtering and pagination
+// @Description	List connections with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			connections
 // @Accept			json
 // @Produce		json
@@ -405,7 +405,7 @@ type ListConnectionRequestQuery struct {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			orderBy		query		string	false	"Order by id, namespace, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	OpenAPIListConnectionResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse

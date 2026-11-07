@@ -253,7 +253,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 }
 
 // @Summary		List keys
-// @Description	List keys with optional filtering and pagination
+// @Description	List keys with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			keys
 // @Accept			json
 // @Produce		json
@@ -263,7 +263,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'state:asc')"
+// @Param			orderBy		query		string	false	"Order by id, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'state desc'). Defaults to id."
 // @Success		200				{object}	schemaapiopenapi.ListKeysResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse

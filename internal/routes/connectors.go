@@ -153,7 +153,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 }
 
 // @Summary		List connectors
-// @Description	List connectors with optional filtering and pagination
+// @Description	List connectors with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
@@ -163,7 +163,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			orderBy		query		string	false	"Order by id, namespace, type, state, generation, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	OpenAPIListConnectorsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -316,7 +316,7 @@ func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 }
 
 // @Summary		List connector generations
-// @Description	List all generations of a specific connector
+// @Description	List all generations of a specific connector, oldest first unless orderBy is set.
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
@@ -327,7 +327,7 @@ func (r *ConnectorsRoutes) getGeneration(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'generation desc')"
+// @Param			orderBy		query		string	false	"Order by id, generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'generation desc'). Defaults to generation ascending (oldest first)."
 // @Success		200				{object}	OpenAPIListConnectorGenerationsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse

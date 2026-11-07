@@ -761,7 +761,7 @@ type C interface {
 	ListToolSetsFromCursor(ctx context.Context, cursor string) (ListToolSetsExecutor, error)
 
 	// ListToolSetGenerationsBuilder starts a listing of one ToolSet's generations,
-	// newest first unless OrderBy selects another order.
+	// oldest first unless OrderBy selects another order.
 	ListToolSetGenerationsBuilder() ListToolSetGenerationsBuilder
 
 	// ListToolSetGenerationsFromCursor continues a generation listing.

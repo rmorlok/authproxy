@@ -224,7 +224,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 }
 
 // @Summary		List rate limits
-// @Description	List rate limits with optional filtering and pagination
+// @Description	List rate limits with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
@@ -233,7 +233,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:desc')"
+// @Param			orderBy		query		string	false	"Order by id, namespace, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	schemaapiopenapi.ListRateLimitsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse

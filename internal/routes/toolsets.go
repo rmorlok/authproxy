@@ -402,14 +402,14 @@ func (r *ToolSetsRoutes) delete(gctx *gin.Context) {
 }
 
 // @Summary		List toolset generations
-// @Description	List a ToolSet's generations, newest first by default. Each projects the current shared connection selector.
+// @Description	List a ToolSet's generations, oldest first by default. Each projects the current shared connection selector.
 // @Tags			toolsets
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string	true	"ToolSet ID"
 // @Param			cursor	query		string	false	"Pagination cursor"
 // @Param			limit	query		integer	false	"Maximum number of results to return (default 50, max 100)"
-// @Param			orderBy	query		string	false	"Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to newest generation first."
+// @Param			orderBy	query		string	false	"Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to generation ascending (oldest first)."
 // @Success		200		{object}	schemaapiopenapi.ListToolSetsResponseJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse

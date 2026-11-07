@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -89,20 +90,39 @@ func (p *listPaging[F]) validate() error {
 //
 // In key mode it orders by keyColumn and restricts to rows after the position;
 // keyColumn must be unique and immutable, and unqualified or qualified to match the
-// query. In offset mode it orders by the caller's field, or by defaultOrder when the
-// caller chose none, and skips Offset rows. defaultOrder may be empty, though a
-// listing without a stable order can repeat or skip rows across pages.
+// query. In offset mode it orders by the caller's field, then by keyColumn in the same
+// direction to break ties, and skips Offset rows. When the caller chose no order it
+// uses defaultOrder, or keyColumn ascending when defaultOrder is empty, so every
+// listing has a total, stable order and offset pages neither repeat nor skip rows
+// while the data is unchanged.
 func (p *listPaging[F]) apply(q sq.SelectBuilder, keyColumn string, defaultOrder ...string) sq.SelectBuilder {
 	return p.applyOrdered(q, keyColumn, func(field F, direction string) []string {
-		return []string{fmt.Sprintf("%s %s", string(field), direction)}
+		clauses := []string{fmt.Sprintf("%s %s", string(field), direction)}
+		if !sameColumn(string(field), keyColumn) {
+			clauses = append(clauses, fmt.Sprintf("%s %s", keyColumn, direction))
+		}
+		return clauses
 	}, defaultOrder...)
+}
+
+// sameColumn reports whether two column references name the same column, ignoring
+// a table qualifier on either, such as "id" and "c.id".
+func sameColumn(a, b string) bool {
+	unqualified := func(col string) string {
+		if i := strings.LastIndex(col, "."); i >= 0 {
+			return col[i+1:]
+		}
+		return col
+	}
+	return unqualified(a) == unqualified(b)
 }
 
 // applyOrdered is apply for a listing whose order fields do not name a column of the
 // query directly, such as one that joins tables or orders by a computed expression.
 // In offset mode with a caller-chosen order, it orders by the clauses orderClauses
-// returns for the field and its direction ("ASC" or "DESC"), which may add
-// tie-breakers. Key mode and the default order behave as in apply.
+// returns for the field and its direction ("ASC" or "DESC"); those clauses must break
+// ties themselves, usually with keyColumn. Key mode and the default order behave as
+// in apply.
 func (p *listPaging[F]) applyOrdered(
 	q sq.SelectBuilder,
 	keyColumn string,
@@ -121,10 +141,13 @@ func (p *listPaging[F]) applyOrdered(
 		return q.OrderBy(keyColumn + " ASC")
 	}
 
-	if p.OrderByFieldVal != nil {
+	switch {
+	case p.OrderByFieldVal != nil:
 		q = q.OrderBy(orderClauses(*p.OrderByFieldVal, p.OrderByVal.String())...)
-	} else if len(defaultOrder) > 0 {
+	case len(defaultOrder) > 0:
 		q = q.OrderBy(defaultOrder...)
+	default:
+		q = q.OrderBy(keyColumn + " ASC")
 	}
 	return q.Offset(p.Offset)
 }

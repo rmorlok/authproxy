@@ -267,8 +267,9 @@ func TestToolSets(t *testing.T) {
 		require.Equal(t, uint64(2), published.Metadata.Generation)
 		require.Equal(t, toolsetschema.ToolSetReleaseStatePrimary, published.Status.Release.State)
 
+		// The generation list is oldest first by default.
 		generations := decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations", nil, all))
-		require.Equal(t, []string{"2:primary", "1:active"}, generationStates(generations))
+		require.Equal(t, []string{"1:active", "2:primary"}, generationStates(generations))
 		for _, item := range generations.Items {
 			require.Equal(t, toolsetschema.ToolSetReleaseStatePrimary, item.Spec.Release.DesiredState, "published generations keep primary intent")
 		}
@@ -282,7 +283,7 @@ func TestToolSets(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		require.Equal(t, uint64(3), decodeToolSet(t, w).Metadata.Generation)
 		generations = decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations", nil, all))
-		require.Equal(t, []string{"3:primary", "2:active", "1:active"}, generationStates(generations))
+		require.Equal(t, []string{"1:active", "2:active", "3:primary"}, generationStates(generations))
 	})
 
 	t.Run("generation endpoints edit drafts only and project the current selector", func(t *testing.T) {
@@ -340,11 +341,12 @@ func TestToolSets(t *testing.T) {
 		}), all)
 		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 		require.Equal(t, uint64(3), decodeToolSet(t, w).Metadata.Generation)
+		// The default oldest-first order pages through the cursor to the new primary.
 		generations := decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations?limit=2", nil, all))
-		require.Equal(t, []string{"3:primary", "2:active"}, generationStates(generations))
+		require.Equal(t, []string{"1:active", "2:active"}, generationStates(generations))
 		require.NotEmpty(t, generations.Metadata.Continue)
 		next := decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations?cursor="+url.QueryEscape(generations.Metadata.Continue), nil, all))
-		require.Equal(t, []string{"1:active"}, generationStates(next))
+		require.Equal(t, []string{"3:primary"}, generationStates(next))
 
 		w = s.do(t, http.MethodGet, path+"/generations/9", nil, all)
 		require.Equal(t, http.StatusNotFound, w.Code, w.Body.String())
@@ -413,11 +415,11 @@ func TestToolSets(t *testing.T) {
 		require.NotEmpty(t, page.Metadata.Continue)
 		require.Equal(t, []string{"alpha"}, names("/toolsets?cursor="+url.QueryEscape(page.Metadata.Continue)))
 
-		// Generations default to newest first, and orderBy overrides that.
+		// Generations default to oldest first, and orderBy overrides that.
 		generations := decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations", nil, all))
-		require.Equal(t, []string{"2:draft", "1:primary"}, generationStates(generations))
-		generations = decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations?orderBy=generation", nil, all))
 		require.Equal(t, []string{"1:primary", "2:draft"}, generationStates(generations))
+		generations = decodeToolSetList(t, s.do(t, http.MethodGet, path+"/generations?orderBy="+url.QueryEscape("generation desc"), nil, all))
+		require.Equal(t, []string{"2:draft", "1:primary"}, generationStates(generations))
 
 		// Unknown fields and directions are client errors on both lists.
 		require.Equal(t, http.StatusBadRequest, s.do(t, http.MethodGet, "/toolsets?orderBy=bogus", nil, all).Code)

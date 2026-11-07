@@ -648,17 +648,28 @@ func TestActor(t *testing.T) {
 		}
 
 		t.Run("all actors", func(t *testing.T) {
+			// The database's own id order, read in key order, is the expected default.
+			byKey := db.ListActorsBuilder().Limit(100).ResumeAfter("").FetchPage(ctx)
+			require.NoError(t, byKey.Error)
+			var wantIds []apid.ID
+			for _, actor := range byKey.Results {
+				wantIds = append(wantIds, actor.Id)
+			}
+
+			// With no order chosen, offset pages list actors by id, not creation time.
 			result := db.ListActorsBuilder().Limit(10).FetchPage(ctx)
 			require.NoError(t, result.Error)
 			require.Len(t, result.Results, 10)
-			require.Equal(t, result.Results[0].Id, firstUuid)
 			require.True(t, result.HasMore)
 			require.NotEmpty(t, result.Cursor)
 
-			total := 10
+			var gotIds []apid.ID
+			for _, actor := range result.Results {
+				gotIds = append(gotIds, actor.Id)
+			}
 			cursor := result.Cursor
-			var last *Actor
 
+			// Following the cursor returns the rest, in the same order, without repeats.
 			for cursor != "" {
 				ex, err := db.ListActorsFromCursor(ctx, cursor)
 				require.NoError(t, err)
@@ -666,13 +677,14 @@ func TestActor(t *testing.T) {
 				require.NoError(t, result.Error)
 				require.True(t, len(result.Results) > 0)
 
-				last = result.Results[len(result.Results)-1]
-				total += len(result.Results)
+				for _, actor := range result.Results {
+					gotIds = append(gotIds, actor.Id)
+				}
 				cursor = result.Cursor
 			}
 
-			require.Equal(t, 50, total)
-			require.Equal(t, lastUuid, last.Id)
+			require.Len(t, gotIds, 50)
+			require.Equal(t, wantIds, gotIds)
 		})
 
 		t.Run("reverse order", func(t *testing.T) {
