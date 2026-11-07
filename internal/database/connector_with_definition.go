@@ -13,7 +13,6 @@ import (
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
-	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -177,6 +176,10 @@ type ListConnectorsExecutor interface {
 type ListConnectorsBuilder interface {
 	ListConnectorsExecutor
 	Limit(int32) ListConnectorsBuilder
+	// ResumeAfter pages in key order (connector id), continuing after a position taken
+	// from PageResult.Position; an empty position starts at the beginning. It cannot be
+	// combined with OrderBy.
+	ResumeAfter(position string) ListConnectorsBuilder
 	ForType(string) ListConnectorsBuilder
 	ForId(apid.ID) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
@@ -189,20 +192,22 @@ type ListConnectorsBuilder interface {
 	ForLabelSelector(selector string) ListConnectorsBuilder
 }
 
+// listConnectorsFilters is the state of a connector listing: its filters and its
+// paging. It is serialized into encrypted cursors, so field JSON names are part of the
+// cursor format.
 type listConnectorsFilters struct {
 	s                 *service                   `json:"-"`
-	LimitVal          uint64                     `json:"limit"`
-	Offset            uint64                     `json:"offset"`
 	StatesVal         []ConnectorGenerationState `json:"states,omitempty"`
 	NamespaceMatchers []string                   `json:"namespaceMatchers,omitempty"`
 	TypeVal           []string                   `json:"types,omitempty"`
 	IdsVal            []apid.ID                  `json:"ids,omitempty"`
 	NameVal           *scommon.ResourceName      `json:"name,omitempty"`
-	OrderByFieldVal   *ConnectorOrderByField     `json:"orderByField"`
-	OrderByVal        *pagination.OrderBy        `json:"orderBy"`
 	IncludeDeletedVal bool                       `json:"includeDeleted,omitempty"`
 	LabelSelectorVal  *string                    `json:"labelSelector,omitempty"`
 	Errors            *multierror.Error          `json:"-"`
+
+	// listPaging owns the page size, order and position. See listPaging.
+	listPaging[ConnectorOrderByField]
 }
 
 func (l *listConnectorsFilters) addError(e error) ListConnectorsBuilder {
@@ -211,7 +216,13 @@ func (l *listConnectorsFilters) addError(e error) ListConnectorsBuilder {
 }
 
 func (l *listConnectorsFilters) Limit(limit int32) ListConnectorsBuilder {
-	l.LimitVal = uint64(limit)
+	l.listPaging.setLimit(limit)
+	return l
+}
+
+// ResumeAfter selects key order by connector id, continuing after position.
+func (l *listConnectorsFilters) ResumeAfter(position string) ListConnectorsBuilder {
+	l.listPaging.resumeAfter(position)
 	return l
 }
 
@@ -265,8 +276,7 @@ func (l *listConnectorsFilters) ForName(name scommon.ResourceName) ListConnector
 
 func (l *listConnectorsFilters) OrderBy(field ConnectorOrderByField, by pagination.OrderBy) ListConnectorsBuilder {
 	if IsValidConnectorOrderByField(field) {
-		l.OrderByFieldVal = &field
-		l.OrderByVal = &by
+		l.listPaging.setOrder(field, by)
 	}
 	return l
 }
@@ -295,12 +305,32 @@ func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (
 	return l, nil
 }
 
+// orderClauses maps a caller-chosen order field to ORDER BY clauses over the
+// connector listing's query, where c is the connector and rr its displayed generation.
+func (l *listConnectorsFilters) orderClauses(field ConnectorOrderByField, direction string) []string {
+	orderCol := string(field)
+	switch field {
+	case ConnectorOrderByGeneration, ConnectorOrderByState:
+		orderCol = "rr." + orderCol
+	case ConnectorOrderByType:
+		orderCol = "json_extract(c.labels, '$.type')"
+		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+			orderCol = "c.labels ->> 'type'"
+		}
+	default:
+		orderCol = "c." + orderCol
+	}
+	return []string{fmt.Sprintf("%s %s", orderCol, direction)}
+}
+
+// fetchPage runs one page of the listing and advances its paging past the returned
+// rows. Key-ordered pages report the last connector id as PageResult.Position.
 func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorWithDefinition] {
-	if l.LimitVal <= 0 {
-		l.LimitVal = 100
+	if err := l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 	}
 
-	if err := l.Errors.ErrorOrNil(); err != nil {
+	if err := l.listPaging.validate(); err != nil {
 		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 	}
 
@@ -382,24 +412,8 @@ c.deleted_at as deleted_at
 		q = q.Where(sq.Eq{"c.deleted_at": nil})
 	}
 
-	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
-
-	if l.OrderByFieldVal != nil {
-		orderCol := string(*l.OrderByFieldVal)
-		switch *l.OrderByFieldVal {
-		case ConnectorOrderByGeneration, ConnectorOrderByState:
-			orderCol = "rr." + orderCol
-		case ConnectorOrderByType:
-			orderCol = "json_extract(c.labels, '$.type')"
-			if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
-				orderCol = "c.labels ->> 'type'"
-			}
-		default:
-			orderCol = "c." + orderCol
-		}
-		q = q.OrderBy(fmt.Sprintf("%s %s", orderCol, l.OrderByVal.String()))
-	}
+	// The key is the connector id: one row per connector, and it never changes.
+	q = l.listPaging.applyOrdered(q, "c.id", l.orderClauses)
 
 	sqlStr, sqlArgs, sqlErr := q.ToSql()
 	rows, err := q.RunWith(l.s.db).Query()
@@ -412,6 +426,7 @@ c.deleted_at as deleted_at
 		}
 		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
 	}
+	defer rows.Close()
 
 	var connectors []ConnectorWithDefinition
 	for rows.Next() {
@@ -423,11 +438,13 @@ c.deleted_at as deleted_at
 
 		connectors = append(connectors, c)
 	}
+	if err := rows.Err(); err != nil {
+		return pagination.PageResult[ConnectorWithDefinition]{Error: err}
+	}
 
-	l.Offset = l.Offset + uint64(len(connectors)) - 1 // we request one more than the page size we return
+	page, hasMore, position := nextPage(&l.listPaging, connectors, func(c ConnectorWithDefinition) string { return string(c.Id) })
 
 	cursor := ""
-	hasMore := uint64(len(connectors)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
@@ -436,9 +453,10 @@ c.deleted_at as deleted_at
 	}
 
 	return pagination.PageResult[ConnectorWithDefinition]{
-		HasMore: hasMore,
-		Results: connectors[:util.MinUint64(l.LimitVal, uint64(len(connectors)))],
-		Cursor:  cursor,
+		HasMore:  hasMore,
+		Results:  page,
+		Cursor:   cursor,
+		Position: position,
 	}
 }
 
@@ -446,7 +464,12 @@ func (l *listConnectorsFilters) FetchPage(ctx context.Context) pagination.PageRe
 	return l.fetchPage(ctx)
 }
 
+// Enumerate walks every page, calling callback for each. Unless the caller chose an
+// order or continued from an offset cursor, it walks in connector id order, so writes
+// made during the walk do not make it skip or repeat connectors.
 func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[ConnectorWithDefinition]) error {
+	l.listPaging.startEnumerate()
+
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true
@@ -466,15 +489,13 @@ func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback paginati
 
 func (s *service) ListConnectorsBuilder() ListConnectorsBuilder {
 	return &listConnectorsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 }
 
 func (s *service) ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
 	b := &listConnectorsFilters{
-		s:        s,
-		LimitVal: 100,
+		s: s,
 	}
 
 	return b.FromCursor(ctx, cursor)

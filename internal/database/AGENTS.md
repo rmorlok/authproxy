@@ -49,14 +49,14 @@ The re-encryption registry (`reencrypt_registry.go`) tracks which tables/columns
 
 ## Key-Ordered Listings
 
-Offset paging skips rows when a walk updates or removes what it visits, because the remaining rows shift under the offset. Key-ordered listings page by a unique, immutable key instead. `listPaging[F]` (`list_paging.go`) owns a listing's page size, order and position in both modes. The connection, namespace, key, rate limit, and actor listings support them:
+Offset paging skips rows when a walk updates or removes what it visits, because the remaining rows shift under the offset. Key-ordered listings page by a unique, immutable key instead. `listPaging[F]` (`list_paging.go`) owns a listing's page size, order and position in both modes. The connection, namespace, key, rate limit, actor, connector, and connector generation listings support them. Namespaces key by `path`, connector generations by the generation row's `id`, and the rest by `id`:
 
 - **`Enumerate`** uses key order unless the caller set `OrderBy` or continued from an offset cursor, so walks that write are safe by default. Do not rely on any other visit order.
 - **`ResumeAfter(position)`** selects key order explicitly, for `FetchPage` or for continuing a walk from `PageResult.Position`. Combining it with `OrderBy` returns `ErrInvalidListQuery`.
 - **`FetchPage`** otherwise stays offset paged for API callers.
 - **Limits:** rows inserted behind the position are not seen until the next walk, and the core list wrappers do not carry `Position`.
 
-To add support, embed `listPaging[F]` in the filters in place of their own limit, offset and order fields, then follow an existing listing: `apply` adds paging to the query, `nextPage` advances past the fetched rows, and `startEnumerate` begins `Enumerate`. The key column must be unique and immutable.
+To add support, embed `listPaging[F]` in the filters in place of their own limit, offset and order fields, then follow an existing listing: `apply` adds paging to the query, `nextPage` advances past the fetched rows, and `startEnumerate` begins `Enumerate`. Use `applyOrdered` instead of `apply` when order fields do not name a query column directly, as in the joined connector listings. The key column must be unique and immutable.
 
 ## Task Checkpoints
 
