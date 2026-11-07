@@ -2,7 +2,6 @@ package javascript
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/dop251/goja"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
@@ -29,39 +28,25 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 		return nil, apjsruntime.ErrInvalidInput
 	}
 
-	return evaluateJSON(ctx, p.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
-		// Match publication validation by tracking initialization as well as
-		// the entry point. Goja drains Promise microtasks before calls return.
-		tracker := apjsruntime.NewPromiseTracker(vm)
-		defer tracker.Close()
-
-		execute, err := p.Initialize(vm)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := tracker.CheckRejections(); err != nil {
-			return nil, err
-		}
-
-		root, err := callTool(vm, execute)
-		if err != nil {
-			return nil, err
-		}
-		return tracker.SettledResult(root)
+	result, err := p.program.Evaluate(ctx, func(runCtx context.Context, vm *goja.Runtime, invocation *apjsruntime.AsyncInvocation) error {
+		return p.prepareInvocation(runCtx, vm, invocation, input)
 	})
+	return common.RawJSON(result), err
 }
 
-// callTool invokes the initialized entry point and requires a native Promise.
-// Checking ExportType first avoids traversing an arbitrary returned object's
-// getters or allocating an unchecked graph while exporting it.
-func callTool(vm *goja.Runtime, execute goja.Callable) (*goja.Promise, error) {
-	value, err := execute(goja.Undefined(), vm.Get("params"), vm.Get("context"))
-	if err != nil {
-		return nil, runtimeEvaluationError(err)
+// prepareInvocation copies the captured Tool input and passes the same native
+// objects positionally to execute. Protected globals and aliases keep sharing
+// these objects, including mutations made during connector initialization.
+func (p *ToolProgram) prepareInvocation(
+	ctx context.Context,
+	vm *goja.Runtime,
+	invocation *apjsruntime.AsyncInvocation,
+	input Input,
+) error {
+	if err := bindInput(ctx, vm, input, p.limits); err != nil {
+		return err
 	}
-	if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
-		return nil, apjsruntime.ErrEvaluation
-	}
-	return value.Export().(*goja.Promise), nil
+	invocation.Params = vm.Get("params")
+	invocation.Context = vm.Get("context")
+	return nil
 }

@@ -87,40 +87,26 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	stop := context.AfterFunc(options.Session.Context(), cancel)
 	defer func() { stop(); cancel() }()
 
-	result, err := evaluateJSON(
+	result, err := p.program.Evaluate(
 		parent,
-		p.limits,
-		input,
-		func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
+		func(runCtx context.Context, vm *goja.Runtime, invocation *apjsruntime.AsyncInvocation) error {
+			if err := p.prepareInvocation(runCtx, vm, invocation, input); err != nil {
+				return err
+			}
 			loop, err := newFetchLoop(runCtx, vm, options, p.limits)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			defer loop.close()
+			// Register cleanup before touching the VM again: preparation can be
+			// interrupted after creating the host but before returning it.
+			invocation.Close = loop.close
+			invocation.Start = func() { loop.enabled = true }
+			invocation.Await = loop.await
 
 			if err := vm.Set("fetch", loop.fetch); err != nil {
-				return nil, apjsruntime.ErrInvalidInput
+				return apjsruntime.ErrInvalidInput
 			}
-
-			tracker := apjsruntime.NewPromiseTracker(vm)
-			defer tracker.Close()
-
-			execute, err := p.Initialize(vm)
-			if err != nil {
-				return nil, err
-			}
-
-			if err := tracker.CheckRejections(); err != nil {
-				return nil, err
-			}
-
-			loop.enabled = true
-			root, err := callTool(vm, execute)
-
-			if err != nil {
-				return nil, err
-			}
-			return loop.settle(root, tracker)
+			return nil
 		},
 	)
 	if contextErr := ctx.Err(); contextErr != nil {
@@ -130,7 +116,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 		return nil, sessionErr
 	}
 
-	return result, err
+	return common.RawJSON(result), err
 }
 
 // fetch validates and detaches authored request values on the VM goroutine.

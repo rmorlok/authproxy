@@ -7,10 +7,10 @@ captured connection's HTTP session. Pure expressions and ordinary Tool evaluatio
 have no I/O capabilities.
 
 The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
-lifecycle, expression evaluation, async compilation/initialization, Promise
+lifecycle, expression evaluation, async compilation and execution, Promise
 tracking, execution limits, and bounded native JSON conversion. This package
 supplies Tool snapshots and aliases, its reserved host names, connector-library
-selection, and async invocation/HTTP orchestration. Its
+selection, and the HTTP host's workers and response readers. Its
 `Limits` type refers to the shared policy. Callers reference error classifications
 directly from `internal/apjs/runtime`.
 
@@ -196,9 +196,11 @@ invocation-service integration remain separate work.
 
 ## Evaluate an async Tool
 
-`ToolProgram.Evaluate` calls `execute(params, context)` and converts its fulfilled
-native Promise result into JSON. The Tool and its called helpers share a private
-copy of the captured input. `await` and Promise chains can compose their results:
+`ToolProgram.Evaluate` binds captured Tool input and delegates invocation and
+Promise settlement to the shared runtime. It calls `execute(params, context)` and
+converts its fulfilled native Promise result into JSON. The Tool and its called
+helpers share a private copy of the captured input. `await` and Promise chains
+can compose their results:
 
 ```javascript
 async function execute(params, context) {
@@ -232,8 +234,10 @@ by the timeout. Errors contain no thrown values, private input, or stack traces.
 Evaluation runs synchronously on one Goja goroutine. Goja drains Promise jobs
 when authored calls finish, which supports `await` and Promise chains that can
 settle without a network or timer host. All JavaScript execution and Promise
-callbacks stay on that goroutine. A rejection tracker records abandoned
-rejections and removes them when a handler is attached.
+callbacks stay on that goroutine. The shared runtime tracks abandoned rejections
+and removes them when a handler is attached. For HTTP evaluation, it enables the
+host after initialization, requests one completion at a time while the root is
+pending, and cancels outstanding host work before encoding the result.
 
 ## Fetch through a connection
 
