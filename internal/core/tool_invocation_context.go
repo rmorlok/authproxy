@@ -106,6 +106,7 @@ func (s *service) prepareToolInvocation(
 			Labels:              maps.Clone(map[string]string(storedConnection.Labels)),
 			Annotations:         maps.Clone(map[string]string(storedConnection.Annotations)),
 			ConnectionID:        storedConnection.Id.String(),
+			ConnectionName:      string(storedConnection.Name),
 			ConnectionNamespace: storedConnection.Namespace,
 			ToolID:              captured.Revision.ToolId.String(),
 			Revision:            captured.Revision.Revision,

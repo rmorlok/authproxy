@@ -2,17 +2,16 @@
 
 This package evaluates pure expressions and async JavaScript Tool functions.
 It reuses connector helper libraries and bounds initialization, execution, and
-JSON conversion with explicit limits. Tools can opt into `fetch` through one
-captured connection's HTTP session. Pure expressions and ordinary Tool evaluation
-have no I/O capabilities.
+JSON conversion with explicit limits. HTTP Tools receive one captured connection
+in `context.connections` and send requests through its `fetch` method. Pure
+expressions and ordinary Tool evaluation have no I/O capabilities.
 
 The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
 lifecycle, expression evaluation, async compilation and execution, Promise
 tracking, execution limits, bounded native JSON conversion, and the HTTP host's
-request conversion, workers, and response readers. This package
-supplies Tool snapshots and aliases, its reserved host names, connector-library
-selection, and connection-session ownership and error precedence. Its
-`Limits` type refers to the shared policy. Callers reference error classifications
+request conversion, workers, and response readers. This package supplies Tool
+snapshots and aliases, its reserved host names, connector-library selection, and
+session ownership and error precedence. Its `Limits` type refers to the shared policy. Callers reference error classifications
 directly from `internal/apjs/runtime`.
 
 ## Pure expressions
@@ -168,8 +167,9 @@ with a synchronous function fails. Publication has no `cfg`, `params`, or other
 invocation values: helpers must read them inside functions called during
 evaluation. For example,
 `const prefix = "customer:"` is valid top-level initialization, while
-`const tenant = cfg.tenant` fails validation. A top-level `fetch(...)` also fails
-because validation has no fetch host. Authored top-level code can itself call
+`const tenant = cfg.tenant` fails validation. A top-level
+`context.connections[0].fetch(...)` also fails because validation has no input
+or HTTP capability. Authored top-level code can itself call
 other functions, so initialization is covered by cancellation, timeout, and
 stack limits. Unhandled Promise rejections during initialization fail validation;
 rejections caught before its Promise jobs finish are allowed. Evaluation checks
@@ -182,8 +182,9 @@ rules. Both reserve global host names such as `fetch`, `context`, `params`,
 variables may reuse these names. Legacy unbraced conditional declarations, such
 as `if (ok) function fetch() {}`, are rejected anywhere in a library because
 they can reach the global object. Host globals are frozen before initialization,
-including absent capabilities whose value is `undefined`. Host capabilities such
-as `fetch` are non-enumerable; existing captured input bindings remain enumerable.
+including absent capabilities whose value is `undefined`. Reserved capability globals
+are non-enumerable; existing captured input bindings remain enumerable. Global
+`fetch` stays undefined for Tools.
 Tool, expression, and connector library parsing, including dynamic
 `eval`/`Function` parsing, do not load source maps.
 
@@ -221,9 +222,12 @@ if err != nil {
 
 The fulfilled value becomes bounded JSON using the same rules as expressions.
 `Response` is optional and normally omitted for Tool functions. It is available
-for callers that already have prepared response data. Changing `params` or
+for callers that already have prepared response data. It shares the initial
+input allowance; async preparation counts its depth below the context root.
+Changing `params` or
 `context.cfg` changes only that evaluation's copy, including changes made by called
-helpers. Reusing a compiled Tool starts fresh each time.
+helpers. Reusing a compiled Tool starts fresh each time. This data-only evaluation
+path exposes `context.connections` as an empty array; it has no HTTP capability.
 
 Evaluation fails if `execute` throws or rejects, or another Promise remains
 rejected without a handler when work finishes. Rejections that are caught before
@@ -242,17 +246,20 @@ pending, and cancels outstanding host work before encoding the result.
 
 ## Fetch through a connection
 
-`EvaluateWithHTTP` adds asynchronous `fetch` to Tool execution. For example,
-this Tool looks up a customer and updates that same customer's record:
+`EvaluateWithHTTP` supplies exactly one connection in `context.connections`.
+The connection holds copied identity, configuration, labels, annotations, and a
+bound `fetch` method. For example, this Tool looks up a customer and updates that
+same customer's record:
 
 ```javascript
 async function execute(params, context) {
-    const base = context.cfg.apiBase;
-    const lookup = await fetch(base + "/customers/" + encodeURIComponent(params.id));
+    const [connection] = context.connections;
+    const base = connection.cfg.apiBase;
+    const lookup = await connection.fetch(base + "/customers/" + encodeURIComponent(params.id));
     if (!lookup.ok) return { updated: false, status: lookup.status };
 
     const customer = await lookup.json();
-    const updated = await fetch(base + "/customers/" + encodeURIComponent(customer.id), {
+    const updated = await connection.fetch(base + "/customers/" + encodeURIComponent(customer.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled: true })
@@ -261,10 +268,26 @@ async function execute(params, context) {
 }
 ```
 
-Both requests use the session's captured connection and authentication. The
-caller authorizes the Tool and constructs the configured connection client
+Both requests use the session's captured connection and authentication. Global
+`fetch` remains undefined. A borrowed `connection.fetch` function keeps its
+original client even when called with a different `this` value.
+
+Connection fields `id`, `name`, `namespace`, `cfg`, `labels`, `annotations`, and
+`fetch` cannot be replaced. The connections array and its membership are also
+read-only. Nested configuration and metadata remain mutable private copies;
+edits affect neither stored data nor the client's captured identity or attribution.
+
+Tool helpers keep `cfg`, `labels`, and `annotations`, plus the corresponding
+`context` fields. These aliases reference the same copied objects held by the
+connection, so their input data is charged once. `context.connection` remains a
+plain identity view containing `id`, `name`, and `namespace`; `context.tool`
+contains Tool metadata. Return selected metadata, such as `{id: connection.id}`;
+returning the connection capability itself is rejected.
+
+The caller authorizes the Tool and constructs the configured connection client
 before evaluation, as shown in [httphost](../httphost/README.md). Given that
-`client`, a compiled `tool`, and a captured `snapshot`:
+`client`, a compiled `tool`, and a captured `snapshot` with a nonempty connection
+ID and the configuration used by the script:
 
 ```go
 session, err := httphost.New(ctx, client, aphttp.Limits{
@@ -301,7 +324,7 @@ The supported Fetch subset is explicit:
 
 | Surface | Behavior |
 | --- | --- |
-| `fetch(url, init)` | Absolute HTTP(S) URL string; optional own `method`, `headers`, and `body` fields. Unsupported fields are rejected. |
+| `connection.fetch(url, init)` | Absolute HTTP(S) URL string; optional own `method`, `headers`, and `body` fields. Unsupported fields are rejected. |
 | Request method | `DELETE`, `GET`, `HEAD`, `OPTIONS`, `POST`, and `PUT` are normalized to uppercase. `CONNECT`, `TRACE`, and `TRACK` are rejected regardless of case. Other methods retain their spelling. |
 | Request headers | Own enumerable string values. `Host` overrides the request host; framing and hop-by-hop headers remain transport-owned. |
 | Request body | String or `ArrayBuffer`, copied before dispatch. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
