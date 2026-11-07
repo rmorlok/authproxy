@@ -1,11 +1,9 @@
 package javascript
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/dop251/goja"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
@@ -132,34 +130,17 @@ func (l *fetchLoop) decodeBody(format string, data []byte) (goja.Value, error) {
 	case "text":
 		return l.vm.ToValue(string(data)), nil
 	default:
-		if !utf8.Valid(data) {
-			return nil, apjsruntime.ErrInvalidInput
-		}
-
-		decoder := json.NewDecoder(bytes.NewReader(data))
-		decoder.UseNumber()
-		budget := inputBudget{
-			ctx:    l.ctx,
-			limits: l.limits,
-		}
-
-		if err := budget.value(decoder, 0, false); err != nil {
-			return nil, err
-		}
-
-		if _, err := decoder.Token(); err != io.EOF {
-			return nil, apjsruntime.ErrInvalidInput
-		}
-
-		if err := validateInputSurrogates(l.ctx, data); err != nil {
-			return nil, err
-		}
-
-		value, err := l.parseJSON(goja.Undefined(), l.vm.ToValue(string(data)))
+		// HTTP readers already cap decoded bytes. Each body receives its own
+		// traversal allowance, independent of the invocation's initial inputs.
+		values, err := l.decoder.Decode(l.ctx, apjsruntime.JSONLimits{
+			MaxBytes: len(data),
+			MaxDepth: l.limits.MaxDepth,
+			MaxNodes: l.limits.MaxNodes,
+		}, json.RawMessage(data))
 		if err != nil {
-			return nil, apjsruntime.ErrInvalidInput
+			return nil, err
 		}
 
-		return value, nil
+		return values[0], nil
 	}
 }

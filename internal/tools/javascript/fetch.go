@@ -92,7 +92,10 @@ func (p *ToolProgram) EvaluateWithHTTP(
 		p.limits,
 		input,
 		func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
-			loop := newFetchLoop(runCtx, vm, options, p.limits)
+			loop, err := newFetchLoop(runCtx, vm, options, p.limits)
+			if err != nil {
+				return nil, err
+			}
 			defer loop.close()
 
 			if err := vm.Set("fetch", loop.fetch); err != nil {

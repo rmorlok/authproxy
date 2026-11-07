@@ -30,7 +30,7 @@ type fetchLoop struct {
 	vm        *goja.Runtime                          // Accessed exclusively by the owner.
 	options   FetchOptions                           // Captured session, admission limits, and diagnostics logger.
 	limits    Limits                                 // Bounds response JSON parsing as well as final output.
-	parseJSON goja.Callable                          // Pristine JSON.parse captured before authored initialization.
+	decoder   *apjsruntime.JSONDecoder               // Native JSON decoder captured before authored initialization.
 	enabled   bool                                   // I/O is admitted only after initialization succeeds.
 	nextID    uint64                                 // Monotonic operation identity within this invocation.
 	pending   map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
@@ -39,15 +39,18 @@ type fetchLoop struct {
 
 // newFetchLoop captures pristine parsing and starts no work. Its caller closes
 // it before disposing the VM, including after an initialization failure.
+// Missing parser bindings return ErrInvalidInput before creating a child context.
 func newFetchLoop(
 	ctx context.Context,
 	vm *goja.Runtime,
 	options FetchOptions,
 	limits Limits,
-) *fetchLoop {
+) (*fetchLoop, error) {
+	decoder, err := apjsruntime.NewJSONDecoder(vm)
+	if err != nil {
+		return nil, err
+	}
 	run, cancel := context.WithCancel(ctx)
-
-	parse, _ := goja.AssertFunction(vm.Get("JSON").ToObject(vm).Get("parse"))
 
 	if options.Logger == nil {
 		options.Logger = slog.Default()
@@ -59,10 +62,10 @@ func newFetchLoop(
 		vm:        vm,
 		options:   options,
 		limits:    limits,
-		parseJSON: parse,
+		decoder:   decoder,
 		pending:   make(map[uint64]func(fetchCompletion) error),
 		completed: make(chan fetchCompletion),
-	}
+	}, nil
 }
 
 // rejected creates a native rejected Promise with a fixed, JavaScript-native
