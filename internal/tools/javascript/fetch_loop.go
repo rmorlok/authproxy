@@ -8,17 +8,17 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
 // fetchCompletion crosses the worker boundary using only owned Go data. A
 // response body must either transfer to the owner or be closed by the worker.
 type fetchCompletion struct {
-	id       uint64             // Owner's lookup key; no VM callback crosses threads.
-	response *httphost.Response // Successful fetch; metadata and body transfer together.
-	body     []byte             // Successful bounded read; worker never touches it again.
-	err      error              // Fixed host classification; no upstream diagnostics.
+	id       uint64           // Owner's lookup key; no VM callback crosses threads.
+	response *aphttp.Response // Successful fetch; metadata and body transfer together.
+	body     []byte           // Successful bounded read; worker never touches it again.
+	err      error            // Fixed host classification; no upstream diagnostics.
 }
 
 // fetchLoop owns Promise settlement and response lifetimes on one VM goroutine.
@@ -149,7 +149,7 @@ func runFetchWorker(
 ) {
 	done := fetchCompletion{
 		id:  id,
-		err: httphost.ErrTransport,
+		err: aphttp.ErrTransport,
 	}
 
 	returned := false
@@ -206,12 +206,12 @@ func fetchErrorMessage(err error) string {
 	switch err {
 	case apjsruntime.ErrInvalidInput,
 		apjsruntime.ErrLimitExceeded,
-		httphost.ErrRequestLimit,
-		httphost.ErrResponseLimit,
-		httphost.ErrStreamLimit,
-		httphost.ErrHeaderLimit,
-		httphost.ErrEncoding,
-		httphost.ErrCredentialsUnavailable:
+		aphttp.ErrRequestLimit,
+		aphttp.ErrResponseLimit,
+		aphttp.ErrStreamLimit,
+		aphttp.ErrHeaderLimit,
+		aphttp.ErrEncoding,
+		aphttp.ErrCredentialsUnavailable:
 		return err.Error()
 	default:
 		return "Tool fetch failed"

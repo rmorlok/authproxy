@@ -266,7 +266,7 @@ before evaluation, as shown in [httphost](../httphost/README.md). Given that
 `client`, a compiled `tool`, and a captured `snapshot`:
 
 ```go
-session, err := httphost.New(ctx, client, httphost.Limits{
+session, err := httphost.New(ctx, client, aphttp.Limits{
     Timeout:          30 * time.Second,
     MaxRequests:      8,
     MaxResponseBytes: 2 * 1024 * 1024,
@@ -286,6 +286,9 @@ result, err := tool.EvaluateWithHTTP(ctx, javascript.Input{Context: snapshot}, j
 })
 state := session.ExecutionState() // Inspect even when evaluation failed.
 ```
+
+Here `aphttp` is `internal/apjs/http`, which owns the HTTP limits, response type,
+and error classifications. `httphost` supplies the Tool-specific session adapter.
 
 Evaluation takes ownership of the dedicated session and closes it before
 returning, including when arguments or options are invalid. It cannot be reused.

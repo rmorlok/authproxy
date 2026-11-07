@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/stretchr/testify/require"
@@ -24,12 +25,12 @@ type sessionTestClient struct {
 func (c *sessionTestClient) Do(req *http.Request) (*http.Response, error) { return c.do(req) }
 
 // sessionTestLimits bounds adapter tests without constraining ordinary responses.
-func sessionTestLimits() httphost.Limits {
-	return httphost.Limits{Timeout: 30 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192, MaxStreamBytes: 8192, MaxHeaderBytes: 4096}
+func sessionTestLimits() aphttp.Limits {
+	return aphttp.Limits{Timeout: 30 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192, MaxStreamBytes: 8192, MaxHeaderBytes: 4096}
 }
 
 // sessionTestNew constructs an invocation and releases its timer after the test.
-func sessionTestNew(t *testing.T, ctx context.Context, client iface.HTTPClient, limits httphost.Limits) *httphost.Session {
+func sessionTestNew(t *testing.T, ctx context.Context, client iface.HTTPClient, limits aphttp.Limits) *httphost.Session {
 	t.Helper()
 	session, err := httphost.New(ctx, client, limits)
 	require.NoError(t, err)

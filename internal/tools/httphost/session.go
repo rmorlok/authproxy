@@ -15,30 +15,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/api"
 )
 
-// Limits is the shared positive HTTP policy. The Tool caller resolves operator
-// ceilings and authored caps before creating a session.
-type Limits = aphttp.Limits
-
-// Response is the shared bounded response, with copied safe headers and a body
-// owned by the caller. It never exposes the credential-bearing request.
-type Response = aphttp.Response
-
-// Shared classifications preserve the Tool adapter's existing errors.Is contract
-// without retaining private credential, transport, or response diagnostics.
-var (
-	ErrInvalidInput           = aphttp.ErrInvalidInput
-	ErrRequestLimit           = aphttp.ErrRequestLimit
-	ErrResponseLimit          = aphttp.ErrResponseLimit
-	ErrStreamLimit            = aphttp.ErrStreamLimit
-	ErrHeaderLimit            = aphttp.ErrHeaderLimit
-	ErrEncoding               = aphttp.ErrEncoding
-	ErrInvalidResponse        = aphttp.ErrInvalidResponse
-	ErrTransport              = aphttp.ErrTransport
-	ErrCredentialsUnavailable = aphttp.ErrCredentialsUnavailable
-	ErrClosed                 = aphttp.ErrClosed
-	ErrTimeout                = aphttp.ErrTimeout
-)
-
 // Session supplies Tool execution-state interpretation around the shared HTTP
 // budget and response owner. The embedded session owns all request accounting,
 // cancellation, and response decoding. Create sessions with New; the zero value
@@ -51,18 +27,18 @@ type Session struct {
 // New captures the already admitted connection client and starts the invocation
 // timeout. The caller configures attribution and an explicit actor choice matching
 // ctx; authorization, snapshots, and effective policy remain caller decisions.
-func New(ctx context.Context, client iface.HTTPClient, limits Limits) (*Session, error) {
+func New(ctx context.Context, client iface.HTTPClient, limits aphttp.Limits) (*Session, error) {
 	return NewWithDeadline(ctx, client, limits, time.Time{})
 }
 
 // NewWithDeadline also honors an earlier absolute policy deadline, including
 // admission/preparation time. A zero deadline adds no restriction. Caller
 // cancellation remains distinct from policy expiration in the shared session.
-func NewWithDeadline(ctx context.Context, client iface.HTTPClient, limits Limits, deadline time.Time) (*Session, error) {
+func NewWithDeadline(ctx context.Context, client iface.HTTPClient, limits aphttp.Limits, deadline time.Time) (*Session, error) {
 	// Validate before wrapping: a nonnil adapter must not conceal a nil client
 	// or let caller cancellation take precedence over invalid constructor input.
 	if client == nil {
-		return nil, ErrInvalidInput
+		return nil, aphttp.ErrInvalidInput
 	}
 	session, err := aphttp.NewWithDeadline(ctx, configuredClient{client: client}, limits, deadline)
 	if err != nil {
@@ -85,7 +61,7 @@ func (s *Session) Context() context.Context {
 // collects per-call and aggregate send evidence. It owns req.Body even when
 // validation rejects the call, and transfers every successful response body to
 // the caller. The configured client retains credential recovery and attribution.
-func (s *Session) Do(req *http.Request) (*Response, error) {
+func (s *Session) Do(req *http.Request) (*aphttp.Response, error) {
 	var shared *aphttp.Session
 	if s != nil {
 		shared = s.Session

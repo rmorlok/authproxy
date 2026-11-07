@@ -62,7 +62,7 @@ func TestAdapterInvalidSession(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	session, err := httphost.New(ctx, nil, sessionTestLimits())
-	require.ErrorIs(t, err, httphost.ErrInvalidInput)
+	require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 	require.Nil(t, session)
 
 	// Both nil and zero adapters reject calls and close their transferred upload.
@@ -70,7 +70,7 @@ func TestAdapterInvalidSession(t *testing.T) {
 		require.Nil(t, empty.Context())
 		request, body := sessionTestRequest(context.Background())
 		response, err := empty.Do(request)
-		require.ErrorIs(t, err, httphost.ErrInvalidInput)
+		require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 		require.Nil(t, response)
 		require.EqualValues(t, 1, body.closes.Load())
 	}
@@ -103,7 +103,7 @@ func TestConfiguredClientPanicDiscardsPartialEvidence(t *testing.T) {
 
 	// The interrupted handoff stays charged and cannot be repeated after recovery.
 	response, err := session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrRequestLimit)
+	require.ErrorIs(t, err, aphttp.ErrRequestLimit)
 	require.Nil(t, response)
 	require.Equal(t, 1, calls)
 }

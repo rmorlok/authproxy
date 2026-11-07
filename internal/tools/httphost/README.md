@@ -29,7 +29,7 @@ func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
     if err != nil {
         return nil, err
     }
-    session, err := httphost.New(ctx, client, httphost.Limits{
+    session, err := httphost.New(ctx, client, aphttp.Limits{
         Timeout:          30 * time.Second,
         MaxRequests:      3,
         MaxResponseBytes: 2 * 1024 * 1024,
@@ -65,9 +65,10 @@ func readAccount(ctx context.Context, conn iface.Connection) ([]byte, error) {
 ```
 
 The AuthProxy imports are `internal/apauth/core` (aliased as `authcore`),
-`internal/core/iface`, and `internal/tools/httphost`. Other imports are from Go's
-standard library. `Limits`, `Response`, and the error sentinels refer to the
-shared HTTP contracts.
+`internal/apjs/http` (aliased as `aphttp`), `internal/core/iface`, and
+`internal/tools/httphost`. Other imports are from Go's standard library.
+Use `aphttp.Limits`, `aphttp.Response`, and the shared HTTP error sentinels
+directly; this adapter supplies the configured-client session and Tool state.
 
 The client's explicit actor choice must match any actor in the session context.
 Background work without an initiating actor can use `iface.WithoutActor()`.
@@ -90,9 +91,9 @@ The adapter calls the configured client once, collecting its existing `httpf`
 observation across redirects and credential-recovery attempts. OAuth token
 requests stay separate from target evidence. A trusted
 `auth_methods.ErrCredentialsUnavailable` marker becomes
-`ErrCredentialsUnavailable`; other client errors become `ErrTransport`. Neither
-error retains private diagnostics. Caller cancellation and policy failures keep
-the shared session's precedence.
+`aphttp.ErrCredentialsUnavailable`; other client errors become
+`aphttp.ErrTransport`. Neither error retains private diagnostics. Caller
+cancellation and policy failures keep the shared session's precedence.
 
 For example, a missing API-key row is unavailable, while failure to decrypt an
 existing key is a transport/operational failure. Error text or a 401/403 status

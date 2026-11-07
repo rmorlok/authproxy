@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -16,7 +17,6 @@ import (
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
@@ -45,7 +45,7 @@ func TestToolHTTPInvocationPolicyDefaults(t *testing.T) {
 			MaxOutputBytes: 8 << 20, MaxEncodedResultBytes: 16 << 20,
 			Transform: javascript.Limits{MaxSourceBytes: 256 << 10, MaxInputBytes: 16 << 20,
 				MaxOutputBytes: 8 << 20, MaxDepth: 64, MaxNodes: 1_000_000, MaxStackDepth: 256, Timeout: time.Minute}},
-		HTTP: httphost.Limits{Timeout: time.Minute, MaxRequests: 20,
+		HTTP: aphttp.Limits{Timeout: time.Minute, MaxRequests: 20,
 			MaxResponseBytes: 8 << 20, MaxStreamBytes: 8 << 20, MaxHeaderBytes: 64 << 10},
 	}
 	for _, test := range []struct {
@@ -104,7 +104,7 @@ func TestToolHTTPInvocationPolicyConfigured(t *testing.T) {
 			MaxOutputBytes: 4 << 10, MaxEncodedResultBytes: 5 << 10,
 			Transform: javascript.Limits{MaxSourceBytes: 10 << 10, MaxInputBytes: 7 << 10,
 				MaxOutputBytes: 4 << 10, MaxDepth: 12, MaxNodes: 3000, MaxStackDepth: 48, Timeout: 3 * time.Second}},
-		HTTP: httphost.Limits{Timeout: 3 * time.Second, MaxRequests: 4,
+		HTTP: aphttp.Limits{Timeout: 3 * time.Second, MaxRequests: 4,
 			MaxResponseBytes: 3 << 10, MaxStreamBytes: 8 << 10, MaxHeaderBytes: 9 << 10},
 	}
 
