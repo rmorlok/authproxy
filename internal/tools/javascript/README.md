@@ -7,10 +7,11 @@ captured connection's HTTP session. Pure expressions and ordinary Tool evaluatio
 have no I/O capabilities.
 
 The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
-lifecycle, execution limits, and bounded native JSON input/output conversion.
-This package supplies Tool snapshots and aliases, compilation, connector helpers,
-and the async HTTP host. Its `Limits` type refers to the shared policy. Callers
-reference error classifications directly from `internal/apjs/runtime`.
+lifecycle, pure-expression compilation/evaluation, execution limits, and bounded
+native JSON input/output conversion. This package supplies Tool snapshots and
+aliases, async compilation, connector helpers, and the async HTTP host. Its
+`Limits` type refers to the shared policy. Callers reference error classifications
+directly from `internal/apjs/runtime`.
 
 ## Pure expressions
 

@@ -5,12 +5,8 @@ package javascript
 
 import (
 	"context"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/dop251/goja"
-	"github.com/dop251/goja/ast"
-	"github.com/dop251/goja/parser"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -38,45 +34,21 @@ type Input struct {
 // always creates a fresh VM, so callers can reuse it concurrently. It has no
 // asynchronous host, connector helper library, or network capability.
 type Expression struct {
-	program *goja.Program
-	limits  Limits
+	// program owns compilation, fresh-VM execution, and JSON output conversion.
+	program *apjsruntime.Expression
+
+	// limits is the same captured policy used by the Tool input adapter.
+	limits Limits
 }
 
-// CompileExpression parses exactly one strict JavaScript expression without
-// executing authored code. Function-call expressions and IIFEs are allowed;
-// statements cannot escape the expression wrapper. Syntax failures are safe
-// classifications rather than parser messages containing source text.
+// CompileExpression prepares a shared pure expression with Tool input bindings.
+// Compilation never executes authored code and returns safe classifications for
+// invalid source or policy. The effective limits are copied for input binding.
 func CompileExpression(source string, limits Limits) (*Expression, error) {
-	if err := limits.Validate(); err != nil {
+	program, err := apjsruntime.CompileExpression(source, limits)
+	if err != nil {
 		return nil, err
 	}
-	if len(source) > limits.MaxSourceBytes {
-		return nil, apjsruntime.ErrLimitExceeded
-	}
-	if !utf8.ValidString(source) || strings.TrimSpace(source) == "" {
-		return nil, apjsruntime.ErrInvalidSource
-	}
-
-	parsed, err := parser.ParseFile(
-		nil, // fileSet
-		"tool-expression.js",
-		"(\n"+source+"\n)",
-		0, // mode
-		parser.WithDisableSourceMaps,
-	)
-	if err != nil || len(parsed.Body) != 1 {
-		return nil, apjsruntime.ErrInvalidSource
-	}
-
-	if _, ok := parsed.Body[0].(*ast.ExpressionStatement); !ok {
-		return nil, apjsruntime.ErrInvalidSource
-	}
-
-	program, err := goja.CompileAST(parsed, true)
-	if err != nil {
-		return nil, apjsruntime.ErrInvalidSource
-	}
-
 	return &Expression{program: program, limits: limits}, nil
 }
 
@@ -86,8 +58,8 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 // this is not a precision-preserving raw JSON passthrough.
 //
 // Cancellation and the configured timeout remain active through conversion.
-// A configured timeout is apjsruntime.ErrLimitExceeded; caller cancellation/deadlines keep
-// ctx.Err(), taking precedence if both have expired before evaluation returns.
+// A configured timeout is apjsruntime.ErrLimitExceeded; caller cancellation and
+// deadlines keep ctx.Err(), taking precedence if both expire before return.
 // Only the interrupt watcher accesses the VM from another goroutine, through
 // Goja's thread-safe Interrupt method. Thrown values and stacks are never exposed.
 func (e *Expression) Evaluate(
@@ -98,11 +70,8 @@ func (e *Expression) Evaluate(
 		return nil, apjsruntime.ErrInvalidInput
 	}
 
-	return evaluateJSON(ctx, e.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
-		value, err := vm.RunProgram(e.program)
-		if err != nil {
-			return nil, runtimeEvaluationError(err)
-		}
-		return value, nil
+	result, err := e.program.Evaluate(ctx, func(runCtx context.Context, vm *goja.Runtime) error {
+		return bindInput(runCtx, vm, input, e.limits)
 	})
+	return common.RawJSON(result), err
 }
