@@ -31,6 +31,14 @@ type fetchClient func(*http.Request) (*http.Response, error)
 // Do delegates a request to the scenario's transport behavior.
 func (f fetchClient) Do(request *http.Request) (*http.Response, error) { return f(request) }
 
+// DoWithLabels makes unexpected label support explicit in this unlabeled fixture.
+func (f fetchClient) DoWithLabels(request *http.Request, labels map[string]string) (*http.Response, error) {
+	if len(labels) != 0 {
+		panic("fetchClient does not support request labels")
+	}
+	return f.Do(request)
+}
+
 // fetchBody detects eager reads and records resource release across goroutines.
 type fetchBody struct {
 	reader io.Reader

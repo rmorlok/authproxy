@@ -47,6 +47,12 @@ func (c *integrationClient) Do(request *http.Request) (*http.Response, error) {
 	return c.client.Do(request)
 }
 
+// DoWithLabels counts one handoff and preserves the production client's label path.
+func (c *integrationClient) DoWithLabels(request *http.Request, labels map[string]string) (*http.Response, error) {
+	c.calls.Add(1)
+	return c.client.DoWithLabels(request, labels)
+}
+
 // integrationAuth exposes deterministic credential rotation without external
 // token storage. Counters distinguish logical host calls from proxy attempts.
 type integrationAuth struct {

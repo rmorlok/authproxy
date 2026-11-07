@@ -61,6 +61,12 @@ func (unconfiguredHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return nil, ErrMockHTTPClientNotConfigured
 }
 
+// DoWithLabels reports the same missing scenario configuration as Do while
+// preserving outgoing body ownership, regardless of the supplied labels.
+func (c unconfiguredHTTPClient) DoWithLabels(req *http.Request, _ map[string]string) (*http.Response, error) {
+	return c.Do(req)
+}
+
 func (m *Connection) GetId() apid.ID {
 	return m.Id
 }

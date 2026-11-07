@@ -28,31 +28,24 @@ func httpClientTestActor() (*apauthcore.Actor, context.Context) {
 	return actor, apauthcore.NewAuthenticatedRequestAuth(actor).ContextWith(context.Background())
 }
 
-// TestProxyHTTPClient_BuildsMiddlewareOnce binds the actor, labels, and request
-// type into one middleware stack that every subsequent Do reuses.
+// TestProxyHTTPClient_BuildsMiddlewareOnce captures attribution without building
+// middleware, then reuses one cached stack across ordinary requests.
 func TestProxyHTTPClient_BuildsMiddlewareOnce(t *testing.T) {
-	factory := mockHttpf.NewMockF(gomock.NewController(t))
+	middleware := &labelClientMiddleware{}
+	factory := httpf.CreateFactory(nil, nil, middleware, nil)
 	conn := &mockCore.Connection{Id: apid.New(apid.PrefixConnection), Namespace: "root"}
 	actor, ctx := httpClientTestActor()
 	labels := map[string]string{"operation": "read-account"}
-	var sends atomic.Int32
-	client := &http.Client{Transport: streamRoundTripper(func(*http.Request) (*http.Response, error) {
-		sends.Add(1)
-		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
-	})}
 
-	// Each factory step runs exactly once, at construction, with the client's
-	// fixed attribution rather than anything read from a request context.
-	factory.EXPECT().ForRequestType(httpf.RequestTypeProxy).Return(factory).Times(1)
-	factory.EXPECT().ForConnection(conn).Return(factory).Times(1)
-	factory.EXPECT().ForActor(actor).Return(factory).Times(1)
-	factory.EXPECT().ForLabels(labels).Return(factory).Times(1)
-	factory.EXPECT().NewHTTPClient().Return(client).Times(1)
+	// Construction fixes attribution; the production factory defers building
+	// its transport stack until a validated request needs it.
 	p := New(factory, conn, &fakeAuth{}, nil)
 	httpClient, err := p.HTTPClient(iface.HTTPClientOptions{Labels: labels, Actor: iface.ActingAs(actor)})
 	require.NoError(t, err)
+	require.Zero(t, middleware.builds)
+	labels["operation"] = "caller-edit"
 
-	// Repeated calls reuse the stack; neither touches the factory again.
+	// New wrappers still share the factory's cached transport and attribution.
 	for range 3 {
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://example.test", nil)
 		require.NoError(t, err)
@@ -60,7 +53,14 @@ func TestProxyHTTPClient_BuildsMiddlewareOnce(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, resp.Body.Close())
 	}
-	assert.EqualValues(t, 3, sends.Load())
+	require.Equal(t, 1, middleware.builds)
+	require.Len(t, middleware.attempts, 3)
+	for _, info := range middleware.attempts {
+		require.Equal(t, conn.Id, info.ConnectionId)
+		require.Equal(t, httpf.RequestTypeProxy, info.Type)
+		require.Equal(t, actor.Id.String(), info.Labels["apxy/act/-/id"])
+		require.Equal(t, "read-account", info.Labels["operation"])
+	}
 }
 
 // TestProxyHTTPClient_WithoutActorPassesNoAttribution forwards the explicit
@@ -71,7 +71,7 @@ func TestProxyHTTPClient_WithoutActorPassesNoAttribution(t *testing.T) {
 	factory.EXPECT().ForRequestType(httpf.RequestTypeProbe).Return(factory)
 	factory.EXPECT().ForConnection(conn).Return(factory)
 	factory.EXPECT().ForActor(nil).Return(factory)
-	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory)
+	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory).Times(2)
 	factory.EXPECT().NewHTTPClient().Return(&http.Client{Transport: streamRoundTripper(func(*http.Request) (*http.Response, error) {
 		return &http.Response{StatusCode: http.StatusNoContent, Body: http.NoBody}, nil
 	})})
@@ -165,7 +165,7 @@ func TestProxyHTTPClient_ActorAgreement(t *testing.T) {
 }
 
 // TestProxyHTTPClient_ActorMutationAfterConstruction keeps the agreement check
-// pinned to the actor id the middleware captured, so mutating the actor object
+// pinned to the actor id the factory captured, so mutating the actor object
 // later cannot admit a request attributed to the original actor's identity.
 func TestProxyHTTPClient_ActorMutationAfterConstruction(t *testing.T) {
 	factory := mockHttpf.NewMockF(gomock.NewController(t))
@@ -181,14 +181,15 @@ func TestProxyHTTPClient_ActorMutationAfterConstruction(t *testing.T) {
 		return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody}, nil
 	})}
 
-	// The middleware snapshots actor A once, at construction.
+	// The factory snapshots actor A once, at construction, before middleware
+	// is built by the first accepted request.
 	factory.EXPECT().ForRequestType(httpf.RequestTypeProxy).Return(factory)
 	factory.EXPECT().ForConnection(conn).Return(factory)
 	factory.EXPECT().ForActor(gomock.Any()).DoAndReturn(func(a httpf.Actor) httpf.F {
 		require.Equal(t, originalID, a.GetId())
 		return factory
 	})
-	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory)
+	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory).Times(2)
 	factory.EXPECT().NewHTTPClient().Return(client)
 	p := New(factory, conn, auth, nil)
 	httpClient, err := p.HTTPClient(iface.HTTPClientOptions{Actor: iface.ActingAs(actor)})
@@ -272,7 +273,7 @@ func TestProxyHTTPClient_InvalidRequests(t *testing.T) {
 	assert.Zero(t, atomic.LoadInt32(&auth.resolveN))
 }
 
-// TestProxyHTTPClient_ConcurrentCalls shares one prebuilt stack across
+// TestProxyHTTPClient_ConcurrentCalls shares one configured client across
 // goroutines while each request keeps its own context and response.
 func TestProxyHTTPClient_ConcurrentCalls(t *testing.T) {
 	const count = 16

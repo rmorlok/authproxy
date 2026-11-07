@@ -24,6 +24,14 @@ type sessionTestClient struct {
 // Do delegates to the scenario without applying any extra middleware.
 func (c *sessionTestClient) Do(req *http.Request) (*http.Response, error) { return c.do(req) }
 
+// DoWithLabels makes unexpected label support explicit in this unlabeled fixture.
+func (c *sessionTestClient) DoWithLabels(req *http.Request, labels map[string]string) (*http.Response, error) {
+	if len(labels) != 0 {
+		panic("sessionTestClient does not support request labels")
+	}
+	return c.Do(req)
+}
+
 // sessionTestLimits bounds adapter tests without constraining ordinary responses.
 func sessionTestLimits() aphttp.Limits {
 	return aphttp.Limits{Timeout: 30 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192, MaxStreamBytes: 8192, MaxHeaderBytes: 4096}
