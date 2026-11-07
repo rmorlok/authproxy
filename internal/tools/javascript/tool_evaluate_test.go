@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apjs"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -175,7 +176,7 @@ func TestToolEvaluateUnhandledRejections(t *testing.T) {
 			// An otherwise successful return cannot conceal an unhandled promise rejection.
 			program := compileTool(t, test.source, toolLibrary(t, test.library))
 			result, err := program.Evaluate(context.Background(), javascript.Input{Context: expressionContext(t, render.Input{})})
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.NotContains(t, err.Error(), "private-rejection")
 			require.Nil(t, result)
 		})
@@ -202,14 +203,14 @@ func TestToolEvaluateRejectsFailedInitialization(t *testing.T) {
 
 	// Publication rejects an abandoned initialization promise without invoking execute.
 	err := program.Validate(context.Background())
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
-	require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
+	require.Equal(t, apjsruntime.ErrEvaluation.Error(), err.Error())
 
 	// Invocation must reject that same initialization before execute can attach a handler.
 	input := javascript.Input{Context: expressionContext(t, render.Input{})}
 	result, err := program.Evaluate(context.Background(), input)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
-	require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
+	require.Equal(t, apjsruntime.ErrEvaluation.Error(), err.Error())
 	require.Nil(t, result)
 }
 
@@ -234,8 +235,8 @@ func TestToolEvaluateSanitizesErrors(t *testing.T) {
 			program := compileTool(t, test.source, toolLibrary(t, test.library))
 			input := javascript.Input{Context: expressionContext(t, render.Input{Cfg: map[string]any{"private": "private-connection-value"}})}
 			result, err := program.Evaluate(context.Background(), input)
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
-			require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
+			require.Equal(t, apjsruntime.ErrEvaluation.Error(), err.Error())
 			require.Nil(t, result)
 		})
 	}
@@ -256,7 +257,7 @@ func TestToolEvaluatePendingPromiseFailsPromptly(t *testing.T) {
 	// With no host work available, waiting for either deadline cannot make progress.
 	start := time.Now()
 	result, err := program.Evaluate(ctx, input)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.Nil(t, result)
 	require.Less(t, time.Since(start), time.Second)
 }
@@ -275,8 +276,8 @@ func TestToolEvaluateJSONContract(t *testing.T) {
 			// Unsupported values are rejected without coercion or authored property access.
 			program := compileTool(t, "async function execute() { return "+value+"; }", nil)
 			result, err := program.Evaluate(context.Background(), input)
-			require.ErrorIs(t, err, javascript.ErrInvalidOutput)
-			require.Equal(t, javascript.ErrInvalidOutput.Error(), err.Error())
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidOutput)
+			require.Equal(t, apjsruntime.ErrInvalidOutput.Error(), err.Error())
 			require.Nil(t, result)
 		})
 	}
@@ -319,7 +320,7 @@ func TestToolEvaluateLimits(t *testing.T) {
 			result, err := program.Evaluate(context.Background(), javascript.Input{Context: expressionContext(t, render.Input{})})
 
 			// All phases discard partial output on a policy failure.
-			require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+			require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 			require.Nil(t, result)
 		})
 	}
@@ -377,7 +378,7 @@ func TestToolEvaluateInvalidInputs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Invalid Go inputs must produce a safe error rather than a panic or script exception.
 			result, err := test.program.Evaluate(test.ctx, test.input)
-			require.ErrorIs(t, err, javascript.ErrInvalidInput)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 			require.Nil(t, result)
 			require.NotContains(t, err.Error(), "private")
 		})

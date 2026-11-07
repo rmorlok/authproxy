@@ -16,16 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
-// These aliases retain existing caller classifications while the generic
-// execution and conversion policy moves into apjs/runtime.
-var (
-	ErrInvalidSource = apjsruntime.ErrInvalidSource
-	ErrInvalidInput  = apjsruntime.ErrInvalidInput
-	ErrInvalidOutput = apjsruntime.ErrInvalidOutput
-	ErrLimitExceeded = apjsruntime.ErrLimitExceeded
-	ErrEvaluation    = apjsruntime.ErrEvaluation
-)
-
 // Limits is the shared execution and JSON conversion policy. Tool callers still
 // resolve operator ceilings and authored caps before compiling their programs.
 type Limits = apjsruntime.Limits
@@ -61,10 +51,10 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 		return nil, err
 	}
 	if len(source) > limits.MaxSourceBytes {
-		return nil, ErrLimitExceeded
+		return nil, apjsruntime.ErrLimitExceeded
 	}
 	if !utf8.ValidString(source) || strings.TrimSpace(source) == "" {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	parsed, err := parser.ParseFile(
@@ -75,16 +65,16 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 		parser.WithDisableSourceMaps,
 	)
 	if err != nil || len(parsed.Body) != 1 {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	if _, ok := parsed.Body[0].(*ast.ExpressionStatement); !ok {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	program, err := goja.CompileAST(parsed, true)
 	if err != nil {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	return &Expression{program: program, limits: limits}, nil
@@ -96,7 +86,7 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 // this is not a precision-preserving raw JSON passthrough.
 //
 // Cancellation and the configured timeout remain active through conversion.
-// A configured timeout is ErrLimitExceeded; caller cancellation/deadlines keep
+// A configured timeout is apjsruntime.ErrLimitExceeded; caller cancellation/deadlines keep
 // ctx.Err(), taking precedence if both have expired before evaluation returns.
 // Only the interrupt watcher accesses the VM from another goroutine, through
 // Goja's thread-safe Interrupt method. Thrown values and stacks are never exposed.
@@ -105,7 +95,7 @@ func (e *Expression) Evaluate(
 	input Input,
 ) (common.RawJSON, error) {
 	if e == nil || e.program == nil || ctx == nil {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 
 	return evaluateJSON(ctx, e.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {

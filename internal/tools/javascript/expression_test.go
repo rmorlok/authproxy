@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -146,7 +147,7 @@ func TestExpressionCompileValidation(t *testing.T) {
 		t.Run(source, func(t *testing.T) {
 			// Invalid syntax and multiple statements must never become an executable plan.
 			compiled, err := javascript.CompileExpression(source, expressionLimits())
-			require.ErrorIs(t, err, javascript.ErrInvalidSource)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
 			require.Nil(t, compiled)
 		})
 	}
@@ -154,7 +155,7 @@ func TestExpressionCompileValidation(t *testing.T) {
 	// Compiling valid but throwing code must not execute any authored JavaScript.
 	compiled := compileExpression(t, `(() => { throw new Error("private-source-marker"); })()`)
 	result, err := compiled.Evaluate(context.Background(), javascript.Input{Context: expressionContext(t, render.Input{})})
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.NotContains(t, err.Error(), "private-source-marker")
 	require.Nil(t, result)
 }
@@ -190,7 +191,7 @@ func TestExpressionLimitsMustBePositive(t *testing.T) {
 	require.NoError(t, err)
 	limits.MaxSourceBytes--
 	compiled, err := javascript.CompileExpression(source, limits)
-	require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, compiled)
 }
 
@@ -207,7 +208,7 @@ func TestExpressionErrorsDoNotExposeInvocationData(t *testing.T) {
 		t.Run(source, func(t *testing.T) {
 			// Exception text and thrown objects are never returned to callers.
 			result, err := compileExpression(t, source).Evaluate(context.Background(), input)
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.NotContains(t, err.Error(), "private-connection-value")
 			require.NotContains(t, err.Error(), source)
 			require.Nil(t, result)
@@ -250,7 +251,7 @@ func TestExpressionRejectsNonJSONResults(t *testing.T) {
 			input := javascript.Input{Context: expressionContext(t, render.Input{})}
 			ctx, cancel := context.WithCancel(context.Background())
 			result, err := evaluateWithWatchdog(t, ctx, cancel, compileExpression(t, source), input)
-			require.ErrorIs(t, err, javascript.ErrInvalidOutput)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidOutput)
 			require.NotContains(t, err.Error(), "private-")
 			require.Nil(t, result)
 		})
@@ -293,7 +294,7 @@ func TestExpressionFreshNativeCopiesAndReadonlyGlobals(t *testing.T) {
 	for _, name := range []string{"params", "context", "response", "cfg", "labels", "annotations"} {
 		t.Run(name, func(t *testing.T) {
 			result, err := compileExpression(t, `(() => { `+name+` = {}; return true; })()`).Evaluate(context.Background(), input)
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.Nil(t, result)
 		})
 	}
@@ -375,21 +376,21 @@ func TestExpressionCancellationAndReuse(t *testing.T) {
 	cancel()
 	result, err := evaluateWithWatchdog(t, ctx, cancel, compiled, input)
 	require.ErrorIs(t, err, context.Canceled)
-	require.NotErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.NotErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, result)
 
 	// An already-expired caller deadline retains its classification at admission.
 	ctx, cancel = context.WithDeadline(context.Background(), time.Time{})
 	result, err = evaluateWithWatchdog(t, ctx, cancel, compiled, input)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.NotErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.NotErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, result)
 
 	// A caller deadline interrupts a running loop; it is not converted to a JavaScript exception.
 	ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
 	result, err = evaluateWithWatchdog(t, ctx, cancel, compiled, input)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.NotErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.NotErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, result)
 
 	// Cancellation belongs to that invocation, so the same plan remains usable afterward.
@@ -476,7 +477,7 @@ func TestExpressionTimeout(t *testing.T) {
 			result, err := evaluateWithWatchdog(t, ctx, cancel, compiled, input)
 
 			// The expression hit its policy limit while the caller remains active.
-			require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+			require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 			require.NotErrorIs(t, err, context.DeadlineExceeded)
 			require.NoError(t, ctx.Err())
 			require.Nil(t, result)
@@ -493,7 +494,7 @@ func TestExpressionStackAndOutputLimits(t *testing.T) {
 	compiled := compileExpression(t, `(() => { function recurse() { return recurse(); } return recurse(); })()`)
 	input := javascript.Input{Context: expressionContext(t, render.Input{})}
 	result, err := compiled.Evaluate(context.Background(), input)
-	require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, result)
 
 	// Byte limits apply to the encoded JSON result, including escaping and quotes.
@@ -506,7 +507,7 @@ func TestExpressionStackAndOutputLimits(t *testing.T) {
 	compiled, err = javascript.CompileExpression(`"\n"`, limits)
 	require.NoError(t, err)
 	result, err = compiled.Evaluate(context.Background(), input)
-	require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, result)
 }
 

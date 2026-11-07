@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
@@ -70,7 +71,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 		options.Session.Context() == nil ||
 		options.MaxRequestBytes <= 0 ||
 		options.MaxPendingOperations <= 0 {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -95,7 +96,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 			defer loop.close()
 
 			if err := vm.Set("fetch", loop.fetch); err != nil {
-				return nil, ErrInvalidInput
+				return nil, apjsruntime.ErrInvalidInput
 			}
 
 			tracker := newPromiseTracker(vm)
@@ -134,10 +135,10 @@ func (p *ToolProgram) EvaluateWithHTTP(
 // text. No worker is launched before initialization and admission complete.
 func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
 	if !l.enabled {
-		return l.rejected(ErrEvaluation)
+		return l.rejected(apjsruntime.ErrEvaluation)
 	}
 	if len(l.pending) >= l.options.MaxPendingOperations {
-		return l.rejected(ErrLimitExceeded)
+		return l.rejected(apjsruntime.ErrLimitExceeded)
 	}
 
 	var req *http.Request
@@ -145,7 +146,7 @@ func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
 	if exception := l.vm.Try(func() {
 		req, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes)
 	}); exception != nil {
-		return l.rejected(ErrInvalidInput)
+		return l.rejected(apjsruntime.ErrInvalidInput)
 
 	}
 	if err != nil {

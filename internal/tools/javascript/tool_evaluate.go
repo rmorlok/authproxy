@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
@@ -15,8 +16,8 @@ import (
 //
 // This execution path supplies no I/O capabilities. Native Promise chains and
 // await work normally, but a pending Promise with no host work cannot make
-// progress and returns ErrEvaluation. Rejected entry points and otherwise
-// unhandled rejections also return ErrEvaluation without exposing their values.
+// progress and returns apjsruntime.ErrEvaluation. Rejected entry points and otherwise
+// unhandled rejections also return apjsruntime.ErrEvaluation without exposing their values.
 // The entry point must return a native Promise, even if top-level code replaced
 // the async declaration. Output follows Expression.Evaluate's JSON rules.
 //
@@ -25,7 +26,7 @@ import (
 // state is reused; compiled programs may be evaluated concurrently.
 func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON, error) {
 	if p == nil || p.program == nil || ctx == nil {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 
 	return evaluateJSON(ctx, p.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
@@ -60,7 +61,7 @@ func callTool(vm *goja.Runtime, execute goja.Callable) (*goja.Promise, error) {
 		return nil, runtimeEvaluationError(err)
 	}
 	if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
-		return nil, ErrEvaluation
+		return nil, apjsruntime.ErrEvaluation
 	}
 	return value.Export().(*goja.Promise), nil
 }

@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
@@ -23,7 +24,7 @@ func bindInput(
 	limits Limits,
 ) error {
 	if ctx == nil || vm == nil || input.Context == nil {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -34,7 +35,7 @@ func bindInput(
 		response = []byte("{}")
 	}
 	if len(response) >= limits.MaxInputBytes {
-		return ErrLimitExceeded
+		return apjsruntime.ErrLimitExceeded
 	}
 
 	// Share the serialized byte allowance with snapshot encoding; the response
@@ -48,7 +49,7 @@ func bindInput(
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		return ErrLimitExceeded
+		return apjsruntime.ErrLimitExceeded
 	}
 
 	// Count values across both documents before JSON.parse constructs its
@@ -63,7 +64,7 @@ func bindInput(
 
 	parse, ok := goja.AssertFunction(vm.Get("JSON").ToObject(vm).Get("parse"))
 	if !ok {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 
 	root, err := parse(goja.Undefined(), vm.ToValue(string(snapshot)))
@@ -89,7 +90,7 @@ func bindInput(
 		"tool",
 	} {
 		if _, ok := rootObject.Get(name).(*goja.Object); !ok {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 
@@ -108,7 +109,7 @@ func bindInput(
 			goja.FLAG_TRUE,
 			goja.FLAG_TRUE,
 		); err != nil {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 
@@ -134,7 +135,7 @@ func bindInput(
 			goja.FLAG_FALSE,
 			goja.FLAG_TRUE,
 		); err != nil {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 
@@ -147,7 +148,7 @@ func inputParseError(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return ErrInvalidInput
+	return apjsruntime.ErrInvalidInput
 }
 
 // inputBudget validates the two encoded input documents with shared accounting.
@@ -163,7 +164,7 @@ type inputBudget struct {
 // values without retaining a second decoded Go object graph.
 func (b *inputBudget) validateObject(encoded []byte) error {
 	if !utf8.Valid(encoded) {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
@@ -174,7 +175,7 @@ func (b *inputBudget) validateObject(encoded []byte) error {
 	}
 
 	if _, err := decoder.Token(); err != io.EOF {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 
 	if err := validateInputSurrogates(b.ctx, encoded); err != nil {
@@ -209,17 +210,17 @@ func validateInputSurrogates(ctx context.Context, encoded []byte) error {
 		unit := inputHexUnit(encoded[i+1 : i+5])
 		i += 4
 		if unit >= 0xdc00 && unit <= 0xdfff {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 		if unit < 0xd800 || unit > 0xdbff {
 			continue
 		}
 		if i+6 >= len(encoded) || encoded[i+1] != '\\' || encoded[i+2] != 'u' {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 		low := inputHexUnit(encoded[i+3 : i+7])
 		if low < 0xdc00 || low > 0xdfff {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 		i += 6
 	}
@@ -254,26 +255,26 @@ func (b *inputBudget) value(
 		return err
 	}
 	if depth > b.limits.MaxDepth || b.nodes >= b.limits.MaxNodes {
-		return ErrLimitExceeded
+		return apjsruntime.ErrLimitExceeded
 	}
 	b.nodes++
 	token, err := decoder.Token()
 	if err != nil {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 	if objectRoot && token != json.Delim('{') {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 
 	switch token := token.(type) {
 	case json.Number:
 		number, err := token.Float64()
 		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	case json.Delim:
 		if token != '{' && token != '[' {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 		for decoder.More() {
 			if token == '{' {
@@ -281,12 +282,12 @@ func (b *inputBudget) value(
 					return err
 				}
 				if b.nodes >= b.limits.MaxNodes {
-					return ErrLimitExceeded
+					return apjsruntime.ErrLimitExceeded
 				}
 				b.nodes++
 				key, err := decoder.Token()
 				if _, ok := key.(string); err != nil || !ok {
-					return ErrInvalidInput
+					return apjsruntime.ErrInvalidInput
 				}
 			}
 			if err := b.value(decoder, depth+1, false); err != nil {
@@ -295,7 +296,7 @@ func (b *inputBudget) value(
 		}
 		closing, err := decoder.Token()
 		if err != nil || (token == '{' && closing != json.Delim('}')) || (token == '[' && closing != json.Delim(']')) {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 	return nil
