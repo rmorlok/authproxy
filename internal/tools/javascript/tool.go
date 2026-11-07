@@ -9,6 +9,7 @@ import (
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/parser"
 	"github.com/rmorlok/authproxy/internal/apjs"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 // toolHostNames reserves the Tool host and captured-input bindings. Reserving
@@ -70,19 +71,19 @@ func CompileTool(
 	library *apjs.Library,
 	limits Limits,
 ) (*ToolProgram, error) {
-	if err := limits.validate(); err != nil {
+	if err := limits.Validate(); err != nil {
 		return nil, err
 	}
 
 	librarySource := library.Source()
 	if len(source) > limits.MaxSourceBytes || len(librarySource) > limits.MaxSourceBytes-len(source) {
-		return nil, ErrLimitExceeded
+		return nil, apjsruntime.ErrLimitExceeded
 	}
 
 	if !utf8.ValidString(source) ||
 		!utf8.ValidString(librarySource) ||
 		strings.TrimSpace(source) == "" {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	parsed, err := parser.ParseFile(
@@ -93,7 +94,7 @@ func CompileTool(
 		parser.WithDisableSourceMaps,
 	)
 	if err != nil {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	entries := 0
@@ -105,19 +106,19 @@ func CompileTool(
 		}
 
 		if !declaration.Function.Async || declaration.Function.Generator {
-			return nil, ErrInvalidSource
+			return nil, apjsruntime.ErrInvalidSource
 		}
 
 		entries++
 	}
 
 	if entries != 1 {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	program, err := goja.CompileAST(parsed, true)
 	if err != nil {
-		return nil, ErrInvalidSource
+		return nil, apjsruntime.ErrInvalidSource
 	}
 
 	if err := checkToolHostBindings(
@@ -160,15 +161,15 @@ func checkToolHostBindings(source string, strict, reserveExecute bool) error {
 		parser.WithDisableSourceMaps,
 	)
 	if err != nil {
-		return ErrInvalidSource
+		return apjsruntime.ErrInvalidSource
 	}
 
 	if !strict && hasReservedConditionalFunction(parsed) {
-		return ErrInvalidSource
+		return apjsruntime.ErrInvalidSource
 	}
 
 	if _, err := goja.CompileAST(parsed, strict); err != nil {
-		return ErrInvalidSource
+		return apjsruntime.ErrInvalidSource
 	}
 
 	return nil
@@ -192,7 +193,7 @@ func checkToolHostBindings(source string, strict, reserveExecute bool) error {
 // never source, thrown values, or library diagnostics. Discard vm on failure.
 func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	if p == nil || p.program == nil || vm == nil {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 
 	// Dynamic eval/Function parsing must not load authored source-map URLs from
@@ -202,7 +203,7 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 
 	asyncPrototype, err := vm.RunProgram(asyncFunctionPrototype)
 	if err != nil {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 	getPrototype, _ := goja.AssertFunction(vm.Get("Object").ToObject(vm).Get("getPrototypeOf"))
 
@@ -225,7 +226,7 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 			goja.FLAG_FALSE, // configurable
 			enumerable,
 		); err != nil {
-			return nil, ErrInvalidInput
+			return nil, apjsruntime.ErrInvalidInput
 		}
 	}
 
@@ -240,7 +241,7 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	entry := vm.Get("execute")
 	callable, ok := goja.AssertFunction(entry)
 	if !ok {
-		return nil, ErrEvaluation
+		return nil, apjsruntime.ErrEvaluation
 	}
 
 	// Calling the captured intrinsic also drains jobs created by a Proxy's
@@ -251,7 +252,7 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 		return nil, runtimeEvaluationError(err)
 	}
 	if prototype != asyncPrototype {
-		return nil, ErrEvaluation
+		return nil, apjsruntime.ErrEvaluation
 	}
 
 	return callable, nil
@@ -264,11 +265,11 @@ func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // this also catches unavailable capabilities used by async top-level work.
 // Helpers that need captured input must read it when called by execute.
 // Caller cancellation retains its context error; policy expiry or stack
-// exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
+// exhaustion returns apjsruntime.ErrLimitExceeded. Any interrupt watcher is joined before
 // returning, and no runtime or pending authored state is reused by invocation.
 func (p *ToolProgram) Validate(ctx context.Context) error {
 	if p == nil || p.program == nil || ctx == nil {
-		return ErrInvalidInput
+		return apjsruntime.ErrInvalidInput
 	}
 	return withRuntime(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
 		tracker := newPromiseTracker(vm)

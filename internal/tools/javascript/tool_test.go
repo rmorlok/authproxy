@@ -10,6 +10,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
 	"github.com/rmorlok/authproxy/internal/apjs"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/stretchr/testify/require"
 )
@@ -56,7 +57,7 @@ func TestToolCompileDoesNotInitializeCode(t *testing.T) {
 
 			// Bounded initialization classifies the failure without exposing its text.
 			err := program.Validate(context.Background())
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.NotContains(t, err.Error(), "private-")
 		})
 	}
@@ -108,7 +109,7 @@ func TestToolRequiresDirectAsyncEntrypoint(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Only an unambiguous top-level async function declaration is accepted.
 			program, err := javascript.CompileTool(source, nil, expressionLimits())
-			require.ErrorIs(t, err, javascript.ErrInvalidSource)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
 			require.Nil(t, program)
 		})
 	}
@@ -127,7 +128,7 @@ func TestToolRejectsReservedGlobalDeclarations(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// An undefined declaration still claims a host name and must be rejected.
 			program, err := javascript.CompileTool("var "+name+"; async function execute() {}", nil, expressionLimits())
-			require.ErrorIs(t, err, javascript.ErrInvalidSource)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
 			require.Nil(t, program)
 		})
 	}
@@ -147,7 +148,7 @@ func TestToolRejectsReservedGlobalDeclarations(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Syntax-level checks catch hoisting and nested binding targets before execution.
 			program, err := javascript.CompileTool(declaration+` async function execute() {}`, nil, expressionLimits())
-			require.ErrorIs(t, err, javascript.ErrInvalidSource)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
 			require.Nil(t, program)
 		})
 	}
@@ -173,7 +174,7 @@ func TestToolChecksLibraryGlobalsWithoutChangingConnectorPolicy(t *testing.T) {
 			// Connector compilation remains permissive; Tool use adds host-name checks.
 			library := toolLibrary(t, source)
 			program, err := javascript.CompileTool(`async function execute() {}`, library, expressionLimits())
-			require.ErrorIs(t, err, javascript.ErrInvalidSource)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
 			require.Nil(t, program)
 		})
 	}
@@ -269,13 +270,13 @@ func TestToolValidationHasNoIOAndDoesNotCallEntrypoint(t *testing.T) {
 	// Top-level code cannot obtain network access while validating a definition.
 	program = compileTool(t, `fetch("https://example.invalid/private"); async function execute() {}`, nil)
 	err := program.Validate(context.Background())
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.NotContains(t, err.Error(), "private")
 
 	// Initialization can replace the declaration, so callability is checked afterward.
 	program = compileTool(t, `async function execute() {} execute = 42;`, nil)
 	err = program.Validate(context.Background())
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 }
 
 // TestToolValidationTracksRejections checks initialization promises without invoking the entry point.
@@ -284,10 +285,10 @@ func TestToolValidationTracksRejections(t *testing.T) {
 		source, library string
 		wantErr         error
 	}{
-		"tool rejection":          {`Promise.reject("private-rejection");`, "", javascript.ErrEvaluation},
-		"library rejection":       {"", `Promise.reject("private-rejection");`, javascript.ErrEvaluation},
-		"tool reaction throws":    {`Promise.resolve().then(() => { throw "private-rejection"; });`, "", javascript.ErrEvaluation},
-		"library reaction throws": {"", `Promise.resolve().then(() => { throw "private-rejection"; });`, javascript.ErrEvaluation},
+		"tool rejection":          {`Promise.reject("private-rejection");`, "", apjsruntime.ErrEvaluation},
+		"library rejection":       {"", `Promise.reject("private-rejection");`, apjsruntime.ErrEvaluation},
+		"tool reaction throws":    {`Promise.resolve().then(() => { throw "private-rejection"; });`, "", apjsruntime.ErrEvaluation},
+		"library reaction throws": {"", `Promise.resolve().then(() => { throw "private-rejection"; });`, apjsruntime.ErrEvaluation},
 		"tool catches":            {`Promise.reject("private-rejection").catch(() => {});`, "", nil},
 		"library catches":         {"", `Promise.reject("private-rejection").catch(() => {});`, nil},
 		"tool catches in microtask": {`const failure = Promise.reject("private-rejection");
@@ -312,7 +313,7 @@ func TestToolValidationTracksRejections(t *testing.T) {
 				require.NoError(t, err)
 			} else {
 				require.ErrorIs(t, err, test.wantErr)
-				require.Equal(t, javascript.ErrEvaluation.Error(), err.Error())
+				require.Equal(t, apjsruntime.ErrEvaluation.Error(), err.Error())
 			}
 		})
 	}
@@ -334,7 +335,7 @@ func TestToolEntrypointMustRemainAsync(t *testing.T) {
 			// Each replacement is callable or nearly so, but breaks the Promise contract.
 			program := compileTool(t, source, nil)
 			err := program.Validate(context.Background())
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.NotContains(t, err.Error(), "private")
 		})
 	}
@@ -364,7 +365,7 @@ func TestToolValidationRejectsUnhandledRejections(t *testing.T) {
 			// Async top-level failures reject after the script ends, without a sync throw.
 			program := compileTool(t, test.source, toolLibrary(t, test.library))
 			err := program.Validate(context.Background())
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.NotContains(t, err.Error(), "private")
 		})
 	}
@@ -393,7 +394,7 @@ func TestToolCombinedSourceBudget(t *testing.T) {
 	require.NoError(t, err)
 	limits.MaxSourceBytes--
 	program, err := javascript.CompileTool(source, library, limits)
-	require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, program)
 
 	// Caller-owned policy is copied when the reusable program is compiled.
@@ -420,13 +421,13 @@ func TestToolValidationLimitsAndCancellation(t *testing.T) {
 			limits.Timeout = 250 * time.Millisecond
 			program, err := javascript.CompileTool(test.source, toolLibrary(t, test.library), limits)
 			require.NoError(t, err)
-			require.ErrorIs(t, program.Validate(context.Background()), javascript.ErrLimitExceeded)
+			require.ErrorIs(t, program.Validate(context.Background()), apjsruntime.ErrLimitExceeded)
 		})
 	}
 
 	// Recursive helper initialization uses the same bounded stack as Tool source.
 	program := compileTool(t, `async function execute() {}`, toolLibrary(t, `function recur() { recur(); } recur();`))
-	require.ErrorIs(t, program.Validate(context.Background()), javascript.ErrLimitExceeded)
+	require.ErrorIs(t, program.Validate(context.Background()), apjsruntime.ErrLimitExceeded)
 
 	// A caller deadline interrupts active initialization before the longer Tool policy.
 	program = compileTool(t, `while (true) {} async function execute() {}`, nil)
@@ -448,17 +449,17 @@ func TestToolValidationLimitsAndCancellation(t *testing.T) {
 func TestToolRejectsMissingPolicyAndRuntime(t *testing.T) {
 	// Missing policy cannot disable the limits used during publication validation.
 	program, err := javascript.CompileTool(`async function execute() {}`, nil, javascript.Limits{})
-	require.ErrorIs(t, err, javascript.ErrInvalidInput)
+	require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 	require.Nil(t, program)
 
 	// A compiled program still needs a caller-owned runtime or validation context.
 	program = compileTool(t, `async function execute() {}`, nil)
 	_, err = program.Initialize(nil)
-	require.ErrorIs(t, err, javascript.ErrInvalidInput)
-	require.ErrorIs(t, program.Validate(nil), javascript.ErrInvalidInput)
+	require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
+	require.ErrorIs(t, program.Validate(nil), apjsruntime.ErrInvalidInput)
 
 	// Compilation errors reveal no authored source even when syntax is private.
 	_, err = javascript.CompileTool(`async function execute( private-source-marker`, nil, expressionLimits())
-	require.ErrorIs(t, err, javascript.ErrInvalidSource)
+	require.ErrorIs(t, err, apjsruntime.ErrInvalidSource)
 	require.False(t, strings.Contains(err.Error(), "private-source-marker"))
 }

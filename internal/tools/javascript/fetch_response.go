@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
@@ -57,13 +58,13 @@ func (l *fetchLoop) responseValue(response *httphost.Response) (goja.Value, erro
 		goja.FLAG_FALSE,
 		goja.FLAG_TRUE,
 	); err != nil {
-		return nil, ErrEvaluation
+		return nil, apjsruntime.ErrEvaluation
 	}
 
 	for _, format := range []string{"text", "json", "arrayBuffer"} {
 		read := func(goja.FunctionCall) goja.Value {
 			if consumed {
-				return l.rejected(ErrInvalidInput)
+				return l.rejected(apjsruntime.ErrInvalidInput)
 			}
 
 			// Session readers already enforce stream and aggregate decoded-byte
@@ -114,7 +115,7 @@ func fetchProperty(object *goja.Object, name string, value goja.Value) error {
 		goja.FLAG_FALSE,
 		goja.FLAG_TRUE,
 	); err != nil {
-		return ErrEvaluation
+		return apjsruntime.ErrEvaluation
 	}
 
 	return nil
@@ -132,7 +133,7 @@ func (l *fetchLoop) decodeBody(format string, data []byte) (goja.Value, error) {
 		return l.vm.ToValue(string(data)), nil
 	default:
 		if !utf8.Valid(data) {
-			return nil, ErrInvalidInput
+			return nil, apjsruntime.ErrInvalidInput
 		}
 
 		decoder := json.NewDecoder(bytes.NewReader(data))
@@ -147,7 +148,7 @@ func (l *fetchLoop) decodeBody(format string, data []byte) (goja.Value, error) {
 		}
 
 		if _, err := decoder.Token(); err != io.EOF {
-			return nil, ErrInvalidInput
+			return nil, apjsruntime.ErrInvalidInput
 		}
 
 		if err := validateInputSurrogates(l.ctx, data); err != nil {
@@ -156,7 +157,7 @@ func (l *fetchLoop) decodeBody(format string, data []byte) (goja.Value, error) {
 
 		value, err := l.parseJSON(goja.Undefined(), l.vm.ToValue(string(data)))
 		if err != nil {
-			return nil, ErrInvalidInput
+			return nil, apjsruntime.ErrInvalidInput
 		}
 
 		return value, nil

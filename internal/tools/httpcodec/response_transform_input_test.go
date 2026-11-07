@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/stretchr/testify/require"
@@ -74,7 +75,7 @@ func TestEncodeTransformResponseExactByteLimits(t *testing.T) {
 			for _, cap := range []int{len(test.want) - 1, len(test.want) / 2, 1} {
 				limits.MaxInputBytes = cap
 				partial, err := encodeTransformResponse(context.Background(), input, decoded, limits)
-				require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+				require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 				require.Nil(t, partial)
 			}
 
@@ -120,7 +121,7 @@ func TestEncodeTransformResponseHeaders(t *testing.T) {
 	require.NoError(t, err)
 	limits.MaxInputBytes = len(encoded) - 1
 	partial, err := encodeTransformResponse(context.Background(), input, decoded, limits)
-	require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, partial)
 }
 
@@ -170,7 +171,7 @@ func TestTransformHeadersBoundsMetadataWork(t *testing.T) {
 	require.Equal(t, http.Header{"x-limit": {"secret"}}, normalized)
 	limits.MaxInputBytes--
 	normalized, err = transformHeaders(context.Background(), headers, limits)
-	require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 	require.Nil(t, normalized)
 
 	// Empty maps and value lists cannot bypass width or aggregate-value bounds.
@@ -191,7 +192,7 @@ func TestTransformHeadersBoundsMetadataWork(t *testing.T) {
 			limits := transformInputLimits()
 			limits.MaxInputBytes, limits.MaxNodes = test.bytes, test.nodes
 			normalized, err := transformHeaders(context.Background(), test.headers, limits)
-			require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+			require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 			require.Nil(t, normalized)
 		})
 	}
@@ -226,10 +227,10 @@ func TestTransformJSONBufferStickyErrors(t *testing.T) {
 
 	// Once exhausted, no later fragment or string modifies the accumulated bytes.
 	buffer.write(" ")
-	require.ErrorIs(t, buffer.err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, buffer.err, apjsruntime.ErrLimitExceeded)
 	buffer.write("")
 	buffer.quoted("private-provider-value")
-	require.ErrorIs(t, buffer.err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, buffer.err, apjsruntime.ErrLimitExceeded)
 	require.Equal(t, want, string(buffer.bytes))
 
 	// A canceled append preserves the earlier prefix and its cancellation error.
@@ -246,7 +247,7 @@ func TestTransformJSONBufferStickyErrors(t *testing.T) {
 	// Escaping that exceeds the cap fails before appending any quoted string.
 	buffer = transformJSONBuffer{ctx: context.Background(), maxBytes: len(want) - 1}
 	buffer.quoted("<\"\n")
-	require.ErrorIs(t, buffer.err, javascript.ErrLimitExceeded)
+	require.ErrorIs(t, buffer.err, apjsruntime.ErrLimitExceeded)
 	require.Empty(t, buffer.bytes)
 }
 
@@ -270,7 +271,7 @@ func FuzzTransformResponseEncoding(f *testing.F) {
 		limits.MaxInputBytes = int(cap%2048) + 1
 		encoded, err := encodeTransformResponse(context.Background(), ResponseInput{StatusCode: 200, Headers: http.Header{"X-Provider": {header}}}, decoded, limits)
 		if err != nil {
-			require.True(t, errors.Is(err, javascript.ErrLimitExceeded) || errors.Is(err, errTransformHeaders))
+			require.True(t, errors.Is(err, apjsruntime.ErrLimitExceeded) || errors.Is(err, errTransformHeaders))
 			require.Nil(t, encoded)
 			return
 		}

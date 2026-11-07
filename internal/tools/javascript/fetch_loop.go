@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
@@ -80,7 +81,7 @@ func (l *fetchLoop) start(
 	convert func(fetchCompletion) (goja.Value, error),
 ) (goja.Value, bool) {
 	if len(l.pending) >= l.options.MaxPendingOperations || l.ctx.Err() != nil {
-		return l.rejected(ErrLimitExceeded), false
+		return l.rejected(apjsruntime.ErrLimitExceeded), false
 	}
 
 	promise, resolve, reject := l.vm.NewPromise()
@@ -113,7 +114,7 @@ func (l *fetchLoop) start(
 func (l *fetchLoop) settle(root *goja.Promise, tracker *promiseTracker) (goja.Value, error) {
 	for root.State() == goja.PromiseStatePending {
 		if len(l.pending) == 0 {
-			return nil, ErrEvaluation
+			return nil, apjsruntime.ErrEvaluation
 		}
 
 		select {
@@ -209,8 +210,8 @@ func fetchWorkerStack() string {
 // Unexpected host errors never disclose their original text to authored code.
 func fetchErrorMessage(err error) string {
 	switch err {
-	case ErrInvalidInput,
-		ErrLimitExceeded,
+	case apjsruntime.ErrInvalidInput,
+		apjsruntime.ErrLimitExceeded,
 		httphost.ErrRequestLimit,
 		httphost.ErrResponseLimit,
 		httphost.ErrStreamLimit,

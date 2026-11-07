@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
@@ -144,7 +145,7 @@ func TestToolFetchOptionsRequirePositiveLimits(t *testing.T) {
 
 			// Missing policy is an input error even when the source never calls fetch.
 			result, err := program.EvaluateWithHTTP(context.Background(), input, options)
-			require.ErrorIs(t, err, javascript.ErrInvalidInput)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 			require.Nil(t, result)
 
 			// A valid transferred session is consumed even when another option is invalid.
@@ -168,10 +169,10 @@ func TestToolFetchInvalidEvaluationClosesSession(t *testing.T) {
 		input   javascript.Input
 		want    error
 	}{
-		{"nil program", nil, context.Background(), input, javascript.ErrInvalidInput},
-		{"uninitialized program", &javascript.ToolProgram{}, context.Background(), input, javascript.ErrInvalidInput},
-		{"nil context", program, nil, input, javascript.ErrInvalidInput},
-		{"invalid input", program, context.Background(), javascript.Input{}, javascript.ErrInvalidInput},
+		{"nil program", nil, context.Background(), input, apjsruntime.ErrInvalidInput},
+		{"uninitialized program", &javascript.ToolProgram{}, context.Background(), input, apjsruntime.ErrInvalidInput},
+		{"nil context", program, nil, input, apjsruntime.ErrInvalidInput},
+		{"invalid input", program, context.Background(), javascript.Input{}, apjsruntime.ErrInvalidInput},
 		{"canceled context", program, canceled, input, context.Canceled},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -405,7 +406,7 @@ func TestToolFetchSanitizesTransportFailure(t *testing.T) {
 				require.NoError(t, err)
 				require.Contains(t, string(result), `"error":true`)
 			} else {
-				require.ErrorIs(t, err, javascript.ErrEvaluation)
+				require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 				require.Nil(t, result)
 				require.NotContains(t, err.Error(), "private-token")
 			}
@@ -467,7 +468,7 @@ func TestToolFetchInitializationHasNoIO(t *testing.T) {
 
 	// Enabling HTTP for execute must not enable it for top-level source or helpers.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.Nil(t, result)
 	require.Zero(t, calls.Load())
 	require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
@@ -491,11 +492,11 @@ func TestToolFetchEntrypointTrapCannotScheduleIO(t *testing.T) {
 	`, nil)
 
 	// Inspecting the entry point is still initialization, including its Proxy's jobs.
-	require.ErrorIs(t, program.Validate(context.Background()), javascript.ErrEvaluation)
+	require.ErrorIs(t, program.Validate(context.Background()), apjsruntime.ErrEvaluation)
 
 	// A job scheduled by that inspection cannot cross into the enabled HTTP phase.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.Nil(t, result)
 	require.Zero(t, calls.Load())
 	require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
@@ -847,7 +848,7 @@ func TestToolFetchAbnormalWorkerExit(t *testing.T) {
 
 			// A worker failure rejects promptly rather than stranding the pending Promise.
 			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.Nil(t, result)
 			require.NotContains(t, err.Error(), "private-panic-payload")
 			require.NotEmpty(t, diagnostics.String())

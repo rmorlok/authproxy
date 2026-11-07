@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,11 +18,11 @@ func TestPromiseTrackerSettledResults(t *testing.T) {
 	}{
 		"fulfilled":          {source: `Promise.resolve(4)`, want: 4},
 		"microtasks":         {source: `(async () => (await Promise.resolve(4)) + 3)()`, want: 7},
-		"root rejected":      {source: `Promise.reject("private reason")`, err: ErrEvaluation},
-		"root stuck":         {source: `new Promise(() => {})`, err: ErrEvaluation},
-		"detached rejection": {source: `Promise.reject("private reason"); Promise.resolve(4)`, err: ErrEvaluation},
+		"root rejected":      {source: `Promise.reject("private reason")`, err: apjsruntime.ErrEvaluation},
+		"root stuck":         {source: `new Promise(() => {})`, err: apjsruntime.ErrEvaluation},
+		"detached rejection": {source: `Promise.reject("private reason"); Promise.resolve(4)`, err: apjsruntime.ErrEvaluation},
 		"handled rejection":  {source: `Promise.reject("private reason").catch(() => {}); Promise.resolve(4)`, want: 4},
-		"partially handled":  {source: `Promise.reject("private").catch(() => {}); Promise.reject("another"); Promise.resolve(4)`, err: ErrEvaluation},
+		"partially handled":  {source: `Promise.reject("private").catch(() => {}); Promise.reject("another"); Promise.resolve(4)`, err: apjsruntime.ErrEvaluation},
 		"multiple handlers":  {source: `const rejected = Promise.reject("private"); rejected.catch(() => {}); rejected.catch(() => {}); Promise.resolve(4)`, want: 4},
 	} {
 		t.Run(name, func(t *testing.T) {

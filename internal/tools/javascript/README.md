@@ -6,6 +6,12 @@ JSON conversion with explicit limits. Tools can opt into `fetch` through one
 captured connection's HTTP session. Pure expressions and ordinary Tool evaluation
 have no I/O capabilities.
 
+The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
+lifecycle, execution limits, and bounded JSON output conversion. This package
+supplies Tool input binding, compilation, connector helpers, and the async HTTP
+host. Its `Limits` type refers to the shared policy. Callers reference error
+classifications directly from `internal/apjs/runtime`.
+
 ## Pure expressions
 
 An expression is compiled once and evaluated against a captured Tool invocation
@@ -366,9 +372,9 @@ Failures return no partial output. Fixed error classifications distinguish
 invalid source, input, output, execution limits, and thrown JavaScript errors.
 Errors never contain authored source, thrown values, stack traces, private
 configuration, or response data. Caller cancellation and deadlines remain Go
-context errors. The configured timeout returns `ErrLimitExceeded`, allowing an
-executor to report an execution-limit failure separately from a canceled
-caller request. If both contexts have expired, the caller's error wins.
+context errors. The configured timeout returns `apjsruntime.ErrLimitExceeded`,
+allowing an executor to report an execution-limit failure separately from a
+canceled caller request. If both contexts have expired, the caller's error wins.
 
 ## Limits and lifecycle
 

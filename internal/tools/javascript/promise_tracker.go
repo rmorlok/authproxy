@@ -1,6 +1,9 @@
 package javascript
 
-import "github.com/dop251/goja"
+import (
+	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
+)
 
 // promiseTracker counts unhandled rejections in one fresh runtime. Install it
 // before authored initialization so Goja's once-only rejection and first-handler
@@ -39,7 +42,7 @@ func (t *promiseTracker) trackRejection(
 // its microtasks. A catch installed before this check clears its rejection.
 func (t *promiseTracker) checkRejections() error {
 	if t.unhandled != 0 {
-		return ErrEvaluation
+		return apjsruntime.ErrEvaluation
 	}
 	return nil
 }
@@ -49,7 +52,7 @@ func (t *promiseTracker) checkRejections() error {
 // cannot progress. Rejected roots and unhandled detached failures are errors.
 func (t *promiseTracker) settledResult(root *goja.Promise) (goja.Value, error) {
 	if root.State() != goja.PromiseStateFulfilled {
-		return nil, ErrEvaluation
+		return nil, apjsruntime.ErrEvaluation
 	}
 
 	if err := t.checkRejections(); err != nil {
