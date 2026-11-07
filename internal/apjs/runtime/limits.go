@@ -1,5 +1,6 @@
-// Package runtime provides a bounded Goja lifecycle and native JSON conversion
-// for trusted host adapters. It has no Tool, connection, schema, or HTTP policy.
+// Package runtime provides a bounded Goja lifecycle, native JSON conversion,
+// and optional asynchronous HTTP bindings for trusted host adapters. It has no
+// Tool, connection lookup, authorization, or HTTP-client selection policy.
 package runtime
 
 import (

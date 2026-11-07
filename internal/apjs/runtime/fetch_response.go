@@ -1,4 +1,4 @@
-package javascript
+package runtime
 
 import (
 	"encoding/json"
@@ -7,13 +7,12 @@ import (
 
 	"github.com/dop251/goja"
 	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
-	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 // responseValue builds native response metadata without reading its body. The
 // closure's consumed flag is VM-owned; workers only receive the Go body reader.
 // No upstream request, credentials, or reflected Go response enters the VM.
-func (l *fetchLoop) responseValue(response *aphttp.Response) (goja.Value, error) {
+func (l *HTTPHost) responseValue(response *aphttp.Response) (goja.Value, error) {
 	object, headers := l.vm.NewObject(), l.vm.NewObject()
 
 	get := func(call goja.FunctionCall) goja.Value {
@@ -56,13 +55,13 @@ func (l *fetchLoop) responseValue(response *aphttp.Response) (goja.Value, error)
 		goja.FLAG_FALSE,
 		goja.FLAG_TRUE,
 	); err != nil {
-		return nil, apjsruntime.ErrEvaluation
+		return nil, ErrEvaluation
 	}
 
 	for _, format := range []string{"text", "json", "arrayBuffer"} {
 		read := func(goja.FunctionCall) goja.Value {
 			if consumed {
-				return l.rejected(apjsruntime.ErrInvalidInput)
+				return l.rejected(ErrInvalidInput)
 			}
 
 			// Session readers already enforce stream and aggregate decoded-byte
@@ -113,7 +112,7 @@ func fetchProperty(object *goja.Object, name string, value goja.Value) error {
 		goja.FLAG_FALSE,
 		goja.FLAG_TRUE,
 	); err != nil {
-		return apjsruntime.ErrEvaluation
+		return ErrEvaluation
 	}
 
 	return nil
@@ -123,7 +122,7 @@ func fetchProperty(object *goja.Object, name string, value goja.Value) error {
 // parsing uses the captured intrinsic and input depth/node rules, never an
 // authored replacement or private parser diagnostics. Text replaces invalid
 // UTF-8 sequences; arrayBuffer preserves the bytes exactly.
-func (l *fetchLoop) decodeBody(format string, data []byte) (goja.Value, error) {
+func (l *HTTPHost) decodeBody(format string, data []byte) (goja.Value, error) {
 	switch format {
 	case "arrayBuffer":
 		return l.vm.ToValue(l.vm.NewArrayBuffer(data)), nil
@@ -132,7 +131,7 @@ func (l *fetchLoop) decodeBody(format string, data []byte) (goja.Value, error) {
 	default:
 		// HTTP readers already cap decoded bytes. Each body receives its own
 		// traversal allowance, independent of the invocation's initial inputs.
-		values, err := l.decoder.Decode(l.ctx, apjsruntime.JSONLimits{
+		values, err := l.decoder.Decode(l.ctx, JSONLimits{
 			MaxBytes: len(data),
 			MaxDepth: l.limits.MaxDepth,
 			MaxNodes: l.limits.MaxNodes,

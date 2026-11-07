@@ -1,15 +1,14 @@
-package javascript
+package runtime
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
-	"runtime"
+	goruntime "runtime"
 	"strings"
 
 	"github.com/dop251/goja"
 	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
-	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 // fetchCompletion crosses the worker boundary using only owned Go data. A
@@ -21,32 +20,62 @@ type fetchCompletion struct {
 	err      error            // Fixed host classification; no upstream diagnostics.
 }
 
-// fetchLoop owns Promise settlement and response lifetimes on one VM goroutine.
+// HTTPOptions supplies resolved limits and diagnostics for one invocation's HTTP
+// host. The caller separately supplies bounded dispatchers through BindFetch.
+type HTTPOptions struct {
+	// MaxRequestBytes bounds the combined URL, method, headers, and body of each
+	// request before handing a detached copy to an HTTP worker.
+	MaxRequestBytes int
+
+	// MaxPendingOperations bounds concurrent fetch and body-read workers across
+	// every binding on the host, before goroutines are started. HTTP session
+	// request and response allowances are independent of this worker cap.
+	MaxPendingOperations int
+
+	// Logger receives fixed diagnostics and Go call locations for abnormal
+	// worker exits, never panic values or request/response data. Nil uses slog's
+	// default logger.
+	Logger *slog.Logger
+}
+
+// HTTPHost owns Promise settlement and response lifetimes on one VM goroutine.
 // Workers receive no pointer to this object, so a stalled transport cannot retain
 // the VM through its completion callback. Only the unbuffered channel is shared.
-type fetchLoop struct {
+// Create one host per AsyncInvocation so all bound fetch functions share its
+// pending-worker allowance. Its methods and bindings belong to that VM goroutine;
+// they must not be retained after evaluation. The zero value is not usable.
+type HTTPHost struct {
 	ctx       context.Context                        // Invocation runtime deadline plus host cleanup cancellation.
 	cancel    context.CancelFunc                     // Stops requests and body reads on every exit.
 	vm        *goja.Runtime                          // Accessed exclusively by the owner.
-	options   FetchOptions                           // Captured session, admission limits, and diagnostics logger.
+	options   HTTPOptions                            // Shared admission limits and diagnostics logger.
 	limits    Limits                                 // Bounds response JSON parsing as well as final output.
-	decoder   *apjsruntime.JSONDecoder               // Native JSON decoder captured before authored initialization.
+	decoder   *JSONDecoder                           // Native JSON decoder captured before authored initialization.
 	enabled   bool                                   // I/O is admitted only after initialization succeeds.
 	nextID    uint64                                 // Monotonic operation identity within this invocation.
 	pending   map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
 	completed chan fetchCompletion                   // Unbuffered ownership handoff from workers.
 }
 
-// newFetchLoop captures pristine parsing and starts no work. Its caller closes
-// it before disposing the VM, including after an initialization failure.
-// Missing parser bindings return ErrInvalidInput before creating a child context.
-func newFetchLoop(
+// NewHTTPHost captures pristine parsing and starts no work. Call it during
+// AsyncProgram.Evaluate preparation, before any authored code runs, with the
+// evaluation's context and limits. Register Close on AsyncInvocation immediately
+// after construction, then Start and Await, before touching the VM again.
+// Invalid policy or missing parser bindings return ErrInvalidInput without
+// acquiring resources. The caller still owns the HTTP session and its cleanup.
+// It must link session cancellation to the evaluation context when session
+// exhaustion or expiry should also interrupt JavaScript that is not awaiting I/O.
+func NewHTTPHost(
 	ctx context.Context,
 	vm *goja.Runtime,
-	options FetchOptions,
+	options HTTPOptions,
 	limits Limits,
-) (*fetchLoop, error) {
-	decoder, err := apjsruntime.NewJSONDecoder(vm)
+) (*HTTPHost, error) {
+	if ctx == nil || vm == nil || options.MaxRequestBytes <= 0 ||
+		options.MaxPendingOperations <= 0 || limits.Validate() != nil {
+		return nil, ErrInvalidInput
+	}
+	decoder, err := NewJSONDecoder(vm)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +85,7 @@ func newFetchLoop(
 		options.Logger = slog.Default()
 	}
 
-	return &fetchLoop{
+	return &HTTPHost{
 		ctx:       run,
 		cancel:    cancel,
 		vm:        vm,
@@ -68,9 +97,15 @@ func newFetchLoop(
 	}, nil
 }
 
+// Start enables I/O after initialization and its Promise jobs succeed. Use it as
+// AsyncInvocation.Start; calling it earlier would allow initialization side effects.
+func (l *HTTPHost) Start() {
+	l.enabled = true
+}
+
 // rejected creates a native rejected Promise with a fixed, JavaScript-native
 // error. NewGoError is deliberately avoided because it reflects a Go error.
-func (l *fetchLoop) rejected(err error) goja.Value {
+func (l *HTTPHost) rejected(err error) goja.Value {
 	promise, _, reject := l.vm.NewPromise()
 	_ = reject(l.vm.NewTypeError("%s", fetchErrorMessage(err)))
 	return l.vm.ToValue(promise)
@@ -79,12 +114,12 @@ func (l *fetchLoop) rejected(err error) goja.Value {
 // start reserves a worker slot before launching it. Work must capture Go data
 // only; convert and the Promise resolvers remain in the owner-only pending map.
 // The boolean reports worker admission, so a refused body read can stay unused.
-func (l *fetchLoop) start(
+func (l *HTTPHost) start(
 	work func() fetchCompletion,
 	convert func(fetchCompletion) (goja.Value, error),
 ) (goja.Value, bool) {
 	if len(l.pending) >= l.options.MaxPendingOperations || l.ctx.Err() != nil {
-		return l.rejected(apjsruntime.ErrLimitExceeded), false
+		return l.rejected(ErrLimitExceeded), false
 	}
 
 	promise, resolve, reject := l.vm.NewPromise()
@@ -100,7 +135,7 @@ func (l *fetchLoop) start(
 			err = resolve(value)
 		}
 		if err != nil {
-			return apjsruntime.EvaluationError(err)
+			return EvaluationError(err)
 		}
 		return nil
 	}
@@ -110,13 +145,13 @@ func (l *fetchLoop) start(
 	return l.vm.ToValue(promise), true
 }
 
-// await processes one host completion on the VM goroutine. Resolving its Promise
+// Await processes one host completion on the VM goroutine. Resolving its Promise
 // drains Goja jobs, which may admit more work. The shared runtime decides whether
 // the root still needs another completion; a winning race never drains siblings.
 // With no pending host work, an unresolved root cannot make progress.
-func (l *fetchLoop) await() error {
+func (l *HTTPHost) Await() error {
 	if len(l.pending) == 0 {
-		return apjsruntime.ErrEvaluation
+		return ErrEvaluation
 	}
 
 	select {
@@ -129,11 +164,12 @@ func (l *fetchLoop) await() error {
 	}
 }
 
-// close cancels requests; the session's cancellation callbacks close received
+// Close cancels requests; the dispatcher's session cancellation callbacks close received
 // bodies. Never wait for Body.Close on the VM owner: even a close can block in
 // an uncooperative transport. Workers blocked on the unbuffered completion channel
 // close their own untransferred bodies. Late workers cannot settle VM Promises.
-func (l *fetchLoop) close() {
+// Close is idempotent and does not close the caller-owned HTTP session or client.
+func (l *HTTPHost) Close() {
 	l.cancel()
 }
 
@@ -163,7 +199,7 @@ func runFetchWorker(
 			}
 			logger.ErrorContext(
 				ctx,
-				"Tool fetch worker exited abnormally",
+				"JavaScript fetch worker exited abnormally",
 				"kind", kind,
 				"panic_type", fmt.Sprintf("%T", recovered),
 				"stack", fetchWorkerStack(),
@@ -188,8 +224,8 @@ func runFetchWorker(
 // stack argument values and the panic payload, which can contain credentials.
 func fetchWorkerStack() string {
 	pcs := make([]uintptr, 24)
-	n := runtime.Callers(3, pcs)
-	frames := runtime.CallersFrames(pcs[:n])
+	n := goruntime.Callers(3, pcs)
+	frames := goruntime.CallersFrames(pcs[:n])
 	var stack strings.Builder
 	for {
 		frame, more := frames.Next()
@@ -204,8 +240,8 @@ func fetchWorkerStack() string {
 // Unexpected host errors never disclose their original text to authored code.
 func fetchErrorMessage(err error) string {
 	switch err {
-	case apjsruntime.ErrInvalidInput,
-		apjsruntime.ErrLimitExceeded,
+	case ErrInvalidInput,
+		ErrLimitExceeded,
 		aphttp.ErrRequestLimit,
 		aphttp.ErrResponseLimit,
 		aphttp.ErrStreamLimit,
@@ -214,6 +250,6 @@ func fetchErrorMessage(err error) string {
 		aphttp.ErrCredentialsUnavailable:
 		return err.Error()
 	default:
-		return "Tool fetch failed"
+		return "JavaScript fetch failed"
 	}
 }

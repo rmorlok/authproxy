@@ -1,4 +1,4 @@
-package javascript
+package runtime
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -151,7 +150,7 @@ func TestPrepareFetchRequestForbiddenMethods(t *testing.T) {
 
 			// Reject before copying header values or returning a request that could be dispatched.
 			request, err := prepareFetchRequest(context.Background(), vm, call, 1024)
-			require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
+			require.ErrorIs(t, err, ErrInvalidInput)
 			require.NotContains(t, err.Error(), "private")
 			require.Nil(t, request)
 		})
@@ -179,7 +178,7 @@ func TestPrepareFetchRequestBounds(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, request)
 			request, err = prepareFetchRequest(context.Background(), vm, call, test.size-1)
-			require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
+			require.ErrorIs(t, err, ErrLimitExceeded)
 			require.Nil(t, request)
 		})
 	}
@@ -205,7 +204,7 @@ func TestPrepareFetchRequestRejectsUnsupportedData(t *testing.T) {
 		// No unsupported value is coerced or included in the public classification.
 		vm := goja.New()
 		request, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024)
-		require.ErrorIs(t, err, apjsruntime.ErrInvalidInput, source)
+		require.ErrorIs(t, err, ErrInvalidInput, source)
 		require.NotContains(t, err.Error(), "private")
 		require.Nil(t, request)
 	}
@@ -214,7 +213,7 @@ func TestPrepareFetchRequestRejectsUnsupportedData(t *testing.T) {
 		vm := goja.New()
 		source := `"https://example.test", {headers: {"` + strings.ToLower(name) + `": "private"}}`
 		request, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024)
-		require.ErrorIs(t, err, apjsruntime.ErrInvalidInput, name)
+		require.ErrorIs(t, err, ErrInvalidInput, name)
 		require.Nil(t, request)
 	}
 }
