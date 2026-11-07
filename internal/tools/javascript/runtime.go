@@ -9,6 +9,37 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
+// evaluateResult installs pure Tool result helpers, binds a private input, and
+// converts successful content under one runtime deadline. The callback owns
+// execution and any HTTP cleanup; no partial result survives a later failure.
+// Expressions use evaluateJSON and never receive Tool result helpers.
+func evaluateResult(
+	ctx context.Context,
+	limits Limits,
+	input Input,
+	run func(context.Context, *goja.Runtime) (goja.Value, error),
+) (result *Result, err error) {
+	err = withRuntime(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) error {
+		encoder, err := newResultEncoder(vm, limits)
+		if err != nil {
+			return err
+		}
+		if err := bindInput(runCtx, vm, input, limits); err != nil {
+			return err
+		}
+		value, err := run(runCtx, vm)
+		if err != nil {
+			return err
+		}
+		result, err = encoder.encode(runCtx, value)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 // evaluateJSON binds a private input copy, runs authored code, and converts its
 // result under one runtime deadline. The callback owns evaluation and safe error
 // classification; callers validate the context, limits, and program beforehand.

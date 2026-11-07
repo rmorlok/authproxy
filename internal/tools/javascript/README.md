@@ -182,14 +182,15 @@ caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start
 its own timeout. Most callers should use `Evaluate` or `EvaluateWithHTTP` for the
-complete bounded lifecycle described below. `ToolError`/`toolResult` helpers and
-invocation-service integration remain separate work.
+complete bounded lifecycle described below. `ToolError` and invocation-service
+integration remain separate work.
 
 ## Evaluate an async Tool
 
 `ToolProgram.Evaluate` calls `execute(params, context)` and converts its fulfilled
-native Promise result into JSON. The Tool and its called helpers share a private
-copy of the captured input. `await` and Promise chains can compose their results:
+native Promise result into a `*javascript.Result`. The Tool and its called helpers
+share a private copy of the captured input. `await` and Promise chains can
+compose their results:
 
 ```javascript
 async function execute(params, context) {
@@ -207,7 +208,9 @@ if err != nil {
 }
 ```
 
-The fulfilled value becomes bounded JSON using the same rules as expressions.
+An ordinary fulfilled value becomes bounded JSON in `result.StructuredContent`.
+Strings also add a text block to `result.Content`; other ordinary values leave
+that array empty. An explicit `toolResult(...)` supplies rich blocks instead.
 `Response` is optional and normally omitted for Tool functions. It is available
 for callers that already have prepared response data. Changing `params` or
 `context.cfg` changes only that evaluation's copy, including changes made by called
@@ -325,12 +328,67 @@ failure and a Go-side diagnostic with call locations, omitting the panic value
 and request/response data. This internal API is not yet wired to public Tool
 invocation or JavaScript Tool publication.
 
+## Return rich content
+
+Use `toolResult(...)` when a Tool should return typed content alongside structured
+data. For example, a report lookup can return a readable title, a link, and the
+report ID without duplicating the provider's full record:
+
+```javascript
+async function execute(params, context) {
+    const response = await fetch(context.cfg.apiBase + "/reports/" + encodeURIComponent(params.id));
+    const report = await response.json();
+    return toolResult({
+        content: [
+            { type: "text", text: report.title },
+            { type: "resource_link", uri: report.webUrl, name: "report" }
+        ],
+        structuredContent: { id: report.id }
+    });
+}
+```
+
+The helper accepts only `content`, `structuredContent`, and `provider`:
+
+- `content` is an ordered array of the API's text, image, audio, resource-link,
+  or embedded-resource blocks. Image/audio data and embedded blobs use base64.
+  Supported annotations and per-block provider metadata are preserved. Omitted
+  content becomes an empty array; explicit null is invalid.
+- `structuredContent` accepts any JSON value. Omitting it produces nil Go bytes;
+  explicit null produces the JSON bytes `null`. Explicit helpers do not add a
+  text block automatically when this field is a string.
+- `provider` is optional extension metadata selected by the Tool author. It must
+  be an object when present and conveys no permissions or execution instructions.
+
+Content uses the existing [API content types](../../schema/api/tool_content.go)
+and their validation. Invalid variants, base64, media types, and resource URIs
+fail the whole conversion. Resource links identify content; they are never
+fetched automatically. Unknown fields, including Tool IDs, revisions, connection
+metadata, and execution state, are rejected. The invocation layer supplies those
+facts when building the public `ToolResult` envelope.
+
+The helper returns an opaque handle for `execute` to return directly. Its payload
+is read when the Tool finishes, so edits made to the payload before returning are
+included. Handles cannot be nested inside ordinary output or another payload.
+An ordinary business object such as `{content: []}` remains structured JSON;
+matching property names alone never turn it into a rich result.
+
+The pure helper is available during Tool initialization and validation, so a
+constant result can be prepared at the top level. Validation does not call
+`execute` or validate its eventual output. Pure response-transform expressions
+retain their JSON-only contract and do not receive the helper.
+
+Both Tool evaluation methods return detached `Result` data. This is content for
+an executor to assemble, not a complete invocation response. The executor still
+owns correlation identities, output-schema validation, safe failure mapping, and
+the final envelope's serialized byte limit. `ToolError` is not implemented yet.
+
 ## Results and errors
 
 Results can be null, booleans, finite numbers, strings, dense arrays, or ordinary
-objects containing those values. Arrays and objects retain their shape. A
-string result is JSON-quoted; conversion into a rich text block belongs to the
-Tool result layer.
+objects containing those values. Arrays and objects retain their shape. Pure
+expressions return the encoded JSON directly; Tool functions return structured
+content and, for ordinary strings, an additional text block.
 
 Conversion rejects undefined, functions, symbols, BigInts, non-finite numbers,
 cycles, array holes, extra array properties, accessors, proxies, and exotic
@@ -338,6 +396,9 @@ objects such as dates, promises, maps, sets, and typed arrays. It reads ordinary
 data properties without invoking getters or `toJSON`. Unsupported values are
 errors rather than being silently omitted or converted to null. Object output
 uses own enumerable string properties; ordinary non-enumerable data is omitted.
+Rich helper payloads and ordinary top-level Tool strings also reject unpaired
+UTF-16 surrogate units, which Go text fields cannot preserve. These are never
+silently replaced during typed content conversion.
 
 Goja does not expose a distinct public type for every built-in object. If author
 code deliberately gives an otherwise indistinguishable object, such as a
@@ -378,7 +439,8 @@ compilation; this package supplies no unlimited defaults.
 - `MaxSourceBytes` bounds authored UTF-8 source before parsing. For Tools, the
   script and connector helper library share this allowance.
 - `MaxInputBytes` bounds the serialized snapshot and response together.
-- `MaxOutputBytes` bounds emitted JSON, including punctuation and escaping.
+- `MaxOutputBytes` bounds ordinary output JSON or the complete authored
+  `toolResult` payload, including punctuation, escaping, base64, and metadata.
 - `MaxDepth` bounds nested JSON values, with the root at depth zero.
 - `MaxNodes` bounds JSON values and object property inspections. Combined input
   and output each receive this allowance; it is not a JavaScript instruction count.
@@ -389,6 +451,9 @@ compilation; this package supplies no unlimited defaults.
 
 The JSON input/output limits apply to expression and Tool evaluation; Tool
 validation receives no input and returns no result data.
+The helper payload shares one output allowance across all of its fields.
+Derived text blocks for ordinary strings and trusted invocation-envelope fields
+need the executor's separate final serialized-result allowance.
 
 A watcher interrupts busy JavaScript loops on cancellation and is joined before
 evaluation or validation returns. It uses only Goja's thread-safe interrupt

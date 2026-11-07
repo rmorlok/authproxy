@@ -39,8 +39,9 @@ type Limits struct {
 	// MaxInputBytes bounds serialized snapshot and response JSON together.
 	MaxInputBytes int
 
-	// MaxOutputBytes bounds the emitted JSON, including quotes and escaping.
-	// A later result envelope needs its own serialized byte allowance.
+	// MaxOutputBytes bounds ordinary output JSON or the complete authored
+	// toolResult payload, including quotes, escaping, and base64 data. Derived
+	// text blocks and the final invocation envelope need their own byte allowance.
 	MaxOutputBytes int
 
 	// MaxDepth bounds JSON value nesting; the root is depth zero.
