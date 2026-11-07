@@ -24,6 +24,13 @@ type AsyncInput struct {
 	// Connections preserves caller order. All snapshots share the initial input
 	// allowance with Params and Context; each ID must be nonempty and unique.
 	Connections []ConnectionInput
+
+	// DirectDispatch optionally supplies global fetch without connection
+	// authentication. Nil disables it; there is no default client or fallback.
+	// It has HTTPHost.BindFetch's ownership contract and must use a direct client
+	// bound to the same HTTP session as Connections. The adapter fixes attribution
+	// and instrumentation. Tool callers must leave this nil.
+	DirectDispatch func(*http.Request) (*aphttp.Response, error)
 }
 
 // ConnectionInput pairs a captured JSON snapshot with its private HTTP dispatch
@@ -50,15 +57,16 @@ var connectionBrand = goja.NewSymbol("AuthProxy connection")
 // PrepareInput copies a complete initial input batch and sets the invocation's
 // native Params and Context only on success. Call it during Evaluate preparation,
 // before authored code runs, with the evaluation's VM, context, and limits.
-// It installs no globals; adapters may bind aliases to these same copied objects.
+// Adapters may bind aliases to these same copied objects. It installs a protected
+// global fetch only when the caller explicitly supplies DirectDispatch.
 //
 // The resulting context always has a read-only ordered connections array. Its
 // members and their top-level properties are frozen; nested metadata stays
 // mutable and private to this VM. Fetch methods retain their captured dispatcher
 // when borrowed, and connection objects cannot be returned as generic JSON.
 //
-// A host is required only when connections are supplied. It must belong to this
-// VM, and its Close/Start/Await must already be registered on the invocation.
+// A host is required when connections or direct HTTP are supplied. It must belong
+// to this VM, and its Close/Start/Await must already be registered on the invocation.
 // This helper owns no session or worker lifecycle and never enables I/O.
 func (i *AsyncInvocation) PrepareInput(
 	ctx context.Context,
@@ -71,7 +79,7 @@ func (i *AsyncInvocation) PrepareInput(
 		ctx == nil ||
 		vm == nil ||
 		limits.Validate() != nil ||
-		(len(input.Connections) != 0 && host == nil) ||
+		((len(input.Connections) != 0 || input.DirectDispatch != nil) && host == nil) ||
 		(host != nil && host.vm != vm) {
 		return ErrInvalidInput
 	}
@@ -216,6 +224,21 @@ func (i *AsyncInvocation) PrepareInput(
 
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+
+	// This is a separate captured capability, never selected from a connection or
+	// used as its fallback. Binding through the same host shares pending workers
+	// and keeps direct I/O disabled throughout initialization and its microtasks.
+	if input.DirectDispatch != nil {
+		fetch, err := host.BindFetch(input.DirectDispatch)
+		if err != nil {
+			return err
+		}
+		if err := vm.GlobalObject().DefineDataProperty(
+			"fetch", vm.ToValue(fetch), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE,
+		); err != nil {
+			return ErrInvalidInput
+		}
 	}
 
 	i.Params, i.Context = values[0], contextObject

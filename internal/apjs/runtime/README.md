@@ -84,7 +84,6 @@ program, err := runtime.CompileAsync(`
         return prefix + params.id;
     }
 `, nil, []runtime.HostBinding{
-    {Name: "fetch"},
     {Name: "params", PreserveEnumerable: true},
     {Name: "context", PreserveEnumerable: true},
 }, limits)
@@ -96,12 +95,13 @@ return program.Validate(ctx)
 
 This passes validation because `params.id` is read only when `execute` is called.
 Moving that read to top-level initialization would fail validation. Declaring
-`let fetch` would fail compilation because this caller reserved that global.
+`let fetch` would fail compilation because the runtime reserves that global.
 
-The caller supplies the complete host binding policy, including names for
-capabilities that are disabled. The compiler copies the descriptors and rejects
+The caller supplies additional host bindings, including names for disabled
+capabilities. `fetch` is always reserved; an explicit descriptor is allowed but
+cannot preserve enumerability. The compiler copies the descriptors and rejects
 invalid, duplicate, or escaped names. `execute` belongs to the program and cannot
-be a host binding. Initialization makes each declared global nonwritable and
+be a host binding. Initialization makes each host global nonwritable and
 nonconfigurable; absent values become `undefined`. Host bindings are normally
 non-enumerable. `PreserveEnumerable` retains an existing JSON alias's visibility
 without changing its identity. The Tool adapter supplies its existing host names
@@ -153,7 +153,7 @@ and all connection snapshots share one byte/node allowance. Depth is checked
 with each supplied document's root at zero. Aliases refer to the resulting native
 objects without another copy or input charge.
 
-No global aliases are installed. Trusted adapters may bind them during
+No input aliases are installed. Trusted adapters may bind them during
 preparation or use the lower-level `Params` and `Context` fields directly with
 their own bounded native input. Preparation must honor `runCtx` and keep VM
 values inside this evaluation.
@@ -188,7 +188,7 @@ completion loop. It installs no globals and selects no clients. `PrepareInput`
 uses it to bind each supplied connection's `fetch` method to the captured
 dispatcher. Creating a host alone gives JavaScript no HTTP access.
 
-For example, compile this program with no host globals:
+For example, compile this program with no additional host globals:
 
 ```javascript
 async function execute(params, context) {
@@ -255,7 +255,7 @@ non-enumerable `fetch` method stays bound when borrowed. Connection objects carr
 a permanent symbol marker that the generic encoder rejects, so scripts return
 selected metadata such as `{id: connection.id}` instead of a live capability.
 No credentials, client lookup, default connection, or automatic helper-library
-selection is exposed. Global `fetch` is not installed.
+selection is exposed. Supplying connections does not enable global `fetch`.
 
 One host can bind several dispatchers. Each function permanently captures its
 dispatcher; borrowing the function does not retarget it. Bind handles from the
@@ -281,6 +281,63 @@ an error. The shared HTTP handles already meet this contract. Workers transfer
 only owned Go data; the VM goroutine settles Promises and decodes JSON. Late
 responses are closed without touching the VM. Worker panics and `Goexit` reject
 safely and log only fixed classifications and Go source locations, never payloads.
+
+## Optional direct HTTP
+
+`AsyncInput.DirectDispatch` enables global `fetch` only for an explicitly supplied
+direct client. It defaults to nil, leaving `fetch` undefined. Tools always leave
+it nil, and pure expressions have no HTTP host. Direct calls apply no connection
+credentials or connection-authentication recovery. Authored headers remain
+request data; a failed connection call never falls back to this client.
+
+For example, a caller can allow a script to read a public status endpoint:
+
+```javascript
+async function execute() {
+    const response = await fetch("https://status.example.test/summary");
+    return await response.json();
+}
+```
+
+Use `httpf.NewDirectClient` to capture attribution and reuse the existing HTTP
+middleware, then bind it to the same `aphttp.Session` as any connection handles:
+
+```go
+client, err := httpf.NewDirectClient(factory, httpf.DirectClientOptions{
+    Namespace: "root.jobs",
+    RequestType: httpf.RequestTypeGlobal,
+    Actor: nil, // Explicit background request without an initiating actor.
+    Labels: map[string]string{"job": "status-check"},
+})
+if err != nil {
+    return nil, err
+}
+direct, err := owner.Bind(client)
+if err != nil {
+    return nil, err
+}
+
+// Inside the existing Evaluate preparation callback, after registering the
+// same host's Close, Start, and Await callbacks:
+input.DirectDispatch = func(request *http.Request) (*aphttp.Response, error) {
+    response, _, err := direct.Do(request)
+    return response, err
+}
+return invocation.PrepareInput(runCtx, vm, input, limits, host)
+```
+
+Here `httpf` is `internal/httpf`, and `owner` is the caller-owned execution
+session. Its aggregate send evidence remains available even when JavaScript
+catches a failed request. The adapter captures namespace, request type, actor,
+and labels before execution; JavaScript cannot replace them. No default client
+is created when the capability is omitted.
+
+Direct and connection calls use one host and one HTTP session, sharing request
+count, decoded response bytes, pending workers, and deadline. They have the same
+Fetch subset and body-read behavior. A supplied direct dispatcher requires a
+host even when there are no connections. Initialization cannot dispatch through
+either path; cleanup cancels both, including late responses. The `labels` fetch
+option remains unsupported for direct requests.
 
 ## Copying JSON into the runtime
 

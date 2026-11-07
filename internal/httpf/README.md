@@ -3,6 +3,46 @@
 This package implements the HTTP client manager for AuthProxy. AuthProxy uses [Gentleman](https://github.com/h2non/gentleman)
 for HTTP clients, and this package automatically applies middleware based on the configuration for session proxy.
 
+## Direct HTTP clients
+
+`NewDirectClient` adapts a supplied factory to the shared HTTP execution budget
+in `internal/apjs/http`. It makes ordinary HTTP requests without connection
+credentials or authentication recovery. For example, a background job can use
+the existing instrumented factory with an explicit namespace and label snapshot:
+
+```go
+client, err := httpf.NewDirectClient(factory, httpf.DirectClientOptions{
+    Namespace: "root.jobs",
+    RequestType: httpf.RequestTypeGlobal,
+    Actor: nil, // Explicitly unattributed background work.
+    Labels: map[string]string{"job": "catalog-sync"},
+})
+if err != nil {
+    return err
+}
+handle, err := session.Bind(client) // session is an apjs/http.Session.
+```
+
+The caller supplies the factory and owns the shared session. Bind direct and
+connection clients to that same session to share its request/response limits,
+deadline, and send evidence. JavaScript callers can then supply the direct handle
+to the runtime's optional global fetch capability; constructing this client alone
+does not expose it to JavaScript.
+
+Construction clears inherited connection/connector attribution, actor labels,
+and per-connection policy while retaining the factory's middleware. The explicit
+actor and user labels are copied into the new client snapshot; protected `apxy/`
+labels cannot override the actor. Namespace and request type are required. A nil
+actor means no actor attribution; it does not infer one from a later request.
+The original factory and caller-owned clients remain unchanged.
+
+`Do` preserves authored headers, Host overrides, ordinary redirects, and the
+factory's logging/rate-limit/telemetry wrappers. A target 401 is returned normally
+without a credential retry. It uses `DoWithSendState` to collect redirect-aware
+target evidence and translates transport failures to safe shared classifications.
+It transfers every returned response body to the shared session, including when
+HTTP returns a response together with an error.
+
 ## Target-request send evidence
 
 The proxy uses `DoWithSendState` for streaming requests and

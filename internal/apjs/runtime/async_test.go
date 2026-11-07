@@ -398,6 +398,7 @@ func TestAsyncRejectsInvalidHostBindings(t *testing.T) {
 	for name, bindings := range map[string][]jsruntime.HostBinding{
 		"empty":                 {{Name: ""}},
 		"duplicate":             {{Name: "custom"}, {Name: "custom", PreserveEnumerable: true}},
+		"visible fetch":         {{Name: "fetch", PreserveEnumerable: true}},
 		"entry point":           {{Name: "execute"}},
 		"escaped spelling":      {{Name: `\u0066etch`}},
 		"multiple names":        {{Name: "one,two"}},
@@ -447,12 +448,10 @@ func TestAsyncReservesCustomNames(t *testing.T) {
 		require.Nil(t, program)
 	}
 
-	// With no declared host globals, the primitive does not invent a domain policy.
+	// The built-in fetch name stays reserved even when direct HTTP is disabled.
 	program, err := jsruntime.CompileAsync(`const fetch = 7; async function execute() { return fetch; }`, nil, nil, runtimeLimits())
-	require.NoError(t, err)
-	execute, err := program.Initialize(goja.New())
-	require.NoError(t, err)
-	require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
+	require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
+	require.Nil(t, program)
 }
 
 // TestAsyncNilLibraryAndInvalidArguments handles absent optional helpers and required runtime state.
