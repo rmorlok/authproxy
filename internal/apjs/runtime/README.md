@@ -1,9 +1,10 @@
 # Bounded JavaScript runtime primitives
 
-This package compiles pure JavaScript expressions and runs trusted Go adapters
-in fresh Goja VMs. It owns the execution deadline, stack limit, interrupt watcher,
-JSON input decoder, and bounded output encoder. Tool expressions delegate to the
-shared expression type; async Tool evaluation uses the lower-level primitives.
+This package compiles pure expressions and async JavaScript programs, validates
+initialization, and runs trusted Go adapters in fresh Goja VMs. It owns the
+execution deadline, stack limit, interrupt watcher, JSON conversion, and Promise
+rejection tracking. Tool expressions use the shared expression type; async Tool
+execution composes the shared compiler and runtime primitives.
 
 `CompileExpression` prepares one strict expression without running it. The
 compiled expression can serve concurrent calls, each with its own VM. For
@@ -68,8 +69,65 @@ choose bindings such as `params`, `response`, or aliases that share copied data.
 execution. Its callback returns a Goja value directly to the private output
 encoder. Use `Run` for bounded work with no output, such as initialization
 validation. These callbacks also own their input/source bounds and host setup;
-they must keep VM values inside the callback. Shared async APIs will be
-extracted separately.
+they must keep VM values inside the callback. Async invocation and host-completion
+orchestration remain in the Tool adapter for now.
+
+## Async compilation and initialization
+
+`CompileAsync` requires one top-level `async function execute(...)` declaration.
+It checks source without executing it. `Validate` then runs only initialization
+in a fresh bounded VM, without invocation inputs or I/O. For example:
+
+```go
+program, err := runtime.CompileAsync(`
+    const prefix = "item:";
+    async function execute(params, context) {
+        return prefix + params.id;
+    }
+`, nil, []runtime.HostBinding{
+    {Name: "fetch"},
+    {Name: "params", PreserveEnumerable: true},
+    {Name: "context", PreserveEnumerable: true},
+}, limits)
+if err != nil {
+    return err
+}
+return program.Validate(ctx)
+```
+
+This passes validation because `params.id` is read only when `execute` is called.
+Moving that read to top-level initialization would fail validation. Declaring
+`let fetch` would fail compilation because this caller reserved that global.
+
+The caller supplies the complete host binding policy, including names for
+capabilities that are disabled. The compiler copies the descriptors and rejects
+invalid, duplicate, or escaped names. `execute` belongs to the program and cannot
+be a host binding. Initialization makes each declared global nonwritable and
+nonconfigurable; absent values become `undefined`. Host bindings are normally
+non-enumerable. `PreserveEnumerable` retains an existing JSON alias's visibility
+without changing its identity. The Tool adapter supplies its existing host names
+and aliases through this same mechanism.
+
+The optional `CompiledLibrary` exposes `Source()` and `Run(vm)`. Its immutable
+source must describe the code it runs, and it must support concurrent use in
+distinct VMs. Combined program and library bytes share the source allowance.
+Helpers keep their existing compilation mode; the program itself is strict.
+Library declarations cannot claim host names or `execute`. Library errors are
+sanitized before returning to the caller.
+
+`Initialize(vm)` is a low-level integration point. It initializes helpers before
+the program, then checks that `execute` is still async. It returns a callable
+owned by that VM. Its caller must keep the runtime deadline active and gate I/O
+until initialization and its Promise microtasks have completed successfully.
+Use it inside `Run` or `EvaluateJSON`; retain no callable or value after cleanup.
+
+`PromiseTracker` records unhandled rejections without retaining private reasons.
+Install one before authored initialization and defer `Close`. Call
+`CheckRejections` after initialization, and `SettledResult` after the host has
+driven the root Promise to settlement or determined it cannot progress. Pending
+or rejected roots and unrelated unhandled rejections fail safely. The returned
+value stays inside the owning runtime for bounded conversion. `Validate` manages
+this lifecycle itself and never calls the entry point.
 
 ## Copying JSON into the runtime
 
@@ -100,8 +158,8 @@ under the same execution deadline.
 
 ## Limits and errors
 
-All limit fields must be positive. `CompileExpression` enforces source bytes;
-adapters that compile other program types enforce their own source cap. All
+All limit fields must be positive. `CompileExpression` and `CompileAsync` enforce
+source bytes; adapters that compile other program types enforce their own cap. All
 input adapters submit their complete batch with the effective JSON limits. The
 decoder enforces those byte/depth/node caps. The runtime enforces timeout, stack
 depth, and the final output's byte/depth/node limits. Input and output have

@@ -1,10 +1,9 @@
-package javascript
+package runtime
 
 import (
 	"testing"
 
 	"github.com/dop251/goja"
-	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,25 +17,25 @@ func TestPromiseTrackerSettledResults(t *testing.T) {
 	}{
 		"fulfilled":          {source: `Promise.resolve(4)`, want: 4},
 		"microtasks":         {source: `(async () => (await Promise.resolve(4)) + 3)()`, want: 7},
-		"root rejected":      {source: `Promise.reject("private reason")`, err: apjsruntime.ErrEvaluation},
-		"root stuck":         {source: `new Promise(() => {})`, err: apjsruntime.ErrEvaluation},
-		"detached rejection": {source: `Promise.reject("private reason"); Promise.resolve(4)`, err: apjsruntime.ErrEvaluation},
+		"root rejected":      {source: `Promise.reject("private reason")`, err: ErrEvaluation},
+		"root stuck":         {source: `new Promise(() => {})`, err: ErrEvaluation},
+		"detached rejection": {source: `Promise.reject("private reason"); Promise.resolve(4)`, err: ErrEvaluation},
 		"handled rejection":  {source: `Promise.reject("private reason").catch(() => {}); Promise.resolve(4)`, want: 4},
-		"partially handled":  {source: `Promise.reject("private").catch(() => {}); Promise.reject("another"); Promise.resolve(4)`, err: apjsruntime.ErrEvaluation},
+		"partially handled":  {source: `Promise.reject("private").catch(() => {}); Promise.reject("another"); Promise.resolve(4)`, err: ErrEvaluation},
 		"multiple handlers":  {source: `const rejected = Promise.reject("private"); rejected.catch(() => {}); rejected.catch(() => {}); Promise.resolve(4)`, want: 4},
 	} {
 		t.Run(name, func(t *testing.T) {
 			// Install tracking before authored code creates or rejects any promises.
 			vm := goja.New()
-			tracker := newPromiseTracker(vm)
-			defer tracker.close()
+			tracker := NewPromiseTracker(vm)
+			defer tracker.Close()
 			value, err := vm.RunString(test.source)
 			require.NoError(t, err)
 			root, ok := value.Export().(*goja.Promise)
 			require.True(t, ok)
 
 			// Only a fulfilled root with no outstanding unhandled failure succeeds.
-			value, err = tracker.settledResult(root)
+			value, err = tracker.SettledResult(root)
 			if test.err != nil {
 				require.ErrorIs(t, err, test.err)
 				require.Nil(t, value)

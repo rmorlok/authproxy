@@ -32,15 +32,15 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 	return evaluateJSON(ctx, p.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
 		// Match publication validation by tracking initialization as well as
 		// the entry point. Goja drains Promise microtasks before calls return.
-		tracker := newPromiseTracker(vm)
-		defer tracker.close()
+		tracker := apjsruntime.NewPromiseTracker(vm)
+		defer tracker.Close()
 
 		execute, err := p.Initialize(vm)
 		if err != nil {
 			return nil, err
 		}
 
-		if err := tracker.checkRejections(); err != nil {
+		if err := tracker.CheckRejections(); err != nil {
 			return nil, err
 		}
 
@@ -48,7 +48,7 @@ func (p *ToolProgram) Evaluate(ctx context.Context, input Input) (common.RawJSON
 		if err != nil {
 			return nil, err
 		}
-		return tracker.settledResult(root)
+		return tracker.SettledResult(root)
 	})
 }
 

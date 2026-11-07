@@ -114,7 +114,7 @@ func (l *fetchLoop) start(
 // may admit additional work; each settlement drains its Goja microtask queue.
 // We wait to check detached rejections until execution finishes, allowing a
 // handler to be installed after an awaited operation, as normal Promise code can.
-func (l *fetchLoop) settle(root *goja.Promise, tracker *promiseTracker) (goja.Value, error) {
+func (l *fetchLoop) settle(root *goja.Promise, tracker *apjsruntime.PromiseTracker) (goja.Value, error) {
 	for root.State() == goja.PromiseStatePending {
 		if len(l.pending) == 0 {
 			return nil, apjsruntime.ErrEvaluation
@@ -135,7 +135,7 @@ func (l *fetchLoop) settle(root *goja.Promise, tracker *promiseTracker) (goja.Va
 	// A caught fail-fast combinator or a winning race may leave siblings in
 	// flight. Root completion ends the Tool: deferred close cancels that work,
 	// and workers dispose late results without running more authored callbacks.
-	return tracker.settledResult(root)
+	return tracker.SettledResult(root)
 }
 
 // close cancels requests; the session's cancellation callbacks close received

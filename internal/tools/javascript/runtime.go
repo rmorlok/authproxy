@@ -26,12 +26,6 @@ func evaluateJSON(
 	return common.RawJSON(result), err
 }
 
-// withRuntime delegates no-result initialization validation to the shared
-// lifecycle. Tool compilation and host installation remain the caller's policy.
-func withRuntime(ctx context.Context, limits Limits, work func(context.Context, *goja.Runtime) error) error {
-	return apjsruntime.Run(ctx, limits, work)
-}
-
 // runtimeEvaluationError preserves the shared safe classifications for authored
 // failures while Tool-specific hosts continue to use this local adapter.
 func runtimeEvaluationError(err error) error {
