@@ -29,7 +29,7 @@ func responseTestSession(t *testing.T, decoded, stream int64) *Session {
 	return s
 }
 
-// responseTestPrepare supplies request cleanup that behaves like Session.Do.
+// responseTestPrepare supplies request cleanup that behaves like ClientHandle.Do.
 func responseTestPrepare(t *testing.T, s *Session, raw *http.Response) (*Response, *atomic.Int64) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(s.ctx)

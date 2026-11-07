@@ -11,7 +11,8 @@ This adapter supplies two AuthProxy-specific translations:
   execution state.
 
 The existing connection client still owns credentials, recovery, rate limiting,
-request events, and telemetry. This package does not select connections, check
+request events, and telemetry. Each Tool session binds that one client to its
+private shared budget owner. This package does not select connections, check
 permissions, render requests, validate schemas, or build Tool results.
 
 ## Use an admitted connection
@@ -102,7 +103,7 @@ returns the original upstream 401 response, and local rate limiting still
 returns a normal 429 response. See the
 [authentication error contract](../../auth_methods/README.md#error-contract).
 
-The embedded session retains `notSent`, `mayHaveSent`, and `sent` evidence.
+The shared session retains `notSent`, `mayHaveSent`, and `sent` evidence.
 `ExecutionState()` maps only `notSent` to the Tool state `notStarted`. Both a
 possible send and a confirmed target response map to `mayHaveExecuted`: neither
 proves that a multi-request Tool action finished successfully.

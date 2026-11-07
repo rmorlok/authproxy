@@ -38,13 +38,23 @@ func sessionTestLimits() aphttp.Limits {
 	return aphttp.Limits{Timeout: 30 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192, MaxStreamBytes: 8192, MaxHeaderBytes: 4096}
 }
 
-// sessionTestNew constructs an invocation and guarantees its timer is released.
-func sessionTestNew(t *testing.T, ctx context.Context, client aphttp.Client, limits aphttp.Limits) *aphttp.Session {
+// sessionTestBound keeps one owner and handle together for existing single-client
+// scenarios. Multi-client tests keep the shared owner and its handles explicit.
+type sessionTestBound struct {
+	*aphttp.Session
+	*aphttp.ClientHandle
+}
+
+// sessionTestNew creates one budget owner, binds its test client, and releases
+// the owner's timer after the scenario. Binding itself grants no new allowance.
+func sessionTestNew(t *testing.T, ctx context.Context, client aphttp.Client, limits aphttp.Limits) *sessionTestBound {
 	t.Helper()
-	session, err := aphttp.New(ctx, client, limits)
+	session, err := aphttp.New(ctx, limits)
 	require.NoError(t, err)
 	t.Cleanup(session.Close)
-	return session
+	handle, err := session.Bind(client)
+	require.NoError(t, err)
+	return &sessionTestBound{Session: session, ClientHandle: handle}
 }
 
 // sessionTestBody records ownership and detects eager response consumption.
@@ -98,7 +108,6 @@ func sessionTestWait(t *testing.T, done <-chan struct{}, cleanup func()) {
 // TestSessionConstructor requires a complete positive policy before creating an
 // invocation and keeps caller cancellation distinct from invalid arguments.
 func TestSessionConstructor(t *testing.T) {
-	client := &sessionTestClient{}
 	for _, test := range []struct {
 		name   string
 		change func(*aphttp.Limits)
@@ -114,23 +123,23 @@ func TestSessionConstructor(t *testing.T) {
 			// A zero or negative value cannot silently disable a guard.
 			limits := sessionTestLimits()
 			test.change(&limits)
-			session, err := aphttp.New(context.Background(), client, limits)
+			session, err := aphttp.New(context.Background(), limits)
 			require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 			require.Nil(t, session)
 		})
 	}
-	_, err := aphttp.New(nil, client, sessionTestLimits())
-	require.ErrorIs(t, err, aphttp.ErrInvalidInput)
-	_, err = aphttp.New(context.Background(), nil, sessionTestLimits())
+	_, err := aphttp.New(nil, sessionTestLimits())
 	require.ErrorIs(t, err, aphttp.ErrInvalidInput)
 
 	// No work starts when the admitted caller was already canceled.
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	session, err := aphttp.New(ctx, client, sessionTestLimits())
+	session, err := aphttp.New(ctx, sessionTestLimits())
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, session)
-	session = sessionTestNew(t, context.Background(), client, sessionTestLimits())
+	session, err = aphttp.New(context.Background(), sessionTestLimits())
+	require.NoError(t, err)
+	t.Cleanup(session.Close)
 	require.Equal(t, aphttp.SendStateNotSent, session.SendState())
 	require.NoError(t, session.Context().Err())
 	require.NoError(t, session.Err())
@@ -201,10 +210,10 @@ func TestSessionLocalRejectionOwnsRequestBody(t *testing.T) {
 	require.Equal(t, aphttp.SendStateMayHaveSent, session.SendState())
 }
 
-// TestSessionUnusableSessionOwnsRequestBody extends entry ownership to nil,
-// zero-valued, and already closed sessions without invoking the client.
-func TestSessionUnusableSessionOwnsRequestBody(t *testing.T) {
-	for _, session := range []*aphttp.Session{nil, {}} {
+// TestClientHandleUnusableOwnsRequestBody extends entry ownership to nil and
+// zero handles, and handles whose owner has closed, without invoking the client.
+func TestClientHandleUnusableOwnsRequestBody(t *testing.T) {
+	for _, session := range []*aphttp.ClientHandle{nil, {}} {
 		request, body := sessionTestRequest(context.Background())
 		response, state, err := session.Do(request)
 		require.ErrorIs(t, err, aphttp.ErrInvalidInput)
@@ -258,9 +267,7 @@ func TestSessionClientContract(t *testing.T) {
 		responseBodies = append(responseBodies, body)
 		return &http.Response{StatusCode: 201, Header: http.Header{"X-Upstream": {"first", "second"}}, Body: body}, nil
 	}}
-	session, err := aphttp.New(parent, client, sessionTestLimits())
-	require.NoError(t, err)
-	t.Cleanup(session.Close)
+	session := sessionTestNew(t, parent, client, sessionTestLimits())
 	require.Equal(t, "admitted identity", session.Context().Value(sessionTestIdentityKey{}))
 
 	// Each request retains its headers, host override, and replay capability.
