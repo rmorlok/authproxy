@@ -145,11 +145,11 @@ func TestToolEvaluateConcurrentRuntimes(t *testing.T) {
 
 // TestToolEvaluateNoHostIO keeps ordinary Tool execution separate from the HTTP adapter.
 func TestToolEvaluateNoHostIO(t *testing.T) {
-	program := compileTool(t, `async function execute() { return typeof fetch; }`, nil)
+	program := compileTool(t, `async function execute() { return {fetch: typeof fetch, connections: context.connections}; }`, nil)
 	input := javascript.Input{Context: expressionContext(t, render.Input{})}
 
 	// Loading Tool input alone must not install the connection's outbound capability.
-	require.JSONEq(t, `"undefined"`, string(evaluateTool(t, program, input)))
+	require.JSONEq(t, `{"fetch":"undefined","connections":[]}`, string(evaluateTool(t, program, input)))
 }
 
 // TestToolEvaluateInvalidInputs rejects incomplete invocation state before running authored code.

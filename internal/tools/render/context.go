@@ -41,6 +41,10 @@ type Input struct {
 	// value is omitted so templates that require it fail strict lookup.
 	ConnectionID string
 
+	// ConnectionName is the captured resource name exposed as connection.name;
+	// an empty value is omitted from the snapshot.
+	ConnectionName string
+
 	// ConnectionNamespace is the owning namespace exposed as connection.namespace;
 	// an empty value is omitted from the snapshot.
 	ConnectionNamespace string
@@ -117,6 +121,10 @@ func NewContext(input Input, limits Limits) (*Context, error) {
 	connection := map[string]any{}
 	if input.ConnectionID != "" {
 		connection["id"] = input.ConnectionID
+	}
+
+	if input.ConnectionName != "" {
+		connection["name"] = input.ConnectionName
 	}
 
 	if input.ConnectionNamespace != "" {

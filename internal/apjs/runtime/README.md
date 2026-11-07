@@ -138,28 +138,25 @@ program above, passing `{"id":"42"}` produces the JSON string `"item:42"`:
 return program.Evaluate(ctx, func(
     runCtx context.Context, vm *goja.Runtime, invocation *runtime.AsyncInvocation,
 ) error {
-    decoder, err := runtime.NewJSONDecoder(vm)
-    if err != nil {
-        return err
-    }
-    values, err := decoder.Decode(runCtx, runtime.JSONLimits{
-        MaxBytes: limits.MaxInputBytes,
-        MaxDepth: limits.MaxDepth,
-        MaxNodes: limits.MaxNodes,
-    }, json.RawMessage(`{"id":"42"}`), json.RawMessage(`{}`))
-    if err != nil {
-        return err
-    }
-    invocation.Params = values[0]
-    invocation.Context = values[1]
-    return nil
+    return invocation.PrepareInput(runCtx, vm, runtime.AsyncInput{
+        Params: json.RawMessage(`{"id":"42"}`),
+        Context: json.RawMessage(`{"job":"customer-sync"}`),
+    }, limits, nil)
 })
 ```
 
-The runtime adds no global aliases or context fields. An adapter can bind aliases
-to the same native values during preparation. Use `goja.Undefined()` for an
-argument that is not needed. Preparation is required and must bound all copied
-input, honor `runCtx`, and keep VM values inside this evaluation.
+`PrepareInput` accepts any JSON value for params and an object for extra context.
+Nil documents default to `{}`; nonnil empty or malformed documents fail. It adds
+`context.connections`, an empty array when no connections are supplied, and
+rejects caller JSON containing that reserved property. Params, extra context,
+and all connection snapshots share one byte/node allowance. Depth is checked
+with each supplied document's root at zero. Aliases refer to the resulting native
+objects without another copy or input charge.
+
+No global aliases are installed. Trusted adapters may bind them during
+preparation or use the lower-level `Params` and `Context` fields directly with
+their own bounded native input. Preparation must honor `runCtx` and keep VM
+values inside this evaluation.
 
 An adapter that supplies asynchronous hosts also fills three optional callbacks:
 
@@ -184,18 +181,19 @@ encoding share one deadline. Callers receive only detached JSON; failure or
 cancellation discards the result. Hosts return safe errors unchanged, while
 authored exceptions and rejection values remain private.
 
-## HTTP bindings
+## Supplied connections and HTTP
 
 `HTTPHost` supplies request conversion, native response objects, and the worker
-completion loop. It installs no globals and selects no clients. An adapter binds
-each fetch function to a trusted dispatcher using `BindFetch`, then chooses where
-JavaScript can access it. Creating a host alone gives JavaScript no HTTP access.
+completion loop. It installs no globals and selects no clients. `PrepareInput`
+uses it to bind each supplied connection's `fetch` method to the captured
+dispatcher. Creating a host alone gives JavaScript no HTTP access.
 
-For example, reserve a `customerFetch` binding when compiling this program:
+For example, compile this program with no host globals:
 
 ```javascript
-async function execute() {
-    const response = await customerFetch("https://api.example.test/customers/42");
+async function execute(params, context) {
+    const connection = context.connections.find(c => c.labels.region === "us");
+    const response = await connection.fetch(connection.cfg.apiHost + "/customers/" + params.id);
     const customer = await response.json();
     return { name: customer.name };
 }
@@ -208,8 +206,6 @@ Given an already-authorized `handle` from an
 result, err := program.Evaluate(ctx, func(
     runCtx context.Context, vm *goja.Runtime, invocation *runtime.AsyncInvocation,
 ) error {
-    invocation.Params = goja.Undefined()
-    invocation.Context = goja.Undefined()
     host, err := runtime.NewHTTPHost(runCtx, vm, runtime.HTTPOptions{
         MaxRequestBytes: 64 << 10,
         MaxPendingOperations: 8,
@@ -221,17 +217,19 @@ result, err := program.Evaluate(ctx, func(
     invocation.Close = host.Close
     invocation.Start = host.Start
     invocation.Await = host.Await
-    fetch, err := host.BindFetch(func(request *http.Request) (*aphttp.Response, error) {
-        response, _, err := handle.Do(request)
-        return response, err
-    })
-    if err != nil {
-        return err
-    }
-    if err := vm.Set("customerFetch", fetch); err != nil {
-        return runtime.ErrInvalidInput
-    }
-    return nil
+    return invocation.PrepareInput(runCtx, vm, runtime.AsyncInput{
+        Params: json.RawMessage(`{"id":"42"}`),
+        Connections: []runtime.ConnectionInput{{
+            Snapshot: json.RawMessage(`{
+                "id":"cxn_example", "name":"CRM", "namespace":"root.product.user1",
+                "cfg":{"apiHost":"https://api.example.test"}, "labels":{"region":"us"}
+            }`),
+            Dispatch: func(request *http.Request) (*aphttp.Response, error) {
+                response, _, err := handle.Do(request)
+                return response, err
+            },
+        }},
+    }, limits, host)
 })
 ```
 
@@ -243,6 +241,22 @@ JavaScript, and map its final error and send evidence into the caller's outcome.
 it does not close the session or its clients. Register cleanup immediately after
 construction, including when later preparation might fail.
 
+Connections preserve caller order; empty or duplicate IDs fail before authored
+code or I/O. Each snapshot accepts only `id`, `name`, `namespace`, `cfg`, `labels`,
+and `annotations`. Missing name/namespace become empty strings and missing
+objects become `{}`. Configuration must be an object; labels and annotations
+must contain string values. Explicit null objects are invalid.
+
+`context.connections`, its array membership, and each connection's top-level
+properties are read-only. Nested metadata remains mutable: changing
+`connection.cfg.apiHost` affects this VM's next authored URL but does not change
+stored configuration or the client's captured identity and attribution. The
+non-enumerable `fetch` method stays bound when borrowed. Connection objects carry
+a permanent symbol marker that the generic encoder rejects, so scripts return
+selected metadata such as `{id: connection.id}` instead of a live capability.
+No credentials, client lookup, default connection, or automatic helper-library
+selection is exposed. Global `fetch` is not installed.
+
 One host can bind several dispatchers. Each function permanently captures its
 dispatcher; borrowing the function does not retarget it. Bind handles from the
 same HTTP session so requests share its deadline, response-byte allowance, and
@@ -250,6 +264,8 @@ send evidence. Fetch calls and body reads across every binding also share the
 host's `MaxPendingOperations`. A refused read leaves `bodyUsed` false, allowing a
 retry after other work finishes. Nothing dispatches before `Start`, which the
 async evaluator calls only after initialization and its Promise jobs succeed.
+The lower-level `BindFetch` API remains available to trusted host adapters that
+own their native binding layout.
 
 Fetch accepts an absolute HTTP(S) URL and optional `method`, `headers`, and `body`.
 Headers are a string record; `Host` sets the request's host override. Bodies are

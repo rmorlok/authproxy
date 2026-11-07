@@ -11,7 +11,8 @@ import (
 )
 
 // FetchOptions supplies the already authorized connection and host-side policy.
-// No connection or credential object is exposed to JavaScript.
+// JavaScript receives only its copied metadata and a bound fetch capability,
+// never a live Go connection or credentials.
 type FetchOptions struct {
 	// Session belongs to this invocation. Its configured client fixes connection
 	// identity and attribution; it also owns cumulative HTTP budgets and send
@@ -33,10 +34,11 @@ type FetchOptions struct {
 	Logger *slog.Logger
 }
 
-// EvaluateWithHTTP evaluates a Tool with connection-bound fetch and bounded,
-// single-use response readers. The caller must authorize and validate the Tool
-// before transferring a session dedicated to this invocation. Validate and ordinary
-// Evaluate remain free of I/O. Fetch is unavailable during initialization.
+// EvaluateWithHTTP evaluates a Tool with exactly one entry in context.connections
+// and bounded, single-use response readers. The caller must authorize and validate
+// the Tool before transferring a session dedicated to this invocation. Validate
+// and ordinary Evaluate remain free of I/O. Connection fetch is unavailable during
+// initialization, and global fetch remains undefined throughout execution.
 //
 // All Goja access stays on the calling goroutine. HTTP workers exchange detached
 // Go data; evaluation cancels its requests and schedules unread-body cleanup on
@@ -89,9 +91,6 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	result, err := p.program.Evaluate(
 		parent,
 		func(runCtx context.Context, vm *goja.Runtime, invocation *apjsruntime.AsyncInvocation) error {
-			if err := p.prepareInvocation(runCtx, vm, invocation, input); err != nil {
-				return err
-			}
 			host, err := apjsruntime.NewHTTPHost(runCtx, vm, apjsruntime.HTTPOptions{
 				MaxRequestBytes:      options.MaxRequestBytes,
 				MaxPendingOperations: options.MaxPendingOperations,
@@ -106,14 +105,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 			invocation.Start = host.Start
 			invocation.Await = host.Await
 
-			fetch, err := host.BindFetch(options.Session.Do)
-			if err != nil {
-				return err
-			}
-			if err := vm.Set("fetch", fetch); err != nil {
-				return apjsruntime.ErrInvalidInput
-			}
-			return nil
+			return p.prepareInvocation(runCtx, vm, invocation, input, host, options.Session)
 		},
 	)
 	if contextErr := ctx.Err(); contextErr != nil {

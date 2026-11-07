@@ -19,33 +19,12 @@ func bindInput(
 	input Input,
 	limits Limits,
 ) error {
-	if ctx == nil || vm == nil || input.Context == nil {
+	if vm == nil {
 		return apjsruntime.ErrInvalidInput
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	response := input.Response
-	if response == nil {
-		response = []byte("{}")
-	}
-	if len(response) >= limits.MaxInputBytes {
-		return apjsruntime.ErrLimitExceeded
-	}
-
-	// Share the serialized byte allowance with snapshot encoding; the response
-	// consumes the same budget even when it contains only an empty object.
-	snapshot, err := input.Context.SnapshotJSON(ctx, render.Limits{
-		MaxBytes: limits.MaxInputBytes - len(response),
-		MaxDepth: limits.MaxDepth,
-		MaxSteps: limits.MaxNodes,
-	})
+	snapshot, response, err := inputJSON(ctx, input, limits)
 	if err != nil {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		return apjsruntime.ErrLimitExceeded
+		return err
 	}
 
 	// The shared decoder charges both documents before constructing native
@@ -105,15 +84,71 @@ func bindInput(
 		}
 	}
 
-	// Each alias is the identical native object stored in context, not a new
-	// wrapper or copy. No Go map, slice, struct, or function enters the VM.
+	if err := bindToolGlobals(
+		vm,
+		rootObject.Get("params"),
+		contextObject,
+		responseValue,
+	); err != nil {
+		return err
+	}
+	return ctx.Err()
+}
+
+// inputJSON bounds snapshot serialization before allocating raw JSON fields for
+// either the expression or async input adapter. The response and snapshot share
+// this byte allowance; the subsequent decoder bounds their combined traversal.
+func inputJSON(
+	ctx context.Context,
+	input Input,
+	limits Limits,
+) (json.RawMessage, json.RawMessage, error) {
+	if ctx == nil || input.Context == nil {
+		return nil, nil, apjsruntime.ErrInvalidInput
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	response := input.Response
+	if response == nil {
+		response = []byte("{}")
+	}
+
+	if len(response) >= limits.MaxInputBytes {
+		return nil, nil, apjsruntime.ErrLimitExceeded
+	}
+
+	snapshot, err := input.Context.SnapshotJSON(ctx, render.Limits{
+		MaxBytes: limits.MaxInputBytes - len(response),
+		MaxDepth: limits.MaxDepth,
+		MaxSteps: limits.MaxNodes,
+	})
+	if err != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, apjsruntime.ErrLimitExceeded
+	}
+
+	return json.RawMessage(snapshot), json.RawMessage(response), nil
+}
+
+// bindToolGlobals installs protected aliases to already copied native values.
+// Aliases share their context objects and incur no second input copy or charge.
+func bindToolGlobals(
+	vm *goja.Runtime,
+	params goja.Value,
+	contextObject *goja.Object,
+	response *goja.Object,
+) error {
 	globals := []struct {
 		name  string
 		value goja.Value
 	}{
-		{"params", rootObject.Get("params")},
+		{"params", params},
 		{"context", contextObject},
-		{"response", responseValue},
+		{"response", response},
 		{"cfg", contextObject.Get("cfg")},
 		{"labels", contextObject.Get("labels")},
 		{"annotations", contextObject.Get("annotations")},
@@ -123,13 +158,13 @@ func bindInput(
 		if err := vm.GlobalObject().DefineDataProperty(
 			global.name,
 			global.value,
-			goja.FLAG_FALSE,
-			goja.FLAG_FALSE,
-			goja.FLAG_TRUE,
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_TRUE,  // enumerable
 		); err != nil {
 			return apjsruntime.ErrInvalidInput
 		}
 	}
 
-	return ctx.Err()
+	return nil
 }
