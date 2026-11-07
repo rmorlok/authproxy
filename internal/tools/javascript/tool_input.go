@@ -26,6 +26,7 @@ func (p *ToolProgram) prepareInvocation(
 	if (host == nil) != (session == nil) {
 		return apjsruntime.ErrInvalidInput
 	}
+
 	snapshot, response, err := inputJSON(ctx, input, p.limits)
 	if err != nil {
 		return err
@@ -37,7 +38,15 @@ func (p *ToolProgram) prepareInvocation(
 	if err := json.Unmarshal(snapshot, &scopes); err != nil {
 		return apjsruntime.ErrInvalidInput
 	}
-	for _, name := range []string{"params", "cfg", "labels", "annotations", "connection", "tool"} {
+
+	for _, name := range []string{
+		"params",
+		"cfg",
+		"labels",
+		"annotations",
+		"connection",
+		"tool",
+	} {
 		if len(scopes[name]) == 0 {
 			return apjsruntime.ErrInvalidInput
 		}

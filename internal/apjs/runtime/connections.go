@@ -67,18 +67,24 @@ func (i *AsyncInvocation) PrepareInput(
 	limits Limits,
 	host *HTTPHost,
 ) error {
-	if i == nil || ctx == nil || vm == nil || limits.Validate() != nil ||
-		(len(input.Connections) != 0 && host == nil) || (host != nil && host.vm != vm) {
+	if i == nil ||
+		ctx == nil ||
+		vm == nil ||
+		limits.Validate() != nil ||
+		(len(input.Connections) != 0 && host == nil) ||
+		(host != nil && host.vm != vm) {
 		return ErrInvalidInput
 	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	// Every document consumes at least one node. Bound the document slice before
 	// allocating it, including the two default argument/context roots.
 	if limits.MaxNodes < 2 || len(input.Connections) > limits.MaxNodes-2 {
 		return ErrLimitExceeded
 	}
+
 	documents := make([]json.RawMessage, 2, 2+len(input.Connections))
 	documents[0], documents[1] = input.Params, input.Context
 	for index := range documents {
@@ -86,6 +92,7 @@ func (i *AsyncInvocation) PrepareInput(
 			documents[index] = json.RawMessage(`{}`)
 		}
 	}
+
 	for _, connection := range input.Connections {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -95,22 +102,30 @@ func (i *AsyncInvocation) PrepareInput(
 		}
 		documents = append(documents, connection.Snapshot)
 	}
+
 	decoder, err := NewJSONDecoder(vm)
 	if err != nil {
 		return err
 	}
-	values, err := decoder.Decode(ctx, JSONLimits{
-		MaxBytes: limits.MaxInputBytes,
-		MaxDepth: limits.MaxDepth,
-		MaxNodes: limits.MaxNodes,
-	}, documents...)
+
+	values, err := decoder.Decode(
+		ctx,
+		JSONLimits{
+			MaxBytes: limits.MaxInputBytes,
+			MaxDepth: limits.MaxDepth,
+			MaxNodes: limits.MaxNodes,
+		},
+		documents...,
+	)
 	if err != nil {
 		return err
 	}
+
 	contextObject, ok := inputObject(values[1])
 	if !ok {
 		return ErrInvalidInput
 	}
+
 	for _, key := range contextObject.GetOwnPropertyNames() {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -128,53 +143,83 @@ func (i *AsyncInvocation) PrepareInput(
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+
 		connection, err := connectionSnapshot(ctx, vm, values[index+2])
 		if err != nil {
 			return err
 		}
+
 		id := connection.Get("id").String()
 		if seen[id] {
 			return ErrInvalidInput
 		}
+
 		seen[id] = true
 		connections[index] = connection
 	}
-	freeze, ok := goja.AssertFunction(vm.Get("Object").ToObject(vm).Get("freeze"))
+
+	freeze, ok := goja.AssertFunction(
+		vm.Get("Object").
+			ToObject(vm).
+			Get("freeze"),
+	)
 	if !ok {
 		return ErrInvalidInput
 	}
+
 	array := vm.NewArray()
 	for index, connection := range connections {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+
 		fetch, err := host.BindFetch(input.Connections[index].Dispatch)
 		if err != nil {
 			return err
 		}
-		if err := connection.DefineDataProperty("fetch", vm.ToValue(fetch), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+
+		if err := connection.DefineDataProperty(
+			"fetch",
+			vm.ToValue(fetch),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
-		if err := connection.DefineDataPropertySymbol(connectionBrand, vm.ToValue(true), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := connection.DefineDataPropertySymbol(
+			connectionBrand,
+			vm.ToValue(true),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
+
 		if _, err := freeze(goja.Undefined(), connection); err != nil {
 			return ErrInvalidInput
 		}
+
 		if err := array.Set(vm.ToValue(index).String(), connection); err != nil {
 			return ErrInvalidInput
 		}
 	}
+
 	if _, err := freeze(goja.Undefined(), array); err != nil {
 		return ErrInvalidInput
 	}
+
 	if err := contextObject.DefineDataProperty("connections", array, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE); err != nil {
 		return ErrInvalidInput
 	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	i.Params, i.Context = values[0], contextObject
+
 	return nil
 }
 
@@ -193,24 +238,39 @@ func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value)
 	if !ok {
 		return nil, ErrInvalidInput
 	}
+
 	for _, key := range object.GetOwnPropertyNames() {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		switch key {
-		case "id", "name", "namespace", "cfg", "labels", "annotations":
+		case "id",
+			"name",
+			"namespace",
+			"cfg",
+			"labels",
+			"annotations":
 		default:
 			return nil, ErrInvalidInput
 		}
 	}
+
 	id, ok := object.Get("id").(goja.String)
 	if !ok || id.Length() == 0 {
 		return nil, ErrInvalidInput
 	}
-	for _, key := range []string{"name", "namespace", "cfg", "labels", "annotations"} {
+
+	for _, key := range []string{
+		"name",
+		"namespace",
+		"cfg",
+		"labels",
+		"annotations",
+	} {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
+
 		value := object.Get(key)
 		if value == nil {
 			if key == "name" || key == "namespace" {
@@ -222,16 +282,19 @@ func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value)
 				return nil, ErrInvalidInput
 			}
 		}
+
 		if key == "name" || key == "namespace" {
 			if _, ok := value.(goja.String); !ok {
 				return nil, ErrInvalidInput
 			}
 			continue
 		}
+
 		metadata, ok := inputObject(value)
 		if !ok {
 			return nil, ErrInvalidInput
 		}
+
 		if key != "cfg" {
 			for _, label := range metadata.GetOwnPropertyNames() {
 				if err := ctx.Err(); err != nil {
@@ -243,5 +306,6 @@ func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value)
 			}
 		}
 	}
+
 	return object, nil
 }
