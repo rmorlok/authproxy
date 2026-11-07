@@ -1,7 +1,7 @@
 # Bounded HTTP execution
 
-This package sends prepared requests through a supplied client with one timeout,
-logical request allowance, and aggregate decoded response allowance. It owns
+This package sends prepared requests through supplied clients with one timeout,
+logical request allowance, and aggregate decoded response allowance per execution. It owns
 request accounting, response decoding, body cleanup, and target-send evidence.
 It has no JavaScript, connection lookup, authorization, or Tool result logic.
 
@@ -11,7 +11,7 @@ helper performs the read through an already configured `Client`:
 
 ```go
 func readAccount(ctx context.Context, client aphttp.Client) ([]byte, error) {
-    session, err := aphttp.New(ctx, client, aphttp.Limits{
+    session, err := aphttp.New(ctx, aphttp.Limits{
         Timeout:          30 * time.Second,
         MaxRequests:      3,
         MaxResponseBytes: 2 * 1024 * 1024,
@@ -23,6 +23,10 @@ func readAccount(ctx context.Context, client aphttp.Client) ([]byte, error) {
     }
     defer session.Close()
 
+    bound, err := session.Bind(client)
+    if err != nil {
+        return nil, err
+    }
     request, err := http.NewRequestWithContext(
         session.Context(), http.MethodGet,
         "https://api.example.test/account", nil,
@@ -30,7 +34,7 @@ func readAccount(ctx context.Context, client aphttp.Client) ([]byte, error) {
     if err != nil {
         return nil, err
     }
-    response, _, err := session.Do(request)
+    response, _, err := bound.Do(request)
     if err != nil {
         return nil, err
     }
@@ -51,12 +55,36 @@ Here `aphttp` is `github.com/rmorlok/authproxy/internal/apjs/http`; `http` is
 policy and admits the client before constructing a session. The
 [Tool adapter](../../tools/httphost/README.md) supplies configured AuthProxy
 clients without importing their authentication or instrumentation into this
-package. A session currently captures one client; concurrent calls through it
-share all allowances.
+package. The session owns the budget; each `ClientHandle` returned by `Bind`
+permanently captures one client and that owner. There is no default client or
+client lookup from request data.
 
 Callers reporting partial effects can capture the second return value from
-`Session.Do`: it describes that call's target-send evidence, including on error.
+`ClientHandle.Do`: it describes that call's target-send evidence, including on error.
 The session also retains aggregate evidence across calls.
+
+## Binding several clients
+
+Create the owner once, then call `session.Bind(crmClient)` and
+`session.Bind(billingClient)` with clients already admitted by the caller.
+Send requests through each returned handle's `Do` method. Both clients keep their
+own authentication and attribution, while their calls use the same session
+context, deadline, allowances, and aggregate evidence.
+
+For a session with `MaxRequests: 2`:
+
+| Call | Remaining requests |
+| --- | --- |
+| CRM client rejects a call before target I/O. | 1: the logical handoff still counts. |
+| Billing client returns a response. | 0: both clients spend the same allowance. |
+| A newly bound handle attempts another request. | Rejected with `ErrRequestLimit`; no client call occurs. |
+
+Binding performs no I/O and grants no fresh allowance. Binding an ended or
+exhausted owner is permitted, but its handles reject dispatch under that same
+policy. A handle cannot be retargeted or moved to another owner; copying it or
+borrowing its `Do` method keeps the original binding. Handles have no independent
+close operation. Close the owner to cancel requests and reads across all clients.
+A session with no handles is valid and makes no requests.
 
 ## Client and ownership contracts
 
@@ -68,7 +96,7 @@ authentication, destination/Host handling, attribution, and instrumentation stay
 with the supplied client. Clients may be reused across sessions and must support
 concurrent calls. Closing a session never closes or reconfigures the client.
 
-`Session.Do` owns the request body on entry, including local rejection. After
+`ClientHandle.Do` owns the request body on entry, including local rejection. After
 handoff, the client owns the body and any replay readers supplied by `GetBody`.
 Every returned raw response body transfers from the client to the session,
 including responses returned alongside an error. The session either closes it
@@ -132,8 +160,8 @@ private cause. It never infers that category from error text or status codes.
 Other client errors become `ErrTransport`, unless caller or session cancellation
 takes precedence. HTTP error statuses remain normal responses.
 
-`Session.Do` returns evidence for that call even on failure. `Session.SendState()`
-reports evidence across all calls:
+`ClientHandle.Do` returns evidence for that call even on failure. `Session.SendState()`
+reports evidence across all handles and calls:
 
 | State | Meaning |
 | --- | --- |

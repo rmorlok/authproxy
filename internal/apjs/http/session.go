@@ -5,7 +5,6 @@ package http
 import (
 	"context"
 	"errors"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -53,14 +52,11 @@ type Limits struct {
 	MaxHeaderBytes int
 }
 
-// Session applies an execution budget to one supplied client.
-// Concurrent calls share the same allowances. Close it when the invocation
+// Session owns one execution budget across all clients bound through Bind.
+// Concurrent calls through every handle share the same allowances. Close it when the invocation
 // ends, and close every returned response body, even when discarding a status.
 // Its zero value is not usable; create sessions with New.
 type Session struct {
-	// client fixes the outbound capability and attribution supplied by the caller.
-	client Client
-
 	// parent preserves caller cancellation separately from policy expiration.
 	parent context.Context
 
@@ -99,18 +95,14 @@ type Session struct {
 	responseExceeded bool
 }
 
-// New captures an already admitted client and starts the execution timeout.
-// Authorization, configuration snapshots, attribution, and policy resolution
-// belong to the caller. The session neither reconfigures nor closes the client.
-func New(
-	ctx context.Context,
-	client Client,
-	limits Limits,
-) (*Session, error) {
-	return NewWithDeadline(ctx, client, limits, time.Time{})
+// New starts an execution timeout and owns its shared HTTP allowances. It
+// installs no default client. Bind already admitted clients before dispatch;
+// authorization, snapshots, attribution, and policy resolution belong to callers.
+func New(ctx context.Context, limits Limits) (*Session, error) {
+	return NewWithDeadline(ctx, limits, time.Time{})
 }
 
-// NewWithDeadline starts a session with New's configured client and policy,
+// NewWithDeadline starts a session with New's shared execution policy,
 // additionally honoring an absolute policy deadline captured during admission.
 // A zero deadline adds no restriction. An earlier deadline includes preparation
 // time in the shared allowance; a later one cannot extend limits.Timeout or a
@@ -118,12 +110,10 @@ func New(
 // retains its original context error, even when both restrict the session.
 func NewWithDeadline(
 	ctx context.Context,
-	client Client,
 	limits Limits,
 	deadline time.Time,
 ) (*Session, error) {
 	if ctx == nil ||
-		client == nil ||
 		limits.Timeout <= 0 ||
 		limits.MaxRequests <= 0 ||
 		limits.MaxResponseBytes <= 0 ||
@@ -153,7 +143,6 @@ func NewWithDeadline(
 	run, cancel := context.WithCancelCause(timed)
 
 	return &Session{
-		client:    client,
 		parent:    ctx,
 		ctx:       run,
 		cancel:    cancel,
@@ -161,6 +150,21 @@ func NewWithDeadline(
 		limits:    limits,
 		sendState: SendStateNotSent,
 	}, nil
+}
+
+// Bind captures a client already selected and authorized by the caller. Binding
+// performs no I/O and adds no time, request, or response allowance. The client
+// remains caller-owned and can be supplied to a different session independently.
+//
+// Nil clients and uninitialized owners return ErrInvalidInput. Binding to a
+// closed, canceled, or exhausted owner is permitted: the handle's Do rejects
+// under that same owner's policy. This also preserves an earlier policy deadline
+// that expired during preparation, without starting a new timer at binding time.
+func (s *Session) Bind(client Client) (*ClientHandle, error) {
+	if s == nil || s.ctx == nil || client == nil {
+		return nil, ErrInvalidInput
+	}
+	return &ClientHandle{session: s, client: client}, nil
 }
 
 // Context supplies the shared execution deadline and caller context values to
@@ -173,7 +177,7 @@ func (s *Session) Context() context.Context { return s.ctx }
 func (s *Session) Err() error { return s.contextError(s.ctx) }
 
 // Close cancels outstanding I/O and releases the invocation timer. It is safe
-// to call repeatedly or concurrently with Do and response body reads.
+// to call repeatedly or concurrently with handle calls and response body reads.
 func (s *Session) Close() {
 	s.cancel(ErrClosed)
 	s.stopTimer()
@@ -200,101 +204,6 @@ func (s *Session) SendState() SendState {
 		return SendStateMayHaveSent
 	}
 	return s.sendState
-}
-
-// Do transfers ownership of req.Body on entry, including local rejection. It
-// returns headers before consuming the response body. The caller must close
-// that body and must handle read errors before using a complete response. The
-// returned evidence covers this call even on error; local rejection is known
-// unsent. SendState reports the aggregate across calls.
-//
-// The session context supplies caller values; req.Context additionally restricts
-// cancellation and deadline, without replacing those values. Host overrides,
-// GetBody replay, authentication, and instrumentation retain the supplied client
-// behavior. This host adds no retries.
-func (s *Session) Do(req *http.Request) (*Response, SendState, error) {
-	transferred := false
-	defer func() {
-		if !transferred && req != nil && req.Body != nil {
-			_ = req.Body.Close()
-		}
-	}()
-
-	if s == nil ||
-		s.ctx == nil ||
-		req == nil ||
-		req.URL == nil ||
-		(req.URL.Scheme != "http" && req.URL.Scheme != "https") ||
-		req.URL.Host == "" ||
-		req.URL.Opaque != "" ||
-		req.URL.Fragment != "" ||
-		req.RequestURI != "" {
-		return nil, SendStateNotSent, ErrInvalidInput
-	}
-
-	base, stopDeadline := s.ctx, func() {}
-	if deadline, ok := req.Context().Deadline(); ok {
-		if current, hasDeadline := base.Deadline(); !hasDeadline || deadline.Before(current) {
-			// Preserve the earlier deadline for transports and authentication
-			// helpers that inspect Deadline rather than only waiting on Done.
-			base, stopDeadline = context.WithDeadline(base, deadline)
-		}
-	}
-
-	ctx, cancel := context.WithCancelCause(base)
-	stopRequest := context.AfterFunc(req.Context(), func() { cancel(req.Context().Err()) })
-
-	// AfterFunc is asynchronous, so an already-canceled request must also be
-	// rejected synchronously before it can consume a request or reach the client.
-	if err := req.Context().Err(); err != nil {
-		cancel(err)
-	}
-	cleanup := func() { stopRequest(); cancel(context.Canceled); stopDeadline() }
-
-	retained := false
-	defer func() {
-		if !retained {
-			cleanup()
-		}
-	}()
-	if err := s.beginRequest(ctx); err != nil {
-		return nil, SendStateNotSent, err
-	}
-	// Always balance the in-flight count, including when caller code recovers
-	// a client or middleware panic. Until Do returns, its evidence is unknown.
-	state := SendStateMayHaveSent
-	defer func() { s.finishRequest(state) }()
-
-	transferred = true
-	// Adapters collect target evidence across their complete logical call,
-	// including recovery and redirects. Missing or invalid reports stay uncertain.
-	raw, reported, err := s.client.Do(req.WithContext(ctx))
-	state = normalizeSendState(reported)
-	if err != nil {
-		if raw != nil && raw.Body != nil {
-			_ = raw.Body.Close()
-		}
-
-		if contextErr := s.contextError(ctx); contextErr != nil {
-			return nil, state, contextErr
-		}
-
-		// Trust only the source's explicit classification, never an error's
-		// text or HTTP status. Keep private causes out of the execution boundary;
-		// cumulative send evidence independently describes possible effects.
-		if errors.Is(err, ErrCredentialsUnavailable) {
-			return nil, state, ErrCredentialsUnavailable
-		}
-
-		return nil, state, ErrTransport
-	}
-
-	// Response preparation owns cleanup on failure and transfers it to the
-	// returned body on success.
-	retained = true
-
-	response, err := s.prepareResponse(ctx, raw, req.Method, cleanup)
-	return response, state, err
 }
 
 // beginRequest reserves one logical call immediately before client handoff.

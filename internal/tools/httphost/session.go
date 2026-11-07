@@ -16,12 +16,16 @@ import (
 )
 
 // Session supplies Tool execution-state interpretation around the shared HTTP
-// budget and response owner. The embedded session owns all request accounting,
+// budget and response owner. The shared session owns all request accounting,
 // cancellation, and response decoding. Create sessions with New; the zero value
 // admits no requests. Concurrent calls share one invocation allowance.
 type Session struct {
-	// Session owns the shared HTTP lifecycle, not the configured client's lifetime.
-	*aphttp.Session
+	// session owns the shared HTTP lifecycle, not the configured client's lifetime.
+	// Keep it private so the budget owner cannot diverge from client's captured owner.
+	session *aphttp.Session
+
+	// client pins the Tool's only admitted connection to the shared budget owner.
+	client *aphttp.ClientHandle
 }
 
 // New captures the already admitted connection client and starts the invocation
@@ -40,33 +44,50 @@ func NewWithDeadline(ctx context.Context, client iface.HTTPClient, limits aphttp
 	if client == nil {
 		return nil, aphttp.ErrInvalidInput
 	}
-	session, err := aphttp.NewWithDeadline(ctx, configuredClient{client: client}, limits, deadline)
+	session, err := aphttp.NewWithDeadline(ctx, limits, deadline)
 	if err != nil {
 		return nil, err
 	}
-	return &Session{Session: session}, nil
+	bound, err := session.Bind(configuredClient{client: client})
+	if err != nil {
+		session.Close()
+		return nil, err
+	}
+	return &Session{session: session, client: bound}, nil
 }
 
 // Context returns the invocation's deadline and identity context. An
 // uninitialized adapter has no context and can be rejected before ownership
 // transfer, matching the shared session's zero-value admission behavior.
 func (s *Session) Context() context.Context {
-	if s == nil || s.Session == nil {
+	if s == nil || s.session == nil {
 		return nil
 	}
-	return s.Session.Context()
+	return s.session.Context()
 }
+
+// Err distinguishes caller cancellation from the shared owner's policy failures.
+// The session must have been constructed successfully.
+func (s *Session) Err() error { return s.session.Err() }
+
+// Close cancels the Tool's shared owner and releases its timer without closing
+// the configured client. It is idempotent for a successfully constructed session.
+func (s *Session) Close() { s.session.Close() }
+
+// SendState returns the shared owner's cumulative target-send evidence. It does
+// not imply completion of the Tool action; use ExecutionState for the Tool mapping.
+func (s *Session) SendState() aphttp.SendState { return s.session.SendState() }
 
 // Do retains the Tool caller's response/error contract while the shared session
 // collects per-call and aggregate send evidence. It owns req.Body even when
 // validation rejects the call, and transfers every successful response body to
 // the caller. The configured client retains credential recovery and attribution.
 func (s *Session) Do(req *http.Request) (*aphttp.Response, error) {
-	var shared *aphttp.Session
+	var client *aphttp.ClientHandle
 	if s != nil {
-		shared = s.Session
+		client = s.client
 	}
-	response, _, err := shared.Do(req)
+	response, _, err := client.Do(req)
 	return response, err
 }
 
@@ -76,7 +97,7 @@ func (s *Session) Do(req *http.Request) (*aphttp.Response, error) {
 // Pending calls remain provisional: callers returning before they finish must
 // retain the conservative snapshot rather than revise it from late evidence.
 func (s *Session) ExecutionState() api.ToolExecutionState {
-	if s == nil || s.Session == nil || s.Session.SendState() == aphttp.SendStateNotSent {
+	if s == nil || s.session == nil || s.session.SendState() == aphttp.SendStateNotSent {
 		return api.ToolExecutionStateNotStarted
 	}
 	return api.ToolExecutionStateMayHaveExecuted
