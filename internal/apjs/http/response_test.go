@@ -1,4 +1,4 @@
-package httphost
+package http
 
 import (
 	"bytes"
