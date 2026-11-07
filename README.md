@@ -56,6 +56,8 @@ Start at the [AuthProxy demo](https://demo.authproxy.net/). The sign-in page is
 a small stand-in for an application that embeds AuthProxy. Choose an example
 identity, then open either the Marketplace or Admin UI.
 
+[![2026-11-07.png](docs/screenshots/demo-home/2026-11-07.png)](https://demo.authproxy.net/)
+
 The demo shell signs a short-lived, one-time JWT for the selected actor and
 redirects the browser to AuthProxy. AuthProxy verifies the token and establishes
 the UI session. In a real integration, your application performs this handoff
@@ -80,7 +82,7 @@ enter real credentials or private data.
 
 ### Connector Marketplace
 
-![Create a connection in the AuthProxy Marketplace](docs/src/content/docs/images/marketplace-connect.gif)
+![Create a connection in the AuthProxy Marketplace](docs/screenshots/marketplace-walkthrough/2026-11-07.gif)
 
 The [Marketplace](https://marketplace.demo.authproxy.net/) shows how users
 discover and manage integrations inside a host application. The demo catalog
@@ -101,7 +103,7 @@ access to a real Google, GitHub, or other provider account.
 
 ### Administration and observability
 
-![Manage AuthProxy through the Admin UI](docs/src/content/docs/images/admin-walkthrough.gif)
+![Manage AuthProxy through the Admin UI](docs/screenshots/admin-walkthrough/2026-11-07.gif)
 
 The [Admin UI](https://admin.demo.authproxy.net/) lets operators inspect
 namespaces, actors, connectors, connections, requests, tasks, encryption keys,
