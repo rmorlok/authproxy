@@ -10,6 +10,7 @@ import (
 // BindFetch returns a native fetch function permanently bound to dispatch. It
 // installs no JavaScript global; an adapter chooses where to expose the function.
 // All bindings share this host's initialization gate and pending-worker allowance.
+// This ordinary fetch binding rejects the connection-specific labels option.
 // A nil dispatcher returns ErrInvalidInput.
 //
 // Dispatch is trusted Go integration code running off the VM goroutine. It must
@@ -26,15 +27,38 @@ func (l *HTTPHost) BindFetch(
 	if dispatch == nil {
 		return nil, ErrInvalidInput
 	}
+
+	direct := func(req *http.Request, _ map[string]string) (*aphttp.Response, error) {
+		return dispatch(req)
+	}
+
 	return func(call goja.FunctionCall) goja.Value {
-		return l.fetch(dispatch, call)
+		return l.fetch(direct, nil, call)
+	}, nil
+}
+
+// BindConnectionFetch binds a connection capability with optional per-request
+// labels. Validation runs before worker admission; only detached requests/maps
+// reach DoWithLabels. Unlike direct BindFetch, every connection binding supports
+// labels without a separate enable flag. Initialization still refuses all I/O.
+func (l *HTTPHost) BindConnectionFetch(dispatcher ConnectionDispatcher) (func(goja.FunctionCall) goja.Value, error) {
+	if dispatcher == nil {
+		return nil, ErrInvalidInput
+	}
+
+	return func(call goja.FunctionCall) goja.Value {
+		return l.fetch(dispatcher.DoWithLabels, dispatcher.ValidateLabels, call)
 	}, nil
 }
 
 // fetch validates and detaches authored request values on the VM goroutine.
 // Even malformed input becomes a rejected Promise, with no private exception
 // text. No worker is launched before initialization and admission complete.
-func (l *HTTPHost) fetch(dispatch func(*http.Request) (*aphttp.Response, error), call goja.FunctionCall) goja.Value {
+func (l *HTTPHost) fetch(
+	dispatch func(*http.Request, map[string]string) (*aphttp.Response, error),
+	validateLabels func(map[string]string) error,
+	call goja.FunctionCall,
+) goja.Value {
 	if !l.enabled {
 		return l.rejected(ErrEvaluation)
 	}
@@ -43,22 +67,36 @@ func (l *HTTPHost) fetch(dispatch func(*http.Request) (*aphttp.Response, error),
 	}
 
 	var req *http.Request
+	var labels map[string]string
 	var err error
+
 	if exception := l.vm.Try(func() {
-		req, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes)
+		req, labels, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes, validateLabels != nil)
 	}); exception != nil {
 		return l.rejected(ErrInvalidInput)
-
 	}
+
 	if err != nil {
 		return l.rejected(err)
+	}
+	if validateLabels != nil {
+		if err := validateLabels(labels); err != nil {
+			if req.Body != nil {
+				_ = req.Body.Close()
+			}
+
+			return l.rejected(ErrInvalidInput)
+		}
 	}
 
 	// The worker captures only the dispatcher and detached request, never l or VM
 	// values. It can finish safely even after evaluation has disposed its runtime.
 	promise, admitted := l.start(func() fetchCompletion {
-		response, err := dispatch(req)
-		return fetchCompletion{response: response, err: err}
+		response, err := dispatch(req, labels)
+		return fetchCompletion{
+			response: response,
+			err:      err,
+		}
 	}, func(done fetchCompletion) (goja.Value, error) {
 		if done.err != nil {
 			return nil, done.err

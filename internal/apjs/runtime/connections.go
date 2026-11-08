@@ -33,6 +33,23 @@ type AsyncInput struct {
 	DirectDispatch func(*http.Request) (*aphttp.Response, error)
 }
 
+// ConnectionDispatcher supplies an already admitted connection's HTTP capability
+// and request-label policy. Its implementation belongs to the domain adapter so
+// the runtime does not import connection models or label-schema packages. It must
+// support concurrent requests; validation may overlap earlier dispatch workers.
+type ConnectionDispatcher interface {
+	// ValidateLabels runs on the VM owner before launching a worker. It must
+	// reject malformed/protected labels, perform no I/O, and neither mutate nor
+	// retain the detached map. Errors become fixed invalid-input rejections.
+	ValidateLabels(map[string]string) error
+
+	// DoWithLabels runs off the VM goroutine with HTTPHost.BindFetch's request,
+	// response, and ownership contract. It must preserve captured attribution
+	// and use the shared execution session. Labels are per-call detached data;
+	// neither this method nor validation may select another connection.
+	DoWithLabels(*http.Request, map[string]string) (*aphttp.Response, error)
+}
+
 // ConnectionInput pairs a captured JSON snapshot with its private HTTP dispatch
 // capability. Snapshot edits in JavaScript never alter or select the dispatcher.
 type ConnectionInput struct {
@@ -42,10 +59,10 @@ type ConnectionInput struct {
 	// default to {}; explicit null and unknown top-level fields are rejected.
 	Snapshot json.RawMessage
 
-	// Dispatch has HTTPHost.BindFetch's ownership and bounded-response contract.
-	// Supply handles from one HTTP session for shared request/response budgets,
-	// deadline, and evidence. It must capture no VM values and cannot be nil.
-	Dispatch func(*http.Request) (*aphttp.Response, error)
+	// Dispatcher supplies fixed HTTP authority and validates request labels.
+	// Use one HTTP session for shared request/response budgets, deadline, and
+	// evidence. It must capture no VM values and cannot be nil.
+	Dispatcher ConnectionDispatcher
 }
 
 // connectionBrand marks a capability independently of its enumerable metadata.
@@ -105,7 +122,7 @@ func (i *AsyncInvocation) PrepareInput(
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if connection.Dispatch == nil {
+		if connection.Dispatcher == nil {
 			return ErrInvalidInput
 		}
 		documents = append(documents, connection.Snapshot)
@@ -181,7 +198,7 @@ func (i *AsyncInvocation) PrepareInput(
 			return err
 		}
 
-		fetch, err := host.BindFetch(input.Connections[index].Dispatch)
+		fetch, err := host.BindConnectionFetch(input.Connections[index].Dispatcher)
 		if err != nil {
 			return err
 		}

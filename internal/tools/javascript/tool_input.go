@@ -56,36 +56,51 @@ func (p *ToolProgram) prepareInvocation(
 
 	if session != nil {
 		var connection map[string]json.RawMessage
-		if err := json.Unmarshal(scopes["connection"], &connection); err != nil || connection == nil {
+		if err := json.Unmarshal(
+			scopes["connection"],
+			&connection,
+		); err != nil || connection == nil {
 			return apjsruntime.ErrInvalidInput
 		}
+
 		for _, name := range []string{"cfg", "labels", "annotations"} {
 			connection[name] = scopes[name]
 			delete(scopes, name)
 		}
 		delete(scopes, "connection")
+
 		metadata, err := encodeAsyncInput(connection)
 		if err != nil {
 			return apjsruntime.ErrInvalidInput
 		}
-		prepared.Connections = []apjsruntime.ConnectionInput{{Snapshot: metadata, Dispatch: session.Do}}
+
+		prepared.Connections = []apjsruntime.ConnectionInput{
+			{
+				Snapshot:   metadata,
+				Dispatcher: session,
+			},
+		}
 	}
 
 	// Include response in the same batch even though it is exposed only as a
 	// legacy global. Remove the temporary context field after native copying.
 	scopes["response"] = response
+
 	prepared.Context, err = encodeAsyncInput(scopes)
 	if err != nil {
 		return apjsruntime.ErrInvalidInput
 	}
+
 	if err := invocation.PrepareInput(ctx, vm, prepared, p.limits, host); err != nil {
 		return err
 	}
+
 	contextObject := invocation.Context.(*goja.Object)
 	responseObject, ok := contextObject.Get("response").(*goja.Object)
 	if !ok || responseObject.ClassName() != "Object" {
 		return apjsruntime.ErrInvalidInput
 	}
+
 	if err := contextObject.Delete("response"); err != nil {
 		return apjsruntime.ErrInvalidInput
 	}
@@ -96,6 +111,7 @@ func (p *ToolProgram) prepareInvocation(
 			return err
 		}
 	}
+
 	if err := bindToolGlobals(vm, invocation.Params, contextObject, responseObject); err != nil {
 		return err
 	}
@@ -112,6 +128,7 @@ func encodeAsyncInput(fields map[string]json.RawMessage) (json.RawMessage, error
 	if err := encoder.Encode(fields); err != nil {
 		return nil, err
 	}
+
 	// Encoder appends one newline; it is not part of the copied input document.
 	return json.RawMessage(buffer.Bytes()[:buffer.Len()-1]), nil
 }
@@ -123,17 +140,38 @@ func encodeAsyncInput(fields map[string]json.RawMessage) (json.RawMessage, error
 func bindConnectionAliases(vm *goja.Runtime, contextObject, connection *goja.Object) error {
 	identity := vm.NewObject()
 	for _, name := range []string{"id", "name", "namespace"} {
-		if err := identity.DefineDataProperty(name, connection.Get(name), goja.FLAG_TRUE, goja.FLAG_TRUE, goja.FLAG_TRUE); err != nil {
+		if err := identity.DefineDataProperty(
+			name,
+			connection.Get(name),
+			goja.FLAG_TRUE, // writable
+			goja.FLAG_TRUE, // configurable
+			goja.FLAG_TRUE, // enumerable
+		); err != nil {
 			return apjsruntime.ErrInvalidInput
 		}
 	}
-	if err := contextObject.DefineDataProperty("connection", identity, goja.FLAG_TRUE, goja.FLAG_TRUE, goja.FLAG_TRUE); err != nil {
+
+	if err := contextObject.DefineDataProperty(
+		"connection",
+		identity,
+		goja.FLAG_TRUE, // writable
+		goja.FLAG_TRUE, // configurable
+		goja.FLAG_TRUE, // enumerable
+	); err != nil {
 		return apjsruntime.ErrInvalidInput
 	}
+
 	for _, name := range []string{"cfg", "labels", "annotations"} {
-		if err := contextObject.DefineDataProperty(name, connection.Get(name), goja.FLAG_TRUE, goja.FLAG_TRUE, goja.FLAG_TRUE); err != nil {
+		if err := contextObject.DefineDataProperty(
+			name,
+			connection.Get(name),
+			goja.FLAG_TRUE, // writable
+			goja.FLAG_TRUE, // configurable
+			goja.FLAG_TRUE, // enumerable
+		); err != nil {
 			return apjsruntime.ErrInvalidInput
 		}
 	}
+
 	return nil
 }

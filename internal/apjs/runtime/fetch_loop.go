@@ -23,8 +23,8 @@ type fetchCompletion struct {
 // HTTPOptions supplies resolved limits and diagnostics for one invocation's HTTP
 // host. The caller separately supplies bounded dispatchers through BindFetch.
 type HTTPOptions struct {
-	// MaxRequestBytes bounds the combined URL, method, headers, and body of each
-	// request before handing a detached copy to an HTTP worker.
+	// MaxRequestBytes bounds the combined URL, method, headers, body, and supported
+	// label keys/values before handing detached request data to an HTTP worker.
 	MaxRequestBytes int
 
 	// MaxPendingOperations bounds concurrent fetch and body-read workers across

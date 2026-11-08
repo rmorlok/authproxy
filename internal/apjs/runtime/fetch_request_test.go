@@ -35,7 +35,7 @@ func TestPrepareFetchRequestConstruction(t *testing.T) {
 	}`)
 
 	// Host routing is separate; connection authentication may later replace the authored candidate.
-	request, err := prepareFetchRequest(context.Background(), vm, call, 1024)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false)
 	require.NoError(t, err)
 	require.Equal(t, "POST", request.Method)
 	require.Equal(t, "network.example.test:8443", request.URL.Host)
@@ -63,7 +63,7 @@ func TestPrepareFetchRequestArrayBufferOwnsBytes(t *testing.T) {
 	_, err := vm.RunString(`var bytes = new Uint8Array([1, 2, 255]);`)
 	require.NoError(t, err)
 	call := fetchRequestCall(t, vm, `"https://example.test", {method: "PUT", body: bytes.buffer}`)
-	request, err := prepareFetchRequest(context.Background(), vm, call, 1024)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false)
 	require.NoError(t, err)
 
 	// Mutate the original buffer after preparation, then verify first send and replay.
@@ -92,7 +92,7 @@ func TestPrepareFetchRequestRecordSemantics(t *testing.T) {
 	} {
 		// Missing and inherited input leave the ordinary GET request untouched.
 		vm := goja.New()
-		request, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024)
+		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false)
 		require.NoError(t, err, source)
 		require.Equal(t, "GET", request.Method)
 		require.Empty(t, request.Header)
@@ -128,7 +128,7 @@ func TestPrepareFetchRequestMethodNormalization(t *testing.T) {
 			call := fetchRequestCall(t, vm, `"https://example.test", {method: "`+test.authored+`"}`)
 
 			// Normalization changes the transmitted method, without changing its byte allowance.
-			request, err := prepareFetchRequest(context.Background(), vm, call, len("https://example.test")+len(test.authored))
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, len("https://example.test")+len(test.authored), false)
 			require.NoError(t, err)
 			require.Equal(t, test.want, request.Method)
 		})
@@ -149,7 +149,7 @@ func TestPrepareFetchRequestForbiddenMethods(t *testing.T) {
 			}`)
 
 			// Reject before copying header values or returning a request that could be dispatched.
-			request, err := prepareFetchRequest(context.Background(), vm, call, 1024)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false)
 			require.ErrorIs(t, err, ErrInvalidInput)
 			require.NotContains(t, err.Error(), "private")
 			require.Nil(t, request)
@@ -174,10 +174,10 @@ func TestPrepareFetchRequestBounds(t *testing.T) {
 			vm := goja.New()
 			call := fetchRequestCall(t, vm, test.source)
 			// The exact shared allowance succeeds; one fewer byte returns no partial request.
-			request, err := prepareFetchRequest(context.Background(), vm, call, test.size)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, test.size, false)
 			require.NoError(t, err)
 			require.NotNil(t, request)
-			request, err = prepareFetchRequest(context.Background(), vm, call, test.size-1)
+			request, _, err = prepareFetchRequest(context.Background(), vm, call, test.size-1, false)
 			require.ErrorIs(t, err, ErrLimitExceeded)
 			require.Nil(t, request)
 		})
@@ -203,7 +203,7 @@ func TestPrepareFetchRequestRejectsUnsupportedData(t *testing.T) {
 	} {
 		// No unsupported value is coerced or included in the public classification.
 		vm := goja.New()
-		request, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024)
+		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false)
 		require.ErrorIs(t, err, ErrInvalidInput, source)
 		require.NotContains(t, err.Error(), "private")
 		require.Nil(t, request)
@@ -212,7 +212,7 @@ func TestPrepareFetchRequestRejectsUnsupportedData(t *testing.T) {
 		// Transport-controlled headers are rejected regardless of capitalization.
 		vm := goja.New()
 		source := `"https://example.test", {headers: {"` + strings.ToLower(name) + `": "private"}}`
-		request, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024)
+		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false)
 		require.ErrorIs(t, err, ErrInvalidInput, name)
 		require.Nil(t, request)
 	}
@@ -225,7 +225,7 @@ func TestPrepareFetchRequestCancellationAndGetters(t *testing.T) {
 	var request *http.Request
 	// Getter exceptions are intercepted by the host's VM boundary, before HTTP dispatch.
 	exception := vm.Try(func() {
-		request, _ = prepareFetchRequest(context.Background(), vm, call, 1024)
+		request, _, _ = prepareFetchRequest(context.Background(), vm, call, 1024, false)
 	})
 	require.NotNil(t, exception)
 	require.Nil(t, request)
@@ -233,7 +233,7 @@ func TestPrepareFetchRequestCancellationAndGetters(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	// Cancellation wins while copying a valid request, with no request returned.
-	request, err := prepareFetchRequest(ctx, vm, fetchRequestCall(t, vm, `"https://example.test"`), 1024)
+	request, _, err := prepareFetchRequest(ctx, vm, fetchRequestCall(t, vm, `"https://example.test"`), 1024, false)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, request)
 }

@@ -20,8 +20,8 @@ type FetchOptions struct {
 	// caller can still read ExecutionState or call the idempotent Close afterward.
 	Session *httphost.Session
 
-	// MaxRequestBytes bounds the combined URL, method, headers, and body of each
-	// request before handing a detached copy to an HTTP worker.
+	// MaxRequestBytes bounds the combined URL, method, headers, body, and request
+	// label keys/values before handing detached data to an HTTP worker.
 	MaxRequestBytes int
 
 	// MaxPendingOperations bounds concurrent fetch and body-read workers before

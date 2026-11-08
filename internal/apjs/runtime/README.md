@@ -199,8 +199,8 @@ async function execute(params, context) {
 }
 ```
 
-Given an already-authorized `handle` from an
-[apjs/http session](../http/README.md), prepare its host in `Evaluate`:
+Given an already-authorized `dispatcher` implementing `ConnectionDispatcher`
+and using an [apjs/http session](../http/README.md), prepare its host in `Evaluate`:
 
 ```go
 result, err := program.Evaluate(ctx, func(
@@ -224,16 +224,14 @@ result, err := program.Evaluate(ctx, func(
                 "id":"cxn_example", "name":"CRM", "namespace":"root.product.user1",
                 "cfg":{"apiHost":"https://api.example.test"}, "labels":{"region":"us"}
             }`),
-            Dispatch: func(request *http.Request) (*aphttp.Response, error) {
-                response, _, err := handle.Do(request)
-                return response, err
-            },
+            Dispatcher: dispatcher,
         }},
     }, limits, host)
 })
 ```
 
-Here `http` is Go's standard HTTP package and `aphttp` is `internal/apjs/http`.
+The dispatcher validates labels and sends requests through the already-admitted
+connection. For Tools, `internal/tools/httphost.Session` implements this interface.
 The adapter owns the session: close it on every exit, link its cancellation to
 the context passed to `Evaluate` so HTTP expiry or exhaustion interrupts busy
 JavaScript, and map its final error and send evidence into the caller's outcome.
@@ -264,8 +262,8 @@ send evidence. Fetch calls and body reads across every binding also share the
 host's `MaxPendingOperations`. A refused read leaves `bodyUsed` false, allowing a
 retry after other work finishes. Nothing dispatches before `Start`, which the
 async evaluator calls only after initialization and its Promise jobs succeed.
-The lower-level `BindFetch` API remains available to trusted host adapters that
-own their native binding layout.
+The lower-level `BindConnectionFetch` and ordinary `BindFetch` APIs remain
+available to trusted host adapters that own their native binding layout.
 
 Fetch accepts an absolute HTTP(S) URL and optional `method`, `headers`, and `body`.
 Headers are a string record; `Host` sets the request's host override. Bodies are
@@ -281,6 +279,39 @@ an error. The shared HTTP handles already meet this contract. Workers transfer
 only owned Go data; the VM goroutine settles Promises and decodes JSON. Late
 responses are closed without touching the VM. Worker panics and `Goexit` reject
 safely and log only fixed classifications and Go source locations, never payloads.
+
+### Connection request labels
+
+Connection fetch also accepts `init.labels`, a string record whose own enumerable
+entries are copied before a worker starts:
+
+```javascript
+const response = await connection.fetch(connection.cfg.apiHost + "/customers", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(params),
+    labels: {operation: "write", workload: "customer-sync"}
+});
+```
+
+Label key/value bytes share `MaxRequestBytes` with the URL, method, headers, and
+body. Omitted, null, or undefined labels add nothing. Values must be primitive
+strings; arrays and enumerable symbol keys are rejected. Inherited and
+non-enumerable properties are ignored. Later edits to the authored map cannot
+change an admitted request, another call, or the connection's metadata snapshot.
+
+`ConnectionDispatcher.ValidateLabels` runs on the VM owner after bounded copying
+and before worker admission. It must perform no I/O or map mutation and must
+reject malformed and protected labels according to the adapter's policy. AuthProxy
+adapters use the existing user-label validator, including protection of `apxy/`
+attribution. Validation failures become fixed invalid-input rejections and do not
+consume a logical HTTP request. The runtime stays independent of schema packages.
+
+The worker calls `DoWithLabels` with detached data. The adapter applies request
+user labels over captured connection/client user labels, using the same session
+for every call. Resolved labels reach rate limits, events, and telemetry without
+changing actor, connection, or request-type attribution. Every supplied connection
+supports this extension; direct `BindFetch` and global `fetch` reject it.
 
 ## Optional direct HTTP
 

@@ -3,16 +3,18 @@
 This package connects a Tool's configured AuthProxy client to the shared
 [HTTP session](../../apjs/http/README.md). The shared package owns deadlines,
 request and response budgets, header filtering, lazy body decoding, and cleanup.
-This adapter supplies two AuthProxy-specific translations:
+This adapter supplies AuthProxy-specific request labels and translations:
 
+- Per-request user labels are validated and copied before the configured client
+  applies them to rate limits, request events, and telemetry.
 - Configured-client send observations and trusted credential failures become
   neutral HTTP evidence and error categories.
 - Aggregate send evidence becomes a Tool's `notStarted` or `mayHaveExecuted`
   execution state.
 
 The existing connection client still owns credentials, recovery, rate limiting,
-request events, and telemetry. Each Tool session binds that one client to its
-private shared budget owner. This package does not select connections, check
+request events, and telemetry. Each Tool session binds calls through that one
+client to its private shared budget owner. This package does not select connections, check
 permissions, render requests, validate schemas, or build Tool results.
 
 ## Use an admitted connection
@@ -85,6 +87,33 @@ contains only status, captured content type, filtered copied headers, and a
 bounded body; it does not expose a credential-bearing `http.Response.Request`.
 Pass `Response.ContentType` to response mapping because filtering can remove the
 original header. See the shared package for decoding and accounting details.
+
+## Request labels
+
+Use `DoWithLabels` to distinguish individual requests in the same operation:
+
+```go
+response, err := session.DoWithLabels(req, map[string]string{
+    "operation": "list-accounts",
+    "page": "second",
+})
+```
+
+These labels override the configured client's user labels for this call only.
+The adapter copies the map; it never changes the client or connection snapshot.
+Keep the supplied map stable during the call. Nil or empty labels behave like
+`Do`. Every call uses the same session deadline, request allowance, aggregate
+response allowance, and send-evidence owner, including when its labels differ.
+
+`ValidateLabels` checks the same user-label rules without I/O or consuming an
+allowance. JavaScript uses that check before starting its worker; `DoWithLabels`
+also validates labels for Go callers. Malformed keys/values and reserved `apxy/`
+keys return the fixed `aphttp.ErrInvalidInput`. A rejected request's body is
+closed and it consumes no logical request allowance. Label validation never
+exposes the invalid key or value in its error.
+
+The execution host must account for label bytes before dispatch. This Go adapter
+does not impose a separate input-byte budget or enable direct HTTP.
 
 ## Errors and send evidence
 

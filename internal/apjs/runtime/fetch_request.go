@@ -19,6 +19,9 @@ import (
 // The URL must be a primitive absolute HTTP(S) string. The optional init object
 // supports only own method, headers, and body properties; headers use own
 // enumerable string properties, and body supports strings or native ArrayBuffers.
+// Connection bindings also accept labels when allowLabels is true. They are
+// detached string maps charged to the same byte allowance; the adapter validates
+// their domain-specific key/value rules before worker dispatch.
 // Methods follow Fetch normalization and its CONNECT/TRACE/TRACK exclusions.
 // JSON must be explicitly serialized by authored code. No credentials are added:
 // the selected HTTP client retains final authentication precedence.
@@ -31,9 +34,10 @@ func prepareFetchRequest(
 	vm *goja.Runtime,
 	call goja.FunctionCall,
 	maxBytes int,
-) (*http.Request, error) {
+	allowLabels bool,
+) (*http.Request, map[string]string, error) {
 	if ctx == nil || vm == nil || maxBytes <= 0 || len(call.Arguments) > 2 {
-		return nil, ErrInvalidInput
+		return nil, nil, ErrInvalidInput
 	}
 
 	budget := fetchRequestBudget{
@@ -42,28 +46,31 @@ func prepareFetchRequest(
 	}
 	rawURL, err := budget.string(call.Argument(0))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !validFetchURL(rawURL) {
-		return nil, ErrInvalidInput
+		return nil, nil, ErrInvalidInput
 	}
 
 	methodValue := vm.ToValue("GET")
-	var headersValue, bodyValue goja.Value
+	var headersValue, bodyValue, labelsValue goja.Value
 
 	if initValue := call.Argument(1); !goja.IsUndefined(initValue) && !goja.IsNull(initValue) {
 		init, ok := initValue.(*goja.Object)
 		if !ok || init.ClassName() != "Object" || len(init.Symbols()) != 0 {
-			return nil, ErrInvalidInput
+			return nil, nil, ErrInvalidInput
 		}
 
 		// Validate all names before evaluating getters so unsupported options
 		// cannot silently acquire a different meaning from browser fetch.
 		keys := init.GetOwnPropertyNames()
 		for _, key := range keys {
-			if key != "method" && key != "headers" && key != "body" {
-				return nil, ErrInvalidInput
+			if key != "method" &&
+				key != "headers" &&
+				key != "body" &&
+				!(allowLabels && key == "labels") {
+				return nil, nil, ErrInvalidInput
 			}
 		}
 
@@ -78,41 +85,48 @@ func prepareFetchRequest(
 				headersValue = value
 			case "body":
 				bodyValue = value
+			case "labels":
+				labelsValue = value
 			}
 		}
 	}
 
 	method, err := budget.string(methodValue)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if !httpguts.ValidHeaderFieldName(method) {
-		return nil, ErrInvalidInput
+		return nil, nil, ErrInvalidInput
 	}
 
 	// Fetch uppercases only these six methods; other valid tokens remain
 	// case-sensitive, including PATCH. Token validation makes this ASCII-only.
 	switch upper := strings.ToUpper(method); upper {
 	case "CONNECT", "TRACE", "TRACK":
-		return nil, ErrInvalidInput
+		return nil, nil, ErrInvalidInput
 	case "DELETE", "GET", "HEAD", "OPTIONS", "POST", "PUT":
 		method = upper
 	}
 
 	headers, host, err := budget.headers(headersValue)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	body, err := budget.body(bodyValue)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+
+	labels, err := budget.labels(labelsValue)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	request, err := http.NewRequestWithContext(ctx, method, rawURL, body)
 	if err != nil {
-		return nil, ErrInvalidInput
+		return nil, nil, ErrInvalidInput
 	}
 
 	request.Header = headers
@@ -121,14 +135,15 @@ func prepareFetchRequest(
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return request, nil
+	return request, labels, nil
 }
 
 // fetchRequestBudget counts the prepared method, URL, header names/values, and
-// body together. It is not a wire-size limit or a JavaScript heap quota.
+// body and label names/values together. It is not a wire-size limit or a
+// JavaScript heap quota.
 type fetchRequestBudget struct {
 	ctx       context.Context // Invocation deadline remains active through conversion.
 	remaining int             // Bytes still available before another detached copy.
@@ -265,6 +280,36 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 	}
 
 	return headers, host, nil
+}
+
+// labels copies only own enumerable string entries before any worker can run.
+// Missing/null/undefined labels add nothing. Key and value bytes share the full
+// request allowance; the trusted connection adapter owns label syntax/policy.
+func (b *fetchRequestBudget) labels(value goja.Value) (map[string]string, error) {
+	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
+		return nil, nil
+	}
+
+	object, ok := value.(*goja.Object)
+	if !ok || object.ClassName() != "Object" || len(object.Symbols()) != 0 {
+		return nil, ErrInvalidInput
+	}
+
+	labels := make(map[string]string)
+	for _, name := range object.Keys() {
+		if err := b.consume(len(name)); err != nil {
+			return nil, err
+		}
+
+		text, err := b.string(object.Get(name))
+		if err != nil {
+			return nil, err
+		}
+
+		labels[name] = text
+	}
+
+	return labels, nil
 }
 
 // body constructs a replayable reader after bounding its data. ArrayBuffer's
