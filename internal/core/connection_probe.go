@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
@@ -35,8 +37,14 @@ func (c *connection) GetProbes() []iface.Probe {
 	return probes
 }
 
+// GetEnabledProbe loads the connector definition with the caller's context and
+// returns the requested probe only when its condition passes. Definition-load
+// errors remain wrapped causes; they neither panic nor become JavaScript errors.
 func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface.Probe, error) {
-	def := c.connector.GetDefinition()
+	def, err := c.connector.getDefinitionWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("probe %q: load connector definition: %w", probeId, err)
+	}
 
 	for i := range def.Probes {
 		probe := &def.Probes[i]
@@ -57,8 +65,14 @@ func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface
 	return nil, ErrProbeNotFound
 }
 
+// GetEnabledProbes loads the connector definition and evaluates its conditions
+// under the caller's context. Any load or predicate failure returns no probes,
+// preserving the underlying error for classification and retry decisions.
 func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error) {
-	def := c.connector.GetDefinition()
+	def, err := c.connector.getDefinitionWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load connector definition for probes: %w", err)
+	}
 	probes := make([]iface.Probe, 0, len(def.Probes))
 
 	for i := range def.Probes {
@@ -76,19 +90,69 @@ func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error
 	return probes, nil
 }
 
+// probePredicateLimits supplies finite caller policy for each probe condition.
+// A predicate returns only a boolean, so five output bytes accommodate either
+// value. These limits apply to the library, input, and condition together; probe
+// HTTP requests retain their existing separate timeout and execution policy.
+func probePredicateLimits() jsruntime.Limits {
+	return jsruntime.Limits{
+		MaxSourceBytes: 256 << 10,
+		MaxInputBytes:  1 << 20,
+		MaxOutputBytes: 5,
+		MaxDepth:       64,
+		MaxNodes:       50000,
+		MaxStackDepth:  256,
+		Timeout:        time.Second,
+	}
+}
+
+// isProbeEnabled evaluates an optional condition against copied connection data
+// under the request/task context and the probe's finite JavaScript policy. A
+// condition failure disables execution by returning an error rather than guessing
+// a boolean, and authored diagnostics remain behind safe runtime classifications.
 func (c *connection) isProbeEnabled(ctx context.Context, probe *cschema.Probe) (bool, error) {
 	if probe == nil || probe.If == nil {
 		return true, nil
 	}
 
-	jsctx, err := c.GetJavascriptContext(ctx)
+	def, err := c.connector.getDefinitionWithContext(ctx)
+	if err != nil {
+		return false, fmt.Errorf("probe %q: load connector definition: %w", probe.Id, err)
+	}
+
+	limits := probePredicateLimits()
+	librarySource := def.Javascript
+
+	if len(probe.If.Javascript) > limits.MaxSourceBytes ||
+		len(librarySource) > limits.MaxSourceBytes-len(probe.If.Javascript) {
+		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, jsruntime.ErrLimitExceeded)
+	}
+
+	// Check combined source size before the connector cache can compile its
+	// library. The successful contextual load above populated the definition
+	// cache, so a library error here is a compile error, not a decryption/decode
+	// failure. Only authored compile diagnostics become ErrInvalidSource.
+	library, err := c.connector.getJavascriptLibrary()
+
+	// Compilation itself cannot be interrupted; preserve a cancellation that
+	// arrived while it ran before reporting source errors or preparing input.
+	if contextErr := ctx.Err(); contextErr != nil {
+		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, contextErr)
+	}
+
+	if err != nil {
+		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, jsruntime.ErrInvalidSource)
+	}
+
+	jsctx, err := c.getJavascriptContext(ctx, library)
 	if err != nil {
 		return false, fmt.Errorf("probe %q: get javascript context: %w", probe.Id, err)
 	}
 
-	ok, err := probe.If.GetValue(jsctx)
+	ok, err := probe.If.GetValueWithContext(ctx, jsctx, limits)
 	if err != nil {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, err)
 	}
+
 	return ok, nil
 }

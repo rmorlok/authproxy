@@ -1,10 +1,12 @@
 package common
 
 import (
+	"context"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 // Predicate defines a JavaScript condition evaluated by runtime with a
@@ -33,4 +35,21 @@ func (p *Predicate) Validate(vc *ValidationContext, jsctx apjs.Context) error {
 // javascript with a prebuilt JavaScript context.
 func (p *Predicate) GetValue(jsctx apjs.Context) (bool, error) {
 	return jsctx.EvaluateBoolean(p.Javascript)
+}
+
+// GetValueWithContext evaluates this predicate with copied native inputs and
+// explicit finite limits under the caller's cancellation. It preserves legacy
+// predicate syntax while returning safe runtime errors and false on failure.
+// A missing predicate is invalid here; callers decide whether omission enables
+// or disables their resource before requesting evaluation.
+func (p *Predicate) GetValueWithContext(
+	ctx context.Context,
+	jsctx apjs.Context,
+	limits jsruntime.Limits,
+) (bool, error) {
+	if p == nil {
+		return false, jsruntime.ErrInvalidInput
+	}
+
+	return jsctx.EvaluateBooleanWithContext(ctx, p.Javascript, limits)
 }
