@@ -42,9 +42,14 @@ func (p *Predicate) GetValue(jsctx apjs.Context) (bool, error) {
 // predicate syntax while returning safe runtime errors and false on failure.
 // A missing predicate is invalid here; callers decide whether omission enables
 // or disables their resource before requesting evaluation.
-func (p *Predicate) GetValueWithContext(ctx context.Context, jsctx apjs.Context, limits jsruntime.Limits) (bool, error) {
+func (p *Predicate) GetValueWithContext(
+	ctx context.Context,
+	jsctx apjs.Context,
+	limits jsruntime.Limits,
+) (bool, error) {
 	if p == nil {
 		return false, jsruntime.ErrInvalidInput
 	}
+
 	return jsctx.EvaluateBooleanWithContext(ctx, p.Javascript, limits)
 }

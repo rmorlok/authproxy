@@ -20,20 +20,35 @@ import (
 // wrappers, structs, pointers, custom marshalers, and live Go objects are rejected
 // without calling their methods. Cyclic containers stop at the depth/node limit.
 // These limits bound conversion work and output, not the runtime's total heap.
-func encodeVariables(ctx context.Context, vars map[string]any, limits jsruntime.JSONLimits) (json.RawMessage, error) {
-	if ctx == nil || limits.MaxBytes <= 0 || limits.MaxDepth <= 0 || limits.MaxNodes <= 0 {
+func encodeVariables(
+	ctx context.Context,
+	vars map[string]any,
+	limits jsruntime.JSONLimits,
+) (json.RawMessage, error) {
+	if ctx == nil ||
+		limits.MaxBytes <= 0 ||
+		limits.MaxDepth <= 0 ||
+		limits.MaxNodes <= 0 {
 		return nil, jsruntime.ErrInvalidInput
 	}
+
 	if vars == nil {
 		vars = map[string]any{}
 	}
-	encoder := variableEncoder{ctx: ctx, limits: limits}
+
+	encoder := variableEncoder{
+		ctx:    ctx,
+		limits: limits,
+	}
+
 	if err := encoder.value(vars, 0); err != nil {
 		return nil, err
 	}
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	return json.RawMessage(encoder.bytes), nil
 }
 
@@ -53,9 +68,11 @@ func (e *variableEncoder) value(value any, depth int) error {
 	if err := e.node(); err != nil {
 		return err
 	}
+
 	if depth > e.limits.MaxDepth {
 		return jsruntime.ErrLimitExceeded
 	}
+
 	switch value := value.(type) {
 	case nil:
 		return e.append([]byte("null"))
@@ -75,7 +92,19 @@ func (e *variableEncoder) value(value any, depth int) error {
 			return jsruntime.ErrInvalidInput
 		}
 		return e.append(encoded)
-	case bool, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+	case bool,
+		int,
+		int8,
+		int16,
+		int32,
+		int64,
+		uint,
+		uint8,
+		uint16,
+		uint32,
+		uint64,
+		float32,
+		float64:
 		encoded, err := json.Marshal(value)
 		if err != nil {
 			return jsruntime.ErrInvalidInput
@@ -105,6 +134,7 @@ func encodeVariableMap[V any](e *variableEncoder, values map[string]V, depth int
 		return err
 	}
 	first := true
+
 	for key, value := range values {
 		if err := e.node(); err != nil {
 			return err
@@ -114,6 +144,7 @@ func encodeVariableMap[V any](e *variableEncoder, values map[string]V, depth int
 				return err
 			}
 		}
+
 		first = false
 		if err := e.string(key); err != nil {
 			return err
@@ -125,6 +156,7 @@ func encodeVariableMap[V any](e *variableEncoder, values map[string]V, depth int
 			return err
 		}
 	}
+
 	return e.append([]byte("}"))
 }
 
@@ -137,6 +169,7 @@ func encodeVariableSlice[V any](e *variableEncoder, values []V, depth int) error
 	if err := e.append([]byte("[")); err != nil {
 		return err
 	}
+
 	for i, value := range values {
 		if i != 0 {
 			if err := e.append([]byte(",")); err != nil {
@@ -147,6 +180,7 @@ func encodeVariableSlice[V any](e *variableEncoder, values []V, depth int) error
 			return err
 		}
 	}
+
 	return e.append([]byte("]"))
 }
 
@@ -171,13 +205,16 @@ func (e *variableEncoder) string(value string) error {
 	if remaining < 2 || len(value) > remaining-2 {
 		return jsruntime.ErrLimitExceeded
 	}
+
 	if !utf8.ValidString(value) {
 		return jsruntime.ErrInvalidInput
 	}
+
 	encoded, err := json.Marshal(value)
 	if err != nil {
 		return jsruntime.ErrInvalidInput
 	}
+
 	return e.append(encoded)
 }
 
@@ -187,9 +224,12 @@ func (e *variableEncoder) append(encoded []byte) error {
 	if err := e.ctx.Err(); err != nil {
 		return err
 	}
+
 	if len(encoded) > e.limits.MaxBytes-len(e.bytes) {
 		return jsruntime.ErrLimitExceeded
 	}
+
 	e.bytes = append(e.bytes, encoded...)
+
 	return nil
 }

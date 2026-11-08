@@ -106,8 +106,10 @@ func (c *connection) isProbeEnabled(ctx context.Context, probe *cschema.Probe) (
 	if err := ctx.Err(); err != nil {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, err)
 	}
+
 	limits := probePredicateLimits()
 	librarySource := c.connector.GetDefinition().Javascript
+
 	if len(probe.If.Javascript) > limits.MaxSourceBytes ||
 		len(librarySource) > limits.MaxSourceBytes-len(probe.If.Javascript) {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, jsruntime.ErrLimitExceeded)
@@ -116,14 +118,17 @@ func (c *connection) isProbeEnabled(ctx context.Context, probe *cschema.Probe) (
 	// Check combined source size before the connector cache can compile its
 	// library. The public legacy context builder intentionally remains unchanged.
 	library, err := c.connector.getJavascriptLibrary()
+
 	// Compilation itself cannot be interrupted; preserve a cancellation that
 	// arrived while it ran before reporting source errors or preparing input.
 	if contextErr := ctx.Err(); contextErr != nil {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, contextErr)
 	}
+
 	if err != nil {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, jsruntime.ErrInvalidSource)
 	}
+
 	jsctx, err := c.getJavascriptContext(ctx, library)
 	if err != nil {
 		return false, fmt.Errorf("probe %q: get javascript context: %w", probe.Id, err)
@@ -133,5 +138,6 @@ func (c *connection) isProbeEnabled(ctx context.Context, probe *cschema.Probe) (
 	if err != nil {
 		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, err)
 	}
+
 	return ok, nil
 }

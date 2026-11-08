@@ -43,77 +43,100 @@ func (c Context) EvaluateBooleanWithContext(
 	if err := limits.Validate(); err != nil {
 		return false, err
 	}
+
 	librarySource := c.library.Source()
-	if len(expression) > limits.MaxSourceBytes || len(librarySource) > limits.MaxSourceBytes-len(expression) {
+	if len(expression) > limits.MaxSourceBytes ||
+		len(librarySource) > limits.MaxSourceBytes-len(expression) {
 		return false, jsruntime.ErrLimitExceeded
 	}
-	if !utf8.ValidString(expression) || !utf8.ValidString(librarySource) || strings.TrimSpace(expression) == "" {
+
+	if !utf8.ValidString(expression) ||
+		!utf8.ValidString(librarySource) ||
+		strings.TrimSpace(expression) == "" {
 		return false, jsruntime.ErrInvalidSource
 	}
 
-	result, err := jsruntime.EvaluateJSON(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
-		// Preserve legacy script syntax and non-strict semantics. Compilation is
-		// byte-bounded; Go parsing is cooperative only at the surrounding checks.
-		program, err := compileSource("predicate.js", expression)
-		if err != nil {
-			return nil, jsruntime.ErrInvalidSource
-		}
-		inputLimits := jsruntime.JSONLimits{
-			MaxBytes: limits.MaxInputBytes, MaxDepth: limits.MaxDepth, MaxNodes: limits.MaxNodes,
-		}
-		encoded, err := encodeVariables(runCtx, c.vars, inputLimits)
-		if err != nil {
-			return nil, err
-		}
+	result, err := jsruntime.EvaluateJSON(
+		ctx,
+		limits,
+		func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
+			// Preserve legacy script syntax and non-strict semantics. Compilation is
+			// byte-bounded; Go parsing is cooperative only at the surrounding checks.
+			program, err := compileSource("predicate.js", expression)
+			if err != nil {
+				return nil, jsruntime.ErrInvalidSource
+			}
 
-		// Decode before authored initialization can replace JSON.parse or other
-		// intrinsics, but keep the copied values private until the library runs.
-		decoder, err := jsruntime.NewJSONDecoder(vm)
-		if err != nil {
-			return nil, err
-		}
-		values, err := decoder.Decode(runCtx, inputLimits, encoded)
-		if err != nil {
-			return nil, err
-		}
-		if err := c.library.Run(vm); err != nil {
-			return nil, jsruntime.EvaluationError(err)
-		}
-		// Reading a reserved global can invoke a library-installed accessor.
-		// Catch authored exceptions without hiding uncatchable runtime limits.
-		if exception := vm.Try(func() { err = validateReservedRuntimeVars(vm) }); exception != nil {
-			return nil, jsruntime.EvaluationError(exception)
-		}
-		if err != nil {
-			return nil, jsruntime.ErrInvalidSource
-		}
-		variables := values[0].(*goja.Object)
-		for _, name := range variables.Keys() {
+			inputLimits := jsruntime.JSONLimits{
+				MaxBytes: limits.MaxInputBytes,
+				MaxDepth: limits.MaxDepth,
+				MaxNodes: limits.MaxNodes,
+			}
+			encoded, err := encodeVariables(runCtx, c.vars, inputLimits)
+			if err != nil {
+				return nil, err
+			}
+
+			// Decode before authored initialization can replace JSON.parse or other
+			// intrinsics, but keep the copied values private until the library runs.
+			decoder, err := jsruntime.NewJSONDecoder(vm)
+			if err != nil {
+				return nil, err
+			}
+
+			values, err := decoder.Decode(runCtx, inputLimits, encoded)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := c.library.Run(vm); err != nil {
+				return nil, jsruntime.EvaluationError(err)
+			}
+
+			// Reading a reserved global can invoke a library-installed accessor.
+			// Catch authored exceptions without hiding uncatchable runtime limits.
+			if exception := vm.Try(
+				func() { err = validateReservedRuntimeVars(vm) },
+			); exception != nil {
+				return nil, jsruntime.EvaluationError(exception)
+			}
+			if err != nil {
+				return nil, jsruntime.ErrInvalidSource
+			}
+
+			variables := values[0].(*goja.Object)
+			for _, name := range variables.Keys() {
+				if err := runCtx.Err(); err != nil {
+					return nil, err
+				}
+				if err := vm.Set(name, variables.Get(name)); err != nil {
+					return nil, jsruntime.EvaluationError(err)
+				}
+			}
+
 			if err := runCtx.Err(); err != nil {
 				return nil, err
 			}
-			if err := vm.Set(name, variables.Get(name)); err != nil {
+
+			value, err := vm.RunProgram(program)
+			if err != nil {
 				return nil, jsruntime.EvaluationError(err)
 			}
-		}
-		if err := runCtx.Err(); err != nil {
-			return nil, err
-		}
-		value, err := vm.RunProgram(program)
-		if err != nil {
-			return nil, jsruntime.EvaluationError(err)
-		}
-		// Inspect the export type before exporting anything: arbitrary objects
-		// could invoke getters or traverse an unbounded graph. Goja's boolean
-		// primitive and Boolean wrapper both export one native bool without
-		// coercion or property access, preserving the legacy conversion contract.
-		if value == nil || value.ExportType() != reflect.TypeFor[bool]() {
-			return nil, jsruntime.ErrInvalidOutput
-		}
-		return vm.ToValue(value.Export().(bool)), nil
-	})
+
+			// Inspect the export type before exporting anything: arbitrary objects
+			// could invoke getters or traverse an unbounded graph. Goja's boolean
+			// primitive and Boolean wrapper both export one native bool without
+			// coercion or property access, preserving the legacy conversion contract.
+			if value == nil || value.ExportType() != reflect.TypeFor[bool]() {
+				return nil, jsruntime.ErrInvalidOutput
+			}
+
+			return vm.ToValue(value.Export().(bool)), nil
+		},
+	)
 	if err != nil {
 		return false, err
 	}
+
 	return string(result) == "true", nil
 }
