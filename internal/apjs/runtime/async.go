@@ -264,8 +264,16 @@ func (p *AsyncProgram) Validate(ctx context.Context) error {
 	return p.validate(ctx, nil)
 }
 
-// validate runs optional pure extension installation before initialization, with
-// rejection tracking already active. No invocation preparation or hosts run here.
+// validate checks authored initialization in a fresh bounded VM without calling
+// execute. The optional install callback binds the extension's pure JavaScript
+// helpers and creates their per-VM branding and result interpreter, so top-level
+// source and library code can use the same helpers as a real invocation. The
+// interpreter is checked for validity but is not called during validation.
+//
+// install runs on the VM owner with rejection tracking already active and must
+// honor its execution context, perform no I/O, and return only safe errors. A nil
+// callback installs no extension. No invocation inputs or HTTP hosts are supplied;
+// installer errors and unhandled initialization rejections fail validation.
 func (p *AsyncProgram) validate(
 	ctx context.Context,
 	install func(context.Context, *goja.Runtime) error,

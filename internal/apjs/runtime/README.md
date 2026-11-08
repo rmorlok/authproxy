@@ -120,14 +120,19 @@ owned by that VM. Its caller must keep the runtime deadline active and gate I/O
 until initialization and its Promise microtasks have completed successfully.
 Use it inside `Run` or `EvaluateJSON`; retain no callable or value after cleanup.
 
-`PromiseTracker` records unhandled Promise identities without inspecting private
-reasons. It releases those identities when handled or when `Close` runs.
-Install one before authored initialization and defer `Close`. Call
-`CheckRejections` after initialization, and `SettledResult` after the host has
-driven the root Promise to settlement or determined it cannot progress. Pending
-or rejected roots and unrelated unhandled rejections fail safely. The returned
-value stays inside the owning runtime for bounded conversion. `Validate` and
-`Evaluate` manage tracking themselves; validation never calls the entry point.
+`PromiseTracker` counts unhandled rejections without inspecting private reasons.
+Install one before authored initialization and defer `Close`. `CheckRejections`
+rejects any failure still unhandled after a VM call drains its microtasks.
+`Validate` and `Evaluate` manage tracking themselves; validation never calls the
+entry point, and evaluation owns root settlement and result conversion.
+
+During the initial `execute` call, the tracker temporarily records rejected
+Promise identities because the root can reject and acquire a handler before the
+call returns. Once the root is known, it releases that map and retains only the
+root's identity and unhandled status alongside the aggregate count. Detached
+rejections during later host work are counted without retaining their promises
+or reasons. This lets extensions interpret the exact root while unrelated
+unhandled rejections still fail execution.
 
 ## Evaluating an async program
 

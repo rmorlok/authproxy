@@ -3,7 +3,6 @@ package runtime
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 
 	"github.com/dop251/goja"
 )
@@ -73,10 +72,26 @@ func (p *AsyncProgram) Evaluate(
 	)
 }
 
-// evaluate owns one async invocation's initialization, host lifecycle, and
-// rejection tracking. install runs before preparation and authored code;
-// interpret runs after host cleanup, on the same owner and under the same
-// deadline. Neither callback may retain VM state after evaluation ends.
+// evaluate drives one async invocation from helper installation through result
+// interpretation, including authored initialization, host work, and rejection
+// checks. Its three required callbacks run in order on the VM owner:
+//
+//   - install binds pure extension helpers and captures the per-VM interpreter
+//     used by interpret. It runs before authored code and must perform no I/O.
+//     Ordinary JSON evaluation supplies an interpreter without adding helpers.
+//   - prepare copies bounded native input into invocation.Params and Context,
+//     installs any input aliases or HTTP bindings, and registers Start, Await,
+//     and Close when hosts are needed. It must register cleanup immediately and
+//     leave I/O disabled until initialization succeeds and Start is called.
+//   - interpret receives the settled root Promise after host cleanup and an
+//     unrelated-rejection check. It converts a fulfilled result or explicitly
+//     recognized root failure into detached data using the shared output encoder;
+//     ordinary rejections remain safe generic failures. It returns conversion
+//     errors, and any new unhandled rejection discards its result.
+//
+// All callbacks share runCtx's deadline, must honor cancellation during Go work,
+// and return only safe errors. No VM state may outlive evaluation. Host cleanup
+// also runs on preparation, initialization, or execution failure.
 func (p *AsyncProgram) evaluate(
 	runCtx context.Context,
 	vm *goja.Runtime,
@@ -127,7 +142,7 @@ func (p *AsyncProgram) evaluate(
 		invocation.Start()
 	}
 
-	root, err := callAsync(execute, invocation.Params, invocation.Context)
+	root, err := tracker.callAsync(execute, invocation.Params, invocation.Context)
 	if err != nil {
 		return err
 	}
@@ -147,29 +162,15 @@ func (p *AsyncProgram) evaluate(
 	// unrelated failures both before interpretation and after trusted callbacks
 	// that might themselves drain microtasks. Only the exact root is exempt.
 	closeHost()
-	if err := tracker.checkRejectionsExcept(root); err != nil {
+	if err := tracker.checkRootRejections(); err != nil {
 		return err
 	}
 	if err := runCtx.Err(); err != nil {
 		return err
 	}
 	resultErr := interpret(root)
-	if err := tracker.checkRejectionsExcept(root); err != nil {
+	if err := tracker.checkRootRejections(); err != nil {
 		return err
 	}
 	return resultErr
-}
-
-// callAsync invokes the entry point and requires a native Promise. Checking its
-// export type first avoids traversing arbitrary getters or exporting an unchecked
-// object graph when authored initialization replaces the entry point.
-func callAsync(execute goja.Callable, params, contextValue goja.Value) (*goja.Promise, error) {
-	value, err := execute(goja.Undefined(), params, contextValue)
-	if err != nil {
-		return nil, EvaluationError(err)
-	}
-	if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
-		return nil, ErrEvaluation
-	}
-	return value.Export().(*goja.Promise), nil
 }
