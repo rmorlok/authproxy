@@ -66,7 +66,10 @@ func prepareFetchRequest(
 		// cannot silently acquire a different meaning from browser fetch.
 		keys := init.GetOwnPropertyNames()
 		for _, key := range keys {
-			if key != "method" && key != "headers" && key != "body" && !(allowLabels && key == "labels") {
+			if key != "method" &&
+				key != "headers" &&
+				key != "body" &&
+				!(allowLabels && key == "labels") {
 				return nil, nil, ErrInvalidInput
 			}
 		}
@@ -286,6 +289,7 @@ func (b *fetchRequestBudget) labels(value goja.Value) (map[string]string, error)
 	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
 		return nil, nil
 	}
+
 	object, ok := value.(*goja.Object)
 	if !ok || object.ClassName() != "Object" || len(object.Symbols()) != 0 {
 		return nil, ErrInvalidInput
@@ -296,12 +300,15 @@ func (b *fetchRequestBudget) labels(value goja.Value) (map[string]string, error)
 		if err := b.consume(len(name)); err != nil {
 			return nil, err
 		}
+
 		text, err := b.string(object.Get(name))
 		if err != nil {
 			return nil, err
 		}
+
 		labels[name] = text
 	}
+
 	return labels, nil
 }
 

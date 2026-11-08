@@ -86,5 +86,6 @@ func (c *connectionHTTPClient) DoWithLabels(req *http.Request, labels map[string
 	if len(labels) == 0 {
 		return c.client.Do(req)
 	}
+
 	return c.client.DoWithLabels(req, labels)
 }

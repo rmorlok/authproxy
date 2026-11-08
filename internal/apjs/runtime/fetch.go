@@ -27,9 +27,11 @@ func (l *HTTPHost) BindFetch(
 	if dispatch == nil {
 		return nil, ErrInvalidInput
 	}
+
 	direct := func(req *http.Request, _ map[string]string) (*aphttp.Response, error) {
 		return dispatch(req)
 	}
+
 	return func(call goja.FunctionCall) goja.Value {
 		return l.fetch(direct, nil, call)
 	}, nil
@@ -43,6 +45,7 @@ func (l *HTTPHost) BindConnectionFetch(dispatcher ConnectionDispatcher) (func(go
 	if dispatcher == nil {
 		return nil, ErrInvalidInput
 	}
+
 	return func(call goja.FunctionCall) goja.Value {
 		return l.fetch(dispatcher.DoWithLabels, dispatcher.ValidateLabels, call)
 	}, nil
@@ -66,12 +69,13 @@ func (l *HTTPHost) fetch(
 	var req *http.Request
 	var labels map[string]string
 	var err error
+
 	if exception := l.vm.Try(func() {
 		req, labels, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes, validateLabels != nil)
 	}); exception != nil {
 		return l.rejected(ErrInvalidInput)
-
 	}
+
 	if err != nil {
 		return l.rejected(err)
 	}
@@ -80,6 +84,7 @@ func (l *HTTPHost) fetch(
 			if req.Body != nil {
 				_ = req.Body.Close()
 			}
+
 			return l.rejected(ErrInvalidInput)
 		}
 	}
@@ -88,7 +93,10 @@ func (l *HTTPHost) fetch(
 	// values. It can finish safely even after evaluation has disposed its runtime.
 	promise, admitted := l.start(func() fetchCompletion {
 		response, err := dispatch(req, labels)
-		return fetchCompletion{response: response, err: err}
+		return fetchCompletion{
+			response: response,
+			err:      err,
+		}
 	}, func(done fetchCompletion) (goja.Value, error) {
 		if done.err != nil {
 			return nil, done.err

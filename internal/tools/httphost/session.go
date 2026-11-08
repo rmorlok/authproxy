@@ -89,9 +89,13 @@ func (s *Session) Do(req *http.Request) (*aphttp.Response, error) {
 // it before worker admission; DoWithLabels repeats the check for direct Go callers.
 // Invalid labels or an uninitialized adapter return one fixed error without data.
 func (s *Session) ValidateLabels(labels map[string]string) error {
-	if s == nil || s.session == nil || s.client == nil || meta.ValidateUserLabels(labels) != nil {
+	if s == nil ||
+		s.session == nil ||
+		s.client == nil ||
+		meta.ValidateUserLabels(labels) != nil {
 		return aphttp.ErrInvalidInput
 	}
+
 	return nil
 }
 
@@ -99,22 +103,34 @@ func (s *Session) ValidateLabels(labels map[string]string) error {
 // configured client. Keep the supplied map stable during the call. Each bound
 // handle uses the same execution owner, so labels cannot reset request/response
 // budgets, deadlines, or evidence. It takes request-body ownership on every path.
-func (s *Session) DoWithLabels(req *http.Request, labels map[string]string) (*aphttp.Response, error) {
+func (s *Session) DoWithLabels(
+	req *http.Request,
+	labels map[string]string,
+) (*aphttp.Response, error) {
 	transferred := false
+
 	defer func() {
 		if !transferred && req != nil && req.Body != nil {
 			_ = req.Body.Close()
 		}
 	}()
+
 	if err := s.ValidateLabels(labels); err != nil {
 		return nil, err
 	}
-	client, err := s.session.Bind(configuredClient{client: s.client, labels: maps.Clone(labels)})
+
+	client, err := s.session.Bind(configuredClient{
+		client: s.client,
+		labels: maps.Clone(labels),
+	})
 	if err != nil {
 		return nil, err
 	}
+
 	transferred = true
+
 	response, _, err := client.Do(req)
+
 	return response, err
 }
 
@@ -124,9 +140,12 @@ func (s *Session) DoWithLabels(req *http.Request, labels map[string]string) (*ap
 // Pending calls remain provisional: callers returning before they finish must
 // retain the conservative snapshot rather than revise it from late evidence.
 func (s *Session) ExecutionState() api.ToolExecutionState {
-	if s == nil || s.session == nil || s.session.SendState() == aphttp.SendStateNotSent {
+	if s == nil ||
+		s.session == nil ||
+		s.session.SendState() == aphttp.SendStateNotSent {
 		return api.ToolExecutionStateNotStarted
 	}
+
 	return api.ToolExecutionStateMayHaveExecuted
 }
 
@@ -145,13 +164,16 @@ type configuredClient struct {
 // diagnostics are discarded. Raw response/body ownership stays with the caller.
 func (c configuredClient) Do(req *http.Request) (*http.Response, aphttp.SendState, error) {
 	ctx, observation := httpf.ObserveSends(req.Context())
+
 	var response *http.Response
 	var err error
+
 	if len(c.labels) == 0 {
 		response, err = c.client.Do(req.WithContext(ctx))
 	} else {
 		response, err = c.client.DoWithLabels(req.WithContext(ctx), c.labels)
 	}
+
 	state := aphttp.SendStateMayHaveSent
 	switch observation.State() {
 	case httpf.SendStateNotSent:
@@ -159,6 +181,7 @@ func (c configuredClient) Do(req *http.Request) (*http.Response, aphttp.SendStat
 	case httpf.SendStateSent:
 		state = aphttp.SendStateSent
 	}
+
 	if err != nil {
 		if errors.Is(err, auth_methods.ErrCredentialsUnavailable) {
 			err = aphttp.ErrCredentialsUnavailable
@@ -166,5 +189,6 @@ func (c configuredClient) Do(req *http.Request) (*http.Response, aphttp.SendStat
 			err = aphttp.ErrTransport
 		}
 	}
+
 	return response, state, err
 }

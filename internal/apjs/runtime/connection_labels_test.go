@@ -29,7 +29,10 @@ func (d connectionTestDispatcher) ValidateLabels(labels map[string]string) error
 }
 
 // DoWithLabels transfers the detached request and labels to the scenario.
-func (d connectionTestDispatcher) DoWithLabels(request *http.Request, labels map[string]string) (*aphttp.Response, error) {
+func (d connectionTestDispatcher) DoWithLabels(
+	request *http.Request,
+	labels map[string]string,
+) (*aphttp.Response, error) {
 	return d.dispatch(request, labels)
 }
 
@@ -42,43 +45,71 @@ type connectionLabelRequest struct {
 
 // connectionLabelInput binds a fake provider to one shared HTTP owner and records
 // the actual maps delivered to worker dispatch, after synchronous validation.
-func connectionLabelInput(t *testing.T, validate func(map[string]string) error) (jsruntime.AsyncInput, chan connectionLabelRequest) {
+func connectionLabelInput(
+	t *testing.T,
+	validate func(map[string]string) error,
+) (jsruntime.AsyncInput, chan connectionLabelRequest) {
 	t.Helper()
+
 	owner, err := aphttp.New(context.Background(), directFetchLimits())
 	require.NoError(t, err)
 	t.Cleanup(owner.Close)
+
 	handle, err := owner.Bind(directFetchClient(func(*http.Request) (*http.Response, aphttp.SendState, error) {
 		return directFetchResponse("ok"), aphttp.SendStateSent, nil
 	}))
 	require.NoError(t, err)
+
 	requests := make(chan connectionLabelRequest, 32)
-	return jsruntime.AsyncInput{Connections: []jsruntime.ConnectionInput{{
-		Snapshot: json.RawMessage(`{"id":"captured","labels":{"operation":"baseline"}}`),
-		Dispatcher: connectionTestDispatcher{validate: validate, dispatch: func(request *http.Request, labels map[string]string) (*aphttp.Response, error) {
-			requests <- connectionLabelRequest{path: request.URL.Path, labels: labels}
-			response, _, err := handle.Do(request)
-			return response, err
-		}},
-	}}}, requests
+	return jsruntime.AsyncInput{
+		Connections: []jsruntime.ConnectionInput{
+			{
+				Snapshot: json.RawMessage(`{"id":"captured","labels":{"operation":"baseline"}}`),
+				Dispatcher: connectionTestDispatcher{
+					validate: validate,
+					dispatch: func(request *http.Request, labels map[string]string) (*aphttp.Response, error) {
+						requests <- connectionLabelRequest{
+							path:   request.URL.Path,
+							labels: labels,
+						}
+						response, _, err := handle.Do(request)
+						return response, err
+					},
+				},
+			},
+		},
+	}, requests
 }
 
 // evaluateConnectionLabels runs the public connection binding with explicit
 // request/worker limits while preserving the normal input and result conversion.
-func evaluateConnectionLabels(t *testing.T, source string, input jsruntime.AsyncInput, maxBytes, maxPending int) (json.RawMessage, error) {
+func evaluateConnectionLabels(
+	t *testing.T,
+	source string,
+	input jsruntime.AsyncInput,
+	maxBytes, maxPending int,
+) (json.RawMessage, error) {
 	t.Helper()
+
 	limits := runtimeLimits()
 	program, err := jsruntime.CompileAsync(source, nil, nil, limits)
 	require.NoError(t, err)
-	return program.Evaluate(context.Background(), func(ctx context.Context, vm *goja.Runtime, invocation *jsruntime.AsyncInvocation) error {
-		host, err := jsruntime.NewHTTPHost(ctx, vm, jsruntime.HTTPOptions{
-			MaxRequestBytes: maxBytes, MaxPendingOperations: maxPending,
-		}, limits)
-		if err != nil {
-			return err
-		}
-		invocation.Close, invocation.Start, invocation.Await = host.Close, host.Start, host.Await
-		return invocation.PrepareInput(ctx, vm, input, limits, host)
-	})
+
+	return program.Evaluate(
+		context.Background(),
+		func(ctx context.Context, vm *goja.Runtime, invocation *jsruntime.AsyncInvocation) error {
+			host, err := jsruntime.NewHTTPHost(ctx, vm, jsruntime.HTTPOptions{
+				MaxRequestBytes:      maxBytes,
+				MaxPendingOperations: maxPending,
+			}, limits)
+			if err != nil {
+				return err
+			}
+
+			invocation.Close, invocation.Start, invocation.Await = host.Close, host.Start, host.Await
+			return invocation.PrepareInput(ctx, vm, input, limits, host)
+		},
+	)
 }
 
 // TestConnectionFetchLabelsAreDetached copies per-call maps before workers can
