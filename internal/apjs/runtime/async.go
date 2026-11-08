@@ -37,7 +37,7 @@ var asyncFunctionPrototype = goja.MustCompile(
 // AsyncProgram owns a compiled async entry point and its optional compiled
 // helper library. It retains no runtime or invocation values and can serve
 // concurrent evaluations, each in a fresh VM. Compilation runs no authored code;
-// validation runs initialization without host capabilities and does not invoke
+// validation runs initialization without I/O capabilities and does not invoke
 // execute. Evaluate owns the complete bounded invocation and JSON conversion.
 type AsyncProgram struct {
 	program  *goja.Program   // Strict async script, including its execute declaration.
@@ -261,15 +261,41 @@ func (p *AsyncProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
 // returning, and no runtime or pending authored state is reused by invocation.
 func (p *AsyncProgram) Validate(ctx context.Context) error {
+	return p.validate(ctx, nil)
+}
+
+// validate checks authored initialization in a fresh bounded VM without calling
+// execute. The optional install callback binds the extension's pure JavaScript
+// helpers and creates their per-VM branding and result interpreter, so top-level
+// source and library code can use the same helpers as a real invocation. The
+// interpreter is checked for validity but is not called during validation.
+//
+// install runs on the VM owner with rejection tracking already active and must
+// honor its execution context, perform no I/O, and return only safe errors. A nil
+// callback installs no extension. No invocation inputs or HTTP hosts are supplied;
+// installer errors and unhandled initialization rejections fail validation.
+func (p *AsyncProgram) validate(
+	ctx context.Context,
+	install func(context.Context, *goja.Runtime) error,
+) error {
 	if p == nil || p.program == nil || ctx == nil {
 		return ErrInvalidInput
 	}
-	return Run(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
+
+	return Run(ctx, p.limits, func(runCtx context.Context, vm *goja.Runtime) error {
 		tracker := NewPromiseTracker(vm)
 		defer tracker.Close()
+
+		if install != nil {
+			if err := install(runCtx, vm); err != nil {
+				return err
+			}
+		}
+
 		if _, err := p.Initialize(vm); err != nil {
 			return err
 		}
+
 		return tracker.CheckRejections()
 	})
 }

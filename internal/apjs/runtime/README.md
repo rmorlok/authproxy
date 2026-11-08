@@ -120,13 +120,19 @@ owned by that VM. Its caller must keep the runtime deadline active and gate I/O
 until initialization and its Promise microtasks have completed successfully.
 Use it inside `Run` or `EvaluateJSON`; retain no callable or value after cleanup.
 
-`PromiseTracker` records unhandled rejections without retaining private reasons.
-Install one before authored initialization and defer `Close`. Call
-`CheckRejections` after initialization, and `SettledResult` after the host has
-driven the root Promise to settlement or determined it cannot progress. Pending
-or rejected roots and unrelated unhandled rejections fail safely. The returned
-value stays inside the owning runtime for bounded conversion. `Validate` and
-`Evaluate` manage tracking themselves; validation never calls the entry point.
+`PromiseTracker` counts unhandled rejections without inspecting private reasons.
+Install one before authored initialization and defer `Close`. `CheckRejections`
+rejects any failure still unhandled after a VM call drains its microtasks.
+`Validate` and `Evaluate` manage tracking themselves; validation never calls the
+entry point, and evaluation owns root settlement and result conversion.
+
+During the initial `execute` call, the tracker temporarily records rejected
+Promise identities because the root can reject and acquire a handler before the
+call returns. Once the root is known, it releases that map and retains only the
+root's identity and unhandled status alongside the aggregate count. Detached
+rejections during later host work are counted without retaining their promises
+or reasons. This lets extensions interpret the exact root while unrelated
+unhandled rejections still fail execution.
 
 ## Evaluating an async program
 
@@ -180,6 +186,96 @@ Preparation, initialization, invocation, host completion, cleanup, and output
 encoding share one deadline. Callers receive only detached JSON; failure or
 cancellation discards the result. Hosts return safe errors unchanged, while
 authored exceptions and rejection values remain private.
+
+## Trusted result extensions
+
+Use `CompileExtendedAsync` when an adapter needs a typed Go result instead of
+JSON. It takes the same source, library, host bindings, and limits as
+`CompileAsync`, plus a `ResultExtension[T]`. Ordinary `AsyncProgram.Evaluate`
+continues to return JSON.
+
+For example, a report adapter could let JavaScript return a branded text result:
+
+```javascript
+async function execute(params, context) {
+    return report("Processed " + params.count + " records");
+}
+```
+
+The adapter reserves `report` and installs a pure helper in each fresh VM. Its
+private map distinguishes helper results from ordinary objects:
+
+```go
+type Report struct { Text string }
+
+extension := runtime.ResultExtension[Report]{
+    Bindings: []runtime.HostBinding{{Name: "report"}},
+    Install: func(_ context.Context, vm *goja.Runtime) (runtime.ResultInterpreter[Report], error) {
+        payloads := make(map[*goja.Object]goja.Value)
+        if err := vm.Set(
+			"report", 
+			func(call goja.FunctionCall) goja.Value {
+				marker := vm.NewObject()
+                payloads[marker] = call.Argument(0)
+                return marker
+            },
+		); err != nil {
+            return runtime.ResultInterpreter[Report]{}, runtime.ErrInvalidInput
+        }
+        return runtime.ResultInterpreter[Report]{
+            Fulfilled: func(
+				_ context.Context, 
+				value goja.Value, 
+				encoder *runtime.ResultEncoder,
+			) (Report, error) {
+                marker, ok := value.(*goja.Object)
+                if !ok { return Report{}, runtime.ErrInvalidOutput }
+            
+                payload, branded := payloads[marker]
+                if !branded { return Report{}, runtime.ErrInvalidOutput }
+            
+                text, err := encoder.String(payload)
+                if err != nil { return Report{}, err }
+            
+                return Report{Text: text}, nil
+            },
+        }, nil
+    },
+}
+program, err := runtime.CompileExtendedAsync(source, nil, nil, limits, extension)
+```
+
+Call `program.Validate(ctx)` to check initialization, then `program.Evaluate`
+with the same preparation callback used for ordinary async programs. Validation
+installs the pure helpers but supplies no inputs or HTTP hosts and never invokes
+`execute` or the result interpreter. Initialization can use these helpers in
+both paths. Their names cannot be redeclared by source or a helper library and
+are frozen before authored initialization.
+
+`Fulfilled` is required and defines both branded and ordinary success behavior.
+The example rejects ordinary values; another adapter can encode them with
+`encoder.Encode(value)`. An optional `Rejected` callback can recognize a branded
+root failure and return a domain result or safe error. If it does not recognize
+the value, the runtime returns `ErrEvaluation`. Ordinary thrown values must stay
+private. An unrelated unhandled Promise rejection prevents interpretation;
+rejections created during interpretation also discard the result.
+
+The runtime closes outstanding hosts before interpretation. It captures the
+encoder's intrinsics before installation and keeps the owner goroutine and
+deadline active throughout conversion. `Encode` returns detached JSON; `String`
+accepts only primitive strings and rejects lone UTF-16 surrogates. Raw JSON
+preserves those units as escapes. Every field converted by either method shares
+one byte/node allowance, with depth measured separately from each field's root.
+Text is charged as JSON, including quotes and escaping. A failed conversion
+remains an error even if the callback ignores it; cancellation also discards the
+entire result.
+
+Extension callbacks are trusted Go code. They must honor their context, use the
+encoder for authored payloads, and return no VM values, callbacks, or host
+objects inside `T`. Installation performs no I/O and creates fresh per-VM state;
+it must support concurrent evaluations. Domain validation and any final envelope
+size limit remain the adapter's responsibility. These helpers do not create a
+hard memory sandbox or change HTTP send evidence.
 
 ## Supplied connections and HTTP
 
