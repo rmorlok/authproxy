@@ -59,62 +59,97 @@ func (p *AsyncProgram) Evaluate(
 	ctx context.Context,
 	prepare func(context.Context, *goja.Runtime, *AsyncInvocation) error,
 ) (json.RawMessage, error) {
-	if p == nil || p.program == nil || ctx == nil || prepare == nil {
-		return nil, ErrInvalidInput
+	return evaluateAsync(ctx, p, prepare, func(context.Context, *goja.Runtime) (ResultInterpreter[json.RawMessage], error) {
+		return ResultInterpreter[json.RawMessage]{
+			Fulfilled: func(_ context.Context, value goja.Value, encoder *ResultEncoder) (json.RawMessage, error) {
+				return encoder.Encode(value)
+			},
+		}, nil
+	})
+}
+
+// evaluate owns one async invocation's initialization, host lifecycle, and
+// rejection tracking. install runs before preparation and authored code;
+// interpret runs after host cleanup, on the same owner and under the same
+// deadline. Neither callback may retain VM state after evaluation ends.
+func (p *AsyncProgram) evaluate(
+	runCtx context.Context,
+	vm *goja.Runtime,
+	prepare func(context.Context, *goja.Runtime, *AsyncInvocation) error,
+	install func() error,
+	interpret func(*goja.Promise) error,
+) error {
+	tracker := NewPromiseTracker(vm)
+	defer tracker.Close()
+
+	// Register cleanup before installing helpers or preparing hosts, including
+	// partial preparation failure and interrupts during subsequent VM calls.
+	invocation := &AsyncInvocation{}
+	closeHost := func() {
+		if close := invocation.Close; close != nil {
+			invocation.Close = nil
+			close()
+		}
+	}
+	defer closeHost()
+	if err := install(); err != nil {
+		return err
+	}
+	if err := prepare(runCtx, vm, invocation); err != nil {
+		return err
+	}
+	if invocation.Params == nil || invocation.Context == nil {
+		return ErrInvalidInput
+	}
+	if err := runCtx.Err(); err != nil {
+		return err
 	}
 
-	return EvaluateJSON(ctx, p.limits, func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
-		// Install cleanup before preparation so partially initialized hosts also
-		// close on errors or Goja interrupt panics. Close precedes output encoding.
-		invocation := &AsyncInvocation{}
-		defer func() {
-			if invocation.Close != nil {
-				invocation.Close()
-			}
-		}()
-		if err := prepare(runCtx, vm, invocation); err != nil {
-			return nil, err
-		}
-		if invocation.Params == nil || invocation.Context == nil {
-			return nil, ErrInvalidInput
-		}
-		if err := runCtx.Err(); err != nil {
-			return nil, err
-		}
+	execute, err := p.Initialize(vm)
+	if err != nil {
+		return err
+	}
+	if err := tracker.CheckRejections(); err != nil {
+		return err
+	}
+	if err := runCtx.Err(); err != nil {
+		return err
+	}
+	if invocation.Start != nil {
+		invocation.Start()
+	}
 
-		tracker := NewPromiseTracker(vm)
-		defer tracker.Close()
-		execute, err := p.Initialize(vm)
-		if err != nil {
-			return nil, err
-		}
-		if err := tracker.CheckRejections(); err != nil {
-			return nil, err
-		}
+	root, err := callAsync(execute, invocation.Params, invocation.Context)
+	if err != nil {
+		return err
+	}
+	for root.State() == goja.PromiseStatePending {
 		if err := runCtx.Err(); err != nil {
-			return nil, err
+			return err
 		}
-		if invocation.Start != nil {
-			invocation.Start()
+		if invocation.Await == nil {
+			return ErrEvaluation
 		}
+		if err := invocation.Await(); err != nil {
+			return err
+		}
+	}
 
-		root, err := callAsync(execute, invocation.Params, invocation.Context)
-		if err != nil {
-			return nil, err
-		}
-		for root.State() == goja.PromiseStatePending {
-			if err := runCtx.Err(); err != nil {
-				return nil, err
-			}
-			if invocation.Await == nil {
-				return nil, ErrEvaluation
-			}
-			if err := invocation.Await(); err != nil {
-				return nil, err
-			}
-		}
-		return tracker.SettledResult(root)
-	})
+	// Root settlement ends HTTP admission before any result conversion. Check
+	// unrelated failures both before interpretation and after trusted callbacks
+	// that might themselves drain microtasks. Only the exact root is exempt.
+	closeHost()
+	if err := tracker.checkRejectionsExcept(root); err != nil {
+		return err
+	}
+	if err := runCtx.Err(); err != nil {
+		return err
+	}
+	resultErr := interpret(root)
+	if err := tracker.checkRejectionsExcept(root); err != nil {
+		return err
+	}
+	return resultErr
 }
 
 // callAsync invokes the entry point and requires a native Promise. Checking its

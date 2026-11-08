@@ -98,9 +98,10 @@ func newOutputEncoder(vm *goja.Runtime, limits Limits) *outputEncoder {
 	}
 }
 
-// outputState owns one traversal's bytes, work counter, and active object path.
-// Shared acyclic objects may appear repeatedly; only a repeated object on the
-// current path is a cycle. No source object or exported Go graph is retained.
+// outputState owns the current traversal's bytes and active object path, plus
+// byte and work counters that may be shared across result fields. Shared acyclic
+// objects may appear repeatedly; only a repeated object on the current path is
+// a cycle. No source object or exported Go graph is retained after traversal.
 type outputState struct {
 	// encoder supplies the runtime, captured reflection functions, object-type
 	// checks, and limits shared throughout this traversal.
@@ -113,6 +114,10 @@ type outputState struct {
 	// bytes accumulates JSON owned by this traversal, bounded by MaxOutputBytes.
 	// It becomes the returned result on success; partial output is discarded on error.
 	bytes []byte
+
+	// usedBytes counts JSON bytes across every traversal sharing this state.
+	// It stays charged when a result buffer is transferred to a trusted adapter.
+	usedBytes int
 
 	// nodes counts visited values and inspected ordinary-object keys against
 	// MaxNodes, including non-enumerable keys. Array indices and length metadata
@@ -138,19 +143,26 @@ func (e *outputEncoder) encode(
 		ctx:     ctx,
 		active:  make(map[*goja.Object]bool),
 	}
+	return state.encode(value)
+}
+
+// encode traverses one root with this state's remaining output allowance.
+// Callers sharing a state transfer or discard its buffer between traversals;
+// byte and node charges remain cumulative while each root starts at depth zero.
+func (s *outputState) encode(value goja.Value) (json.RawMessage, error) {
 	var err error
-	if exception := e.vm.Try(
-		func() { err = state.value(value, 0) },
+	if exception := s.encoder.vm.Try(
+		func() { err = s.value(value, 0) },
 	); exception != nil {
 		return nil, ErrInvalidOutput
 	}
 	if err != nil {
 		return nil, err
 	}
-	if err := ctx.Err(); err != nil {
+	if err := s.ctx.Err(); err != nil {
 		return nil, err
 	}
-	return json.RawMessage(state.bytes), nil
+	return json.RawMessage(s.bytes), nil
 }
 
 // value appends one JSON value after checking cancellation and structural
@@ -452,11 +464,12 @@ func (s *outputState) node() error {
 
 // append checks the encoded byte budget before growing the result buffer.
 func (s *outputState) append(text string) error {
-	if len(text) > s.encoder.limits.MaxOutputBytes-len(s.bytes) {
+	if len(text) > s.encoder.limits.MaxOutputBytes-s.usedBytes {
 		return ErrLimitExceeded
 	}
 
 	s.bytes = append(s.bytes, text...)
+	s.usedBytes += len(text)
 
 	return nil
 }
@@ -465,7 +478,7 @@ func (s *outputState) append(text string) error {
 // an unbounded Go string. Paired surrogates become UTF-8; lone surrogates remain
 // JSON escapes instead of being silently replaced by Unicode replacement text.
 func (s *outputState) quoted(text goja.String) error {
-	if text.Length() > s.encoder.limits.MaxOutputBytes-len(s.bytes)-2 {
+	if text.Length() > s.encoder.limits.MaxOutputBytes-s.usedBytes-2 {
 		return ErrLimitExceeded
 	}
 

@@ -37,7 +37,7 @@ var asyncFunctionPrototype = goja.MustCompile(
 // AsyncProgram owns a compiled async entry point and its optional compiled
 // helper library. It retains no runtime or invocation values and can serve
 // concurrent evaluations, each in a fresh VM. Compilation runs no authored code;
-// validation runs initialization without host capabilities and does not invoke
+// validation runs initialization without I/O capabilities and does not invoke
 // execute. Evaluate owns the complete bounded invocation and JSON conversion.
 type AsyncProgram struct {
 	program  *goja.Program   // Strict async script, including its execute declaration.
@@ -261,12 +261,23 @@ func (p *AsyncProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 // exhaustion returns ErrLimitExceeded. Any interrupt watcher is joined before
 // returning, and no runtime or pending authored state is reused by invocation.
 func (p *AsyncProgram) Validate(ctx context.Context) error {
+	return p.validate(ctx, nil)
+}
+
+// validate runs optional pure extension installation before initialization, with
+// rejection tracking already active. No invocation preparation or hosts run here.
+func (p *AsyncProgram) validate(ctx context.Context, install func(context.Context, *goja.Runtime) error) error {
 	if p == nil || p.program == nil || ctx == nil {
 		return ErrInvalidInput
 	}
-	return Run(ctx, p.limits, func(_ context.Context, vm *goja.Runtime) error {
+	return Run(ctx, p.limits, func(runCtx context.Context, vm *goja.Runtime) error {
 		tracker := NewPromiseTracker(vm)
 		defer tracker.Close()
+		if install != nil {
+			if err := install(runCtx, vm); err != nil {
+				return err
+			}
+		}
 		if _, err := p.Initialize(vm); err != nil {
 			return err
 		}
