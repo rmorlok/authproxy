@@ -2,8 +2,11 @@ package core
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
@@ -146,4 +149,151 @@ func TestConnection_GetEnabledProbesPredicateError(t *testing.T) {
 	_, err := conn.GetEnabledProbes(context.Background())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `probe "broken" if.javascript`)
+}
+
+// TestConnection_ProbePredicateSourceBudget rejects oversized source before the
+// connector cache compiles the library, counting library and condition together.
+func TestConnection_ProbePredicateSourceBudget(t *testing.T) {
+	conn := newTestConnection(cschema.ConnectorDefinition{
+		Javascript: strings.Repeat(" ", probePredicateLimits().MaxSourceBytes),
+		Probes: []cschema.Probe{{
+			Id: "large-source", If: &common.Predicate{Javascript: "true"},
+		}},
+	})
+
+	// Even a library that compiles to nothing still consumes authored source bytes.
+	probe, err := conn.GetEnabledProbe(context.Background(), "large-source")
+	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+	require.Nil(t, probe)
+	require.False(t, conn.connector.jsLoaded, "oversized input must not reach library compilation")
+}
+
+// TestConnection_ProbePredicateBounds fails closed when either initialization,
+// authored evaluation, or input copying exceeds this caller's finite policy.
+func TestConnection_ProbePredicateBounds(t *testing.T) {
+	for name, test := range map[string]struct {
+		library   string
+		condition string
+		config    map[string]any
+	}{
+		"library loop":   {library: "for (;;) {}", condition: "true"},
+		"condition loop": {condition: "for (;;) {}"},
+		"input bytes": {
+			condition: "true",
+			config:    map[string]any{"padding": strings.Repeat("x", probePredicateLimits().MaxInputBytes)},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			conn := newTestConnection(cschema.ConnectorDefinition{
+				Javascript: test.library,
+				Probes: []cschema.Probe{{
+					Id: "bounded", If: &common.Predicate{Javascript: test.condition},
+				}},
+			})
+			conn.configLoaded, conn.configCache = true, test.config
+
+			// An earlier policy expiration is distinct from the caller's longer deadline.
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			probe, err := conn.GetEnabledProbe(ctx, "bounded")
+			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+			require.Nil(t, probe)
+			require.NoError(t, ctx.Err())
+		})
+	}
+}
+
+// TestConnection_ProbePredicateCancellation preserves caller cancellation both
+// before library compilation and while authored JavaScript is still executing.
+func TestConnection_ProbePredicateCancellation(t *testing.T) {
+	t.Run("before compilation", func(t *testing.T) {
+		conn := newTestConnection(cschema.ConnectorDefinition{
+			Javascript: "const privateCompileDetail = ;",
+			Probes: []cschema.Probe{{
+				Id: "canceled", If: &common.Predicate{Javascript: "true"},
+			}},
+		})
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+
+		// The caller's cancellation wins without compiling invalid private source.
+		probe, err := conn.GetEnabledProbe(ctx, "canceled")
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, probe)
+		require.False(t, conn.connector.jsLoaded)
+	})
+
+	t.Run("during evaluation", func(t *testing.T) {
+		conn := newTestConnection(cschema.ConnectorDefinition{
+			Probes: []cschema.Probe{{
+				Id: "canceled", If: &common.Predicate{Javascript: "for (;;) {}"},
+			}},
+		})
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+
+		// The request deadline interrupts the loop before the one-second policy timeout.
+		probe, err := conn.GetEnabledProbe(ctx, "canceled")
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+		require.Nil(t, probe)
+	})
+}
+
+// TestConnection_ProbePredicatePrivateErrors keeps authored source and throw
+// payloads out of returned errors while retaining probe identity for diagnosis.
+func TestConnection_ProbePredicatePrivateErrors(t *testing.T) {
+	for name, test := range map[string]struct {
+		library   string
+		condition string
+		want      error
+	}{
+		"library syntax": {library: "const privateCompileDetail = ;", condition: "true", want: jsruntime.ErrInvalidSource},
+		"library throw":  {library: `throw new Error("privateLibraryDetail")`, condition: "true", want: jsruntime.ErrEvaluation},
+		"condition throw": {
+			condition: `throw {message: "privateConditionDetail"};`, want: jsruntime.ErrEvaluation,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			conn := newTestConnection(cschema.ConnectorDefinition{
+				Javascript: test.library,
+				Probes: []cschema.Probe{{
+					Id: "safe-error", If: &common.Predicate{Javascript: test.condition},
+				}},
+			})
+
+			// All failure stages use fixed runtime classifications rather than JavaScript diagnostics.
+			probe, err := conn.GetEnabledProbe(context.Background(), "safe-error")
+			require.ErrorIs(t, err, test.want)
+			require.Nil(t, probe)
+			require.Contains(t, err.Error(), `probe "safe-error" if.javascript`)
+			require.NotContains(t, err.Error(), "private")
+		})
+	}
+}
+
+// TestConnection_ProbePredicatePreservesConnectionData checks that mutating a
+// predicate's native snapshots cannot change stored metadata or the next probe.
+func TestConnection_ProbePredicatePreservesConnectionData(t *testing.T) {
+	conn := newTestConnection(cschema.ConnectorDefinition{
+		Javascript: `function configuredRegion() { return cfg.region; }`,
+		Probes: []cschema.Probe{
+			{Id: "mutate", If: &common.Predicate{Javascript: `
+				cfg.region = "changed"; labels.team = "changed"; annotations.note = "changed"; true;
+			`}},
+			{Id: "original", If: &common.Predicate{Javascript: `
+				configuredRegion() === "eu" && labels.team === "platform" && annotations.note === "original"
+			`}},
+		},
+	})
+	conn.configLoaded, conn.configCache = true, map[string]any{"region": "eu"}
+	conn.Labels = map[string]string{"team": "platform"}
+	conn.Annotations = map[string]string{"note": "original"}
+
+	// Statement-list predicates and helper reuse stay compatible across fresh invocations.
+	probes, err := conn.GetEnabledProbes(context.Background())
+	require.NoError(t, err)
+	require.Len(t, probes, 2)
+	require.Equal(t, "eu", conn.configCache["region"])
+	require.Equal(t, "platform", conn.Labels["team"])
+	require.Equal(t, "original", conn.Annotations["note"])
 }

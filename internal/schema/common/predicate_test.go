@@ -1,9 +1,12 @@
 package common
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -91,4 +94,39 @@ func TestPredicateGetValue(t *testing.T) {
 		_, err := p.GetValue(jsctx)
 		require.Error(t, err)
 	})
+}
+
+// TestPredicateGetValueWithContext forwards finite policy and cancellation to
+// the bounded connector adapter while retaining ordinary predicate behavior.
+func TestPredicateGetValueWithContext(t *testing.T) {
+	limits := jsruntime.Limits{
+		MaxSourceBytes: 4096, MaxInputBytes: 4096, MaxOutputBytes: 5,
+		MaxDepth: 16, MaxNodes: 100, MaxStackDepth: 64, Timeout: time.Second,
+	}
+	jsctx := apjs.NewContext(nil, map[string]any{"cfg": map[string]any{"enabled": true}})
+	predicate := &Predicate{Javascript: `var enabled = cfg.enabled; enabled;`}
+
+	// Statement-list syntax remains valid and produces a primitive Boolean.
+	value, err := predicate.GetValueWithContext(context.Background(), jsctx, limits)
+	require.NoError(t, err)
+	require.True(t, value)
+
+	// The caller's source cap is enforced instead of falling back to legacy execution.
+	tight := limits
+	tight.MaxSourceBytes = len(predicate.Javascript) - 1
+	value, err = predicate.GetValueWithContext(context.Background(), jsctx, tight)
+	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+	require.False(t, value)
+
+	// A canceled request keeps its context error and never yields a positive match.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	value, err = predicate.GetValueWithContext(ctx, jsctx, limits)
+	require.ErrorIs(t, err, context.Canceled)
+	require.False(t, value)
+
+	// Omission must be handled by the resource caller, not interpreted as a match.
+	value, err = (*Predicate)(nil).GetValueWithContext(context.Background(), jsctx, limits)
+	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
+	require.False(t, value)
 }
