@@ -22,8 +22,13 @@ type PromiseTracker struct {
 // supply a non-nil fresh runtime and defer Close, including on initialization
 // failure. It replaces the VM's existing rejection hook rather than chaining it.
 func NewPromiseTracker(vm *goja.Runtime) *PromiseTracker {
-	tracker := &PromiseTracker{vm: vm, unhandled: make(map[*goja.Promise]struct{})}
+	tracker := &PromiseTracker{
+		vm:        vm,
+		unhandled: make(map[*goja.Promise]struct{}),
+	}
+
 	vm.SetPromiseRejectionTracker(tracker.trackRejection)
+
 	return tracker
 }
 

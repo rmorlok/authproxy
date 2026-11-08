@@ -266,21 +266,28 @@ func (p *AsyncProgram) Validate(ctx context.Context) error {
 
 // validate runs optional pure extension installation before initialization, with
 // rejection tracking already active. No invocation preparation or hosts run here.
-func (p *AsyncProgram) validate(ctx context.Context, install func(context.Context, *goja.Runtime) error) error {
+func (p *AsyncProgram) validate(
+	ctx context.Context,
+	install func(context.Context, *goja.Runtime) error,
+) error {
 	if p == nil || p.program == nil || ctx == nil {
 		return ErrInvalidInput
 	}
+
 	return Run(ctx, p.limits, func(runCtx context.Context, vm *goja.Runtime) error {
 		tracker := NewPromiseTracker(vm)
 		defer tracker.Close()
+
 		if install != nil {
 			if err := install(runCtx, vm); err != nil {
 				return err
 			}
 		}
+
 		if _, err := p.Initialize(vm); err != nil {
 			return err
 		}
+
 		return tracker.CheckRejections()
 	})
 }

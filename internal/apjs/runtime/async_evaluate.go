@@ -59,13 +59,18 @@ func (p *AsyncProgram) Evaluate(
 	ctx context.Context,
 	prepare func(context.Context, *goja.Runtime, *AsyncInvocation) error,
 ) (json.RawMessage, error) {
-	return evaluateAsync(ctx, p, prepare, func(context.Context, *goja.Runtime) (ResultInterpreter[json.RawMessage], error) {
-		return ResultInterpreter[json.RawMessage]{
-			Fulfilled: func(_ context.Context, value goja.Value, encoder *ResultEncoder) (json.RawMessage, error) {
-				return encoder.Encode(value)
-			},
-		}, nil
-	})
+	return evaluateAsync(
+		ctx,
+		p,
+		prepare,
+		func(context.Context, *goja.Runtime) (ResultInterpreter[json.RawMessage], error) {
+			return ResultInterpreter[json.RawMessage]{
+				Fulfilled: func(_ context.Context, value goja.Value, encoder *ResultEncoder) (json.RawMessage, error) {
+					return encoder.Encode(value)
+				},
+			}, nil
+		},
+	)
 }
 
 // evaluate owns one async invocation's initialization, host lifecycle, and
@@ -75,8 +80,8 @@ func (p *AsyncProgram) Evaluate(
 func (p *AsyncProgram) evaluate(
 	runCtx context.Context,
 	vm *goja.Runtime,
-	prepare func(context.Context, *goja.Runtime, *AsyncInvocation) error,
 	install func() error,
+	prepare func(context.Context, *goja.Runtime, *AsyncInvocation) error,
 	interpret func(*goja.Promise) error,
 ) error {
 	tracker := NewPromiseTracker(vm)
@@ -92,12 +97,15 @@ func (p *AsyncProgram) evaluate(
 		}
 	}
 	defer closeHost()
+
 	if err := install(); err != nil {
 		return err
 	}
+
 	if err := prepare(runCtx, vm, invocation); err != nil {
 		return err
 	}
+
 	if invocation.Params == nil || invocation.Context == nil {
 		return ErrInvalidInput
 	}
