@@ -180,17 +180,16 @@ func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupF
 	})
 }
 
+// newSchemaStepEligibility captures an optional condition for a form or redirect
+// step. Evaluation uses the connection's bounded predicate profile and the
+// caller's context; failures retain their cause and identify the affected step.
+// An omitted condition leaves eligibility at the step's unconditional default.
 func newSchemaStepEligibility(c iface.Connection, spec *cschema.SetupFlowStep) func(context.Context) (bool, error) {
 	if spec.If == nil {
 		return nil
 	}
 	return func(ctx context.Context) (bool, error) {
-		jsCtx, err := c.GetJavascriptContext(ctx)
-		if err != nil {
-			return false, fmt.Errorf("step %q: get javascript context: %w", spec.Id, err)
-		}
-
-		ok, err := spec.If.GetValue(jsCtx)
+		ok, err := c.EvaluateJavascriptPredicate(ctx, spec.If.Javascript)
 		if err != nil {
 			return false, fmt.Errorf("step %q if.javascript: %w", spec.Id, err)
 		}
