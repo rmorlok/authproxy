@@ -31,11 +31,13 @@ type ResultEncoder struct {
 // output allowance shared by an invocation's result fields. The caller keeps
 // the VM's interruption policy active until all conversions and cleanup finish.
 func newResultEncoder(ctx context.Context, vm *goja.Runtime, limits Limits) *ResultEncoder {
-	return &ResultEncoder{state: &outputState{
-		encoder: newOutputEncoder(vm, limits),
-		ctx:     ctx,
-		active:  make(map[*goja.Object]bool),
-	}}
+	return &ResultEncoder{
+		state: &outputState{
+			encoder: newOutputEncoder(vm, limits),
+			ctx:     ctx,
+			active:  make(map[*goja.Object]bool),
+		},
+	}
 }
 
 // Encode converts one native value into independently owned JSON without
@@ -46,14 +48,17 @@ func (e *ResultEncoder) Encode(value goja.Value) (json.RawMessage, error) {
 	if e.err != nil {
 		return nil, e.err
 	}
+
 	// Drop the buffer reference on every exit. The cumulative byte counter and
 	// node counter survive, but returned buffers are never reused or retained.
 	defer func() { e.state.bytes = nil }()
+
 	result, err := e.state.encode(value)
 	if err != nil {
 		e.err = err
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -66,11 +71,13 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 	if e.err != nil {
 		return "", e.err
 	}
+
 	text, ok := value.(goja.String)
 	if !ok {
 		e.err = ErrInvalidOutput
 		return "", e.err
 	}
+
 	if _, err := e.Encode(text); err != nil {
 		return "", err
 	}
@@ -79,10 +86,12 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 			e.err = err
 			return "", err
 		}
+
 		unit := text.CharAt(i)
 		if unit < 0xD800 || unit > 0xDFFF {
 			continue
 		}
+
 		if unit <= 0xDBFF && i+1 < text.Length() {
 			next := text.CharAt(i + 1)
 			if next >= 0xDC00 && next <= 0xDFFF {
@@ -90,15 +99,20 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 				continue
 			}
 		}
+
 		e.err = ErrInvalidOutput
+
 		return "", e.err
 	}
+
 	// Primitive conversion is bounded by the JSON already charged above. Check
 	// cancellation again after conversion so late cancellation discards the text.
 	result := text.String()
+
 	if err := e.state.ctx.Err(); err != nil {
 		e.err = err
 		return "", err
 	}
+
 	return result, nil
 }

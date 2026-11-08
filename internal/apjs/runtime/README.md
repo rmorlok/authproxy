@@ -212,21 +212,31 @@ extension := runtime.ResultExtension[Report]{
     Bindings: []runtime.HostBinding{{Name: "report"}},
     Install: func(_ context.Context, vm *goja.Runtime) (runtime.ResultInterpreter[Report], error) {
         payloads := make(map[*goja.Object]goja.Value)
-        if err := vm.Set("report", func(call goja.FunctionCall) goja.Value {
-            marker := vm.NewObject()
-            payloads[marker] = call.Argument(0)
-            return marker
-        }); err != nil {
+        if err := vm.Set(
+			"report", 
+			func(call goja.FunctionCall) goja.Value {
+				marker := vm.NewObject()
+                payloads[marker] = call.Argument(0)
+                return marker
+            },
+		); err != nil {
             return runtime.ResultInterpreter[Report]{}, runtime.ErrInvalidInput
         }
         return runtime.ResultInterpreter[Report]{
-            Fulfilled: func(_ context.Context, value goja.Value, encoder *runtime.ResultEncoder) (Report, error) {
+            Fulfilled: func(
+				_ context.Context, 
+				value goja.Value, 
+				encoder *runtime.ResultEncoder,
+			) (Report, error) {
                 marker, ok := value.(*goja.Object)
                 if !ok { return Report{}, runtime.ErrInvalidOutput }
+            
                 payload, branded := payloads[marker]
                 if !branded { return Report{}, runtime.ErrInvalidOutput }
+            
                 text, err := encoder.String(payload)
                 if err != nil { return Report{}, err }
+            
                 return Report{Text: text}, nil
             },
         }, nil

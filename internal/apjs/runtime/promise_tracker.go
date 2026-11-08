@@ -77,7 +77,10 @@ func (t *PromiseTracker) trackRejection(
 // returned here must have rejected during this call or already have a handler.
 // Checking ExportType avoids traversing arbitrary getters or exporting an
 // unchecked object graph when authored initialization replaces the entry point.
-func (t *PromiseTracker) callAsync(execute goja.Callable, params, contextValue goja.Value) (*goja.Promise, error) {
+func (t *PromiseTracker) callAsync(
+	execute goja.Callable,
+	params, contextValue goja.Value,
+) (*goja.Promise, error) {
 	t.initialUnhandled = make(map[*goja.Promise]struct{})
 	defer func() { t.initialUnhandled = nil }()
 
@@ -85,11 +88,15 @@ func (t *PromiseTracker) callAsync(execute goja.Callable, params, contextValue g
 	if err != nil {
 		return nil, EvaluationError(err)
 	}
+
 	if value == nil || value.ExportType() != reflect.TypeFor[*goja.Promise]() {
 		return nil, ErrEvaluation
 	}
+
 	t.root = value.Export().(*goja.Promise)
+
 	_, t.rootUnhandled = t.initialUnhandled[t.root]
+
 	return t.root, nil
 }
 
@@ -108,12 +115,15 @@ func (t *PromiseTracker) CheckRejections() error {
 // handlers still update the count without retaining those promises.
 func (t *PromiseTracker) checkRootRejections() error {
 	allowed := 0
+
 	if t.rootUnhandled {
 		allowed = 1
 	}
+
 	if t.unhandled != allowed {
 		return ErrEvaluation
 	}
+
 	return nil
 }
 

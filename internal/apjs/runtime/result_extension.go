@@ -69,14 +69,20 @@ func CompileExtendedAsync[T any](
 	if extension.Install == nil {
 		return nil, ErrInvalidInput
 	}
+
 	combined := make([]HostBinding, 0, len(bindings)+len(extension.Bindings))
 	combined = append(combined, bindings...)
 	combined = append(combined, extension.Bindings...)
+
 	program, err := CompileAsync(source, library, combined, limits)
 	if err != nil {
 		return nil, err
 	}
-	return &ExtendedAsyncProgram[T]{program: program, install: extension.Install}, nil
+
+	return &ExtendedAsyncProgram[T]{
+		program: program,
+		install: extension.Install,
+	}, nil
 }
 
 // Validate installs pure helpers and runs bounded initialization without inputs,
@@ -86,14 +92,17 @@ func (p *ExtendedAsyncProgram[T]) Validate(ctx context.Context) error {
 	if p == nil || p.program == nil || p.install == nil {
 		return ErrInvalidInput
 	}
+
 	return p.program.validate(ctx, func(runCtx context.Context, vm *goja.Runtime) error {
 		interpreter, err := p.install(runCtx, vm)
 		if err != nil {
 			return err
 		}
+
 		if interpreter.Fulfilled == nil {
 			return ErrInvalidInput
 		}
+
 		return nil
 	})
 }
@@ -110,6 +119,7 @@ func (p *ExtendedAsyncProgram[T]) Evaluate(
 		var zero T
 		return zero, ErrInvalidInput
 	}
+
 	return evaluateAsync(ctx, p.program, prepare, p.install)
 }
 
@@ -124,55 +134,63 @@ func evaluateAsync[T any](
 ) (T, error) {
 	var result, zero T
 
-	if p == nil || p.program == nil || ctx == nil || prepare == nil || install == nil {
+	if p == nil ||
+		p.program == nil ||
+		ctx == nil ||
+		prepare == nil ||
+		install == nil {
 		return zero, ErrInvalidInput
 	}
 
-	err := Run(ctx, p.limits, func(runCtx context.Context, vm *goja.Runtime) error {
-		encoder := newResultEncoder(runCtx, vm, p.limits)
-		var interpreter ResultInterpreter[T]
-		return p.evaluate(
-			runCtx,
-			vm,
-			func() error { // install
-				var err error
-				interpreter, err = install(runCtx, vm)
-				if err != nil {
-					return err
-				}
-				if interpreter.Fulfilled == nil {
-					return ErrInvalidInput
-				}
-				return nil
-			},
-			prepare,
-			func(root *goja.Promise) error { // interpret
-				var err error
+	err := Run(
+		ctx,
+		p.limits,
+		func(runCtx context.Context, vm *goja.Runtime) error {
+			encoder := newResultEncoder(runCtx, vm, p.limits)
+			var interpreter ResultInterpreter[T]
+			return p.evaluate(
+				runCtx,
+				vm,
+				func() error { // install
+					var err error
+					interpreter, err = install(runCtx, vm)
+					if err != nil {
+						return err
+					}
+					if interpreter.Fulfilled == nil {
+						return ErrInvalidInput
+					}
+					return nil
+				},
+				prepare,
+				func(root *goja.Promise) error { // interpret
+					var err error
 
-				switch root.State() {
-				case goja.PromiseStateFulfilled:
-					result, err = interpreter.Fulfilled(runCtx, root.Result(), encoder)
-				case goja.PromiseStateRejected:
-					if interpreter.Rejected == nil {
+					switch root.State() {
+					case goja.PromiseStateFulfilled:
+						result, err = interpreter.Fulfilled(runCtx, root.Result(), encoder)
+					case goja.PromiseStateRejected:
+						if interpreter.Rejected == nil {
+							return ErrEvaluation
+						}
+						var recognized bool
+						result, recognized, err = interpreter.Rejected(runCtx, root.Result(), encoder)
+						if !recognized {
+							err = ErrEvaluation
+						}
+					default:
 						return ErrEvaluation
 					}
-					var recognized bool
-					result, recognized, err = interpreter.Rejected(runCtx, root.Result(), encoder)
-					if !recognized {
-						err = ErrEvaluation
+
+					if encoder.err != nil {
+						return encoder.err
 					}
-				default:
-					return ErrEvaluation
-				}
 
-				if encoder.err != nil {
-					return encoder.err
-				}
-
-				return err
-			},
-		)
-	})
+					return err
+				},
+			)
+		},
+	)
 	if err != nil {
 		return zero, err
 	}

@@ -124,6 +124,7 @@ func (p *AsyncProgram) evaluate(
 	if invocation.Params == nil || invocation.Context == nil {
 		return ErrInvalidInput
 	}
+
 	if err := runCtx.Err(); err != nil {
 		return err
 	}
@@ -132,12 +133,15 @@ func (p *AsyncProgram) evaluate(
 	if err != nil {
 		return err
 	}
+
 	if err := tracker.CheckRejections(); err != nil {
 		return err
 	}
+
 	if err := runCtx.Err(); err != nil {
 		return err
 	}
+
 	if invocation.Start != nil {
 		invocation.Start()
 	}
@@ -146,13 +150,16 @@ func (p *AsyncProgram) evaluate(
 	if err != nil {
 		return err
 	}
+
 	for root.State() == goja.PromiseStatePending {
 		if err := runCtx.Err(); err != nil {
 			return err
 		}
+
 		if invocation.Await == nil {
 			return ErrEvaluation
 		}
+
 		if err := invocation.Await(); err != nil {
 			return err
 		}
@@ -168,9 +175,12 @@ func (p *AsyncProgram) evaluate(
 	if err := runCtx.Err(); err != nil {
 		return err
 	}
+
 	resultErr := interpret(root)
+
 	if err := tracker.checkRootRejections(); err != nil {
 		return err
 	}
+
 	return resultErr
 }
