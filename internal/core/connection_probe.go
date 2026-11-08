@@ -37,8 +37,14 @@ func (c *connection) GetProbes() []iface.Probe {
 	return probes
 }
 
+// GetEnabledProbe loads the connector definition with the caller's context and
+// returns the requested probe only when its condition passes. Definition-load
+// errors remain wrapped causes; they neither panic nor become JavaScript errors.
 func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface.Probe, error) {
-	def := c.connector.GetDefinition()
+	def, err := c.connector.getDefinitionWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("probe %q: load connector definition: %w", probeId, err)
+	}
 
 	for i := range def.Probes {
 		probe := &def.Probes[i]
@@ -59,8 +65,14 @@ func (c *connection) GetEnabledProbe(ctx context.Context, probeId string) (iface
 	return nil, ErrProbeNotFound
 }
 
+// GetEnabledProbes loads the connector definition and evaluates its conditions
+// under the caller's context. Any load or predicate failure returns no probes,
+// preserving the underlying error for classification and retry decisions.
 func (c *connection) GetEnabledProbes(ctx context.Context) ([]iface.Probe, error) {
-	def := c.connector.GetDefinition()
+	def, err := c.connector.getDefinitionWithContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load connector definition for probes: %w", err)
+	}
 	probes := make([]iface.Probe, 0, len(def.Probes))
 
 	for i := range def.Probes {
@@ -103,12 +115,13 @@ func (c *connection) isProbeEnabled(ctx context.Context, probe *cschema.Probe) (
 		return true, nil
 	}
 
-	if err := ctx.Err(); err != nil {
-		return false, fmt.Errorf("probe %q if.javascript: %w", probe.Id, err)
+	def, err := c.connector.getDefinitionWithContext(ctx)
+	if err != nil {
+		return false, fmt.Errorf("probe %q: load connector definition: %w", probe.Id, err)
 	}
 
 	limits := probePredicateLimits()
-	librarySource := c.connector.GetDefinition().Javascript
+	librarySource := def.Javascript
 
 	if len(probe.If.Javascript) > limits.MaxSourceBytes ||
 		len(librarySource) > limits.MaxSourceBytes-len(probe.If.Javascript) {
@@ -116,7 +129,9 @@ func (c *connection) isProbeEnabled(ctx context.Context, probe *cschema.Probe) (
 	}
 
 	// Check combined source size before the connector cache can compile its
-	// library. The public legacy context builder intentionally remains unchanged.
+	// library. The successful contextual load above populated the definition
+	// cache, so a library error here is a compile error, not a decryption/decode
+	// failure. Only authored compile diagnostics become ErrInvalidSource.
 	library, err := c.connector.getJavascriptLibrary()
 
 	// Compilation itself cannot be interrupted; preserve a cancellation that

@@ -2,11 +2,16 @@ package core
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
+	"github.com/rmorlok/authproxy/internal/encfield"
+	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
@@ -296,4 +301,119 @@ func TestConnection_ProbePredicatePreservesConnectionData(t *testing.T) {
 	require.Equal(t, "eu", conn.configCache["region"])
 	require.Equal(t, "platform", conn.Labels["team"])
 	require.Equal(t, "original", conn.Annotations["note"])
+}
+
+// lookupEnabledProbe exercises both public lookup paths and direct condition
+// evaluation, so a contextual predicate cannot be preceded by a background load.
+func lookupEnabledProbe(ctx context.Context, conn *connection, probe *cschema.Probe, lookup string) (bool, error) {
+	switch lookup {
+	case "single probe":
+		result, err := conn.GetEnabledProbe(ctx, probe.Id)
+		return result != nil, err
+	case "probe list":
+		result, err := conn.GetEnabledProbes(ctx)
+		return len(result) != 0, err
+	default:
+		return conn.isProbeEnabled(ctx, probe)
+	}
+}
+
+// TestConnection_ProbeDefinitionLoadFailure distinguishes definition-load errors
+// from invalid JavaScript and leaves failed loads retryable through every caller.
+func TestConnection_ProbeDefinitionLoadFailure(t *testing.T) {
+	for _, lookup := range []string{"single probe", "probe list", "condition"} {
+		for _, failure := range []string{"decrypt", "decode", "canceled during decrypt", "deadline during decrypt"} {
+			t.Run(lookup+"/"+failure, func(t *testing.T) {
+				// Start with an uncached encrypted definition and already-loaded connection data.
+				probe := cschema.Probe{Id: "conditional", If: &common.Predicate{Javascript: "probeEnabled()"}}
+				definition := cschema.ConnectorDefinition{
+					Javascript: "function probeEnabled() { return true; }",
+					Probes:     []cschema.Probe{probe},
+				}
+				conn := newTestConnection(definition)
+				conn.configLoaded = true
+				encryption := encryptmock.NewMockE(gomock.NewController(t))
+				conn.s.encrypt = encryption
+				encoded, err := json.Marshal(definition)
+				require.NoError(t, err)
+				require.Nil(t, conn.connector.def)
+				loadFailure := errors.New("transient definition decryption failure")
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				if failure == "deadline during decrypt" {
+					ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+					defer cancel()
+				}
+				encryption.EXPECT().DecryptString(ctx, conn.connector.EncryptedDefinition).
+					DoAndReturn(func(loadCtx context.Context, _ encfield.EncryptedField) (string, error) {
+						switch failure {
+						case "decrypt":
+							return "", loadFailure
+						case "decode":
+							return "{", nil
+						case "canceled during decrypt":
+							cancel()
+							return string(encoded), nil
+						default:
+							<-loadCtx.Done()
+							return "", loadCtx.Err()
+						}
+					})
+
+				// Loading fails through ordinary errors, preserving infrastructure/cancellation identity.
+				var enabled bool
+				require.NotPanics(t, func() {
+					enabled, err = lookupEnabledProbe(ctx, conn, &probe, lookup)
+				})
+				require.Error(t, err)
+				require.False(t, enabled)
+				require.Contains(t, err.Error(), "load connector definition")
+				require.NotErrorIs(t, err, jsruntime.ErrInvalidSource)
+				switch failure {
+				case "decrypt":
+					require.ErrorIs(t, err, loadFailure)
+				case "decode":
+					var syntaxError *json.SyntaxError
+					require.ErrorAs(t, err, &syntaxError)
+				case "canceled during decrypt":
+					require.ErrorIs(t, err, context.Canceled)
+				default:
+					require.ErrorIs(t, err, context.DeadlineExceeded)
+				}
+				require.Nil(t, conn.connector.def)
+				require.False(t, conn.connector.jsLoaded)
+
+				// A later live call retries loading, evaluates the predicate, and then reuses the cache.
+				encryption.EXPECT().DecryptString(context.Background(), conn.connector.EncryptedDefinition).
+					Return(string(encoded), nil)
+				for range 2 {
+					enabled, err = lookupEnabledProbe(context.Background(), conn, &probe, lookup)
+					require.NoError(t, err)
+					require.True(t, enabled)
+				}
+			})
+		}
+	}
+}
+
+// TestConnection_ProbeDefinitionCanceledBeforeLoad skips decryption entirely when
+// the request is already canceled, including before the public lookup finds its probe.
+func TestConnection_ProbeDefinitionCanceledBeforeLoad(t *testing.T) {
+	for _, lookup := range []string{"single probe", "probe list", "condition"} {
+		t.Run(lookup, func(t *testing.T) {
+			// No encryption expectation is installed: any attempted load would fail this test.
+			probe := cschema.Probe{Id: "conditional", If: &common.Predicate{Javascript: "true"}}
+			conn := newTestConnection(cschema.ConnectorDefinition{Probes: []cschema.Probe{probe}})
+			conn.s.encrypt = encryptmock.NewMockE(gomock.NewController(t))
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			// Both public lookup and direct condition evaluation retain caller cancellation.
+			enabled, err := lookupEnabledProbe(ctx, conn, &probe, lookup)
+			require.ErrorIs(t, err, context.Canceled)
+			require.False(t, enabled)
+			require.Nil(t, conn.connector.def)
+			require.False(t, conn.connector.jsLoaded)
+		})
+	}
 }
