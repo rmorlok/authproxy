@@ -81,10 +81,13 @@ retains its context error, while policy expiration returns `ErrLimitExceeded`.
 These bounds limit execution and host conversion work; they are not a process
 sandbox or a hard heap quota.
 
-## Probe policy and migration status
+## Connection predicate policy and migration status
 
-Probe `if.javascript` conditions use the bounded adapter with the calling
-request/task context. Each condition has this explicit policy:
+`iface.Connection.EvaluateJavascriptPredicate(ctx, source)` loads the captured
+connector library and connection data, then calls the bounded adapter. Probes,
+setup-step eligibility, and OAuth scope inclusion/required predicates use this
+method with their request/task context. `ConnectorPredicateLimits()` supplies
+their shared explicit policy; it returns a fresh value on each call:
 
 | Limit | Value |
 | --- | --- |
@@ -96,15 +99,23 @@ request/task context. Each condition has this explicit policy:
 | JavaScript call stack | 256 |
 | Evaluation timeout | 1 second |
 
-The source check happens before compiling a connector library. A predicate
-failure prevents the probe from running and returns a safe error with the probe
-ID. Probe HTTP calls keep their existing separate policy. Multiple conditions
-get separate execution budgets, while their common caller context can cancel
-the whole operation.
+Definition loading observes the caller context and preserves decryption/decode
+errors for retry decisions. The source check happens before compiling a connector
+library; only authored compile failures become `ErrInvalidSource`. A predicate
+failure stops the operation with its probe, step, or scope identity in the error.
+HTTP calls keep their existing separate policy. Multiple conditions get separate
+execution budgets, while their common caller context can cancel evaluation.
+
+Setup form and redirect steps evaluate their conditions when the flow checks
+eligibility. OAuth evaluates inclusion before dynamic required status and returns
+cloned scope declarations with concrete Boolean requirements. Constants and
+omitted conditions need no JavaScript execution. Each condition gets a fresh VM;
+mutating `cfg` in one condition cannot affect a later step or scope decision.
+Setup flow construction remains separate from predicate evaluation; its existing
+definition lookup is not changed by this migration.
 
 The legacy `EvaluateBoolean`, `EvaluateObject`, `TransformOptions`, and
-`TransformJSON` APIs remain available during migration. Setup and OAuth scope
-predicates, schema validation, option transforms, and migration hooks still use
-those APIs. They do not yet gain the bounded adapter's cancellation or copied
-inputs. Object and option conversion semantics will be preserved as those
-callers move; this slice changes only runtime probe predicates.
+`TransformJSON` APIs remain available during migration. Schema validation, option
+transforms, and migration hooks still use those APIs; they do not yet gain the
+bounded adapter's cancellation or copied inputs. Object and option conversion
+semantics will be preserved as those callers move.

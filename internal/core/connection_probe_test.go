@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
@@ -160,7 +161,7 @@ func TestConnection_GetEnabledProbesPredicateError(t *testing.T) {
 // connector cache compiles the library, counting library and condition together.
 func TestConnection_ProbePredicateSourceBudget(t *testing.T) {
 	conn := newTestConnection(cschema.ConnectorDefinition{
-		Javascript: strings.Repeat(" ", probePredicateLimits().MaxSourceBytes),
+		Javascript: strings.Repeat(" ", apjs.ConnectorPredicateLimits().MaxSourceBytes),
 		Probes: []cschema.Probe{{
 			Id: "large-source", If: &common.Predicate{Javascript: "true"},
 		}},
@@ -185,7 +186,7 @@ func TestConnection_ProbePredicateBounds(t *testing.T) {
 		"condition loop": {condition: "for (;;) {}"},
 		"input bytes": {
 			condition: "true",
-			config:    map[string]any{"padding": strings.Repeat("x", probePredicateLimits().MaxInputBytes)},
+			config:    map[string]any{"padding": strings.Repeat("x", apjs.ConnectorPredicateLimits().MaxInputBytes)},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
