@@ -2,10 +2,12 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/hibiken/asynq"
@@ -30,6 +32,7 @@ import (
 type toolSetReconcileTest struct {
 	ctx      context.Context
 	db       database.DB
+	encrypt  encrypt.E
 	service  *service
 	enqueued *[]*asynq.Task
 
@@ -49,7 +52,7 @@ func newToolSetReconcileTest(t *testing.T) *toolSetReconcileTest {
 	cfg, e := encrypt.NewTestEncryptService(cfg, db)
 
 	// Record every enqueued task so trigger tests can assert on them.
-	r := &toolSetReconcileTest{ctx: context.Background(), db: db, enqueued: &[]*asynq.Task{}}
+	r := &toolSetReconcileTest{ctx: context.Background(), db: db, encrypt: e, enqueued: &[]*asynq.Task{}}
 	ac := mock.NewMockClient(gomock.NewController(t))
 	ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).
 		DoAndReturn(func(ctx context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
@@ -122,10 +125,23 @@ func (r *toolSetReconcileTest) toolSet(
 	templates ...toolsetschema.ToolTemplate,
 ) apid.ID {
 	t.Helper()
+	return r.toolSetIn(t, "root.team_a", name, state, templates...)
+}
+
+// toolSetIn creates a ToolSet like toolSet, owned by the supplied namespace and
+// selecting provider=calendar across that namespace's subtree.
+func (r *toolSetReconcileTest) toolSetIn(
+	t *testing.T,
+	namespace string,
+	name string,
+	state toolsetschema.ToolSetReleaseState,
+	templates ...toolsetschema.ToolTemplate,
+) apid.ID {
+	t.Helper()
 	created, err := r.service.CreateToolSet(r.ctx, &toolsetschema.ToolSet{
 		TypeMeta: meta.NewTypeMeta(toolsetschema.ToolSetKind),
 		Metadata: meta.ObjectMeta{
-			Namespace: "root.team_a",
+			Namespace: namespace,
 			Name:      scommon.ResourceName(name),
 		},
 		Spec: toolsetschema.ToolSetSpec{
@@ -523,6 +539,133 @@ func (d *cancelAfterSelectorDB) UpdateToolSetConnectionSelector(
 	logical, err := d.DB.UpdateToolSetConnectionSelector(ctx, id, expectedRevision, selector)
 	d.cancel()
 	return logical, err
+}
+
+// TestReconcileToolSetCheckpoints covers saving and resuming a pass's progress.
+func TestReconcileToolSetCheckpoints(t *testing.T) {
+	calendar := map[string]string{"provider": "calendar"}
+
+	// checkpointKey reads the key a pass over the ToolSet's current state uses.
+	checkpointKey := func(t *testing.T, r *toolSetReconcileTest, id apid.ID) database.TaskCheckpointKey {
+		t.Helper()
+		logical, err := r.db.GetToolSet(r.ctx, id)
+		require.NoError(t, err)
+		membership, err := r.service.loadToolSetMembership(r.ctx, logical)
+		require.NoError(t, err)
+		return toolSetReconcileCheckpointKey(membership)
+	}
+
+	// saveProgress stores progress under key, as an interrupted pass would have.
+	saveProgress := func(t *testing.T, r *toolSetReconcileTest, key database.TaskCheckpointKey, progress toolSetReconcileProgress) {
+		t.Helper()
+		checkpointer := database.NewTaskCheckpointer[toolSetReconcileProgress](r.db, key, toolSetReconcileCheckpointTTL)
+		_, err := checkpointer.Load(r.ctx)
+		require.NoError(t, err)
+		require.NoError(t, checkpointer.Save(r.ctx, progress))
+	}
+
+	t.Run("each page is saved and a finished pass clears its progress", func(t *testing.T) {
+		r := newToolSetReconcileTest(t)
+		connection := r.connection(t, "root.team_a", "owner", database.ConnectionStateConfigured, calendar)
+		id := r.toolSet(t, "calendar-tools", toolsetschema.ToolSetReleaseStatePrimary, toolTemplate("list"))
+		key := checkpointKey(t, r, id)
+
+		// Record each saved position while the pass runs.
+		recorder := &checkpointRecordingDB{DB: r.db}
+		r.service.db = recorder
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+		r.service.db = r.db
+
+		// The additions page ended at the connection, then the removals page did.
+		require.Equal(t, []toolSetReconcileProgress{
+			{Phase: toolSetReconcilePhaseAdditions, After: connection.Id.String()},
+			{Phase: toolSetReconcilePhaseRemovals, After: connection.Id.String()},
+		}, recorder.saved)
+
+		// Nothing is left behind once the walk finishes.
+		_, err := r.db.GetTaskCheckpoint(r.ctx, key)
+		require.ErrorIs(t, err, database.ErrNotFound)
+	})
+
+	t.Run("a pass resumes from saved progress", func(t *testing.T) {
+		r := newToolSetReconcileTest(t)
+		id := r.toolSet(t, "calendar-tools", toolsetschema.ToolSetReleaseStatePrimary, toolTemplate("list"))
+		connection := r.connection(t, "root.team_a", "owner", database.ConnectionStateConfigured, calendar)
+
+		// An earlier run of this exact state already finished its additions walk.
+		key := checkpointKey(t, r, id)
+		saveProgress(t, r, key, toolSetReconcileProgress{Phase: toolSetReconcilePhaseRemovals})
+
+		// Resuming skips the additions walk, so the connection is not bound here, and
+		// the finished run clears the checkpoint.
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+		_, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+		require.ErrorIs(t, err, database.ErrNotFound)
+		_, err = r.db.GetTaskCheckpoint(r.ctx, key)
+		require.ErrorIs(t, err, database.ErrNotFound)
+
+		// The next pass starts from the beginning and binds it.
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+		_, err = r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("progress through an older selector is ignored", func(t *testing.T) {
+		r := newToolSetReconcileTest(t)
+		id := r.toolSet(t, "calendar-tools", toolsetschema.ToolSetReleaseStatePrimary, toolTemplate("list"))
+		connection := r.connection(t, "root.team_a", "owner", database.ConnectionStateConfigured, map[string]string{"provider": "crm"})
+
+		// Progress saved under the old selector says the additions walk was done.
+		staleKey := checkpointKey(t, r, id)
+		saveProgress(t, r, staleKey, toolSetReconcileProgress{Phase: toolSetReconcilePhaseRemovals})
+
+		// Changing the selector gives the pass a new key, so it walks additions again.
+		_, err := r.service.UpdateToolSet(r.ctx, id, selectorPatch(toolsetschema.ConnectionSelector{
+			MatchLabels: map[string]string{"provider": "crm"},
+		}))
+		require.NoError(t, err)
+		require.NotEqual(t, staleKey, checkpointKey(t, r, id))
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+		_, err = r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+		require.NoError(t, err)
+	})
+
+	t.Run("a pass that loses its checkpoint stops without failing", func(t *testing.T) {
+		r := newToolSetReconcileTest(t)
+		id := r.toolSet(t, "calendar-tools", toolsetschema.ToolSetReleaseStatePrimary, toolTemplate("list"))
+		r.connection(t, "root.team_a", "owner", database.ConnectionStateConfigured, calendar)
+
+		// Every save conflicts, as if another pass for the same state took over.
+		r.service.db = &checkpointRecordingDB{DB: r.db, conflict: true}
+		require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+	})
+}
+
+// checkpointRecordingDB records the progress each checkpoint save writes, and
+// can instead fail every save as if another run held the checkpoint.
+type checkpointRecordingDB struct {
+	database.DB
+	conflict bool
+	saved    []toolSetReconcileProgress
+}
+
+// SaveTaskCheckpoint records the progress and writes it, or reports a conflict.
+func (d *checkpointRecordingDB) SaveTaskCheckpoint(
+	ctx context.Context,
+	key database.TaskCheckpointKey,
+	expectedRevision string,
+	payload json.RawMessage,
+	ttl time.Duration,
+) (string, error) {
+	if d.conflict {
+		return "", database.ErrTaskCheckpointConflict
+	}
+	var progress toolSetReconcileProgress
+	if err := json.Unmarshal(payload, &progress); err != nil {
+		return "", err
+	}
+	d.saved = append(d.saved, progress)
+	return d.DB.SaveTaskCheckpoint(ctx, key, expectedRevision, payload, ttl)
 }
 
 // TestReconcileToolSetTask covers payload handling in the asynq handler.

@@ -73,11 +73,14 @@ func TestGetCronTasks_SchedulesOnlyEnabledPeriodicProbes(t *testing.T) {
 		DecryptString(gomock.Any(), encryptedDef).
 		Return(string(connJSON), nil)
 
+	// The enabled periodic probe, then the singleton cleanup and ToolSet sweep.
 	tasks := svc.GetCronTasks()
-	require.Len(t, tasks, 2)
+	require.Len(t, tasks, 3)
 	assert.Equal(t, taskTypeProbe, tasks[0].Task.Type())
 	assert.Equal(t, "@every 1m0s", tasks[0].Cronspec)
 	assert.Equal(t, taskTypeProbeOutcomeCleanup, tasks[1].Task.Type())
+	assert.Equal(t, taskTypeSweepToolSets, tasks[2].Task.Type())
+	assert.Equal(t, toolSetSweepCronspec, tasks[2].Cronspec)
 }
 
 type staticListConnectionsBuilder struct {
