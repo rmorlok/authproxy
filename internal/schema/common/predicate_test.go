@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -9,6 +10,50 @@ import (
 	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
+
+// TestPredicateValidateBounded checks copied validation inputs, limits, and safe
+// error paths at the common entry point shared by connector predicate fields.
+func TestPredicateValidateBounded(t *testing.T) {
+	vars := map[string]any{"cfg": map[string]any{"enabled": true}}
+	jsctx := apjs.NewContext(nil, vars)
+	vc := &ValidationContext{Path: "predicate"}
+
+	// Statement completion and boxed Boolean compatibility do not expose Go maps.
+	p := &Predicate{Javascript: `cfg.enabled = false; new Boolean(true);`}
+	require.NoError(t, p.Validate(vc, jsctx))
+	require.Equal(t, true, vars["cfg"].(map[string]any)["enabled"])
+
+	for _, tc := range []struct {
+		name   string
+		source string
+		vars   map[string]any
+		want   error
+	}{
+		{name: "source", source: strings.Repeat(" ", apjs.ConnectorPredicateLimits().MaxSourceBytes) + "true", want: jsruntime.ErrLimitExceeded},
+		{name: "input", source: "true", vars: map[string]any{"padding": strings.Repeat("x", apjs.ConnectorPredicateLimits().MaxInputBytes)}, want: jsruntime.ErrLimitExceeded},
+		{name: "private throw", source: `throw new Error("privateValidationDetail")`, want: jsruntime.ErrEvaluation},
+		{name: "private syntax", source: "privateValidationDetail ===", want: jsruntime.ErrInvalidSource},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Schema errors retain the field path and safe category, not authored details.
+			p := &Predicate{Javascript: tc.source}
+			err := p.Validate(vc, apjs.NewContext(nil, tc.vars))
+			require.ErrorContains(t, err, "predicate.javascript")
+			require.ErrorContains(t, err, tc.want.Error())
+			require.NotContains(t, err.Error(), "privateValidationDetail")
+		})
+	}
+
+	// Nested validation observes cancellation before parsing authored source.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	vc = (&ValidationContext{Path: "setup", Ctx: ctx}).PushField("steps").PushIndex(0).PushField("if")
+	p = &Predicate{Javascript: "privateValidationDetail ==="}
+	err := p.Validate(vc, jsctx)
+	require.ErrorContains(t, err, "setup.steps[0].if.javascript")
+	require.ErrorContains(t, err, context.Canceled.Error())
+	require.NotContains(t, err.Error(), "privateValidationDetail")
+}
 
 func TestPredicateValidate(t *testing.T) {
 	vars := map[string]any{

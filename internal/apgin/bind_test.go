@@ -1,17 +1,24 @@
 package apgin
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apid"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/apserde"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/stretchr/testify/require"
 )
@@ -178,15 +185,71 @@ func TestRenderResourceJSONValidatesAndRedacts(t *testing.T) {
     }`, response.Body.String())
 }
 
+// TestRenderResourceJSONRejectsInvalidServerResponse keeps validation failures
+// usable without an HTTP request, before the API renderer needs one.
 func TestRenderResourceJSONRejectsInvalidServerResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 
 	resource := bindTestResource{
 		TypeMeta: meta.NewTypeMeta(bindTestResourceKind),
 		Metadata: meta.ObjectMeta{Name: "example"},
 	}
+	// Missing server identity is rejected even without a request context.
 	err := RenderResourceJSON(ctx, http.StatusOK, &resource)
 	require.ErrorContains(t, err, "$.metadata.id: is required")
+}
+
+// TestResourceJSONConnectorJavascriptValidation exercises real connector
+// validation at both HTTP boundaries, including request cancellation and safe
+// errors that retain the offending field without exposing authored details.
+func TestResourceJSONConnectorJavascriptValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, boundary := range []string{"bind", "render"} {
+		for name, test := range map[string]struct {
+			source string
+			want   error
+		}{
+			"request deadline":  {source: "for (;;) {} // private source", want: context.DeadlineExceeded},
+			"private exception": {source: `throw new Error("private exception")`, want: jsruntime.ErrEvaluation},
+		} {
+			t.Run(boundary+"/"+name, func(t *testing.T) {
+				// The only invalid field is the authored helper library.
+				resource := cschema.NewConnector()
+				resource.Metadata.Namespace = "root"
+				resource.Spec.Definition.Javascript = test.source
+				if boundary == "render" {
+					resource = resource.ApplyAPICreateDefaults(apid.New(apid.PrefixConnector))
+					resource.Status = &cschema.ConnectorStatus{
+						Release: cschema.ConnectorReleaseStatus{State: cschema.ConnectorReleaseStateDraft},
+					}
+				}
+				body, err := json.Marshal(resource)
+				require.NoError(t, err)
+				var requestCtx context.Context
+				var cancel context.CancelFunc
+				if test.want == context.DeadlineExceeded {
+					requestCtx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
+				} else {
+					requestCtx, cancel = context.WithCancel(context.Background())
+				}
+				defer cancel()
+				response := httptest.NewRecorder()
+				gctx, _ := gin.CreateTestContext(response)
+				gctx.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body)).WithContext(requestCtx)
+
+				// Both paths stop JavaScript at the request deadline and keep errors safe.
+				if boundary == "bind" {
+					var decoded cschema.Connector
+					err = BindResourceJSON(gctx, &decoded, meta.ValidationModeCreate)
+				} else {
+					err = RenderResourceJSON(gctx, http.StatusOK, resource)
+				}
+				require.ErrorContains(t, err, "$.spec.definition.javascript")
+				require.ErrorContains(t, err, test.want.Error())
+				require.NotContains(t, err.Error(), "private")
+				require.Empty(t, response.Body.String(), "validation failures must not write a response")
+			})
+		}
+	}
 }

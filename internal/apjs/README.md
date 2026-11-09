@@ -81,13 +81,48 @@ retains its context error, while policy expiration returns `ErrLimitExceeded`.
 These bounds limit execution and host conversion work; they are not a process
 sandbox or a hard heap quota.
 
+## Bounded connector validation
+
+`CompileAndValidateLibraryWithContext` checks raw source size before parsing and
+runs helper initialization in a fresh bounded VM:
+
+```go
+library, err := apjs.CompileAndValidateLibraryWithContext(
+    ctx, `function isEnabled() { return cfg.enabled === true; }`,
+    apjs.ConnectorPredicateLimits(),
+)
+```
+
+Initialization has no input globals or HTTP hosts. The function above is valid
+because it reads `cfg` only when called. Top-level `const enabled = cfg.enabled`
+fails validation because `cfg` is not available yet. Reserved-name checks run
+under the same deadline, including getters installed by the library. Parsing is
+byte-bounded and checked for cancellation around the call, but cannot be
+interrupted midway. Successful libraries retain their raw source for subsequent
+combined library/predicate limits, including whitespace-only source.
+
+Connector schema validation uses this API for the library, then evaluates each
+Boolean predicate with empty `cfg`, `labels`, and `annotations` objects. A false
+result is valid; a non-Boolean result is rejected. This preserves the existing
+validation contract rather than predicting the result for a real connection.
+
+`common.ValidationContext` carries cancellation through nested fields. API
+resource binding/rendering and connector create/update operations supply their
+request context. Synchronous callers that omit it, such as configuration and
+local manifest validation, still get finite execution limits. Each library and
+predicate gets a separate budget; there is no total connector-validation timeout
+unless the caller supplies one. Schema errors keep field paths and safe failure
+text; these existing wrappers stringify the underlying error rather than retain
+its Go error identity. The bounded library API itself preserves context errors.
+
 ## Connection predicate policy and migration status
 
 `iface.Connection.EvaluateJavascriptPredicate(ctx, source)` loads the captured
 connector library and connection data, then calls the bounded adapter. Probes,
 setup-step eligibility, and OAuth scope inclusion/required predicates use this
 method with their request/task context. `ConnectorPredicateLimits()` supplies
-their shared explicit policy; it returns a fresh value on each call:
+their shared explicit policy, also used for library and Boolean predicate schema
+validation; it returns a fresh value on each call:
 
 | Limit | Value |
 | --- | --- |
@@ -114,8 +149,8 @@ mutating `cfg` in one condition cannot affect a later step or scope decision.
 Setup flow construction remains separate from predicate evaluation; its existing
 definition lookup is not changed by this migration.
 
-The legacy `EvaluateBoolean`, `EvaluateObject`, `TransformOptions`, and
-`TransformJSON` APIs remain available during migration. Schema validation, option
-transforms, and migration hooks still use those APIs; they do not yet gain the
-bounded adapter's cancellation or copied inputs. Object and option conversion
-semantics will be preserved as those callers move.
+The legacy library and expression APIs remain available during migration.
+Option transforms and migration hooks, including hook syntax validation, still
+use those APIs; they do not yet gain the bounded adapters' cancellation or copied
+inputs. Object and option conversion semantics will be preserved as those
+callers move.

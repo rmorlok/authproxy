@@ -16,16 +16,23 @@ type Predicate struct {
 	Javascript string `json:"javascript" yaml:"javascript"`
 }
 
+// Validate checks that a present predicate returns a Boolean with the supplied
+// validation variables. It uses the connector predicate limits and caller
+// cancellation, copies inputs, and reports safe failures at the javascript path.
+// As with other schema errors, the path wrapper retains error text, not causes.
 func (p *Predicate) Validate(vc *ValidationContext, jsctx apjs.Context) error {
 	if p == nil {
 		return nil
 	}
 	result := &multierror.Error{}
-	if strings.TrimSpace(p.Javascript) == "" {
+	limits := apjs.ConnectorPredicateLimits()
+	// Bound even the blank-source scan; oversized input goes to the evaluator's
+	// source gate without scanning or parsing the entire authored string.
+	if len(p.Javascript) <= limits.MaxSourceBytes && strings.TrimSpace(p.Javascript) == "" {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript is required"))
 		return result.ErrorOrNil()
 	}
-	if _, err := jsctx.EvaluateBoolean(p.Javascript); err != nil {
+	if _, err := jsctx.EvaluateBooleanWithContext(vc.Context(), p.Javascript, limits); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript must evaluate to a boolean: %v", err))
 	}
 	return result.ErrorOrNil()
