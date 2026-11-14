@@ -2,15 +2,80 @@ package apjs
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
+	"github.com/dop251/goja/parser"
 	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
+
+// TestBoundedLibraryValidationDiagnostics exposes only source coordinates and
+// fixed reserved names while retaining the shared invalid-source category.
+func TestBoundedLibraryValidationDiagnostics(t *testing.T) {
+	limits := boundedPredicateTestLimits()
+	for _, tc := range []struct {
+		name     string
+		source   string
+		position string
+	}{
+		{name: "parse", source: "\n\nconst secret = ;", position: "line 3, column 16"},
+		{name: "compile", source: "let secret = 1;\nlet secret = 2;", position: "line 2, column 5"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Parsing and AST compilation report positions through different Goja error types.
+			library, err := CompileAndValidateLibraryWithContext(context.Background(), tc.source, limits)
+			require.Nil(t, library)
+			require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
+			require.ErrorContains(t, err, tc.position)
+			require.NotContains(t, err.Error(), "secret")
+			require.NotContains(t, err.Error(), "connector.js")
+			require.NotContains(t, err.Error(), "Unexpected")
+			require.NotContains(t, err.Error(), "already been declared")
+
+			// The sanitized error must not retain authored diagnostics in its unwrap chain.
+			var parseErrors parser.ErrorList
+			var compileError *goja.CompilerSyntaxError
+			require.False(t, errors.As(err, &parseErrors))
+			require.False(t, errors.As(err, &compileError))
+		})
+	}
+
+	for _, name := range []string{"cfg", "labels", "annotations", "data"} {
+		t.Run(name, func(t *testing.T) {
+			// Only the trusted reserved name is exposed; its authored value remains private.
+			source := fmt.Sprintf(`const %s = "privateLibraryDetail";`, name)
+			library, err := CompileAndValidateLibraryWithContext(context.Background(), source, limits)
+			require.Nil(t, library)
+			require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
+			require.ErrorContains(t, err, fmt.Sprintf(`reserved runtime variable %q`, name))
+			require.NotContains(t, err.Error(), "privateLibraryDetail")
+		})
+	}
+}
+
+// TestBoundedLibraryDiagnosticsDoNotChangePredicates keeps runtime predicate
+// failures opaque even when equivalent definition-validation errors have detail.
+func TestBoundedLibraryDiagnosticsDoNotChangePredicates(t *testing.T) {
+	limits := boundedPredicateTestLimits()
+
+	// Predicate syntax does not inherit validation-only line and column details.
+	_, err := NewContext(nil, nil).EvaluateBooleanWithContext(context.Background(), "\nconst secret = ;", limits)
+	require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
+	require.Equal(t, jsruntime.ErrInvalidSource.Error(), err.Error())
+
+	// A reserved global in a runtime helper library remains a bare classification.
+	library, err := CompileLibrary(`const data = "privateLibraryDetail";`)
+	require.NoError(t, err)
+	_, err = library.NewContext(nil).EvaluateBooleanWithContext(context.Background(), "true", limits)
+	require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
+	require.Equal(t, jsruntime.ErrInvalidSource.Error(), err.Error())
+}
 
 // TestBoundedLibrarySourceLimits checks the raw source before parsing or dropping
 // whitespace and retains it for a later combined library/predicate allowance.

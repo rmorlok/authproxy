@@ -115,7 +115,8 @@ func (c *ConnectorDefinition) Clone() *ConnectorDefinition {
 // Validate checks connector behavior and evaluates authored JavaScript with
 // finite limits under the validation context. Each library or predicate gets
 // its own budget. Field errors are collected; library and predicate failures
-// omit authored diagnostics.
+// omit authored messages while library validation includes syntax positions and
+// conflicting reserved global names.
 func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
 	javascript, err := apjs.CompileAndValidateLibraryWithContext(vc.Context(), c.Javascript, apjs.ConnectorPredicateLimits())

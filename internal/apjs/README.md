@@ -101,6 +101,13 @@ byte-bounded and checked for cancellation around the call, but cannot be
 interrupted midway. Successful libraries retain their raw source for subsequent
 combined library/predicate limits, including whitespace-only source.
 
+Library validation errors include the first syntax error's one-based line and
+column within the library source when available, or the conflicting reserved
+global name (`cfg`, `labels`, `annotations`, or `data`). They still match
+`ErrInvalidSource` and do not retain parser messages, source text, filenames, or
+thrown values. Runtime failures and
+predicate evaluation errors remain opaque shared-runtime categories.
+
 Connector schema validation uses this API for the library, then evaluates each
 Boolean predicate with empty `cfg`, `labels`, and `annotations` objects. A false
 result is valid; a non-Boolean result is rejected. This preserves the existing

@@ -113,6 +113,17 @@ func TestConnectorJavascriptValidation(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "javascript: invalid connector javascript")
 		assert.Contains(t, err.Error(), jsruntime.ErrInvalidSource.Error())
+		assert.Contains(t, err.Error(), `reserved runtime variable "cfg"`)
+	})
+
+	t.Run("library syntax errors retain position", func(t *testing.T) {
+		// Definition authors get a useful location without parser text or source.
+		connector := ConnectorDefinition{Javascript: "// privateSource\nconst x = ;"}
+		err := connector.Validate(&common.ValidationContext{Path: "definition"})
+		require.ErrorContains(t, err, "definition.javascript: invalid connector javascript")
+		require.ErrorContains(t, err, "invalid JavaScript source at line 2, column 11")
+		require.NotContains(t, err.Error(), "privateSource")
+		require.NotContains(t, err.Error(), "Unexpected token")
 	})
 }
 
