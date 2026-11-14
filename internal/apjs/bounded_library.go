@@ -92,14 +92,17 @@ func libraryCompileValidationError(err error) error {
 	var line, column int
 	var parseErrors parser.ErrorList
 	var compileError *goja.CompilerSyntaxError
+
 	if errors.As(err, &parseErrors) && len(parseErrors) > 0 && parseErrors[0] != nil {
 		line, column = parseErrors[0].Position.Line, parseErrors[0].Position.Column
 	} else if errors.As(err, &compileError) && compileError.File != nil && compileError.Offset >= 0 {
 		position := compileError.File.Position(compileError.Offset)
 		line, column = position.Line, position.Column
 	}
+
 	if line > 0 && column > 0 {
 		return fmt.Errorf("%w at line %d, column %d", jsruntime.ErrInvalidSource, line, column)
 	}
+	
 	return jsruntime.ErrInvalidSource
 }
