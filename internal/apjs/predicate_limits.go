@@ -23,3 +23,13 @@ func ConnectorPredicateLimits() jsruntime.Limits {
 		Timeout:        time.Second,
 	}
 }
+
+// ConnectorMigrationLimits returns the explicit policy for one generation's
+// migration hook. It shares the connector predicate source, input, traversal,
+// stack, and execution bounds, with a separate 1 MiB JSON patch allowance.
+// Multiple generations receive independent budgets under the common task context.
+func ConnectorMigrationLimits() jsruntime.Limits {
+	limits := ConnectorPredicateLimits()
+	limits.MaxOutputBytes = 1 << 20
+	return limits
+}

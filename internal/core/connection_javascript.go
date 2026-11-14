@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/apjs"
-	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 // EvaluateJavascriptPredicate evaluates a connector condition against copied
@@ -20,27 +19,10 @@ import (
 // Source is checked before the library cache can compile it, and caller
 // cancellation takes precedence over errors from that noninterruptible parsing.
 func (c *connection) EvaluateJavascriptPredicate(ctx context.Context, expression string) (bool, error) {
-	if ctx == nil {
-		return false, jsruntime.ErrInvalidInput
-	}
-	def, err := c.connector.getDefinitionWithContext(ctx)
-	if err != nil {
-		return false, fmt.Errorf("load connector definition: %w", err)
-	}
-
 	limits := apjs.ConnectorPredicateLimits()
-	if len(expression) > limits.MaxSourceBytes || len(def.Javascript) > limits.MaxSourceBytes-len(expression) {
-		return false, jsruntime.ErrLimitExceeded
-	}
-
-	// The contextual load populated the definition cache. Library failures
-	// below can only be compile errors, not decryption or decode failures.
-	library, err := c.connector.getJavascriptLibrary()
-	if contextErr := ctx.Err(); contextErr != nil {
-		return false, contextErr
-	}
+	library, err := c.connector.getBoundedJavascriptLibrary(ctx, expression, limits)
 	if err != nil {
-		return false, jsruntime.ErrInvalidSource
+		return false, err
 	}
 
 	jsctx, err := c.getJavascriptContext(ctx, library)

@@ -40,6 +40,10 @@ type outputEncoder struct {
 	// traversal work. Each encode call starts fresh counters against these caps.
 	limits Limits
 
+	// options records the trusted adapter's serialization choices. The default
+	// rejects undefined values; an adapter may omit undefined object properties.
+	options JSONOutputOptions
+
 	// ownKeys is the original Reflect.ownKeys function, captured before authored
 	// code runs. It includes symbol and non-enumerable keys so validation can
 	// inspect properties that ordinary JSON serialization would silently omit.
@@ -289,8 +293,9 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 }
 
 // properties emits own enumerable string data properties in JavaScript's key
-// order. Hidden data properties are omitted but consume inspection work;
-// accessors and symbol keys are rejected instead of invoking or losing them.
+// order. Hidden data properties and optionally undefined data properties are
+// omitted but consume inspection work; accessors and symbol keys are rejected
+// instead of invoking or losing them.
 func (s *outputState) properties(
 	object, keys *goja.Object,
 	keyCount int64,
@@ -317,6 +322,9 @@ func (s *outputState) properties(
 		}
 
 		if !enumerable {
+			continue
+		}
+		if s.encoder.options.OmitUndefinedProperties && goja.IsUndefined(value) {
 			continue
 		}
 

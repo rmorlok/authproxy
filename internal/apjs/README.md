@@ -157,8 +157,72 @@ mutating `cfg` in one condition cannot affect a later step or scope decision.
 Setup flow construction remains separate from predicate evaluation; its existing
 definition lookup is not changed by this migration.
 
-The legacy library and expression APIs remain available during migration.
-Option transforms and migration hooks, including hook syntax validation, still
-use those APIs; they do not yet gain the bounded adapters' cancellation or copied
-inputs. Object and option conversion semantics will be preserved as those
-callers move.
+## Bounded migration hooks
+
+`Context.EvaluateObjectJSONWithContext` evaluates a connector expression and
+returns detached JSON object bytes. Boolean predicates and object expressions
+share input copying, helper initialization, cancellation, and bounded output
+encoding. The returned bytes can be decoded directly into a caller's patch type.
+
+For example, an upgrade hook can rename a saved configuration field:
+
+```javascript
+({
+    config: {
+        set: { workspaceId: cfg.workspace_id },
+        unset: ["workspace_id"]
+    }
+})
+```
+
+Migration hooks receive the candidate's `cfg`, user `labels`, and `annotations`.
+The selected generation's helper library is available to both upgrade and
+downgrade hooks. Only the returned patch changes the candidate: assigning to
+`cfg` inside JavaScript edits a private copy. The next generation sees changes
+from the previous generation's successfully applied patch.
+
+Root `null` and `undefined` retain their existing meaning: an empty `{}` patch.
+Other results must be plain JSON objects. Arrays and scalar roots are rejected.
+Object properties valued `undefined` are omitted at any depth, matching
+`JSON.stringify`. In the example above, if `cfg.workspace_id` is missing, `set`
+becomes `{}` and the hook succeeds without setting `workspaceId`. Explicit `null`
+is retained, so `workspaceId: null` sets a JSON null value.
+
+Nested getters, proxies, custom prototypes, cycles, functions, undefined array
+elements, and non-finite numbers are rejected by the shared encoder. This
+deliberately narrows the legacy object export behavior; migration hooks should
+return ordinary JSON data rather than rely on getter execution or implicit
+object conversion.
+Property omission is an explicit object-evaluator option; other runtime callers
+keep the strict default. It does not invoke getters or `toJSON`, and inspecting
+omitted properties still counts toward the traversal budget.
+
+`ConnectorMigrationLimits()` uses the source, input, depth, node, stack, and
+timeout limits above, with a **1 MiB JSON output allowance**. Each generation's
+hook gets its own JavaScript/encoding budget under the common migration context.
+Definition loading uses that context, and raw library-plus-hook source is checked
+by the shared bounded library loader before compilation or reuse from its cache.
+The loader also serves connector predicates and checks each caller's combined
+source allowance, including callers with a tighter limit than the first compile.
+JavaScript and encoding errors are opaque; definition-load failures retain their
+causes. Typed patch decoding and existing patch validation follow evaluation,
+with caller cancellation checked before applying the patch.
+
+Hook compilation and evaluation failures write an application log with the
+connection and generation IDs, the failure category, and the evaluation phase
+(such as `execute` or `output`).
+Syntax errors and throws also include the `library` or `expression` source unit
+and one-based line/column when available. For example, a helper that throws can
+report `phase=execute source=library line=7 column=3` while the API error stays
+`JavaScript execution failed`. This metadata is available to trusted adapters
+through `Diagnostic(err)`. Logs omit exception messages, source snippets,
+configuration, returned values, and JSON property names, which can all contain
+private data. Output rejections currently identify the phase and category,
+without a JSON path.
+
+The unused unbounded object evaluator has been removed; object callers use
+`EvaluateObjectJSONWithContext`. Other legacy library and expression APIs remain
+available during migration.
+Option transforms still use unbounded execution and their existing conversion
+semantics. Migration-hook syntax validation remains on its legacy compile-only
+path; it does not execute the hook and is a separate migration follow-up.
