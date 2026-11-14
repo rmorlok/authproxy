@@ -7,7 +7,8 @@ import (
 )
 
 // ConnectorPredicateLimits returns the finite execution profile for connection
-// predicates used by probes, setup eligibility, and OAuth scope decisions. Each
+// predicates used by probes, setup eligibility, and OAuth scope decisions, and
+// for schema validation of their helper library and predicates. Each
 // call returns an independent policy value; it does not change shared runtime
 // defaults or grant capabilities. Five output bytes accommodate either boolean.
 // HTTP requests and other connector expressions use their own separate policy.
