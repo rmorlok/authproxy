@@ -2,7 +2,6 @@ package apjs
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -38,13 +37,9 @@ func TestBoundedObjectCompatibility(t *testing.T) {
 
 	// Existing helpers initialize without input globals and read them when called.
 	source := `assignedWithoutDeclaration = patch(); assignedWithoutDeclaration;`
-	legacy, err := jsctx.EvaluateObject(source)
-	require.NoError(t, err)
-	want, err := json.Marshal(legacy)
-	require.NoError(t, err)
 	got, err := jsctx.EvaluateObjectJSONWithContext(context.Background(), source, boundedObjectTestLimits())
 	require.NoError(t, err)
-	require.JSONEq(t, string(want), string(got))
+	require.JSONEq(t, `{"config":{"set":{"name":"tenant","integer":9007199254740991,"decimal":1.25}},"labels":{"set":{"team":"platform"}},"initializedWithoutConfig":true}`, string(got))
 	require.Contains(t, string(got), "9007199254740991")
 
 	// Omitted results retain the migration contract instead of becoming invalid JSON output.
@@ -53,6 +48,22 @@ func TestBoundedObjectCompatibility(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "{}", string(got))
 	}
+}
+
+// TestBoundedObjectUndefinedProperties preserves optional-field copying by
+// omitting undefined object properties at every depth while retaining nulls.
+func TestBoundedObjectUndefinedProperties(t *testing.T) {
+	// Missing input fields disappear even inside objects nested in arrays.
+	got, err := NewContext(nil, map[string]any{"cfg": map[string]any{}}).EvaluateObjectJSONWithContext(
+		context.Background(), `({
+			missing: cfg.optional,
+			nested: {first: undefined, kept: null, last: undefined},
+			items: [{optional: cfg.optional, present: 1}],
+			empty: {optional: cfg.optional}
+		})`, boundedObjectTestLimits(),
+	)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"nested":{"kept":null},"items":[{"present":1}],"empty":{}}`, string(got))
 }
 
 // TestBoundedObjectOwnership keeps mutations inside one VM and returns JSON
@@ -97,7 +108,7 @@ func TestBoundedObjectFailures(t *testing.T) {
 		"getter":           {source: `({get privateDetail() { for (;;) {} }})`, want: jsruntime.ErrInvalidOutput},
 		"proxy":            {source: `new Proxy({}, {ownKeys() { for (;;) {} }})`, want: jsruntime.ErrInvalidOutput},
 		"cycle":            {source: `const result = {}; result.privateDetail = result; result;`, want: jsruntime.ErrInvalidOutput},
-		"nested undefined": {source: `({privateDetail: undefined})`, want: jsruntime.ErrInvalidOutput},
+		"array undefined":  {source: `({privateDetail: [undefined]})`, want: jsruntime.ErrInvalidOutput},
 		"custom prototype": {source: `Object.create({privateDetail: true})`, want: jsruntime.ErrInvalidOutput},
 	} {
 		t.Run(name, func(t *testing.T) {

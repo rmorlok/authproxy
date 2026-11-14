@@ -26,7 +26,7 @@ func (s *service) applyMigrationHookForGeneration(
 	generation *Connector,
 	sourceGeneration,
 	targetGeneration uint64,
-) error {
+) (err error) {
 	if ctx == nil {
 		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, jsruntime.ErrInvalidInput)
 	}
@@ -47,20 +47,38 @@ func (s *service) applyMigrationHookForGeneration(
 	if hook == nil || hook.Javascript == "" {
 		return nil
 	}
+	defer func() {
+		// Only host-owned diagnostic fields cross into logs. Error messages,
+		// output paths, and source snippets can contain connection secrets.
+		diagnostic, ok := apjs.Diagnostic(err)
+		if !ok {
+			return
+		}
+		attrs := []any{
+			"operation", "migrate_connection_generation",
+			"connection_id", candidate.Connection.Id,
+			"connector_id", generation.Id,
+			"generation", generation.Generation,
+			"source_generation", sourceGeneration,
+			"target_generation", targetGeneration,
+			"phase", diagnostic.Phase,
+			"category", diagnostic.Category,
+		}
+		if diagnostic.Source != "" {
+			attrs = append(attrs, "source", diagnostic.Source)
+		}
+		if diagnostic.Line > 0 && diagnostic.Column > 0 {
+			attrs = append(attrs, "line", diagnostic.Line, "column", diagnostic.Column)
+		}
+		s.logger.WarnContext(ctx, "migration hook JavaScript failed", attrs...)
+	}()
 
 	limits := apjs.ConnectorMigrationLimits()
-	if len(hook.Javascript) > limits.MaxSourceBytes || len(def.Javascript) > limits.MaxSourceBytes-len(hook.Javascript) {
-		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, jsruntime.ErrLimitExceeded)
-	}
-
-	// The contextual definition load completed before the library cache can
-	// compile source. Any cache error is now authored syntax, not a load failure.
-	jsLib, err := generation.getJavascriptLibrary()
-	if contextErr := ctx.Err(); contextErr != nil {
-		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, contextErr)
-	}
+	// The shared loader bounds library and hook source before compiling or
+	// reusing the library, including when this caller has a tighter policy.
+	jsLib, err := generation.getBoundedJavascriptLibrary(ctx, hook.Javascript, limits)
 	if err != nil {
-		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, jsruntime.ErrInvalidSource)
+		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, err)
 	}
 	result, err := apjs.NewContext(jsLib, map[string]any{
 		"cfg":         candidate.Config,

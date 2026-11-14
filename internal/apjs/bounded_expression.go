@@ -19,8 +19,30 @@ func (c Context) evaluateJSONWithContext(
 	ctx context.Context,
 	expression string,
 	limits jsruntime.Limits,
+	outputOptions jsruntime.JSONOutputOptions,
 	convert func(context.Context, *goja.Runtime, goja.Value) (goja.Value, error),
-) (json.RawMessage, error) {
+) (result json.RawMessage, err error) {
+	diagnostic := FailureDiagnostic{Phase: "source"}
+	var locatedError error
+	defer func() {
+		if err != nil {
+			// The runtime may replace an authored failure with cancellation or a
+			// policy timeout. Do not attribute the final failure to a stale throw.
+			if locatedError != nil && err != locatedError {
+				diagnostic.Source, diagnostic.Line, diagnostic.Column = "", 0, 0
+			}
+			err = withFailureDiagnostic(err, diagnostic)
+		}
+	}()
+
+	// Capture metadata before the classifier discards the Goja error. Neither
+	// metadata nor the returned safe category retains the original exception.
+	evaluationError := func(cause error) error {
+		diagnostic.setExceptionPosition(cause)
+		locatedError = jsruntime.EvaluationError(cause)
+		return locatedError
+	}
+
 	if ctx == nil {
 		return nil, jsruntime.ErrInvalidInput
 	}
@@ -43,17 +65,22 @@ func (c Context) evaluateJSONWithContext(
 		return nil, jsruntime.ErrInvalidSource
 	}
 
-	return jsruntime.EvaluateJSON(
+	return jsruntime.EvaluateJSONWithOptions(
 		ctx,
 		limits,
+		outputOptions,
 		func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
+			diagnostic = FailureDiagnostic{Phase: "expression-compile"}
 			// Preserve legacy script syntax and non-strict semantics. Compilation is
 			// byte-bounded; Go parsing is cooperative only at the surrounding checks.
 			program, err := compileSource("expression.js", expression)
 			if err != nil {
+				diagnostic.setCompilePosition(err, "expression")
+				locatedError = jsruntime.ErrInvalidSource
 				return nil, jsruntime.ErrInvalidSource
 			}
 
+			diagnostic = FailureDiagnostic{Phase: "input"}
 			inputLimits := jsruntime.JSONLimits{
 				MaxBytes: limits.MaxInputBytes,
 				MaxDepth: limits.MaxDepth,
@@ -76,28 +103,35 @@ func (c Context) evaluateJSONWithContext(
 				return nil, err
 			}
 
-			if err := c.library.Run(vm); err != nil {
-				return nil, jsruntime.EvaluationError(err)
+			diagnostic = FailureDiagnostic{Phase: "library-initialize"}
+			if c.library != nil && c.library.program != nil {
+				// Library.Run formats its legacy diagnostic, which can call an
+				// authored thrown value's toString. The bounded path never needs it.
+				if _, err := vm.RunProgram(c.library.program); err != nil {
+					return nil, evaluationError(err)
+				}
 			}
 
+			diagnostic = FailureDiagnostic{Phase: "reserved-bindings"}
 			// Reading a reserved global can invoke a library-installed accessor.
 			// Catch authored exceptions without hiding uncatchable runtime limits.
 			if exception := vm.Try(
 				func() { err = validateReservedRuntimeVars(vm) },
 			); exception != nil {
-				return nil, jsruntime.EvaluationError(exception)
+				return nil, evaluationError(exception)
 			}
 			if err != nil {
 				return nil, jsruntime.ErrInvalidSource
 			}
 
+			diagnostic = FailureDiagnostic{Phase: "input-bindings"}
 			variables := values[0].(*goja.Object)
 			for _, name := range variables.Keys() {
 				if err := runCtx.Err(); err != nil {
 					return nil, err
 				}
 				if err := vm.Set(name, variables.Get(name)); err != nil {
-					return nil, jsruntime.EvaluationError(err)
+					return nil, evaluationError(err)
 				}
 			}
 
@@ -105,11 +139,13 @@ func (c Context) evaluateJSONWithContext(
 				return nil, err
 			}
 
+			diagnostic = FailureDiagnostic{Phase: "execute"}
 			value, err := vm.RunProgram(program)
 			if err != nil {
-				return nil, jsruntime.EvaluationError(err)
+				return nil, evaluationError(err)
 			}
 
+			diagnostic = FailureDiagnostic{Phase: "output"}
 			return convert(runCtx, vm, value)
 		},
 	)

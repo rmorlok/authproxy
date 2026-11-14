@@ -33,7 +33,7 @@ func (c Context) EvaluateBooleanWithContext(
 	limits jsruntime.Limits,
 ) (bool, error) {
 	result, err := c.evaluateJSONWithContext(
-		ctx, expression, limits,
+		ctx, expression, limits, jsruntime.JSONOutputOptions{},
 		func(_ context.Context, vm *goja.Runtime, value goja.Value) (goja.Value, error) {
 			// Inspect the export type before exporting anything: arbitrary objects
 			// could invoke getters or traverse an unbounded graph. Goja's boolean

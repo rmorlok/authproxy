@@ -13,8 +13,10 @@ import (
 // a detached JSON object under explicit finite limits and caller cancellation.
 // Root null/undefined becomes {}, preserving migration hooks' no-op result.
 // Ordinary objects and null-prototype objects are supported; arrays and other
-// root values are rejected. Nested values must follow the shared JSON contract:
-// no getters, proxies, custom prototypes, cycles, functions, or undefined fields.
+// root values are rejected. Object data properties valued undefined are omitted,
+// like JSON.stringify, so optional configuration fields can be copied naturally.
+// Other nested values follow the shared JSON contract: no getters, proxies,
+// custom prototypes, cycles, functions, or undefined array elements.
 //
 // Input copying, library initialization, expression execution, and output
 // encoding share one deadline. Library source must also be bounded before its
@@ -27,7 +29,7 @@ func (c Context) EvaluateObjectJSONWithContext(
 	limits jsruntime.Limits,
 ) (json.RawMessage, error) {
 	return c.evaluateJSONWithContext(
-		ctx, expression, limits,
+		ctx, expression, limits, jsruntime.JSONOutputOptions{OmitUndefinedProperties: true},
 		func(_ context.Context, vm *goja.Runtime, value goja.Value) (goja.Value, error) {
 			if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
 				return vm.NewObject(), nil

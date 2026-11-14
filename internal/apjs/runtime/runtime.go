@@ -9,6 +9,17 @@ import (
 	"github.com/dop251/goja/parser"
 )
 
+// JSONOutputOptions selects explicit serialization behavior for a trusted
+// adapter. The zero value keeps the strict JSON data contract; options do not
+// relax prototype, accessor, cycle, or structural-limit validation.
+type JSONOutputOptions struct {
+	// OmitUndefinedProperties omits own enumerable object data properties whose
+	// value is undefined, recursively, including objects contained in arrays.
+	// Inspected keys still consume the traversal budget, but omitted properties
+	// consume no output bytes. Undefined array elements and roots remain invalid.
+	OmitUndefinedProperties bool
+}
+
 // EvaluateJSON runs a trusted host adapter in a fresh bounded VM and converts
 // its value into detached JSON before ending the runtime. Conversion intrinsics
 // are captured before the callback can bind input or execute authored code.
@@ -23,12 +34,26 @@ func EvaluateJSON(
 	ctx context.Context,
 	limits Limits,
 	run func(context.Context, *goja.Runtime) (goja.Value, error),
+) (json.RawMessage, error) {
+	return EvaluateJSONWithOptions(ctx, limits, JSONOutputOptions{}, run)
+}
+
+// EvaluateJSONWithOptions applies an adapter's explicit output policy while
+// retaining EvaluateJSON's bounded lifecycle and callback ownership contract.
+// Reflection intrinsics are captured before authored code runs; options never
+// enable getters, proxy traps, toJSON methods, or JavaScript coercion.
+func EvaluateJSONWithOptions(
+	ctx context.Context,
+	limits Limits,
+	options JSONOutputOptions,
+	run func(context.Context, *goja.Runtime) (goja.Value, error),
 ) (result json.RawMessage, err error) {
 	if run == nil {
 		return nil, ErrInvalidInput
 	}
 	err = Run(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) error {
 		encoder := newOutputEncoder(vm, limits)
+		encoder.options = options
 		value, err := run(runCtx, vm)
 		if err != nil {
 			return err

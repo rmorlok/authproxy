@@ -11,6 +11,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -227,6 +228,55 @@ func (c *Connector) setDefinition(def *cschema.ConnectorDefinition) error {
 	return nil
 }
 
+// getBoundedJavascriptLibrary loads this generation's helper library after
+// checking the raw library and expression against the caller's shared source
+// allowance. Every call checks the raw definition, including cache hits and
+// whitespace-only libraries whose compiled representation omits the source.
+//
+// Definition failures retain their causes so callers can make retry decisions;
+// authored compile failures return only a safe runtime classification. Parsing
+// cannot be interrupted, so caller cancellation is checked again afterward.
+func (c *Connector) getBoundedJavascriptLibrary(
+	ctx context.Context,
+	expression string,
+	limits jsruntime.Limits,
+) (*apjs.Library, error) {
+	if ctx == nil {
+		return nil, jsruntime.ErrInvalidInput
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := limits.Validate(); err != nil {
+		return nil, err
+	}
+
+	def, err := c.getDefinitionWithContext(ctx)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return nil, fmt.Errorf("load connector definition: %w", contextErr)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load connector definition: %w", err)
+	}
+	if len(expression) > limits.MaxSourceBytes || len(def.Javascript) > limits.MaxSourceBytes-len(expression) {
+		return nil, jsruntime.ErrLimitExceeded
+	}
+
+	// The contextual load populated the immutable captured generation's
+	// definition cache. This call can now fail only while compiling the library.
+	library, err := c.getJavascriptLibrary()
+	if contextErr := ctx.Err(); contextErr != nil {
+		return nil, contextErr
+	}
+	if err != nil {
+		return nil, apjs.LibraryCompilationError(err)
+	}
+	return library, nil
+}
+
+// getJavascriptLibrary compiles and caches this generation's helper library
+// for legacy callers without source limits. Bounded execution adapters must use
+// getBoundedJavascriptLibrary to enforce their combined source allowance first.
 func (c *Connector) getJavascriptLibrary() (*apjs.Library, error) {
 	c.jsMu.RLock()
 	if c.jsLoaded {

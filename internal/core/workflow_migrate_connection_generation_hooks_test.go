@@ -1,9 +1,11 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
@@ -17,6 +19,76 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 )
+
+// TestMigrationHookDiagnostics logs bounded host metadata for author failures
+// without exposing private source, thrown values, or dynamically named output.
+func TestMigrationHookDiagnostics(t *testing.T) {
+	for name, test := range map[string]struct {
+		library  string
+		source   string
+		phase    string
+		unit     string
+		position bool
+		want     error
+	}{
+		"library syntax":         {library: "\nconst privateSource = ;", source: "({})", phase: "library-compile", unit: "library", position: true, want: jsruntime.ErrInvalidSource},
+		"hook syntax":            {source: "\nprivateSource ===", phase: "expression-compile", unit: "expression", position: true, want: jsruntime.ErrInvalidSource},
+		"library initialization": {library: `throw new Error("privateLibrary")`, source: "({})", phase: "library-initialize", unit: "library", position: true, want: jsruntime.ErrEvaluation},
+		"helper throw":           {library: "function helper() {\n throw new Error(cfg.secret);\n}", source: "helper()", phase: "execute", unit: "library", position: true, want: jsruntime.ErrEvaluation},
+		"thrown coercion":        {source: `throw {toString() { for (;;) {} }};`, phase: "execute", unit: "expression", position: true, want: jsruntime.ErrEvaluation},
+		"private output key":     {source: `({config: {set: {[cfg.secret]: function() {}}}})`, phase: "output", want: jsruntime.ErrInvalidOutput},
+		"Date output":            {source: `({config: {set: {created: new Date()}}})`, phase: "output", want: jsruntime.ErrInvalidOutput},
+		"timeout":                {source: `for (;;) {}`, phase: "execute", want: jsruntime.ErrLimitExceeded},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Exercise the real hook adapter with a captured application logger.
+			generation := NewTestConnector(cschema.ConnectorDefinition{
+				Javascript: test.library,
+				Migrations: &cschema.Migrations{Up: &cschema.MigrationHook{Javascript: test.source}},
+			})
+			candidate := newMigrationTestCandidate(t)
+			candidate.Config["secret"] = "privateConnectionSecret"
+			var logs bytes.Buffer
+			generation.s.logger = slog.New(slog.NewJSONHandler(&logs, nil))
+			err := generation.s.applyMigrationHookForGeneration(context.Background(), candidate, generation, 1, 2)
+
+			// API-facing errors stay opaque; logs add only stage and safe coordinates.
+			require.ErrorIs(t, err, test.want)
+			require.EqualError(t, err, "evaluate migration hook for generation 1: "+test.want.Error())
+			require.NotContains(t, logs.String(), "private")
+			records := decodeJSONLines(t, &logs)
+			require.Len(t, records, 1)
+			record := records[0]
+			require.Equal(t, candidate.Connection.Id.String(), record["connection_id"])
+			require.Equal(t, generation.Id.String(), record["connector_id"])
+			require.Equal(t, float64(1), record["generation"])
+			require.Equal(t, float64(1), record["source_generation"])
+			require.Equal(t, float64(2), record["target_generation"])
+			require.Equal(t, test.phase, record["phase"])
+			require.Equal(t, test.want.Error(), record["category"])
+			if test.unit != "" {
+				require.Equal(t, test.unit, record["source"])
+			}
+			if test.position {
+				require.Greater(t, record["line"].(float64), float64(0))
+				require.Greater(t, record["column"].(float64), float64(0))
+			} else {
+				// Timeout and output failures must not borrow an earlier stack position.
+				require.NotContains(t, record, "line")
+				require.NotContains(t, record, "column")
+			}
+		})
+	}
+
+	// Successful output is never logged automatically.
+	generation := NewTestConnector(cschema.ConnectorDefinition{Migrations: &cschema.Migrations{
+		Up: &cschema.MigrationHook{Javascript: `({config: {set: {secret: "privateResult"}}})`},
+	}})
+	var logs bytes.Buffer
+	generation.s.logger = slog.New(slog.NewJSONHandler(&logs, nil))
+	require.NoError(t, generation.s.applyMigrationHookForGeneration(context.Background(), newMigrationTestCandidate(t), generation, 1, 2))
+	require.Empty(t, logs.String())
+}
 
 func TestApplyMigrationHookForGenerationSelectsUpAndDown(t *testing.T) {
 	generation := NewTestConnector(cschema.ConnectorDefinition{
@@ -53,6 +125,39 @@ func TestApplyMigrationHookForGenerationSkipsMissingHook(t *testing.T) {
 
 	require.NoError(t, generation.s.applyMigrationHookForGeneration(context.Background(), candidate, generation, 1, 2))
 	require.Empty(t, candidate.Config)
+}
+
+// TestMigrationHookOptionalConfiguration runs the README's rename example with
+// missing and present values, distinguishing omitted fields from explicit null.
+func TestMigrationHookOptionalConfiguration(t *testing.T) {
+	for name, test := range map[string]struct {
+		config map[string]any
+		want   map[string]any
+	}{
+		"missing":         {config: map[string]any{}, want: map[string]any{}},
+		"present":         {config: map[string]any{"workspace_id": "workspace-1"}, want: map[string]any{"workspaceId": "workspace-1"}},
+		"null":            {config: map[string]any{"workspace_id": nil}, want: map[string]any{"workspaceId": nil}},
+		"existing target": {config: map[string]any{"workspaceId": "existing"}, want: map[string]any{"workspaceId": "existing"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Copy the optional field naturally, without a conditional spread or null guard.
+			generation := NewTestConnector(cschema.ConnectorDefinition{Migrations: &cschema.Migrations{
+				Up: &cschema.MigrationHook{Javascript: `({
+					config: {
+						set: { workspaceId: cfg.workspace_id },
+						unset: ["workspace_id"]
+					}
+				})`},
+			}})
+			candidate := newMigrationTestCandidate(t)
+			candidate.Config = test.config
+			err := generation.s.applyMigrationHookForGeneration(context.Background(), candidate, generation, 1, 2)
+
+			// Undefined means no set operation; explicit null still sets a JSON null.
+			require.NoError(t, err)
+			require.Equal(t, test.want, candidate.Config)
+		})
+	}
 }
 
 // TestMigrationHookResultCompatibility preserves no-op completion values and

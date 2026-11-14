@@ -30,6 +30,15 @@ func evaluateSource(ctx context.Context, limits jsruntime.Limits, source string)
 	})
 }
 
+// evaluateSourceWithOutputOptions runs authored code with an adapter's explicit
+// JSON policy while retaining the normal runtime error-classification boundary.
+func evaluateSourceWithOutputOptions(limits jsruntime.Limits, options jsruntime.JSONOutputOptions, source string) (json.RawMessage, error) {
+	return jsruntime.EvaluateJSONWithOptions(context.Background(), limits, options, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
+		value, err := vm.RunString(source)
+		return value, jsruntime.EvaluationError(err)
+	})
+}
+
 // TestRuntimeInvalidOptions rejects missing policy and callbacks before invoking trusted work.
 func TestRuntimeInvalidOptions(t *testing.T) {
 	for _, test := range []struct {
@@ -129,6 +138,101 @@ func TestRuntimeOutputConversion(t *testing.T) {
 	result, err = evaluateSource(context.Background(), limits, `"\n"`)
 	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 	require.Nil(t, result)
+}
+
+// TestRuntimeOmitUndefinedProperties recursively omits optional object fields
+// only when an adapter explicitly selects that output contract.
+func TestRuntimeOmitUndefinedProperties(t *testing.T) {
+	const source = `({
+		before: undefined,
+		keep: 1,
+		nested: {missing: undefined, kept: null},
+		items: [{missing: undefined}, {keep: false, after: undefined}],
+		after: undefined
+	})`
+
+	// The ordinary API and explicitly zero options retain strict output validation.
+	result, err := evaluateSource(context.Background(), runtimeLimits(), source)
+	require.ErrorIs(t, err, jsruntime.ErrInvalidOutput)
+	require.Nil(t, result)
+	result, err = evaluateSourceWithOutputOptions(runtimeLimits(), jsruntime.JSONOutputOptions{}, source)
+	require.ErrorIs(t, err, jsruntime.ErrInvalidOutput)
+	require.Nil(t, result)
+
+	// Omission preserves surrounding separators, null values, and array positions.
+	result, err = evaluateSourceWithOutputOptions(runtimeLimits(), jsruntime.JSONOutputOptions{OmitUndefinedProperties: true}, source)
+	require.NoError(t, err)
+	require.Equal(t, `{"keep":1,"nested":{"kept":null},"items":[{},{"keep":false}]}`, string(result))
+}
+
+// TestRuntimeOmittedPropertiesRemainBounded charges inspection work for omitted
+// fields without charging their names, separators, or values as serialized bytes.
+func TestRuntimeOmittedPropertiesRemainBounded(t *testing.T) {
+	options := jsruntime.JSONOutputOptions{OmitUndefinedProperties: true}
+	for _, test := range []struct {
+		name   string
+		source string
+		limits func(*jsruntime.Limits)
+		want   string
+		err    error
+	}{
+		{"omitted key exact nodes", `({missing: undefined})`, func(l *jsruntime.Limits) { l.MaxNodes = 2 }, `{}`, nil},
+		{"omitted key exceeds nodes", `({missing: undefined})`, func(l *jsruntime.Limits) { l.MaxNodes = 1 }, ``, jsruntime.ErrLimitExceeded},
+		{"mixed keys exact nodes", `({missing: undefined, keep: 1})`, func(l *jsruntime.Limits) { l.MaxNodes = 4 }, `{"keep":1}`, nil},
+		{"mixed keys exceed nodes", `({missing: undefined, keep: 1})`, func(l *jsruntime.Limits) { l.MaxNodes = 3 }, ``, jsruntime.ErrLimitExceeded},
+		{"omitted name has no byte charge", `({["x".repeat(1000)]: undefined})`, func(l *jsruntime.Limits) { l.MaxOutputBytes = 2 }, `{}`, nil},
+		{"mixed exact bytes", `({before: undefined, keep: 1, after: undefined})`, func(l *jsruntime.Limits) { l.MaxOutputBytes = len(`{"keep":1}`) }, `{"keep":1}`, nil},
+		{"mixed exceeds bytes", `({before: undefined, keep: 1, after: undefined})`, func(l *jsruntime.Limits) { l.MaxOutputBytes = len(`{"keep":1}`) - 1 }, ``, jsruntime.ErrLimitExceeded},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Lower one budget to its exact boundary or one unit below it.
+			limits := runtimeLimits()
+			test.limits(&limits)
+			result, err := evaluateSourceWithOutputOptions(limits, options, test.source)
+
+			// Budget failures discard every byte; admitted omission emits only retained data.
+			if test.err != nil {
+				require.ErrorIs(t, err, test.err)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.want, string(result))
+			}
+		})
+	}
+}
+
+// TestRuntimeUndefinedOmissionKeepsSafeReflection never converts optional-field
+// handling into permission to run accessors, proxy traps, or forged intrinsics.
+func TestRuntimeUndefinedOmissionKeepsSafeReflection(t *testing.T) {
+	options := jsruntime.JSONOutputOptions{OmitUndefinedProperties: true}
+	for _, source := range []string{
+		`undefined`,
+		`[undefined]`,
+		`({items: [undefined]})`,
+		`({get missing() { for (;;) {} }})`,
+		`Object.defineProperty({}, "missing", {enumerable: true, get: undefined, set: undefined})`,
+		`new Proxy({missing: undefined}, {ownKeys() {for (;;) {}}})`,
+		`({[Symbol("missing")]: undefined})`,
+		`Object.assign([], {missing: undefined})`,
+	} {
+		// Only ordinary object data fields are eligible; all prior shape checks remain active.
+		result, err := evaluateSourceWithOutputOptions(runtimeLimits(), options, source)
+		require.ErrorIs(t, err, jsruntime.ErrInvalidOutput)
+		require.Nil(t, result)
+	}
+
+	// Captured descriptors identify undefined correctly even after globals and prototypes change.
+	result, err := evaluateSourceWithOutputOptions(runtimeLimits(), options, `
+		Object.getOwnPropertyDescriptor = () => ({value: undefined, enumerable: true, writable: true});
+		Reflect.ownKeys = () => [];
+		JSON.stringify = () => "forged";
+		Object.defineProperty(Object.prototype, "get", {get() {for (;;) {}}});
+		Object.defineProperty(Object.prototype, "toJSON", {get() {for (;;) {}}});
+		({missing: undefined, keep: 1});
+	`)
+	require.NoError(t, err)
+	require.Equal(t, `{"keep":1}`, string(result))
 }
 
 // TestRuntimeFreshVMHasNoDomainHosts leaves capability and input binding to the trusted caller.
