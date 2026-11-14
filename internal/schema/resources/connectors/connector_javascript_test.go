@@ -34,10 +34,14 @@ func TestConnectorJavascriptValidation(t *testing.T) {
 			`,
 			Auth: testOAuth2AuthWithScopes([]Scope{
 				{
-					Id:       "read",
-					If:       &common.Predicate{Javascript: `var enabled = isEnabled(cfg); new Boolean(enabled);`},
-					Required: NewScopeRequiredPredicate(&common.Predicate{Javascript: `new Boolean(isProd(labels));`}),
-					Reason:   "Read access",
+					Id: "read",
+					If: &common.Predicate{
+						Javascript: `var enabled = isEnabled(cfg); new Boolean(enabled);`,
+					},
+					Required: NewScopeRequiredPredicate(&common.Predicate{
+						Javascript: `new Boolean(isProd(labels));`,
+					}),
+					Reason: "Read access",
 				},
 			}),
 			SetupFlow: &SetupFlow{

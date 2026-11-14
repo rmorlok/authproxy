@@ -119,7 +119,10 @@ func (c *ConnectorDefinition) Clone() *ConnectorDefinition {
 // conflicting reserved global names.
 func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
-	javascript, err := apjs.CompileAndValidateLibraryWithContext(vc.Context(), c.Javascript, apjs.ConnectorPredicateLimits())
+	javascript, err := apjs.CompileAndValidateLibraryWithContext(
+		vc.Context(),
+		c.Javascript, apjs.ConnectorPredicateLimits(),
+	)
 	if err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid connector javascript: %v", err))
 		javascript = nil
