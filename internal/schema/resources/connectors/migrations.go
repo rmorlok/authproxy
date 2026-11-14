@@ -38,18 +38,24 @@ func (m *Migrations) Validate(vc *common.ValidationContext) error {
 // ValidateWithJavascript checks each hook independently under the caller's
 // validation context and the combined library-plus-hook source allowance.
 // Neither the hooks nor the supplied library are executed by this validation.
-func (m *Migrations) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
+func (m *Migrations) ValidateWithJavascript(
+	vc *common.ValidationContext,
+	library *apjs.Library,
+) error {
 	result := &multierror.Error{}
+
 	if m.Up != nil {
 		if err := m.Up.ValidateWithJavascript(vc.PushField("up"), library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
+
 	if m.Down != nil {
 		if err := m.Down.ValidateWithJavascript(vc.PushField("down"), library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
+
 	return result.ErrorOrNil()
 }
 
@@ -78,14 +84,24 @@ func (h *MigrationHook) Validate(vc *common.ValidationContext) error {
 // migration execution, including the library's original source bytes. Errors
 // retain the javascript field path and safe syntax positions without authored
 // parser messages. Library initialization remains the connector's responsibility.
-func (h *MigrationHook) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
+func (h *MigrationHook) ValidateWithJavascript(
+	vc *common.ValidationContext,
+	library *apjs.Library,
+) error {
 	result := &multierror.Error{}
+
 	if h.Javascript == "" {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "migration javascript is required"))
 		return result.ErrorOrNil()
 	}
-	if err := library.ValidateExpressionSyntaxWithContext(vc.Context(), h.Javascript, apjs.ConnectorMigrationLimits()); err != nil {
+
+	if err := library.ValidateExpressionSyntaxWithContext(
+		vc.Context(),
+		h.Javascript,
+		apjs.ConnectorMigrationLimits(),
+	); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid migration javascript expression: %v", err))
 	}
+
 	return result.ErrorOrNil()
 }
