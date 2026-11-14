@@ -138,7 +138,13 @@ func (s *service) UpdateConnector(
 	}
 
 	current := page.Results[0]
-	desired, err := patch.ApplyTo(current.GetResource(), &scommon.ValidationContext{Path: "$", Ctx: ctx})
+	desired, err := patch.ApplyTo(
+		current.GetResource(),
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
