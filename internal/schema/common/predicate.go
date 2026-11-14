@@ -24,17 +24,21 @@ func (p *Predicate) Validate(vc *ValidationContext, jsctx apjs.Context) error {
 	if p == nil {
 		return nil
 	}
+
 	result := &multierror.Error{}
 	limits := apjs.ConnectorPredicateLimits()
+
 	// Bound even the blank-source scan; oversized input goes to the evaluator's
 	// source gate without scanning or parsing the entire authored string.
 	if len(p.Javascript) <= limits.MaxSourceBytes && strings.TrimSpace(p.Javascript) == "" {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript is required"))
 		return result.ErrorOrNil()
 	}
+
 	if _, err := jsctx.EvaluateBooleanWithContext(vc.Context(), p.Javascript, limits); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "javascript must evaluate to a boolean: %v", err))
 	}
+
 	return result.ErrorOrNil()
 }
 

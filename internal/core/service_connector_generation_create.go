@@ -24,7 +24,13 @@ func (s *service) CreateConnector(
 		return nil, fmt.Errorf("connector cannot be nil")
 	}
 
-	if err := resource.ValidateFor(meta.ValidationModeCreate, &scommon.ValidationContext{Path: "$", Ctx: ctx}); err != nil {
+	if err := resource.ValidateFor(
+		meta.ValidationModeCreate,
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
@@ -165,7 +171,13 @@ func (s *service) CreateConnectorGeneration(
 		return s.CreateDraftConnectorGeneration(ctx, id, nil, nil, nil)
 	}
 
-	if err := resource.ValidateFor(meta.ValidationModeCreate, &scommon.ValidationContext{Path: "$", Ctx: ctx}); err != nil {
+	if err := resource.ValidateFor(
+		meta.ValidationModeCreate,
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
