@@ -30,7 +30,13 @@ type Library struct {
 func compileSource(name, source string) (*goja.Program, error) {
 	// Parse directly so validation can read structured positions. goja.Parse
 	// flattens parser errors into a message and discards their position fields.
-	parsed, err := parser.ParseFile(nil, name, source, 0, parser.WithDisableSourceMaps)
+	parsed, err := parser.ParseFile(
+		nil, // fileSet
+		name,
+		source,
+		0, // mode
+		parser.WithDisableSourceMaps,
+	)
 	if err != nil {
 		// Preserve the legacy diagnostic prefix while retaining the structured
 		// parser cause for the definition-validation adapter.

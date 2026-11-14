@@ -188,7 +188,13 @@ func (s *service) UpdateConnector(
 		return nil, err
 	}
 
-	desiredDraft, err := patch.ApplyTo(draft.GetResource(), &scommon.ValidationContext{Path: "$", Ctx: ctx})
+	desiredDraft, err := patch.ApplyTo(
+		draft.GetResource(),
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
@@ -226,7 +232,13 @@ func (s *service) UpdateConnectorGeneration(
 		return nil, ErrNotDraft
 	}
 
-	desired, err := patch.ApplyTo(existing.GetResource(), &scommon.ValidationContext{Path: "$", Ctx: ctx})
+	desired, err := patch.ApplyTo(
+		existing.GetResource(),
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
