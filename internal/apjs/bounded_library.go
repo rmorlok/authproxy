@@ -47,6 +47,7 @@ func CompileAndValidateLibraryWithContext(
 	var library *Library
 	err := jsruntime.Run(ctx, limits, func(runCtx context.Context, vm *goja.Runtime) error {
 		var err error
+
 		library, err = CompileLibrary(source)
 		if contextErr := runCtx.Err(); contextErr != nil {
 			return contextErr
@@ -54,18 +55,24 @@ func CompileAndValidateLibraryWithContext(
 		if err != nil {
 			return libraryCompileValidationError(err)
 		}
+
 		// The legacy compiler drops whitespace-only source. Retain those bytes
 		// so later predicate checks cannot undercount the combined source size.
 		library.source = source
+
 		if err := library.Run(vm); err != nil {
 			return jsruntime.EvaluationError(err)
 		}
+
 		// A reserved global may be an authored accessor. Catch its exception
 		// while leaving interrupts and stack limits to the shared lifecycle.
 		var reservedName string
-		if exception := vm.Try(func() { reservedName = findReservedRuntimeVar(vm) }); exception != nil {
+		if exception := vm.Try(func() {
+			reservedName = findReservedRuntimeVar(vm)
+		}); exception != nil {
 			return jsruntime.EvaluationError(exception)
 		}
+
 		if reservedName != "" {
 			return fmt.Errorf("%w: reserved runtime variable %q", jsruntime.ErrInvalidSource, reservedName)
 		}

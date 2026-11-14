@@ -42,6 +42,7 @@ func compileSource(name, source string) (*goja.Program, error) {
 		// parser cause for the definition-validation adapter.
 		return nil, fmt.Errorf("SyntaxError: %w", err)
 	}
+
 	return goja.CompileAST(parsed, false)
 }
 
