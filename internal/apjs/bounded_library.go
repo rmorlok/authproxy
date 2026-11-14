@@ -103,6 +103,6 @@ func libraryCompileValidationError(err error) error {
 	if line > 0 && column > 0 {
 		return fmt.Errorf("%w at line %d, column %d", jsruntime.ErrInvalidSource, line, column)
 	}
-	
+
 	return jsruntime.ErrInvalidSource
 }

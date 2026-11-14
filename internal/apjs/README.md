@@ -88,7 +88,8 @@ runs helper initialization in a fresh bounded VM:
 
 ```go
 library, err := apjs.CompileAndValidateLibraryWithContext(
-    ctx, `function isEnabled() { return cfg.enabled === true; }`,
+    ctx, 
+	`function isEnabled() { return cfg.enabled === true; }`,
     apjs.ConnectorPredicateLimits(),
 )
 ```
