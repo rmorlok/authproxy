@@ -157,8 +157,47 @@ mutating `cfg` in one condition cannot affect a later step or scope decision.
 Setup flow construction remains separate from predicate evaluation; its existing
 definition lookup is not changed by this migration.
 
+## Bounded migration hooks
+
+`Context.EvaluateObjectJSONWithContext` evaluates a connector expression and
+returns detached JSON object bytes. Boolean predicates and object expressions
+share input copying, helper initialization, cancellation, and bounded output
+encoding. The returned bytes can be decoded directly into a caller's patch type.
+
+For example, an upgrade hook can rename a saved configuration field:
+
+```javascript
+({
+    config: {
+        set: { workspaceId: cfg.workspace_id },
+        unset: ["workspace_id"]
+    }
+})
+```
+
+Migration hooks receive the candidate's `cfg`, user `labels`, and `annotations`.
+The selected generation's helper library is available to both upgrade and
+downgrade hooks. Only the returned patch changes the candidate: assigning to
+`cfg` inside JavaScript edits a private copy. The next generation sees changes
+from the previous generation's successfully applied patch.
+
+Root `null` and `undefined` retain their existing meaning: an empty `{}` patch.
+Other results must be plain JSON objects. Arrays and scalar roots are rejected.
+Nested getters, proxies, custom prototypes, cycles, functions, undefined fields,
+and non-finite numbers are rejected by the shared encoder. This deliberately
+narrows the legacy object export behavior; migration hooks should return ordinary
+JSON data rather than rely on getter execution or implicit object conversion.
+Use explicit `null` for a nested JSON null value.
+
+`ConnectorMigrationLimits()` uses the source, input, depth, node, stack, and
+timeout limits above, with a **1 MiB JSON output allowance**. Each generation's
+hook gets its own JavaScript/encoding budget under the common migration context.
+Definition loading uses that context, and raw library-plus-hook source is checked
+before library compilation. JavaScript and encoding errors are opaque; definition-load failures
+retain their causes. Typed patch decoding and existing patch validation follow
+evaluation, with caller cancellation checked before applying the patch.
+
 The legacy library and expression APIs remain available during migration.
-Option transforms and migration hooks, including hook syntax validation, still
-use those APIs; they do not yet gain the bounded adapters' cancellation or copied
-inputs. Object and option conversion semantics will be preserved as those
-callers move.
+Option transforms still use unbounded execution and their existing conversion
+semantics. Migration-hook syntax validation remains on its legacy compile-only
+path; it does not execute the hook and is a separate migration follow-up.

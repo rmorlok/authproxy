@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -16,7 +17,9 @@ import (
 // applyMigrationHookForGeneration applies the javascript upgrade/downgrade hook,
 // if one exists, for a connection generation migration. This may modify the
 // candidate by changing the config, user labels, and annotations, and/or
-// adding/removing notifications.
+// adding/removing notifications. Authored code receives copied inputs and a finite
+// execution policy; only its detached patch changes the candidate. Definition
+// loading retains infrastructure errors, while authored execution errors are safe.
 func (s *service) applyMigrationHookForGeneration(
 	ctx context.Context,
 	candidate *connectionMigrationCandidate,
@@ -24,7 +27,13 @@ func (s *service) applyMigrationHookForGeneration(
 	sourceGeneration,
 	targetGeneration uint64,
 ) error {
-	def := generation.GetDefinition()
+	if ctx == nil {
+		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, jsruntime.ErrInvalidInput)
+	}
+	def, err := generation.getDefinitionWithContext(ctx)
+	if err != nil {
+		return fmt.Errorf("load migration hook definition for generation %d: %w", generation.Generation, err)
+	}
 	if def == nil || def.Migrations == nil {
 		return nil
 	}
@@ -39,20 +48,35 @@ func (s *service) applyMigrationHookForGeneration(
 		return nil
 	}
 
+	limits := apjs.ConnectorMigrationLimits()
+	if len(hook.Javascript) > limits.MaxSourceBytes || len(def.Javascript) > limits.MaxSourceBytes-len(hook.Javascript) {
+		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, jsruntime.ErrLimitExceeded)
+	}
+
+	// The contextual definition load completed before the library cache can
+	// compile source. Any cache error is now authored syntax, not a load failure.
 	jsLib, err := generation.getJavascriptLibrary()
+	if contextErr := ctx.Err(); contextErr != nil {
+		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, contextErr)
+	}
 	if err != nil {
-		return err
+		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, jsruntime.ErrInvalidSource)
 	}
 	result, err := apjs.NewContext(jsLib, map[string]any{
 		"cfg":         candidate.Config,
 		"labels":      candidate.UserLabels,
 		"annotations": candidate.Annotations,
-	}).EvaluateObject(hook.Javascript)
+	}).EvaluateObjectJSONWithContext(ctx, hook.Javascript, limits)
 	if err != nil {
 		return fmt.Errorf("evaluate migration hook for generation %d: %w", generation.Generation, err)
 	}
 
 	patch, err := decodeMigrationHookPatch(result)
+	// Decoding is bounded by the detached JSON size. Honor cancellation that
+	// arrived during this Go work before applying any returned patch operations.
+	if contextErr := ctx.Err(); contextErr != nil {
+		return fmt.Errorf("decode migration hook for generation %d: %w", generation.Generation, contextErr)
+	}
 	if err != nil {
 		return fmt.Errorf("decode migration hook for generation %d: %w", generation.Generation, err)
 	}
@@ -62,22 +86,16 @@ func (s *service) applyMigrationHookForGeneration(
 	return nil
 }
 
-// decodeMigrationHookPatch decodes a migration hook patch from a
-// map[string]any to the strongly typed migrationHookPatch. This
-// is accomplished by unmarshalling the raw map into a
-// migrationHookPatch.
-func decodeMigrationHookPatch(raw map[string]any) (migrationHookPatch, error) {
+// decodeMigrationHookPatch decodes bounded, detached JSON directly into the
+// migration patch contract. Configuration values keep the existing JSON number
+// representation; no live JavaScript values or intermediate exported map remain.
+func decodeMigrationHookPatch(raw json.RawMessage) (migrationHookPatch, error) {
 	if len(raw) == 0 {
 		return migrationHookPatch{}, nil
 	}
 
-	b, err := json.Marshal(raw)
-	if err != nil {
-		return migrationHookPatch{}, err
-	}
-
 	var patch migrationHookPatch
-	if err := json.Unmarshal(b, &patch); err != nil {
+	if err := json.Unmarshal(raw, &patch); err != nil {
 		return migrationHookPatch{}, err
 	}
 
