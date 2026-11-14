@@ -57,7 +57,7 @@ func BindOptionalJSONBody(gctx *gin.Context, obj any) error {
 
 // BindResourceJSON decodes and validates a resource create or update body.
 // Secret placeholders emitted by redacted API responses are never accepted as
-// write values.
+// write values. Validation follows the request's cancellation and deadline.
 func BindResourceJSON(
 	gctx *gin.Context,
 	obj resourceLifecycleValidator,
@@ -75,7 +75,7 @@ func BindResourceJSON(
 		return err
 	}
 
-	return obj.ValidateFor(mode, &common.ValidationContext{Path: "$"})
+	return obj.ValidateFor(mode, resourceValidationContext(gctx))
 }
 
 // BindActionJSON decodes and validates a typed action request, including the
@@ -97,7 +97,8 @@ func BindActionJSON(
 }
 
 // RenderResourceJSON validates a resource as a server response before using
-// the standard redacting API renderer.
+// the standard redacting API renderer. Validation follows the request's
+// cancellation and deadline; failures leave the response unwritten.
 func RenderResourceJSON(
 	gctx *gin.Context,
 	code int,
@@ -105,7 +106,7 @@ func RenderResourceJSON(
 ) error {
 	if err := obj.ValidateFor(
 		meta.ValidationModeResponse,
-		&common.ValidationContext{Path: "$"},
+		resourceValidationContext(gctx),
 	); err != nil {
 		return fmt.Errorf("validate API resource response: %w", err)
 	}
@@ -113,6 +114,17 @@ func RenderResourceJSON(
 	APIJSON(gctx, code, obj)
 
 	return nil
+}
+
+// resourceValidationContext carries request cancellation into nested resource
+// checks. Contexts without an HTTP request retain the validation package's
+// background-context fallback, as used by validation-only tests.
+func resourceValidationContext(gctx *gin.Context) *common.ValidationContext {
+	vc := &common.ValidationContext{Path: "$"}
+	if gctx != nil && gctx.Request != nil {
+		vc.Ctx = gctx.Request.Context()
+	}
+	return vc
 }
 
 // RenderActionJSON validates an action response before using the standard

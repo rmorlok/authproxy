@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -111,6 +112,7 @@ func (s *service) updateDraftConnectorGeneration(
 // UpdateConnector applies logical metadata changes without manufacturing a
 // generation. Definition or release changes are applied to the existing draft,
 // or to a newly cloned draft when the selected generation is published.
+// Both selected and draft definitions are validated under the caller's context.
 func (s *service) UpdateConnector(
 	ctx context.Context,
 	id apid.ID,
@@ -136,7 +138,7 @@ func (s *service) UpdateConnector(
 	}
 
 	current := page.Results[0]
-	desired, err := patch.ApplyTo(current.GetResource(), nil)
+	desired, err := patch.ApplyTo(current.GetResource(), &scommon.ValidationContext{Path: "$", Ctx: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
@@ -186,7 +188,7 @@ func (s *service) UpdateConnector(
 		return nil, err
 	}
 
-	desiredDraft, err := patch.ApplyTo(draft.GetResource(), nil)
+	desiredDraft, err := patch.ApplyTo(draft.GetResource(), &scommon.ValidationContext{Path: "$", Ctx: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
@@ -203,7 +205,8 @@ func (s *service) UpdateConnector(
 }
 
 // UpdateConnectorGeneration applies a canonical patch to one draft generation.
-// Connector-level naming remains the responsibility of UpdateConnector.
+// Validation follows the caller's context. Connector-level naming remains the
+// responsibility of UpdateConnector.
 func (s *service) UpdateConnectorGeneration(
 	ctx context.Context,
 	id apid.ID,
@@ -223,7 +226,7 @@ func (s *service) UpdateConnectorGeneration(
 		return nil, ErrNotDraft
 	}
 
-	desired, err := patch.ApplyTo(existing.GetResource(), nil)
+	desired, err := patch.ApplyTo(existing.GetResource(), &scommon.ValidationContext{Path: "$", Ctx: ctx})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}

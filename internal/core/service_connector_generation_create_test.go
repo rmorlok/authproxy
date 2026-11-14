@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -104,6 +105,38 @@ func TestCreateConnector(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector generation")
 	})
+}
+
+// TestCreateConnectorJavascriptCancellation stops library initialization when
+// the caller's deadline expires, before either create path persists anything.
+func TestCreateConnectorJavascriptCancellation(t *testing.T) {
+	for _, generation := range []bool{false, true} {
+		name := "connector"
+		if generation {
+			name = "generation"
+		}
+		t.Run(name, func(t *testing.T) {
+			// No database/encryption calls are expected after validation fails.
+			s, _, _, _, _, _ := FullMockService(t, gomock.NewController(t))
+			resource := cschema.NewConnector()
+			resource.Metadata.Namespace = "root"
+			resource.Spec.Definition.Javascript = "for (;;) {} // private source"
+			ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+			defer cancel()
+
+			// Validation must follow this deadline, not wait for its own longer policy timeout.
+			var err error
+			if generation {
+				_, err = s.CreateConnectorGeneration(ctx, apid.New(apid.PrefixConnector), resource)
+			} else {
+				_, err = s.CreateConnector(ctx, resource)
+			}
+			require.ErrorIs(t, err, ErrInvalidArgument)
+			require.ErrorContains(t, err, context.DeadlineExceeded.Error())
+			require.ErrorContains(t, err, "$.spec.definition.javascript")
+			require.NotContains(t, err.Error(), "private")
+		})
+	}
 }
 
 func TestUpdateConnectorName(t *testing.T) {

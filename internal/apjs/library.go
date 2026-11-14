@@ -28,9 +28,13 @@ type Library struct {
 // would give connector authors a server-side file read and existence oracle
 // through the returned parse error.
 func compileSource(name, source string) (*goja.Program, error) {
-	parsed, err := goja.Parse(name, source, parser.WithDisableSourceMaps)
+	// Parse directly so validation can read structured positions. goja.Parse
+	// flattens parser errors into a message and discards their position fields.
+	parsed, err := parser.ParseFile(nil, name, source, 0, parser.WithDisableSourceMaps)
 	if err != nil {
-		return nil, err
+		// Preserve the legacy diagnostic prefix while retaining the structured
+		// parser cause for the definition-validation adapter.
+		return nil, fmt.Errorf("SyntaxError: %w", err)
 	}
 	return goja.CompileAST(parsed, false)
 }
@@ -143,12 +147,25 @@ func (l *Library) Run(vm *goja.Runtime) error {
 	return nil
 }
 
+// validateReservedRuntimeVars rejects libraries that claim an injected global.
+// The legacy error names the conflicting global; bounded callers choose whether
+// that fixed name is appropriate for their validation or evaluation boundary.
 func validateReservedRuntimeVars(vm *goja.Runtime) error {
+	if name := findReservedRuntimeVar(vm); name != "" {
+		return fmt.Errorf("JS library defines reserved runtime variable %q", name)
+	}
+	return nil
+}
+
+// findReservedRuntimeVar returns one conflicting name from the fixed host-owned
+// set, or an empty string. Reading a global may invoke authored getters; callers
+// must apply their own execution limits and exception handling.
+func findReservedRuntimeVar(vm *goja.Runtime) string {
 	for name := range reservedRuntimeVars {
 		value := vm.Get(name)
 		if value != nil && !goja.IsUndefined(value) {
-			return fmt.Errorf("JS library defines reserved runtime variable %q", name)
+			return name
 		}
 	}
-	return nil
+	return ""
 }

@@ -1,10 +1,31 @@
 package common
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// TestValidationContextCancellation follows one caller through nested field and
+// index paths while preserving the zero-value synchronous validation contract.
+func TestValidationContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	root := &ValidationContext{Path: "$", Ctx: ctx}
+	child := root.PushField("probes").PushIndex(2).PushField("if")
+
+	// Derived paths retain caller identity without mutating the parent path.
+	require.Equal(t, "$.probes[2].if", child.Path)
+	require.Equal(t, "$", root.Path)
+	require.Same(t, ctx, child.Context())
+	cancel()
+	require.ErrorIs(t, child.Context().Err(), context.Canceled)
+
+	// Existing synchronous validation has no caller deadline, not a canceled one.
+	require.NoError(t, (&ValidationContext{}).Context().Err())
+	require.NoError(t, (*ValidationContext)(nil).Context().Err())
+}
 
 func TestValidationContext(t *testing.T) {
 	ctx := &ValidationContext{}

@@ -14,6 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
+// CreateConnector validates a new connector under the caller's context before
+// encrypting and persisting its first generation.
 func (s *service) CreateConnector(
 	ctx context.Context,
 	resource *cschema.Connector,
@@ -22,7 +24,7 @@ func (s *service) CreateConnector(
 		return nil, fmt.Errorf("connector cannot be nil")
 	}
 
-	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+	if err := resource.ValidateFor(meta.ValidationModeCreate, &scommon.ValidationContext{Path: "$", Ctx: ctx}); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
@@ -152,7 +154,8 @@ func (s *service) CreateDraftConnectorGeneration(
 
 // CreateConnectorGeneration creates the next generation from a canonical
 // Connector request. A nil request preserves the existing blank-POST behavior
-// and clones the newest generation as a draft.
+// and clones the newest generation as a draft. Supplied definitions are
+// validated under the caller's context before creating a generation.
 func (s *service) CreateConnectorGeneration(
 	ctx context.Context,
 	id apid.ID,
@@ -162,7 +165,7 @@ func (s *service) CreateConnectorGeneration(
 		return s.CreateDraftConnectorGeneration(ctx, id, nil, nil, nil)
 	}
 
-	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
+	if err := resource.ValidateFor(meta.ValidationModeCreate, &scommon.ValidationContext{Path: "$", Ctx: ctx}); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
 	}
 
