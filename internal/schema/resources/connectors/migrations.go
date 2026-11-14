@@ -29,15 +29,24 @@ func (m *Migrations) Clone() *Migrations {
 	return &clone
 }
 
+// Validate checks hook syntax without a connector library. It does not execute
+// either hook; runtime configuration and helper calls need not be available.
 func (m *Migrations) Validate(vc *common.ValidationContext) error {
+	return m.ValidateWithJavascript(vc, nil)
+}
+
+// ValidateWithJavascript checks each hook independently under the caller's
+// validation context and the combined library-plus-hook source allowance.
+// Neither the hooks nor the supplied library are executed by this validation.
+func (m *Migrations) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	result := &multierror.Error{}
 	if m.Up != nil {
-		if err := m.Up.Validate(vc.PushField("up")); err != nil {
+		if err := m.Up.ValidateWithJavascript(vc.PushField("up"), library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 	if m.Down != nil {
-		if err := m.Down.Validate(vc.PushField("down")); err != nil {
+		if err := m.Down.ValidateWithJavascript(vc.PushField("down"), library); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -59,13 +68,23 @@ func (h *MigrationHook) Clone() *MigrationHook {
 	return &clone
 }
 
+// Validate checks required hook syntax with no connector library. Runtime
+// behavior and the returned patch are checked when the migration is executed.
 func (h *MigrationHook) Validate(vc *common.ValidationContext) error {
+	return h.ValidateWithJavascript(vc, nil)
+}
+
+// ValidateWithJavascript bounds source compilation using the same allowance as
+// migration execution, including the library's original source bytes. Errors
+// retain the javascript field path and safe syntax positions without authored
+// parser messages. Library initialization remains the connector's responsibility.
+func (h *MigrationHook) ValidateWithJavascript(vc *common.ValidationContext, library *apjs.Library) error {
 	result := &multierror.Error{}
 	if h.Javascript == "" {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "migration javascript is required"))
 		return result.ErrorOrNil()
 	}
-	if err := apjs.ValidateExpressionSyntax(h.Javascript); err != nil {
+	if err := library.ValidateExpressionSyntaxWithContext(vc.Context(), h.Javascript, apjs.ConnectorMigrationLimits()); err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid migration javascript expression: %v", err))
 	}
 	return result.ErrorOrNil()

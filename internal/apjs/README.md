@@ -117,11 +117,35 @@ validation contract rather than predicting the result for a real connection.
 `common.ValidationContext` carries cancellation through nested fields. API
 resource binding/rendering and connector create/update operations supply their
 request context. Synchronous callers that omit it, such as configuration and
-local manifest validation, still get finite execution limits. Each library and
-predicate gets a separate budget; there is no total connector-validation timeout
-unless the caller supplies one. Schema errors keep field paths and safe failure
-text; these existing wrappers stringify the underlying error rather than retain
+local manifest validation, still get finite execution limits. Each library,
+predicate, and hook syntax check gets a separate budget; there is no total
+connector-validation timeout unless the caller supplies one. Schema errors keep
+field paths and safe failure text; these existing wrappers stringify the underlying error rather than retain
 its Go error identity. The bounded library API itself preserves context errors.
+
+Migration hooks use compile-only validation because they depend on connection
+data that is not available when a connector is saved:
+
+```go
+err = library.ValidateExpressionSyntaxWithContext(
+    ctx,
+    `({config: {set: {workspaceId: cfg.workspace_id}}})`,
+    apjs.ConnectorMigrationLimits(),
+)
+```
+
+This method compiles the hook without initializing the library or running the
+hook. It accepts references to `cfg` and helper functions without resolving
+them. Syntax errors include a safe line and column within the hook; runtime
+errors and the returned patch are checked when the migration executes.
+
+The connector validates `migrations.up.javascript` and
+`migrations.down.javascript` independently. Each hook shares the **256 KiB source
+allowance** with the library's raw source, including whitespace. The **one-second
+validation allowance** and caller cancellation are checked around compilation.
+The parser cannot be interrupted midway; the source cap limits the work admitted
+before parsing. Up and down errors retain their individual field paths. The
+unbounded syntax-validation entry point has been removed.
 
 ## Connection predicate policy and migration status
 
@@ -224,5 +248,5 @@ The unused unbounded object evaluator has been removed; object callers use
 `EvaluateObjectJSONWithContext`. Other legacy library and expression APIs remain
 available during migration.
 Option transforms still use unbounded execution and their existing conversion
-semantics. Migration-hook syntax validation remains on its legacy compile-only
-path; it does not execute the hook and is a separate migration follow-up.
+semantics. Migration-hook syntax validation uses the bounded compile-only path
+described above.

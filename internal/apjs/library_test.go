@@ -1,6 +1,7 @@
 package apjs
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -16,7 +17,7 @@ func TestLibraryParsingDoesNotLoadSourceMaps(t *testing.T) {
 	// Static library and expression parsing ignore the directive.
 	library, err := CompileLibrary("const value = 7;" + sourceMap)
 	require.NoError(t, err)
-	require.NoError(t, ValidateExpressionSyntax("1 + 1;"+sourceMap))
+	require.NoError(t, library.ValidateExpressionSyntaxWithContext(context.Background(), "1 + 1;"+sourceMap, ConnectorMigrationLimits()))
 
 	// Dynamic parsing during library validation uses the same policy.
 	dynamic, err := CompileLibrary(`eval("1` + directive + `");`)
