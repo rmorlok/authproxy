@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -12,15 +13,30 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
-// GetDataSource fetches data from an external API through the connection's authenticated proxy,
-// transforms the response using a JavaScript expression, and returns options for form dropdowns.
+// GetDataSource fetches JSON through the connection's authenticated proxy and
+// transforms it into options for an eligible configure step. The caller's
+// context covers definition loading, HTTP, and JavaScript. Source is admitted
+// before HTTP; the separate finite transform budget starts after the response
+// arrives and bounds copied inputs, execution, and option conversion.
 func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error) {
+	if ctx == nil {
+		return nil, jsruntime.ErrInvalidInput
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	setupStep := c.GetSetupStep()
 	if setupStep == nil {
 		return nil, httperr.BadRequest("connection has no active setup step")
 	}
 
-	connector := c.connector.GetDefinition()
+	connector, err := c.connector.getDefinitionWithContext(ctx)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return nil, contextErr
+	}
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to load data source connector definition: %w", err))
+	}
 	if connector == nil || connector.SetupFlow == nil {
 		return nil, httperr.BadRequest("connector has no setup flow")
 	}
@@ -48,6 +64,14 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 
 	if ds.ProxyRequest == nil {
 		return nil, httperr.InternalServerErrorMsg("data source has no proxy_request defined")
+	}
+
+	// Admit the raw library-plus-transform source before sending an HTTP request.
+	// This also loads connection input without executing the helper library.
+	limits := apjs.ConnectorDataSourceLimits()
+	jsctx, err := c.getBoundedJavascriptContext(ctx, ds.Transform, limits)
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get javascript context: %w", err))
 	}
 
 	// Get mustache context for template rendering
@@ -79,7 +103,13 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		Headers: common.HeadersValMapFromStrings(renderedHeaders),
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	proxyResp, err := c.ProxyRequest(ctx, httpf.RequestTypeProxy, proxyReq)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return nil, contextErr
+	}
 	if err != nil {
 		return nil, httperr.New(http.StatusBadGateway, "failed to fetch data source", httperr.WithInternalErrorf("data source proxy request failed: %w", err))
 	}
@@ -96,13 +126,9 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.New(http.StatusBadGateway, "data source did not return JSON response")
 	}
 
-	// Run JavaScript transform
-	jsctx, err := c.GetJavascriptContext(ctx)
-	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get javascript context: %w", err))
-	}
-
-	options, err := jsctx.TransformJSON(ds.Transform, responseData)
+	// The transform's execution allowance starts after HTTP; the request itself
+	// retains its existing proxy policy and the caller's overall deadline.
+	options, err := jsctx.TransformJSONWithContext(ctx, ds.Transform, responseData, limits)
 	if err != nil {
 		return nil, httperr.InternalServerErrorMsg("failed to transform data source response", httperr.WithInternalErrorf("data source transform failed: %w", err))
 	}

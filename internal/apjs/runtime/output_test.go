@@ -68,6 +68,158 @@ func TestOutputJSONValues(t *testing.T) {
 	}
 }
 
+// TestOutputUndefinedAsNull supports the explicit compatibility policy without
+// changing the strict output contract used by existing runtime callers.
+func TestOutputUndefinedAsNull(t *testing.T) {
+	for name, test := range map[string]struct{ expression, want string }{
+		"root":               {`undefined`, `null`},
+		"object properties":  {`({missing: undefined, nested: {missing: undefined, kept: null}})`, `{"missing":null,"nested":{"missing":null,"kept":null}}`},
+		"dense array":        {`[undefined, {missing: undefined}, null]`, `[null,{"missing":null},null]`},
+		"hidden array index": {`Object.defineProperty([undefined], "0", {enumerable: false})`, `[null]`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// The policy is opt-in; the same explicit undefined values remain invalid by default.
+			encoder, value := outputTestValue(t, test.expression, outputTestLimits())
+			actual, err := encoder.encode(context.Background(), value)
+			require.ErrorIs(t, err, ErrInvalidOutput)
+			require.Nil(t, actual)
+
+			// Enable only null substitution, preserving the original object and array shapes.
+			encoder.options.UndefinedAsNull = true
+			actual, err = encoder.encode(context.Background(), value)
+			require.NoError(t, err)
+			require.Equal(t, test.want, string(actual))
+		})
+	}
+
+	// A missing Go result is not an authored JavaScript undefined value.
+	encoder := newOutputEncoder(goja.New(), outputTestLimits())
+	encoder.options.UndefinedAsNull = true
+	actual, err := encoder.encode(context.Background(), nil)
+	require.ErrorIs(t, err, ErrInvalidOutput)
+	require.Nil(t, actual)
+}
+
+// TestOutputUndefinedPoliciesTogether preserves omission for object keys while
+// the null policy still applies to roots and explicit array elements.
+func TestOutputUndefinedPoliciesTogether(t *testing.T) {
+	options := JSONOutputOptions{OmitUndefinedProperties: true, UndefinedAsNull: true}
+	for _, test := range []struct{ source, want string }{
+		{`undefined`, `null`},
+		{`({missing: undefined, items: [undefined, {missing: undefined, kept: null}], kept: null})`, `{"items":[null,{"kept":null}],"kept":null}`},
+	} {
+		// Use the public runtime entry point to exercise propagation of both policy flags.
+		actual, err := EvaluateJSONWithOptions(context.Background(), outputTestLimits(), options,
+			func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
+				value, err := vm.RunString(test.source)
+				return value, EvaluationError(err)
+			})
+		require.NoError(t, err)
+		require.Equal(t, test.want, string(actual))
+	}
+}
+
+// TestOutputUndefinedAsNullKeepsSafeReflection rejects absent elements and
+// authored accessors or proxies even if they could yield undefined themselves.
+func TestOutputUndefinedAsNullKeepsSafeReflection(t *testing.T) {
+	for name, source := range map[string]string{
+		"sparse array":         `[undefined, , undefined]`,
+		"inherited array hole": `Array.prototype[0] = undefined; new Array(1)`,
+		"object accessor":      `({get missing() {for (;;) {}}})`,
+		"empty accessor":       `Object.defineProperty({}, "missing", {get: undefined, set: undefined})`,
+		"array accessor":       `Object.defineProperty([undefined], "0", {get() {for (;;) {}}})`,
+		"proxy":                `new Proxy({missing: undefined}, {ownKeys() {for (;;) {}}})`,
+		"revoked proxy":        `const x = Proxy.revocable({}, {}); x.revoke(); x.proxy`,
+		"symbol key":           `({[Symbol("private")]: undefined})`,
+		"array extra property": `Object.assign([undefined], {missing: undefined})`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			// A bounded VM makes accidental execution of one of the traps fail as
+			// a timeout, rather than allowing the test to hang indefinitely.
+			limits := outputTestLimits()
+			limits.Timeout = 100 * time.Millisecond
+			actual, err := EvaluateJSONWithOptions(context.Background(), limits, JSONOutputOptions{UndefinedAsNull: true},
+				func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
+					value, err := vm.RunString(source)
+					return value, EvaluationError(err)
+				})
+
+			// Only explicit data values can become null; metadata validation stays strict.
+			require.ErrorIs(t, err, ErrInvalidOutput)
+			require.Nil(t, actual)
+		})
+	}
+}
+
+// TestOutputUndefinedAsNullLimits charges null substitutions against the same
+// output and traversal allowances as explicit null values.
+func TestOutputUndefinedAsNullLimits(t *testing.T) {
+	for _, test := range []struct {
+		name, expression string
+		change           func(*Limits)
+		want             string
+		wantErr          error
+	}{
+		{"root exact bytes", `undefined`, func(l *Limits) { l.MaxOutputBytes = 4 }, `null`, nil},
+		{"root exceeds bytes", `undefined`, func(l *Limits) { l.MaxOutputBytes = 3 }, ``, ErrLimitExceeded},
+		{"object exact nodes", `({a: undefined})`, func(l *Limits) { l.MaxNodes = 3 }, `{"a":null}`, nil},
+		{"object exceeds nodes", `({a: undefined})`, func(l *Limits) { l.MaxNodes = 2 }, ``, ErrLimitExceeded},
+		{"array exact nodes", `[undefined]`, func(l *Limits) { l.MaxNodes = 2 }, `[null]`, nil},
+		{"array exceeds nodes", `[undefined]`, func(l *Limits) { l.MaxNodes = 1 }, ``, ErrLimitExceeded},
+		{"nested exact depth", `[undefined, {a: undefined}]`, func(l *Limits) { l.MaxDepth = 2 }, `[null,{"a":null}]`, nil},
+		{"nested exceeds depth", `[undefined, {a: undefined}]`, func(l *Limits) { l.MaxDepth = 1 }, ``, ErrLimitExceeded},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Isolate one exact boundary or one unit below it for each resource.
+			limits := outputTestLimits()
+			test.change(&limits)
+			encoder, value := outputTestValue(t, test.expression, limits)
+			encoder.options.UndefinedAsNull = true
+			actual, err := encoder.encode(context.Background(), value)
+
+			// Failed substitutions discard partial JSON just like all other output failures.
+			if test.wantErr != nil {
+				require.ErrorIs(t, err, test.wantErr)
+				require.Nil(t, actual)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.want, string(actual))
+			}
+		})
+	}
+}
+
+// TestOutputUndefinedAsNullCancellation keeps cancellation authoritative before
+// null substitution and while inspecting a containing object's data property.
+func TestOutputUndefinedAsNullCancellation(t *testing.T) {
+	// Cancellation after authored execution but before output drops even a scalar null.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	actual, err := EvaluateJSONWithOptions(ctx, outputTestLimits(), JSONOutputOptions{UndefinedAsNull: true},
+		func(context.Context, *goja.Runtime) (goja.Value, error) {
+			cancel()
+			return goja.Undefined(), nil
+		})
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, actual)
+
+	// A trusted descriptor wrapper cancels after the object's opening bytes have
+	// been encoded but before its undefined data value can be appended as null.
+	ctx, cancel = context.WithCancel(context.Background())
+	defer cancel()
+	encoder, value := outputTestValue(t, `({a: undefined})`, outputTestLimits())
+	encoder.options.UndefinedAsNull = true
+	propertyDescriptor := encoder.propertyDescriptor
+	encoder.propertyDescriptor = func(this goja.Value, args ...goja.Value) (goja.Value, error) {
+		value, err := propertyDescriptor(this, args...)
+		cancel()
+		return value, err
+	}
+	actual, err = encoder.encode(ctx, value)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Nil(t, actual)
+}
+
 func TestOutputUTF16Strings(t *testing.T) {
 	tests := []struct {
 		name       string

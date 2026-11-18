@@ -34,3 +34,14 @@ func ConnectorMigrationLimits() jsruntime.Limits {
 	limits.MaxOutputBytes = 1 << 20
 	return limits
 }
+
+// ConnectorDataSourceLimits returns the finite policy for one setup dropdown
+// transform. Source, copied cfg/metadata/response inputs, traversal, stack, and
+// timeout use the connector defaults. Both the intermediate JSON result and the
+// final option array must fit 1 MiB independently. The HTTP fetch has its own
+// existing policy; this timeout starts when JavaScript evaluation begins.
+func ConnectorDataSourceLimits() jsruntime.Limits {
+	limits := ConnectorPredicateLimits()
+	limits.MaxOutputBytes = 1 << 20
+	return limits
+}

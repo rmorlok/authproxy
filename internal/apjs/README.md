@@ -255,7 +255,79 @@ without a JSON path.
 
 The unused unbounded object evaluator has been removed; object callers use
 `EvaluateObjectJSONWithContext`. Other legacy library and expression APIs remain
-available during migration.
-Option transforms still use unbounded execution and their existing conversion
-semantics. Migration-hook syntax validation uses the bounded compile-only path
-described above.
+available for compatibility. Runtime connector predicates, migration hooks, and
+setup data-source transforms use the bounded APIs.
+
+## Bounded setup options
+
+A setup form's data source fetches JSON through its connection's authenticated
+proxy, then transforms that response into dropdown options. For example, given
+this response:
+
+```json
+{"items": [{"id": 42, "name": "Primary"}]}
+```
+
+this transform can use the response as `data` and the saved connection's `cfg`:
+
+```javascript
+data.items.map(item => ({
+    value: item.id,
+    label: cfg.region + "/" + item.name
+}))
+```
+
+With `cfg.region` set to `us-east`, it produces:
+
+```json
+[{"value": "42", "label": "us-east/Primary"}]
+```
+
+`Context.TransformJSONWithContext(ctx, source, data, limits)` copies `data` into
+the VM alongside the context's other variables. `TransformOptionsWithContext`
+uses the existing variables without adding `data`. Both support connector
+helpers and non-strict statement lists, and neither installs HTTP capabilities.
+Mutations to `data`, `cfg`, `labels`, or `annotations` affect only the current VM.
+
+`GetDataSource` checks the raw library-plus-transform source allowance before
+sending its proxy request. After the response arrives, `ConnectorDataSourceLimits`
+applies the connector source/input/depth/node/stack limits above, a **one-second
+timeout**, and a **1 MiB output allowance**. The timeout covers JavaScript, JSON
+encoding and decoding, option string conversion, and final output accounting.
+The intermediate JSON and final serialized option array must each fit the output
+allowance, including JSON quotes, punctuation, and escaping. HTTP retains its
+existing separate policy; the caller's context covers the whole operation.
+
+Each result item must be a plain object with own enumerable `value` and `label`
+data properties. Their values retain the existing Go-style string conversion:
+
+| Authored field value | Returned string |
+| --- | --- |
+| `42` | `"42"` |
+| `true` | `"true"` |
+| `null` or an explicitly present `undefined` | `"<nil>"` |
+| `[1, null, "x"]` | `"[1 <nil> x]"` |
+| `{b: null, a: 1}` | `"map[a:1 b:<nil>]"` |
+
+Missing `value` or `label` is invalid; an empty root array returns an empty option
+slice. The shared encoder's explicit `UndefinedAsNull` option retains present
+undefined fields through detached JSON conversion. Other callers keep their
+existing strict or omit-undefined policy.
+
+There are two deliberate changes from unrestricted Goja export:
+
+- Inputs are copied as native JavaScript values. For an identity transform,
+  a Go `float64(1e6)` now becomes `"1000000"` instead of `"1e+06"`; authored
+  JavaScript integer literals and mapped values already used that spelling.
+  Large numeric inputs also follow JavaScript Number precision. Use string IDs
+  when exact digits or spelling matter.
+- Output must be ordinary JSON data, with the explicit undefined handling above.
+  Getters, proxies, custom prototypes, cycles, functions, symbols, boxed values,
+  sparse arrays, and non-finite numbers are rejected, including in extra fields.
+  Conversion never invokes authored coercion methods.
+
+Failures return no partial options. Errors keep safe classifications and
+diagnostics; caller cancellation retains its context cause, and policy expiry
+returns `ErrLimitExceeded`. Go JSON decoding and map-key sorting run on already
+bounded data and check cancellation around their work; these operations are not
+interruptible midway.

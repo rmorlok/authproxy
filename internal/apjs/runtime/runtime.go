@@ -16,8 +16,16 @@ type JSONOutputOptions struct {
 	// OmitUndefinedProperties omits own enumerable object data properties whose
 	// value is undefined, recursively, including objects contained in arrays.
 	// Inspected keys still consume the traversal budget, but omitted properties
-	// consume no output bytes. Undefined array elements and roots remain invalid.
+	// consume no output bytes. This takes precedence over UndefinedAsNull for
+	// object properties; array elements and roots are unaffected by omission.
 	OmitUndefinedProperties bool
+
+	// UndefinedAsNull encodes explicit JavaScript undefined as JSON null,
+	// including roots, object data properties, and dense array elements. The
+	// replacement consumes the same byte, node, and depth allowances as null.
+	// Missing array elements, accessors, and nil Go values remain invalid. This
+	// is an adapter compatibility policy, not JavaScript coercion or toJSON.
+	UndefinedAsNull bool
 }
 
 // EvaluateJSON runs a trusted host adapter in a fresh bounded VM and converts
