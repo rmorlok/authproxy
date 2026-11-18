@@ -68,7 +68,7 @@ func TestConnectorValidationHTTPError(t *testing.T) {
 					err = apgin.BindResourceJSON(gctx, &patch, mode)
 				}
 				require.Error(t, err)
-				writeConnectorValidationError(gctx, err)
+				apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 
 				// Cancellation keeps its error identity and never presents a migration field error.
 				require.Equal(t, test.status, response.Code)

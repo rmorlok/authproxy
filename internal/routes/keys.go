@@ -198,7 +198,7 @@ func (r *KeysRoutes) create(gctx *gin.Context) {
 		apgin.WriteError(
 			gctx,
 			nil, // logger
-			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+			httperr.RequestValidationErr(err, httperr.WithPublicErr(err)),
 		)
 		val.MarkErrorReturn()
 		return
@@ -279,7 +279,7 @@ func (r *KeysRoutes) list(gctx *gin.Context) {
 		apgin.WriteError(
 			gctx,
 			nil, // logger
-			httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)),
+			httperr.RequestValidationErr(err, httperr.WithPublicErr(err)),
 		)
 		val.MarkErrorReturn()
 		return
@@ -430,7 +430,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		apgin.WriteError(
 			gctx,
 			nil, // logger
-			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+			httperr.RequestValidationErr(err, httperr.WithPublicErr(err)),
 		)
 		val.MarkErrorReturn()
 		return
@@ -477,7 +477,7 @@ func (r *KeysRoutes) update(gctx *gin.Context) {
 		apgin.WriteError(
 			gctx,
 			nil, // logger
-			httperr.BadRequestErr(err, httperr.WithPublicErr(err)),
+			httperr.RequestValidationErr(err, httperr.WithPublicErr(err)),
 		)
 		val.MarkErrorReturn()
 		return

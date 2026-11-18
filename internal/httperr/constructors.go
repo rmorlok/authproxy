@@ -1,6 +1,7 @@
 package httperr
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -27,6 +28,22 @@ func BadRequestf(format string, args ...any) *Error {
 // (defaults to "Bad Request").
 func BadRequestErr(err error, opts ...Option) *Error {
 	return apply(&Error{Status: http.StatusBadRequest, InternalErr: err}, opts)
+}
+
+// RequestValidationErr classifies an error from request binding or validation.
+// Ordinary validation failures become 400 errors; like BadRequestErr, their
+// details are private unless opts supplies a public message (for example,
+// WithPublicErr for validation messages that are safe to show to the caller).
+//
+// Cancellation and deadline errors, including wrapped errors, are operational
+// failures rather than invalid input. They become 500 errors with the original
+// cause and no public message; opts is ignored for these failures. ForContext
+// then maps cancellation to 499 when the request context was also canceled.
+func RequestValidationErr(err error, opts ...Option) *Error {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return NewWithErr(http.StatusInternalServerError, err)
+	}
+	return BadRequestErr(err, opts...)
 }
 
 // Unauthorized creates a 401 error with no message (defaults to "Unauthorized").

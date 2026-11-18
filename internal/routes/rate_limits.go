@@ -189,7 +189,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 
 	var req rlschema.RateLimit
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -246,7 +246,7 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 
 	var req ListRateLimitsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -347,7 +347,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 
 	var req rlschema.RateLimitPatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -371,7 +371,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 
 	updated, err := req.ApplyTo(rl.GetResource(), nil)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -480,7 +480,7 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 
 	var req schemaapi.RateLimitDryRunAction
 	if err := apgin.BindActionJSON(gctx, &req, schemaapi.RateLimitDryRunActionKind); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}

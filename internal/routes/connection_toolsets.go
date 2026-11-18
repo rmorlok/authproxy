@@ -62,7 +62,7 @@ func (r *ConnectionsRoutes) listToolSetBindings(gctx *gin.Context) {
 
 	var req ListConnectionToolSetBindingsQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		writeError(httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		writeError(httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		return
 	}
 

@@ -34,18 +34,6 @@ type OpenAPIListConnectorGenerationsResponseJson = schemaapiopenapi.ListConnecto
 type OpenAPIConnectorLifecycleActionJson = schemaapiopenapi.ConnectorLifecycleActionJson
 type OpenAPIConnectorForceStateActionJson = schemaapiopenapi.ConnectorForceStateActionJson
 
-// writeConnectorValidationError preserves request cancellation instead of
-// reporting it as an invalid connector definition. Ordinary binding and authored
-// validation failures remain public 400 errors; context failures use the normal
-// server error mapping, including 499 when the client canceled the request.
-func writeConnectorValidationError(gctx *gin.Context, err error) {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		apgin.WriteErr(gctx, nil, err)
-		return
-	}
-	apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
-}
-
 type ListConnectorsRequestQueryParams struct {
 	Cursor        *string                            `form:"cursor"`
 	LimitVal      *int32                             `form:"limit"`
@@ -188,7 +176,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 
 	var req ListConnectorsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -362,7 +350,7 @@ func (r *ConnectorsRoutes) listGenerations(gctx *gin.Context) {
 
 	var req ListConnectorGenerationsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -490,7 +478,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 
 	var req cschema.Connector
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeCreate); err != nil {
-		writeConnectorValidationError(gctx, err)
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -552,7 +540,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 
 	var req cschema.ConnectorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
-		writeConnectorValidationError(gctx, err)
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -647,7 +635,7 @@ func (r *ConnectorsRoutes) createGeneration(gctx *gin.Context) {
 	if gctx.Request.ContentLength > 0 {
 		req = cschema.NewConnector()
 		if err := apgin.BindResourceJSON(gctx, req, smeta.ValidationModeCreate); err != nil {
-			writeConnectorValidationError(gctx, err)
+			apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -713,7 +701,7 @@ func (r *ConnectorsRoutes) updateGeneration(gctx *gin.Context) {
 
 	var req cschema.ConnectorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
-		writeConnectorValidationError(gctx, err)
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -795,7 +783,7 @@ func (r *ConnectorsRoutes) forceGenerationState(gctx *gin.Context) {
 
 	req := schemaapi.ConnectorForceStateAction{}
 	if err := apgin.BindActionJSON(gctx, &req, schemaapi.ConnectorForceStateActionKind); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -888,7 +876,7 @@ func (r *ConnectorsRoutes) parseLifecycleRequest(
 
 	req := schemaapi.ConnectorLifecycleAction{}
 	if err := apgin.BindActionJSON(gctx, &req, kind); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return schemaapi.ConnectorLifecycleSpec{}, connIface.ConnectorLifecycleOptions{}, false
 	}

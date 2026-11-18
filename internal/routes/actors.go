@@ -70,7 +70,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -405,7 +405,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	var req actorschema.Actor
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -483,7 +483,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 
 	var req actorschema.ActorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -573,7 +573,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	var req actorschema.ActorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

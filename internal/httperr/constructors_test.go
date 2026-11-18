@@ -1,6 +1,7 @@
 package httperr
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -28,6 +29,59 @@ func TestBadRequestErr(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, e.Status)
 	require.Equal(t, "", e.ResponseMsg)
 	require.Equal(t, inner, e.InternalErr)
+}
+
+// TestRequestValidationErr verifies that ordinary validation errors retain each
+// caller's chosen disclosure policy and preserve their cause for logging.
+func TestRequestValidationErr(t *testing.T) {
+	inner := errors.New("spec.name is required")
+	for _, test := range []struct {
+		name    string
+		opts    []Option
+		message string
+	}{
+		{name: "private by default", message: "Bad Request"},
+		{name: "public validation details", opts: []Option{WithPublicErr(inner)}, message: inner.Error()},
+		{name: "fixed public message", opts: []Option{WithResponseMsg("invalid request body")}, message: "invalid request body"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Each route chooses how much of an ordinary validation failure to expose.
+			err := RequestValidationErr(inner, test.opts...)
+
+			// Classification does not discard the original error or change disclosure.
+			require.Equal(t, http.StatusBadRequest, err.Status)
+			require.Equal(t, test.message, err.ResponseMsgOrDefault())
+			require.ErrorIs(t, err, inner)
+		})
+	}
+}
+
+// TestRequestValidationErr_ContextFailures verifies that validation wrappers and
+// public-message options cannot turn cancellation into an authored input error.
+func TestRequestValidationErr_ContextFailures(t *testing.T) {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded} {
+		for name, inner := range map[string]error{
+			"direct":     cause,
+			"wrapped":    fmt.Errorf("private validation detail: %w", cause),
+			"aggregated": errors.Join(errors.New("private validation detail"), cause),
+			"classified": BadRequestErr(cause, WithResponseMsg("private validation detail")),
+		} {
+			t.Run(cause.Error()+"/"+name, func(t *testing.T) {
+				// A caller may offer public validation details or a fixed input-error
+				// message; neither describes an operational context failure.
+				for _, opts := range [][]Option{nil, {WithPublicErr(inner)}, {WithResponseMsg("invalid request body")}} {
+					err := RequestValidationErr(inner, opts...)
+
+					// Keep the full cause chain, but let the normal server error policy
+					// choose the response instead of leaking validation details.
+					require.Equal(t, http.StatusInternalServerError, err.Status)
+					require.Equal(t, "Internal Server Error", err.ResponseMsgOrDefault())
+					require.Equal(t, inner, err.InternalErr)
+					require.ErrorIs(t, err, cause)
+				}
+			})
+		}
+	}
 }
 
 func TestBadRequest_WithOptions(t *testing.T) {
