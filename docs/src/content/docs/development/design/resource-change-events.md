@@ -80,7 +80,7 @@ Non-goals:
 ```mermaid
 flowchart LR
   W["Write in internal/database"] -->|"same transaction"| O[("resource_changes")]
-  O -->|"claim batch"| R["Relay task (core)"]
+  O -->|"claim batch"| R["Relay loop (one worker, holds lock)"]
   R -->|"one task per interested subscriber"| Q["asynq"]
   Q --> S1["ToolSet subscriber"]
   Q --> S2["Future subscribers"]
@@ -95,8 +95,8 @@ The design has two parts that can ship separately:
    commit, the same delivery as today. This removes the coupling but not the
    loss.
 2. **Outbox** (phase 2). The database layer writes a row for each change in
-   the same transaction as the change. A relay task reads those rows and
-   dispatches them through the same registry. Subscribers don't change; only
+   the same transaction as the change. A single long-running relay loop in
+   the worker reads those rows and dispatches them through the same registry. Subscribers don't change; only
    how changes reach them does.
 
 ## Change model
@@ -273,12 +273,28 @@ forgets to record is the main new way to miss a change, so:
 
 ### Relay
 
-The relay is an asynq task in core, `core:relay_resource_changes`. It runs
-every 5 seconds from the scheduler and also whenever a "drain now" request
-arrives (see Latency). Each run repeats until the outbox is empty or its time
-budget ends:
+The relay is a long-running loop, not a scheduled task. Core implements it as
+a `changeRelay` with a `Run(ctx)` method that drains the outbox. The worker
+service owns its lifecycle, as it does for the scheduler in
+`internal/service/worker/scheduler.go`:
 
-1. **Claim** a batch under a lease, using a fresh claim token:
+- **One relay at a time.** Every worker tries to take the Redis lock
+  `worker:resource_change_relay`. The holder runs the relay under
+  `apredis.RunWithMutex`, which renews the lease (30 seconds) while the loop
+  runs and cancels the loop's context if a renewal fails. Workers without the
+  lock retry every half lease, so a crashed holder is replaced within one
+  lease.
+- **Health.** The worker reports whether it holds the relay lock and whether
+  the relay is running, the same way it reports scheduler ownership.
+- **Shutdown.** On `SIGTERM` the loop finishes or abandons its current batch
+  within a short bound, then releases the lock so another worker takes over
+  without waiting for the lease.
+
+The loop waits for a wake-up signal or a 1-second poll interval, whichever
+comes first, and then drains: it repeats these steps until a claim returns no
+rows.
+
+1. **Claim** a batch under a row lease (1 minute), using a fresh claim token:
 
    ```sql
    update resource_changes
@@ -289,23 +305,29 @@ budget ends:
          and (claimed_until is null or claimed_until < :now)
        order by id
        limit :batch
-       -- PostgreSQL only: for update skip locked
     )
    returning id, resource_kind, resource_id, namespace, aspects;
    ```
 
-   SQLite has a single writer, so the update alone is safe there. On
-   PostgreSQL, `for update skip locked` lets replicas claim disjoint batches.
+   Only the lock holder claims, so claims don't compete. The row lease and
+   claim token cover the moment a lock changes hands: a relay that lost its
+   lock mid-batch can't mark rows that a new holder has since claimed, and
+   the new holder can't claim rows the old one still holds until their lease
+   expires.
 2. **Merge** rows for the same resource within the batch by OR-ing their
    aspects.
 3. **Dispatch** each merged change to every interested subscriber. Each task
    gets the ID `rc:<highest row id>:<subscriber>` and short asynq
-   retention, so a retry of the same batch is rejected as a duplicate
-   (`asynq.ErrTaskIDConflict`, treated as success) and not queued again.
-4. **Mark** the batch published, but only rows that still carry this run's
-   claim token. If any dispatch failed, the batch isn't marked. Its lease
+   retention, so a second dispatch of the same batch is rejected as a
+   duplicate (`asynq.ErrTaskIDConflict`, treated as success) and not queued
+   again.
+4. **Mark** the batch published, but only rows that still carry this claim
+   token. If any dispatch failed, the batch isn't marked. Its row lease
    expires, the batch is claimed again, and subscribers that already received
    it are deduplicated by task ID.
+
+A database or Redis error doesn't end the loop or release the lock. The loop
+backs off exponentially, up to 30 seconds, and tries again.
 
 The database interface gains the relay's operations:
 
@@ -316,15 +338,24 @@ PurgePublishedResourceChanges(ctx context.Context, before time.Time) (int64, err
 CountPendingResourceChanges(ctx context.Context) (count int64, oldest time.Time, err error)
 ```
 
-A daily task purges rows published more than 24 hours ago.
+A daily scheduled task purges rows published more than 24 hours ago.
 
-### Latency
+### Wake-up signal
 
-Polling every 5 seconds alone would delay every change by up to 5 seconds. To
-keep today's latency, the API path that made the change also queues a
-best-effort drain request after the commit, using `asynq.Unique` with a short
-TTL so a burst of changes produces one drain. Losing a drain request is
-harmless, since the scheduled run picks the rows up.
+The 1-second poll bounds latency on its own. To deliver sooner, a write that
+recorded a change sends a wake-up after its transaction commits: a Redis
+pub/sub message on `resource_changes:wake`, which the relay subscribes to.
+
+- **Sending.** The database layer doesn't depend on Redis. It accepts an
+  injected `func()` that it calls after committing any transaction that
+  recorded a change, and the service wiring supplies one that publishes the
+  message. Changes recorded inside worker tasks, such as label propagation,
+  wake the relay the same way.
+- **Losing it is harmless.** Pub/sub messages aren't stored, so a wake-up sent
+  while no relay is subscribed, such as during a lock handover, is dropped.
+  The next poll picks the rows up.
+- **Bursts.** Several wake-ups during a drain cause at most one more drain,
+  which ends at the first empty claim.
 
 ### Phase 2 cutover
 
@@ -345,8 +376,10 @@ With the outbox in place:
 | Failure | Result |
 |---|---|
 | Redis unavailable when a change commits | The row waits in the outbox; the relay dispatches it once Redis is back. |
-| Worker crashes after dispatch, before marking | The lease expires, the batch is claimed again, and task IDs deduplicate subscribers that already got it. |
-| Two relays run at once | PostgreSQL: disjoint batches. SQLite: writes serialize; a reclaimed batch only causes deduplicated dispatches. |
+| Relay holder crashes | Another worker takes the lock within one lock lease (30 seconds). Rows the crashed relay had claimed become claimable when their row lease expires. |
+| Relay crashes after dispatch, before marking | The row lease expires, the batch is claimed again, and task IDs deduplicate subscribers that already got it. |
+| Relay loses its lock mid-batch | Its context is cancelled and it stops. The claim token stops it marking rows a new holder claimed, and task IDs deduplicate anything it already dispatched. |
+| Wake-up signal is lost | The next 1-second poll picks the rows up. |
 | A subscriber keeps failing | Only that subscriber's task retries and is eventually archived; its sweep repairs it later. Other subscribers are unaffected. |
 | A write path doesn't record its change | The subscriber's sweep repairs it on its next run. The per-kind recording tests are meant to catch this before it ships. |
 | Outbox backlog grows | The pending-count metric and oldest-pending age show it; see Observability. |
@@ -357,10 +390,13 @@ With the outbox in place:
   pending row, from `CountPendingResourceChanges`, plus counters for
   dispatched and deduplicated tasks per subscriber. Subscriber names are the
   only metric dimension, which keeps cardinality bounded.
-- **Logs:** each relay run logs how many rows it claimed, merged and
-  dispatched.
-- **Tracing:** each subscriber task links to the relay run that dispatched it,
-  through the existing asynq middleware.
+- **Relay ownership:** which worker holds the relay lock, through the worker
+  health check and a log line on each acquire, loss and release.
+- **Logs:** each drain logs how many rows it claimed, merged and dispatched.
+  An idle poll that claims nothing logs nothing.
+- **Tracing:** each drain is a span. The relay isn't an asynq task, so it
+  starts its own span, and the tasks it queues carry that trace context into
+  the subscribers.
 
 ## Alternatives considered
 
@@ -372,6 +408,11 @@ With the outbox in place:
   commit can still happen without its event.
 - **PostgreSQL `LISTEN/NOTIFY` or logical replication.** PostgreSQL only, and
   `NOTIFY` isn't durable. SQLite must keep working.
+- **Scheduled asynq task every few seconds** to relay the outbox. It reuses
+  asynq's retries, timeouts and telemetry, but runs about 17,000 times a day
+  even when nothing changed, needs `asynq.Unique` so runs don't overlap, and
+  needs a separate "drain now" task to beat its polling interval. The loop is
+  nearly free when idle and wakes immediately.
 - **Carry new values in the change.** Would allow subscribers to skip a read,
   but would forbid merging and make ordering matter. Reading current state is
   cheap here.
@@ -391,7 +432,8 @@ Each phase is one or two pull requests of about ten significant files.
    listed above, including wrapping `SetConnectionState` in a transaction and
    recording from `recomputeConnectionLabelsTx`. Add the per-kind recording
    test.
-4. **Relay and cutover.** Add the relay task, drain request, purge task and
+4. **Relay and cutover.** Add the relay loop with its lock, lifecycle and
+   health reporting in the worker, the wake-up signal, the purge task and
    metrics. Remove `publishChange` from connection producers. Reduce the
    ToolSet sweep cadence to daily.
 5. **Later adopters** (each optional, each its own pull request):
@@ -403,7 +445,7 @@ Each phase is one or two pull requests of about ten significant files.
 ## Open questions
 
 - **Retention of task IDs.** Deduplication needs completed tasks retained in
-  Redis for at least the lease length. The proposal is 10 minutes; confirm
+  Redis for at least the row lease (1 minute). The proposal is 10 minutes; confirm
   that's acceptable for Redis memory at expected change rates.
 - **Large fan-outs.** Relabeling a large namespace records one row per
   connection whose effective labels changed. That's the real work, but if it
