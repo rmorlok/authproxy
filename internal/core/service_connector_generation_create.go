@@ -14,6 +14,26 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
+// connectorValidationError keeps caller cancellation separate from authored
+// validation failures, which are invalid arguments. The context check also
+// stops persistence when validation succeeds after cancellation, including
+// metadata-only updates that do not execute JavaScript.
+func connectorValidationError(ctx context.Context, err error) error {
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+	return nil
+}
+
 // CreateConnector validates a new connector under the caller's context before
 // encrypting and persisting its first generation.
 func (s *service) CreateConnector(
@@ -24,14 +44,15 @@ func (s *service) CreateConnector(
 		return nil, fmt.Errorf("connector cannot be nil")
 	}
 
-	if err := resource.ValidateFor(
+	validationErr := resource.ValidateFor(
 		meta.ValidationModeCreate,
 		&scommon.ValidationContext{
 			Path: "$",
 			Ctx:  ctx,
 		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	)
+	if err := connectorValidationError(ctx, validationErr); err != nil {
+		return nil, err
 	}
 
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnector)
@@ -171,14 +192,15 @@ func (s *service) CreateConnectorGeneration(
 		return s.CreateDraftConnectorGeneration(ctx, id, nil, nil, nil)
 	}
 
-	if err := resource.ValidateFor(
+	validationErr := resource.ValidateFor(
 		meta.ValidationModeCreate,
 		&scommon.ValidationContext{
 			Path: "$",
 			Ctx:  ctx,
 		},
-	); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	)
+	if err := connectorValidationError(ctx, validationErr); err != nil {
+		return nil, err
 	}
 
 	currentPage := s.ListConnectorsBuilder().

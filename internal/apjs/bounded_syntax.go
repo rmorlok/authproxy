@@ -2,6 +2,7 @@ package apjs
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"unicode/utf8"
 
@@ -17,8 +18,9 @@ import (
 // A context and positive limits are required. Parsing is not interruptible, so
 // source bytes bound the admitted work and cancellation/timeout are checked
 // before and after compilation. Caller cancellation takes precedence over the
-// policy timeout. Errors retain only a safe category and a one-based syntax
-// position when available, never source, filenames, or raw parser diagnostics.
+// policy timeout. Errors retain a safe category, the applicable byte or time
+// allowance, and a one-based syntax position when available; they never retain
+// source, filenames, or raw parser diagnostics.
 // No VM or host capability is created, and source maps remain disabled.
 func (l *Library) ValidateExpressionSyntaxWithContext(
 	ctx context.Context,
@@ -34,8 +36,8 @@ func (l *Library) ValidateExpressionSyntaxWithContext(
 	if err := limits.Validate(); err != nil {
 		return err
 	}
-	if len(expression) > limits.MaxSourceBytes || len(l.Source()) > limits.MaxSourceBytes-len(expression) {
-		return jsruntime.ErrLimitExceeded
+	if err := CheckCombinedSource(l.Source(), expression, limits.MaxSourceBytes); err != nil {
+		return err
 	}
 	if !utf8.ValidString(expression) || strings.TrimSpace(expression) == "" {
 		return jsruntime.ErrInvalidSource
@@ -57,7 +59,7 @@ func (l *Library) ValidateExpressionSyntaxWithContext(
 		return err
 	}
 	if parseErr != nil {
-		return jsruntime.ErrLimitExceeded
+		return fmt.Errorf("%w: compilation time exceeded %s", jsruntime.ErrLimitExceeded, limits.Timeout)
 	}
 	if compileErr != nil {
 		return compileValidationError(compileErr)

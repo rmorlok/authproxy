@@ -245,7 +245,13 @@ func TestResourceJSONConnectorJavascriptValidation(t *testing.T) {
 				} else {
 					err = RenderResourceJSON(gctx, http.StatusOK, resource)
 				}
-				require.ErrorContains(t, err, "$.spec.definition.javascript")
+				if test.want == context.DeadlineExceeded {
+					// Request cancellation keeps its identity, not an authored field error.
+					require.ErrorIs(t, err, test.want)
+					require.NotContains(t, err.Error(), "invalid connector javascript")
+				} else {
+					require.ErrorContains(t, err, "$.spec.definition.javascript")
+				}
 				require.ErrorContains(t, err, test.want.Error())
 				require.NotContains(t, err.Error(), "private")
 				require.Empty(t, response.Body.String(), "validation failures must not write a response")

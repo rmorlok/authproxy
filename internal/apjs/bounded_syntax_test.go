@@ -14,6 +14,40 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestCombinedSourceAdmission keeps raw-byte admission identical for callers
+// checking definitions before compilation and callers reusing a compiled library.
+func TestCombinedSourceAdmission(t *testing.T) {
+	for _, test := range []struct {
+		library, expression string
+		limit               int
+		want                error
+	}{
+		{"", "", 1, nil},
+		{" \n", "é", 4, nil},
+		{" \n", "é", 3, jsruntime.ErrLimitExceeded},
+		{"privateLibrary", "", 1, jsruntime.ErrLimitExceeded},
+		{"", "privateExpression", 1, jsruntime.ErrLimitExceeded},
+		{"", "", 0, jsruntime.ErrInvalidInput},
+		{"", "", -1, jsruntime.ErrInvalidInput},
+	} {
+		// Whitespace and multibyte characters count without trimming or parsing.
+		err := CheckCombinedSource(test.library, test.expression, test.limit)
+		if test.want == nil {
+			require.NoError(t, err)
+		} else {
+			require.ErrorIs(t, err, test.want)
+			require.NotContains(t, err.Error(), "private")
+		}
+	}
+
+	// Runtime adapters still hide validation-only detail behind their public category.
+	limits := ConnectorMigrationLimits()
+	limits.MaxSourceBytes = 1
+	_, err := NewContext(nil, nil).EvaluateObjectJSONWithContext(context.Background(), "({})", limits)
+	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+	require.EqualError(t, err, jsruntime.ErrLimitExceeded.Error())
+}
+
 // TestBoundedSyntaxDoesNotExecute preserves compile-only validation for hooks
 // that need connection inputs and helper functions available only at runtime.
 func TestBoundedSyntaxDoesNotExecute(t *testing.T) {
@@ -52,7 +86,11 @@ func TestBoundedSyntaxSourceLimits(t *testing.T) {
 	limits := ConnectorMigrationLimits()
 	limits.MaxSourceBytes = 8
 	for _, source := range []string{strings.Repeat(" ", 9), "privateDetail = ;"} {
-		require.ErrorIs(t, (*Library)(nil).ValidateExpressionSyntaxWithContext(context.Background(), source, limits), jsruntime.ErrLimitExceeded)
+		err := (*Library)(nil).ValidateExpressionSyntaxWithContext(context.Background(), source, limits)
+		require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+		require.ErrorContains(t, err, "combined source exceeds 8 bytes")
+		require.NotContains(t, err.Error(), "compilation time")
+		require.NotContains(t, err.Error(), "privateDetail")
 	}
 }
 
@@ -105,7 +143,10 @@ func TestBoundedSyntaxCancellation(t *testing.T) {
 
 	// Expiring the local allowance yields a limit failure, without executing source.
 	limits.Timeout = time.Nanosecond
-	require.ErrorIs(t, library.ValidateExpressionSyntaxWithContext(context.Background(), "({})", limits), jsruntime.ErrLimitExceeded)
+	err := library.ValidateExpressionSyntaxWithContext(context.Background(), "({})", limits)
+	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+	require.ErrorContains(t, err, "compilation time exceeded 1ns")
+	require.NotContains(t, err.Error(), "combined source")
 }
 
 // TestBoundedSyntaxConcurrentReuse checks that validations share only immutable

@@ -145,8 +145,8 @@ func (s *service) UpdateConnector(
 			Ctx:  ctx,
 		},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	if err := connectorValidationError(ctx, err); err != nil {
+		return nil, err
 	}
 
 	if current.GetName() != desired.Metadata.Name {
@@ -201,8 +201,8 @@ func (s *service) UpdateConnector(
 			Ctx:  ctx,
 		},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	if err := connectorValidationError(ctx, err); err != nil {
+		return nil, err
 	}
 
 	return s.updateDraftConnectorGeneration(
@@ -245,8 +245,8 @@ func (s *service) UpdateConnectorGeneration(
 			Ctx:  ctx,
 		},
 	)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	if err := connectorValidationError(ctx, err); err != nil {
+		return nil, err
 	}
 
 	if desired.Metadata.Name != existing.GetName() {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -12,8 +13,142 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 )
+
+// connectorValidationListBuilder supplies the selected connector to update
+// validation tests. Unused builder methods remain unsupported.
+type connectorValidationListBuilder struct {
+	database.ListConnectorsBuilder
+	connector database.ConnectorWithDefinition
+}
+
+// ForId retains the single connector selected for this validation scenario.
+func (b *connectorValidationListBuilder) ForId(apid.ID) database.ListConnectorsBuilder {
+	return b
+}
+
+// Limit keeps the fixed single-result page used by the service's initial read.
+func (b *connectorValidationListBuilder) Limit(int32) database.ListConnectorsBuilder {
+	return b
+}
+
+// FetchPage permits reads even after cancellation so the test exercises the
+// service's validation boundary rather than a database context check.
+func (b *connectorValidationListBuilder) FetchPage(context.Context) pagination.PageResult[database.ConnectorWithDefinition] {
+	return pagination.PageResult[database.ConnectorWithDefinition]{Results: []database.ConnectorWithDefinition{b.connector}}
+}
+
+// TestUpdateConnectorValidationErrors checks both update entry points before
+// metadata changes or generation writes can follow canceled validation.
+func TestUpdateConnectorValidationErrors(t *testing.T) {
+	for _, generation := range []bool{false, true} {
+		name := "connector"
+		if generation {
+			name = "generation"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, tt := range []struct {
+				name       string
+				javascript string
+				canceled   bool
+				wantErr    error
+			}{
+				{name: "canceled metadata-only validation", canceled: true, wantErr: context.Canceled},
+				{name: "canceled javascript validation", javascript: "for (;;) {} // private source", canceled: true, wantErr: context.Canceled},
+				{name: "deadline during javascript validation", javascript: "for (;;) {} // private source", wantErr: context.DeadlineExceeded},
+				{name: "invalid javascript", javascript: "function ( // private source", wantErr: ErrInvalidArgument},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					// Allow only the reads needed to validate; writes and encryption fail the test.
+					s, db, _, _, _, e := FullMockService(t, gomock.NewController(t))
+					id := apid.New(apid.PrefixConnector)
+					existing := database.ConnectorWithDefinition{
+						Id: id, Generation: 1, Namespace: "root", Name: "connector",
+						State:               database.ConnectorGenerationStateDraft,
+						EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "definition"},
+					}
+					if generation {
+						db.EXPECT().GetConnectorGeneration(gomock.Any(), id, uint64(1)).Return(&existing, nil)
+					} else {
+						db.EXPECT().ListConnectorsBuilder().Return(&connectorValidationListBuilder{connector: existing})
+					}
+					e.EXPECT().DecryptString(gomock.Any(), existing.EncryptedDefinition).Return(`{"display_name":"Existing"}`, nil)
+
+					// A label change would persist even without a definition, unless cancellation wins.
+					patch := cschema.NewConnectorPatch()
+					labels := map[string]string{"env": "updated"}
+					patch.Metadata.Labels = &labels
+					if tt.javascript != "" {
+						patch.Spec.Definition = &cschema.ConnectorDefinition{Javascript: tt.javascript}
+					}
+					ctx, cancel := context.WithCancel(context.Background())
+					if tt.wantErr == context.DeadlineExceeded {
+						cancel()
+						ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
+					}
+					defer cancel()
+					if tt.canceled {
+						cancel()
+					}
+
+					// Authored syntax errors keep their field path; context failures keep their identity.
+					var err error
+					if generation {
+						_, err = s.UpdateConnectorGeneration(ctx, id, 1, patch)
+					} else {
+						_, err = s.UpdateConnector(ctx, id, patch)
+					}
+					require.ErrorIs(t, err, tt.wantErr)
+					if tt.wantErr != ErrInvalidArgument {
+						require.Equal(t, tt.wantErr, err)
+						require.NotErrorIs(t, err, ErrInvalidArgument)
+					} else {
+						require.ErrorContains(t, err, "$.spec.definition.javascript")
+					}
+					require.NotContains(t, err.Error(), "private")
+				})
+			}
+		})
+	}
+}
+
+// TestUpdateConnectorCancellationBeforeDraftValidation covers cancellation
+// between validating the selected generation and applying the patch to its draft.
+func TestUpdateConnectorCancellationBeforeDraftValidation(t *testing.T) {
+	s, db, _, _, _, e := FullMockService(t, gomock.NewController(t))
+	id := apid.New(apid.PrefixConnector)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// The selected primary validates successfully without changing logical metadata.
+	current := database.ConnectorWithDefinition{
+		Id: id, Generation: 1, Namespace: "root", Name: "connector",
+		State:               database.ConnectorGenerationStatePrimary,
+		EncryptedDefinition: encfield.EncryptedField{ID: "dek_test", Data: "primary"},
+	}
+	db.EXPECT().ListConnectorsBuilder().Return(&connectorValidationListBuilder{connector: current})
+	e.EXPECT().DecryptString(gomock.Any(), current.EncryptedDefinition).Return(`{"display_name":"Existing"}`, nil)
+
+	// Cancel while reading the existing draft; no write may follow its validation.
+	draft := current
+	draft.Generation = 2
+	draft.State = database.ConnectorGenerationStateDraft
+	draft.EncryptedDefinition.Data = "draft"
+	db.EXPECT().GetConnectorGenerationForState(gomock.Any(), id, database.ConnectorGenerationStateDraft).
+		DoAndReturn(func(context.Context, apid.ID, database.ConnectorGenerationState) (*database.ConnectorWithDefinition, error) {
+			cancel()
+			return &draft, nil
+		})
+	e.EXPECT().DecryptString(gomock.Any(), draft.EncryptedDefinition).Return(`{"display_name":"Existing"}`, nil)
+	patch := cschema.NewConnectorPatch()
+	patch.Spec.Definition = &cschema.ConnectorDefinition{DisplayName: "Updated"}
+
+	_, err := s.UpdateConnector(ctx, id, patch)
+	require.Equal(t, context.Canceled, err)
+	require.NotErrorIs(t, err, ErrInvalidArgument)
+}
 
 func TestUpdateDraftConnectorGeneration(t *testing.T) {
 	t.Run("success", func(t *testing.T) {

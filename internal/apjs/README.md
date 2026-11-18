@@ -119,9 +119,10 @@ resource binding/rendering and connector create/update operations supply their
 request context. Synchronous callers that omit it, such as configuration and
 local manifest validation, still get finite execution limits. Each library,
 predicate, and hook syntax check gets a separate budget; there is no total
-connector-validation timeout unless the caller supplies one. Schema errors keep
-field paths and safe failure text; these existing wrappers stringify the underlying error rather than retain
-its Go error identity. The bounded library API itself preserves context errors.
+connector-validation timeout unless the caller supplies one. Authored validation
+errors keep field paths and safe failure text. Caller cancellation and deadlines
+stop connector validation and retain their context error identity through the
+schema, core, and HTTP layers; they are not reported as invalid JavaScript fields.
 
 Migration hooks use compile-only validation because they depend on connection
 data that is not available when a connector is saved:
@@ -146,6 +147,14 @@ validation allowance** and caller cancellation are checked around compilation.
 The parser cannot be interrupted midway; the source cap limits the work admitted
 before parsing. Up and down errors retain their individual field paths. The
 unbounded syntax-validation entry point has been removed.
+
+Source-size failures name the combined byte allowance; compilation-time failures
+name the elapsed-time allowance. Both still match `ErrLimitExceeded`. Syntax
+validation, runtime evaluation, and pre-compilation library loading share
+`CheckCombinedSource`, which counts raw bytes without trimming whitespace.
+Runtime error text remains opaque. Schema callers pass the library explicitly
+to `Migrations.Validate(vc, library)` or `MigrationHook.Validate(vc, library)`;
+pass `nil` only when there is no helper library to account for.
 
 ## Connection predicate policy and migration status
 
