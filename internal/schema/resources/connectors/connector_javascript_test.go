@@ -166,6 +166,13 @@ func TestConnectorJavascriptValidationLibraryFailures(t *testing.T) {
 
 			err := connector.Validate(vc)
 
+			// Caller cancellation remains operational, not a connector definition error.
+			if tc.canceled || tc.deadline {
+				require.ErrorIs(t, err, tc.want)
+				require.Equal(t, tc.want.Error(), err.Error())
+				return
+			}
+
 			// ValidationError stores text rather than wrapping the underlying runtime cause.
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "definition.javascript: invalid connector javascript")
@@ -239,6 +246,13 @@ func TestConnectorJavascriptValidationPredicateFailures(t *testing.T) {
 					}
 
 					err := connector.Validate(vc)
+
+					// A caller deadline stops validation instead of becoming a predicate field error.
+					if tc.deadline {
+						require.ErrorIs(t, err, tc.want)
+						require.Equal(t, tc.want.Error(), err.Error())
+						return
+					}
 
 					// Every call site keeps its field path and the bounded evaluator's safe category.
 					require.Error(t, err)

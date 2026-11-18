@@ -114,15 +114,25 @@ func (c *ConnectorDefinition) Clone() *ConnectorDefinition {
 
 // Validate checks connector behavior and evaluates authored JavaScript with
 // finite limits under the validation context. Each library or predicate gets
-// its own budget. Field errors are collected; library and predicate failures
-// omit authored messages while library validation includes syntax positions and
-// conflicting reserved global names.
+// its own budget. Migration hooks are only compiled, with the library's source
+// counted against each hook's allowance. Field errors are collected; JavaScript
+// failures omit authored messages while syntax validation includes positions and
+// library validation includes conflicting reserved global names. Caller
+// cancellation stops validation and is returned directly rather than collected
+// as a field error, including when a nested validator formatted that error.
 func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
+	ctx := vc.Context()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	result := &multierror.Error{}
 	javascript, err := apjs.CompileAndValidateLibraryWithContext(
-		vc.Context(),
+		ctx,
 		c.Javascript, apjs.ConnectorPredicateLimits(),
 	)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
 	if err != nil {
 		result = multierror.Append(result, vc.NewErrorfForField("javascript", "invalid connector javascript: %v", err))
 		javascript = nil
@@ -133,11 +143,17 @@ func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, err)
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	if c.Migrations != nil {
-		if err := c.Migrations.Validate(vc.PushField("migrations")); err != nil {
+		if err := c.Migrations.Validate(vc.PushField("migrations"), javascript); err != nil {
 			result = multierror.Append(result, err)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	if c.Auth != nil {
@@ -151,10 +167,16 @@ func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
 			}
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	for i, probe := range c.Probes {
 		if err := probe.ValidateWithJavascript(vc.PushField("probes").PushIndex(i), javascript); err != nil {
 			result = multierror.Append(result, err)
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 	}
 
@@ -163,9 +185,15 @@ func (c *ConnectorDefinition) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, err)
 		}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	if err := c.validateMustacheReferences(vc); err != nil {
 		result = multierror.Append(result, err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	return result.ErrorOrNil()

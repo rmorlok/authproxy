@@ -88,7 +88,7 @@ func (r *ResourceSearchRoutes) search(gctx *gin.Context) {
 
 	var req SearchResourcesRequestQuery
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		return
 	}
 	if _, legacyResourceTypePresent := gctx.GetQuery("resourceType"); legacyResourceTypePresent {

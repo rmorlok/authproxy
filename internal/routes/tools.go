@@ -177,7 +177,7 @@ func (r *ToolsRoutes) create(gctx *gin.Context) {
 
 	var req toolschema.Tool
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -226,7 +226,7 @@ func (r *ToolsRoutes) list(gctx *gin.Context) {
 
 	var req ListToolsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -317,7 +317,7 @@ func (r *ToolsRoutes) update(gctx *gin.Context) {
 
 	var req toolschema.ToolPatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -333,7 +333,7 @@ func (r *ToolsRoutes) update(gctx *gin.Context) {
 
 	candidate, err := req.ApplyTo(tool.GetResource(), nil)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

@@ -131,7 +131,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 
 	var req namespace.Namespace
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -206,7 +206,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 
 	var req ListNamespacesRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -345,7 +345,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 
 	var req namespace.NamespacePatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithResponseMsg("invalid request body")))
 		val.MarkErrorReturn()
 		return
 	}
@@ -372,7 +372,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	before := ns.GetResource()
 	_, err = req.ApplyTo(before, nil)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}

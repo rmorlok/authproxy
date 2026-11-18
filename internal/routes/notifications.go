@@ -58,7 +58,7 @@ func (r *NotificationsRoutes) list(gctx *gin.Context) {
 
 	var req ListNotificationsRequestQuery
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		return
 	}
 
@@ -149,7 +149,7 @@ func (r *NotificationsRoutes) markViewedBatch(gctx *gin.Context) {
 		&req,
 		schemaapi.NotificationBatchViewActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		return
 	}
 
@@ -211,7 +211,7 @@ func (r *NotificationsRoutes) markViewed(gctx *gin.Context) {
 	}
 	var req schemaapi.NotificationViewAction
 	if err := apgin.BindActionJSON(gctx, &req, schemaapi.NotificationViewActionKind); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		return
 	}
 	if req.Metadata.Target.ID != id.String() {

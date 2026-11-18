@@ -258,7 +258,9 @@ func (c *Connector) getBoundedJavascriptLibrary(
 	if err != nil {
 		return nil, fmt.Errorf("load connector definition: %w", err)
 	}
-	if len(expression) > limits.MaxSourceBytes || len(def.Javascript) > limits.MaxSourceBytes-len(expression) {
+	if err := apjs.CheckCombinedSource(def.Javascript, expression, limits.MaxSourceBytes); err != nil {
+		// Limits were validated above; keep runtime failures opaque while
+		// sharing the same raw-byte admission as definition validation.
 		return nil, jsruntime.ErrLimitExceeded
 	}
 

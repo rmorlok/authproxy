@@ -6,6 +6,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 var reservedRuntimeVars = map[string]struct{}{
@@ -85,15 +86,18 @@ func CompileAndValidateLibrary(source string) (*Library, error) {
 	return library, nil
 }
 
-// ValidateExpressionSyntax parses a connector-authored expression without
-// executing it. This is useful for expressions that depend on runtime variables
-// and cannot be safely evaluated while the connector definition is validated.
-func ValidateExpressionSyntax(expression string) error {
-	if strings.TrimSpace(expression) == "" {
-		return fmt.Errorf("expression is required")
+// CheckCombinedSource checks raw library and expression bytes against a shared
+// positive allowance before parsing or reusing compiled code. Raw strings let
+// pre-compilation callers count whitespace that a legacy compiler may discard.
+// The subtraction avoids overflowing a combined length. Errors disclose only
+// the configured allowance, never source; runtime adapters may retain just the
+// error category while definition validation exposes the safe limit detail.
+func CheckCombinedSource(librarySource, expression string, maxSourceBytes int) error {
+	if maxSourceBytes <= 0 {
+		return jsruntime.ErrInvalidInput
 	}
-	if _, err := compileSource("expression.js", expression); err != nil {
-		return fmt.Errorf("compile JavaScript expression: %w", err)
+	if len(expression) > maxSourceBytes || len(librarySource) > maxSourceBytes-len(expression) {
+		return fmt.Errorf("%w: combined source exceeds %d bytes", jsruntime.ErrLimitExceeded, maxSourceBytes)
 	}
 	return nil
 }

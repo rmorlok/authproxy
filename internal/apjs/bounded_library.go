@@ -53,7 +53,7 @@ func CompileAndValidateLibraryWithContext(
 			return contextErr
 		}
 		if err != nil {
-			return libraryCompileValidationError(err)
+			return compileValidationError(err)
 		}
 
 		// The legacy compiler drops whitespace-only source. Retain those bytes
@@ -84,11 +84,11 @@ func CompileAndValidateLibraryWithContext(
 	return library, nil
 }
 
-// libraryCompileValidationError retains only a one-based syntax position for
+// compileValidationError retains only a one-based syntax position for
 // definition authors. Neither parser/compiler messages nor their underlying
 // errors escape: they can retain source text and filenames. Unknown positions
 // fall back to the shared category; errors.Is still recognizes ErrInvalidSource.
-func libraryCompileValidationError(err error) error {
+func compileValidationError(err error) error {
 	var line, column int
 	var parseErrors parser.ErrorList
 	var compileError *goja.CompilerSyntaxError

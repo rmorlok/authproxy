@@ -54,9 +54,8 @@ func (c Context) evaluateJSONWithContext(
 	}
 
 	librarySource := c.library.Source()
-	if len(expression) > limits.MaxSourceBytes ||
-		len(librarySource) > limits.MaxSourceBytes-len(expression) {
-		return nil, jsruntime.ErrLimitExceeded
+	if err := CheckCombinedSource(librarySource, expression, limits.MaxSourceBytes); err != nil {
+		return nil, err
 	}
 
 	if !utf8.ValidString(expression) ||
