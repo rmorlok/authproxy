@@ -59,9 +59,9 @@ type AsyncProgram struct {
 // a library because they can reach the global object. A helper library cannot
 // declare execute because that entry point belongs to the main program. The
 // caller supplies domain-specific host bindings. The shared fetch name is always
-// reserved, even when direct HTTP is disabled; an explicit fetch descriptor may
-// repeat that default but cannot preserve enumerability. Malformed binding
-// options return ErrInvalidInput.
+// reserved, even when direct HTTP is disabled; enabled utility names are reserved
+// too. Explicit descriptors may repeat these defaults but cannot preserve
+// enumerability. Malformed binding options return ErrInvalidInput.
 func CompileAsync(
 	source string,
 	library CompiledLibrary,
@@ -77,19 +77,22 @@ func CompileAsync(
 		return nil, err
 	}
 
-	// Reserve the optional built-in capability before source and library checks.
-	// Existing adapters may already include it in their host policy.
-	hasFetch := false
-	for _, binding := range bindings {
-		if binding.Name == "fetch" {
-			if binding.PreserveEnumerable {
-				return nil, ErrInvalidInput
+	// Existing adapters may already reserve these names. Reuse those bindings,
+	// preserving the shared non-enumerable policy and rejecting real duplicates.
+	builtins := append([]HostBinding{{Name: "fetch"}}, limits.Utilities.bindings()...)
+	for _, builtin := range builtins {
+		found := false
+		for _, binding := range bindings {
+			if binding.Name == builtin.Name {
+				if binding.PreserveEnumerable {
+					return nil, ErrInvalidInput
+				}
+				found = true
 			}
-			hasFetch = true
 		}
-	}
-	if !hasFetch {
-		bindings = append(bindings, HostBinding{Name: "fetch"})
+		if !found {
+			bindings = append(bindings, builtin)
+		}
 	}
 
 	librarySource := ""
@@ -184,9 +187,17 @@ func CompileAsync(
 // runs; missing capabilities remain undefined. Stack policy is applied here.
 // Top-level errors and noncallable entry points return fixed classifications,
 // never source, thrown values, or library diagnostics. Discard vm on failure.
+// When Utilities is enabled, call this low-level method inside Run with the
+// same limits so the helpers and their execution-wide accounting already exist.
+// Validate and Evaluate manage that setup automatically.
 func (p *AsyncProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	if p == nil || p.program == nil || vm == nil {
 		return nil, ErrInvalidInput
+	}
+	for _, binding := range p.limits.Utilities.bindings() {
+		if _, ok := goja.AssertFunction(vm.Get(binding.Name)); !ok {
+			return nil, ErrInvalidInput
+		}
 	}
 
 	// Dynamic eval/Function parsing must not load authored source-map URLs from
@@ -252,7 +263,7 @@ func (p *AsyncProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 }
 
 // Validate checks top-level initialization in a fresh runtime under the program's
-// timeout and stack policy. It never supplies host capabilities, connection
+// timeout and stack policy. It never supplies I/O capabilities, connection
 // values, or execute arguments, and never invokes the returned entry point.
 // Unhandled initialization rejections fail just as they do during evaluation;
 // this also catches unavailable capabilities used by async top-level work.

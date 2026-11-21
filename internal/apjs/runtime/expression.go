@@ -61,9 +61,10 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 }
 
 // Evaluate binds optional input, executes the expression, and converts its
-// result to detached JSON under one deadline. A nil prepare callback leaves the
-// fresh VM's standard globals unchanged. Unsupported output, including Promises,
-// fails with ErrInvalidOutput; cancellation or failure returns no partial JSON.
+// result to detached JSON under one deadline. A nil prepare callback installs no
+// adapter bindings; selected pure utilities remain available. Unsupported output,
+// including Promises, fails with ErrInvalidOutput; cancellation or failure returns
+// no partial JSON.
 //
 // prepare is trusted adapter code, called before the expression. It may bind
 // copied native JSON and selected pure helpers, but must not install I/O or live
