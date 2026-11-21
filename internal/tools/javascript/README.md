@@ -361,7 +361,7 @@ The supported Fetch subset is explicit:
 | `connection.fetch(url, init)` | Absolute HTTP(S) URL string; optional own `method`, `headers`, and `body` fields. Unsupported fields are rejected. |
 | Request method | `DELETE`, `GET`, `HEAD`, `OPTIONS`, `POST`, and `PUT` are normalized to uppercase. `CONNECT`, `TRACE`, and `TRACK` are rejected regardless of case. Other methods retain their spelling. |
 | Request headers | Own enumerable string values. `Host` overrides the request host; framing and hop-by-hop headers remain transport-owned. |
-| Request body | String or `ArrayBuffer`, copied before dispatch. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
+| Request body | String, `ArrayBuffer`, or genuine `URLSearchParams` when enabled, copied before dispatch. Form instances serialize automatically and default to `application/x-www-form-urlencoded;charset=UTF-8` unless a content type was supplied. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
 | Response metadata | Read-only `status`, `ok`, `bodyUsed`, and `headers.get(name)`. Header lookup is case-insensitive and returns null for a missing or filtered header. |
 | Response body | Single-use async `text()`, `json()`, or `arrayBuffer()`. A second admitted read rejects. If worker admission is refused, `bodyUsed` stays false and the read can be retried after other work finishes. |
 

@@ -71,7 +71,7 @@ func (l *HTTPHost) fetch(
 	var err error
 
 	if exception := l.vm.Try(func() {
-		req, labels, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes, validateLabels != nil)
+		req, labels, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes, validateLabels != nil, l.formEncoder)
 	}); exception != nil {
 		return l.rejected(ErrInvalidInput)
 	}

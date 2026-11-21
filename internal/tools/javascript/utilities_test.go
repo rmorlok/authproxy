@@ -48,6 +48,56 @@ func TestToolSearchParamsHTTP(t *testing.T) {
 	}
 }
 
+// TestToolSearchParamsFormBody serializes a genuine instance through the shared
+// fetch host, copying its form data before any worker or later mutation runs.
+func TestToolSearchParamsFormBody(t *testing.T) {
+	limits := expressionLimits()
+	limits.Utilities = jsruntime.UtilityPolicy{URLSearchParams: true, MaxCalls: 8, MaxInputBytes: 512, MaxOutputBytes: 512}
+	program, err := javascript.CompileTool(`
+		const form = new URLSearchParams("grant_type=client_credentials&scope=first&scope=second");
+		async function execute(params, context) {
+			form.append("audience", "café + news");
+			Object.defineProperty(form, "toString", {get() {throw "must not run";}});
+			const pending = context.connections[0].fetch("https://provider.example/token", {method: "POST", body: form});
+			form.set("scope", "changed after dispatch");
+			const response = await pending;
+			return [await response.text(), typeof fetch];
+		}`, nil, limits)
+	require.NoError(t, err)
+	require.NoError(t, program.Validate(context.Background()))
+	requests := make(chan [4]string, 1)
+	options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+		defer request.Body.Close()
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			return nil, err
+		}
+		replay, err := request.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		defer replay.Close()
+		repeated, err := io.ReadAll(replay)
+		if err != nil {
+			return nil, err
+		}
+		requests <- [4]string{request.Method, request.Header.Get("Content-Type"), string(body), string(repeated)}
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader("ok"))), nil
+	}, fetchLimits())
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+	// Both initial send and replay use the same encoded snapshot and inferred header.
+	require.NoError(t, err)
+	require.JSONEq(t, `["ok","undefined"]`, string(result))
+	select {
+	case request := <-requests:
+		const body = "grant_type=client_credentials&scope=first&scope=second&audience=caf%C3%A9+%2B+news"
+		require.Equal(t, [4]string{"POST", "application/x-www-form-urlencoded;charset=UTF-8", body, body}, request)
+	default:
+		t.Fatal("connection did not receive the form request")
+	}
+}
+
 // TestToolSearchParamsExhaustionStopsHTTP preserves earlier send evidence and
 // prevents a caught query-output limit from enabling any subsequent requests.
 func TestToolSearchParamsExhaustionStopsHTTP(t *testing.T) {
@@ -72,6 +122,21 @@ func TestToolSearchParamsExhaustionStopsHTTP(t *testing.T) {
 				await context.connections[0].fetch("https://provider.example/first");
 				const q = new URLSearchParams("x=1"); try {q.toString();} catch (_) {}
 				await context.connections[0].fetch("https://provider.example/second"); return true;}`,
+			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
+		},
+		"form body before first request": {
+			source: `async function execute(params, context) {
+				const q = new URLSearchParams("x=1");
+				try {await context.connections[0].fetch("https://provider.example/form", {method: "POST", body: q});} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/later"); return true;}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"form body after first request": {
+			source: `async function execute(params, context) {
+				await context.connections[0].fetch("https://provider.example/first");
+				const q = new URLSearchParams("x=1");
+				try {await context.connections[0].fetch("https://provider.example/form", {method: "POST", body: q});} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/later"); return true;}`,
 			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
 		},
 	} {

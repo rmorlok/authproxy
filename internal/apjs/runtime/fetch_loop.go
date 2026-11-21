@@ -45,24 +45,25 @@ type HTTPOptions struct {
 // pending-worker allowance. Its methods and bindings belong to that VM goroutine;
 // they must not be retained after evaluation. The zero value is not usable.
 type HTTPHost struct {
-	ctx       context.Context                        // Invocation runtime deadline plus host cleanup cancellation.
-	cancel    context.CancelFunc                     // Stops requests and body reads on every exit.
-	vm        *goja.Runtime                          // Accessed exclusively by the owner.
-	options   HTTPOptions                            // Shared admission limits and diagnostics logger.
-	limits    Limits                                 // Bounds response JSON parsing as well as final output.
-	decoder   *JSONDecoder                           // Native JSON decoder captured before authored initialization.
-	enabled   bool                                   // I/O is admitted only after initialization succeeds.
-	nextID    uint64                                 // Monotonic operation identity within this invocation.
-	pending   map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
-	completed chan fetchCompletion                   // Unbuffered ownership handoff from workers.
+	ctx         context.Context                        // Invocation runtime deadline plus host cleanup cancellation.
+	cancel      context.CancelFunc                     // Stops requests and body reads on every exit.
+	vm          *goja.Runtime                          // Accessed exclusively by the owner.
+	options     HTTPOptions                            // Shared admission limits and diagnostics logger.
+	limits      Limits                                 // Bounds response JSON parsing as well as final output.
+	decoder     *JSONDecoder                           // Native JSON decoder captured before authored initialization.
+	formEncoder goja.Callable                          // Protected native query serializer, nil when that utility is disabled; owner-only.
+	enabled     bool                                   // I/O is admitted only after initialization succeeds.
+	nextID      uint64                                 // Monotonic operation identity within this invocation.
+	pending     map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
+	completed   chan fetchCompletion                   // Unbuffered ownership handoff from workers.
 }
 
 // NewHTTPHost captures pristine parsing and starts no work. Call it during
 // AsyncProgram.Evaluate preparation, before any authored code runs, with the
 // evaluation's context and limits. Register Close on AsyncInvocation immediately
 // after construction, then Start and Await, before touching the VM again.
-// Invalid policy or missing parser bindings return ErrInvalidInput without
-// acquiring resources. The caller still owns the HTTP session and its cleanup.
+// Invalid policy or missing parser/enabled utility bindings return ErrInvalidInput
+// without acquiring resources. The caller still owns the HTTP session and cleanup.
 // It must link session cancellation to the evaluation context when session
 // exhaustion or expiry should also interrupt JavaScript that is not awaiting I/O.
 func NewHTTPHost(
@@ -79,6 +80,25 @@ func NewHTTPHost(
 	if err != nil {
 		return nil, err
 	}
+	var formEncoder goja.Callable
+	if limits.Utilities.URLSearchParams {
+		// Utilities are installed by Run before preparation. Capture the
+		// protected native method now, never a candidate body's toString.
+		// Its private receiver map supplies the genuine-instance check and
+		// shared utility accounting. Keep this closure off worker contexts.
+		constructor, ok := vm.Get("URLSearchParams").(*goja.Object)
+		if !ok {
+			return nil, ErrInvalidInput
+		}
+		prototype, ok := constructor.Get("prototype").(*goja.Object)
+		if !ok {
+			return nil, ErrInvalidInput
+		}
+		formEncoder, ok = goja.AssertFunction(prototype.Get("toString"))
+		if !ok {
+			return nil, ErrInvalidInput
+		}
+	}
 	run, cancel := context.WithCancel(ctx)
 
 	if options.Logger == nil {
@@ -86,14 +106,15 @@ func NewHTTPHost(
 	}
 
 	return &HTTPHost{
-		ctx:       run,
-		cancel:    cancel,
-		vm:        vm,
-		options:   options,
-		limits:    limits,
-		decoder:   decoder,
-		pending:   make(map[uint64]func(fetchCompletion) error),
-		completed: make(chan fetchCompletion),
+		ctx:         run,
+		cancel:      cancel,
+		vm:          vm,
+		options:     options,
+		limits:      limits,
+		decoder:     decoder,
+		formEncoder: formEncoder,
+		pending:     make(map[uint64]func(fetchCompletion) error),
+		completed:   make(chan fetchCompletion),
 	}, nil
 }
 

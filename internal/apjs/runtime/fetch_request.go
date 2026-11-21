@@ -19,6 +19,9 @@ import (
 // The URL must be a primitive absolute HTTP(S) string. The optional init object
 // supports only own method, headers, and body properties; headers use own
 // enumerable string properties, and body supports strings or native ArrayBuffers.
+// A nonnil formEncoder adds genuine URLSearchParams bodies; it must be the
+// protected native serializer captured before authored code, never a value read
+// from the body. It owns receiver validation and shared utility allowances.
 // Connection bindings also accept labels when allowLabels is true. They are
 // detached string maps charged to the same byte allowance; the adapter validates
 // their domain-specific key/value rules before worker dispatch.
@@ -35,6 +38,7 @@ func prepareFetchRequest(
 	call goja.FunctionCall,
 	maxBytes int,
 	allowLabels bool,
+	formEncoder goja.Callable,
 ) (*http.Request, map[string]string, error) {
 	if ctx == nil || vm == nil || maxBytes <= 0 || len(call.Arguments) > 2 {
 		return nil, nil, ErrInvalidInput
@@ -114,9 +118,17 @@ func prepareFetchRequest(
 		return nil, nil, err
 	}
 
-	body, err := budget.body(bodyValue)
+	body, contentType, err := budget.body(bodyValue, formEncoder)
 	if err != nil {
 		return nil, nil, err
+	}
+	if _, supplied := headers["Content-Type"]; !supplied && contentType != "" {
+		// An explicitly empty header still counts as supplied. The generated
+		// header shares the request allowance with all authored request data.
+		if err := budget.consume(len("Content-Type") + len(contentType)); err != nil {
+			return nil, nil, err
+		}
+		headers.Set("Content-Type", contentType)
 	}
 
 	labels, err := budget.labels(labelsValue)
@@ -312,37 +324,57 @@ func (b *fetchRequestBudget) labels(value goja.Value) (map[string]string, error)
 	return labels, nil
 }
 
-// body constructs a replayable reader after bounding its data. ArrayBuffer's
+// body constructs a replayable reader and optional inferred content type after
+// bounding its data. URLSearchParams uses only the captured native serializer;
+// its output counts against both utility and request allowances. ArrayBuffer's
 // exported bytes alias the VM, so they are cloned before a worker can use them.
 // Typed arrays are intentionally unsupported; callers may pass an ArrayBuffer.
-func (b *fetchRequestBudget) body(value goja.Value) (io.Reader, error) {
+func (b *fetchRequestBudget) body(value goja.Value, formEncoder goja.Callable) (io.Reader, string, error) {
 	if value == nil || goja.IsUndefined(value) || goja.IsNull(value) {
-		return nil, nil
+		return nil, "", nil
 	}
 
 	if _, ok := value.(goja.String); ok {
 		text, err := b.string(value)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 
-		return strings.NewReader(text), nil
+		return strings.NewReader(text), "", nil
 	}
 
 	if value.ExportType() != reflect.TypeFor[goja.ArrayBuffer]() {
-		return nil, ErrInvalidInput
+		if formEncoder == nil {
+			return nil, "", ErrInvalidInput
+		}
+		// This method validates its private receiver brand without consulting
+		// authored properties, prototypes, coercion hooks, or proxy traps.
+		serialized, err := formEncoder(value)
+		if err != nil {
+			switch err.(type) {
+			case *goja.InterruptedError, *goja.StackOverflowError:
+				panic(err) // Preserve uncatchable runtime/utility failure semantics.
+			default:
+				return nil, "", ErrInvalidInput
+			}
+		}
+		text, err := b.string(serialized)
+		if err != nil {
+			return nil, "", err
+		}
+		return strings.NewReader(text), "application/x-www-form-urlencoded;charset=UTF-8", nil
 	}
 
 	buffer := value.Export().(goja.ArrayBuffer)
 	if buffer.Detached() {
-		return nil, ErrInvalidInput
+		return nil, "", ErrInvalidInput
 	}
 
 	if err := b.consume(len(buffer.Bytes())); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return bytes.NewReader(bytes.Clone(buffer.Bytes())), nil
+	return bytes.NewReader(bytes.Clone(buffer.Bytes())), "", nil
 }
 
 // validFetchURL limits the URL to an absolute HTTP(S) destination without

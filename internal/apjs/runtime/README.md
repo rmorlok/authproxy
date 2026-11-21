@@ -365,7 +365,11 @@ available to trusted host adapters that own their native binding layout.
 
 Fetch accepts an absolute HTTP(S) URL and optional `method`, `headers`, and `body`.
 Headers are a string record; `Host` sets the request's host override. Bodies are
-strings or native `ArrayBuffer` values. The combined request fields must fit
+strings, native `ArrayBuffer` values, or genuine `URLSearchParams` instances when
+that utility is enabled. Form bodies are serialized and receive
+`Content-Type: application/x-www-form-urlencoded;charset=UTF-8` unless the caller
+supplied a content type. The serialized body and generated header count toward
+the same request allowance. The combined request fields must fit
 `MaxRequestBytes`; unsupported options fail without dispatch. Responses expose
 `status`, `ok`, `headers.get(name)`, `bodyUsed`, and single-use async `text()`,
 `json()`, and `arrayBuffer()` readers. HTTP status errors resolve normally.
@@ -638,6 +642,31 @@ query.toString();
 The result has no leading `?`. An already-supplied connection can use it with
 `connection.fetch("https://api.example/items?" + query.toString())`. Selecting
 this helper grants no HTTP capability and does not install `URL`.
+
+You can also pass an instance directly as a form POST body:
+
+```javascript
+async function execute(params, context) {
+    const form = new URLSearchParams();
+    form.append("grant_type", "client_credentials");
+    form.append("scope", "read write");
+    return (await context.connections[0].fetch("https://api.example/token", {
+        method: "POST",
+        body: form,
+    })).json();
+}
+```
+
+Fetch sends `grant_type=client_credentials&scope=read+write` with
+`Content-Type: application/x-www-form-urlencoded;charset=UTF-8`. An explicit
+content-type header, including an empty one, is preserved. Fetch uses the
+protected native serializer, so it ignores an instance's overridden `toString`
+and rejects fake or proxy receivers. Serialization consumes the same utility
+allowances as `toString()`; the copied body and any inferred header also consume
+request bytes. Later mutations do not change the request or its replay body.
+This works with connection fetch and an explicitly enabled direct fetch.
+If you pass `body: form.toString()` instead, set the content type yourself;
+plain string bodies do not infer it.
 
 The supported [URL Standard](https://url.spec.whatwg.org/#interface-urlsearchparams)
 subset uses ordered name/value pairs, including duplicates:

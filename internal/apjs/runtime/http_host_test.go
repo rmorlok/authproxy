@@ -151,7 +151,7 @@ func TestHTTPHostBindingsWaitForInitialization(t *testing.T) {
 // TestHTTPHostRejectsIncompletePolicy prevents a reusable host from accidentally
 // bypassing the positive limits that its former Tool-only caller checked.
 func TestHTTPHostRejectsIncompletePolicy(t *testing.T) {
-	for _, name := range []string{"context", "runtime", "request bytes", "pending operations", "runtime limits"} {
+	for _, name := range []string{"context", "runtime", "request bytes", "pending operations", "runtime limits", "missing query utility"} {
 		t.Run(name, func(t *testing.T) {
 			ctx, vm := context.Background(), goja.New()
 			options := jsruntime.HTTPOptions{MaxRequestBytes: 8192, MaxPendingOperations: 2}
@@ -167,6 +167,9 @@ func TestHTTPHostRejectsIncompletePolicy(t *testing.T) {
 				options.MaxPendingOperations = 0
 			case "runtime limits":
 				limits.MaxDepth = 0
+			case "missing query utility":
+				// Opted-in utilities must be installed by the enclosing Run before host preparation.
+				limits.Utilities = searchParamsLimits().Utilities
 			}
 
 			// Invalid inputs return no partially initialized host to clean up.
