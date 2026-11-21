@@ -119,6 +119,7 @@ export default defineConfig({
                 'development/design/kubernetes-resource-api',
                 'development/design/key-model-migration',
                 'development/design/oauth-provider-identity',
+                'development/design/resource-change-events',
               ],
             },
           ],

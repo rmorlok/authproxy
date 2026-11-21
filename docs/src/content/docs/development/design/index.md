@@ -17,6 +17,9 @@ They are contributor context, not stable user-facing contracts.
 - [OAuth provider identity changes](/development/design/oauth-provider-identity/) — current gap
   and target behavior for enforcing a stable provider account during
   reauthentication.
+- [Resource change events](/development/design/resource-change-events/) —
+  proposed registry of resource change subscribers and a transactional outbox
+  that delivers changes durably, replacing direct cross-resource calls.
 - [Unified key-model migration](/development/design/key-model-migration/) — migration history,
   data model, provider behavior, and implementation sequencing for logical
   keys and data-encryption keys.
