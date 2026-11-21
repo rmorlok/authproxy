@@ -14,6 +14,89 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestToolSearchParamsHTTP builds an encoded query with shared pure utilities
+// while keeping all outbound work on the Tool's captured connection.
+func TestToolSearchParamsHTTP(t *testing.T) {
+	limits := expressionLimits()
+	limits.Utilities = jsruntime.UtilityPolicy{URLSearchParams: true, MaxCalls: 8, MaxInputBytes: 256, MaxOutputBytes: 256}
+	program, err := javascript.CompileTool(`
+		const query = new URLSearchParams("status=open");
+		async function execute(params, context) {
+			query.append("q", "café + news");
+			query.append("status", "new");
+			const response = await context.connections[0].fetch("https://provider.example/items?" + query.toString());
+			return [await response.text(), typeof fetch, typeof URL, typeof TextEncoder];
+		}`, nil, limits)
+	require.NoError(t, err)
+	// Query initialization is pure and can run during validation without a connection.
+	require.NoError(t, program.Validate(context.Background()))
+	queries := make(chan string, 1)
+	options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+		queries <- request.URL.RawQuery
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader("ok"))), nil
+	}, fetchLimits())
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+	// Duplicate parameters and escaped user text arrive intact at the configured client.
+	require.NoError(t, err)
+	require.JSONEq(t, `["ok","undefined","undefined","undefined"]`, string(result))
+	select {
+	case query := <-queries:
+		require.Equal(t, "status=open&q=caf%C3%A9+%2B+news&status=new", query)
+	default:
+		t.Fatal("connection did not receive the query request")
+	}
+}
+
+// TestToolSearchParamsExhaustionStopsHTTP preserves earlier send evidence and
+// prevents a caught query-output limit from enabling any subsequent requests.
+func TestToolSearchParamsExhaustionStopsHTTP(t *testing.T) {
+	for name, test := range map[string]struct {
+		source string
+		calls  int32
+		state  api.ToolExecutionState
+	}{
+		"initialization": {
+			source: `const q = new URLSearchParams("x=1"); try {q.toString();} catch (_) {}
+				async function execute(params, context) {await context.connections[0].fetch("https://provider.example/items"); return true;}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"before first request": {
+			source: `async function execute(params, context) {
+				const q = new URLSearchParams("x=1"); try {q.toString();} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/items"); return true;}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"after first request": {
+			source: `async function execute(params, context) {
+				await context.connections[0].fetch("https://provider.example/first");
+				const q = new URLSearchParams("x=1"); try {q.toString();} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/second"); return true;}`,
+			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Parsing uses six output units, leaving too little for the three-byte serialization.
+			limits := expressionLimits()
+			limits.Utilities = jsruntime.UtilityPolicy{URLSearchParams: true, MaxCalls: 8, MaxInputBytes: 64, MaxOutputBytes: 8}
+			program, err := javascript.CompileTool(test.source, nil, limits)
+			require.NoError(t, err)
+			var calls atomic.Int32
+			options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return fetchResponse(http.StatusOK, http.NoBody), nil
+			}, fetchLimits())
+			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+			// The overall invocation fails even though authored code tried to catch the limit.
+			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+			require.Nil(t, result)
+			require.Equal(t, test.calls, calls.Load())
+			require.Equal(t, test.state, options.Session.ExecutionState())
+		})
+	}
+}
+
 // TestToolTextCodecHTTP uses the shared codecs with the Tool's sole connection,
 // preserving native byte ownership and keeping unrelated capabilities disabled.
 func TestToolTextCodecHTTP(t *testing.T) {

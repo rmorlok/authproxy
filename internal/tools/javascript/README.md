@@ -188,11 +188,13 @@ are non-enumerable; existing captured input bindings remain enumerable. Global
 Tool, expression, and connector library parsing, including dynamic
 `eval`/`Function` parsing, do not load source maps.
 
-`atob`, `btoa`, `TextEncoder`, and `TextDecoder` also remain absent by default.
-A trusted Go caller can select `limits.Utilities.Base64` or
-`limits.Utilities.TextCodecs` with explicit allowances to enable the shared
-runtime's [base64 helpers](../../apjs/runtime/README.md#optional-base64-helpers)
-or [UTF-8 codecs](../../apjs/runtime/README.md#optional-text-codecs).
+`atob`, `btoa`, `TextEncoder`, `TextDecoder`, and `URLSearchParams` also remain absent by default.
+A trusted Go caller can select `limits.Utilities.Base64`,
+`limits.Utilities.TextCodecs`, or `limits.Utilities.URLSearchParams` with explicit
+allowances to enable the shared runtime's
+[base64 helpers](../../apjs/runtime/README.md#optional-base64-helpers),
+[UTF-8 codecs](../../apjs/runtime/README.md#optional-text-codecs), or
+[query helpers](../../apjs/runtime/README.md#optional-query-strings).
 The same policy applies during validation, initialization, and execution;
 enabling it grants no HTTP capability. Utility exhaustion stops execution before
 any later request while preserving evidence of requests already sent.

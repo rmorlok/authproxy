@@ -19,26 +19,33 @@ type UtilityPolicy struct {
 	// Constructors and methods share the same allowances as other selected helpers.
 	TextCodecs bool
 
-	// MaxCalls counts native helper/method entries and codec initialization,
+	// URLSearchParams enables bounded form-query parsing and editing. It does
+	// not install URL or grant HTTP access.
+	URLSearchParams bool
+
+	// MaxCalls counts native helper/method/getter entries and construction,
 	// including argument failures that reach them. It also bounds retained
-	// native codec instance metadata; JavaScript errors before entry do not count.
+	// native instance metadata; JavaScript errors before entry do not count.
 	MaxCalls int
 
 	// MaxInputBytes counts string UTF-16 code units and buffer bytes before
 	// scanning or allocating. Decoder labels count too; fixed Boolean options
-	// do not. Whitespace and invalid strings consume their admitted length.
+	// do not. Query operations also charge stored tuples/code units they scan,
+	// and sort charges each comparison. Invalid attempts keep their charges.
 	MaxInputBytes int
 
 	// MaxOutputBytes bounds reserved output buffer bytes or string UTF-16 code
 	// units. Native buffers and Goja string storage use bounded multiples of
-	// these caps; instance metadata is bounded by MaxCalls, not a heap quota.
+	// these caps. Query helpers also charge temporary UTF-8, retained normalized
+	// strings, and one unit per tuple/returned array slot. Nothing is refunded.
+	// Instance metadata is bounded by MaxCalls; these caps are not a heap quota.
 	MaxOutputBytes int
 }
 
 // validate rejects unlimited work for enabled helpers. Caps are unused when
 // no helpers are selected, so existing zero-valued execution policies still work.
 func (p UtilityPolicy) validate() error {
-	if (p.Base64 || p.TextCodecs) && (p.MaxCalls <= 0 || p.MaxInputBytes <= 0 || p.MaxOutputBytes <= 0) {
+	if (p.Base64 || p.TextCodecs || p.URLSearchParams) && (p.MaxCalls <= 0 || p.MaxInputBytes <= 0 || p.MaxOutputBytes <= 0) {
 		return ErrInvalidInput
 	}
 	return nil
@@ -59,6 +66,9 @@ func (p UtilityPolicy) bindings() []HostBinding {
 			HostBinding{Name: "TextEncoder"},
 			HostBinding{Name: "TextDecoder"},
 		)
+	}
+	if p.URLSearchParams {
+		bindings = append(bindings, HostBinding{Name: "URLSearchParams"})
 	}
 	return bindings
 }
@@ -84,7 +94,7 @@ func installUtilities(
 	vm *goja.Runtime,
 	policy UtilityPolicy,
 ) (*utilityHost, error) {
-	if !policy.Base64 && !policy.TextCodecs {
+	if !policy.Base64 && !policy.TextCodecs && !policy.URLSearchParams {
 		return nil, nil
 	}
 	if err := ctx.Err(); err != nil {
@@ -117,6 +127,11 @@ func installUtilities(
 			return nil, err
 		}
 	}
+	if policy.URLSearchParams {
+		if err := newSearchParams(host).install(); err != nil {
+			return nil, err
+		}
+	}
 
 	return host, nil
 }
@@ -134,7 +149,7 @@ func (h *utilityHost) begin(call goja.FunctionCall) goja.String {
 	return text
 }
 
-// beginCall charges a native helper entry or codec initialization before validating arguments.
+// beginCall charges a native helper entry or construction before validating arguments.
 func (h *utilityHost) beginCall() {
 	h.checkContext()
 	if h.calls >= h.policy.MaxCalls {

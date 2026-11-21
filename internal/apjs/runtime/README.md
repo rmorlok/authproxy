@@ -612,6 +612,94 @@ Limits and cancellation behave like the base64 helpers: periodic native checks,
 one execution deadline, no result after failure, and uncatchable budget
 exhaustion that prevents later HTTP requests while preserving earlier effects.
 
+## Optional query strings
+
+`URLSearchParams` parses and edits query strings. It is absent by default:
+
+```go
+limits.Utilities = runtime.UtilityPolicy{
+    URLSearchParams: true,
+    MaxCalls: 64,
+    MaxInputBytes: 64 << 10,
+    MaxOutputBytes: 128 << 10,
+}
+```
+
+For example, build a query from an existing filter and an unencoded search term:
+
+```javascript
+const query = new URLSearchParams("status=open");
+query.append("q", "café + news");
+query.append("status", "new");
+query.toString();
+// "status=open&q=caf%C3%A9+%2B+news&status=new"
+```
+
+The result has no leading `?`. An already-supplied connection can use it with
+`connection.fetch("https://api.example/items?" + query.toString())`. Selecting
+this helper grants no HTTP capability and does not install `URL`.
+
+The supported [URL Standard](https://url.spec.whatwg.org/#interface-urlsearchparams)
+subset uses ordered name/value pairs, including duplicates:
+
+| Operation | Behavior |
+| --- | --- |
+| `new URLSearchParams(text)` | Parses a primitive string; omitted or undefined means empty. Removes one initial `?`, skips empty `&` segments, and splits each pair at its first `=`. |
+| `append(name, value)` | Adds another pair at the end. |
+| `set(name, value)` | Replaces the first matching pair and removes later duplicates; appends if absent. |
+| `get(name)` / `getAll(name)` | Returns the first value or null / a new native array of all values. |
+| `has(name, value?)` | Tests for the name, optionally requiring a matching value. |
+| `delete(name, value?)` | Removes all matching pairs. An omitted or undefined value matches any value. |
+| `sort()` | Stably sorts names by UTF-16 code units, preserving the order of equal names. |
+| `size` | Read-only number of pairs, including duplicates. |
+| `toString()` | Serializes using form encoding, preserving the current order. |
+
+Parsing changes `+` to a space and decodes valid `%HH` bytes. Invalid escapes
+stay literal. Malformed UTF-8 uses replacement characters; a BOM remains data.
+Serialization changes spaces to `+` and leaves only ASCII letters, digits,
+`*`, `-`, `.`, and `_` unescaped. Other UTF-8 bytes become uppercase percent
+escapes. For example, `new URLSearchParams("q=a+b%2Bc").get("q")` returns
+`"a b+c"`. Passing a full URL treats it as query text; it does not extract the
+URL's query component.
+
+Methods accept primitive strings, replacing lone UTF-16 surrogates with U+FFFD.
+Mutation arguments are unencoded data: `append("q", "%2B")` serializes as
+`q=%252B`. There is no implicit object or scalar coercion. Object/sequence/copy
+constructors, iterators, `forEach`, and coupling to a `URL` object are not
+implemented. Use `new URLSearchParams(existing.toString())` to copy a query.
+Constructors require `new`; methods require genuine instances from the current
+VM. Invalid arguments or receivers raise a fixed, catchable `TypeError` without
+running their getters, proxy traps, or conversion hooks. Installed global and
+prototype properties are nonwritable and nonconfigurable.
+
+Query helpers share the existing utility counters with selected base64 and text
+codecs. They work in pure expressions, validation, initialization, and async
+execution. Each VM owns its mutable query state and counters:
+
+- `MaxCalls` counts construction, methods, and `size` reads, including failed
+  native argument checks. It also bounds retained instance metadata.
+- `MaxInputBytes` counts supplied UTF-16 code units. Operations that scan stored
+  state also charge its name/value code units plus one unit per pair, even when
+  they find a match early. `append` and `size` do not scan. Sort additionally
+  charges each moved tuple and both names in each comparison.
+- `MaxOutputBytes` counts temporary UTF-8 bytes and normalized UTF-16 strings
+  produced during parsing or argument conversion, plus one unit per retained
+  pair. Reads charge returned string units; `getAll` also charges one unit per
+  array element. Serialization charges its exact ASCII length. Sort reserves
+  one scratch slot per pair when there are at least two pairs.
+
+Charges are cumulative; deletion does not refund storage allowance. One storage
+unit for a pair or array slot bounds its constant-size native metadata, rather
+than representing one byte of memory. These limits bound allocations by fixed
+multiples and are separate from JSON limits; they are not a heap quota.
+For example, `new URLSearchParams("a=b").toString()` uses two calls, six input
+units (three supplied and three scanned), and nine output units (three temporary
+UTF-8 bytes, two retained string units, one pair, and three serialized bytes).
+
+Native parsing, comparison, sorting, and serialization check cancellation.
+Exhaustion stops the entire evaluation even inside `try/catch`, preventing later
+HTTP requests while preserving evidence for requests already sent.
+
 ## Copying JSON into the runtime
 
 Create a `JSONDecoder` before authored code or libraries run. It captures the
