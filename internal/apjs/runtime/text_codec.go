@@ -77,22 +77,44 @@ func (t *textCodecs) install() error {
 		if err != nil {
 			return EvaluationError(err)
 		}
+
 		constructor := constructorValue.ToObject(vm)
-		if err := constructor.DefineDataProperty("name", vm.ToValue(definition.name),
-			goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := constructor.DefineDataProperty(
+			"name",
+			vm.ToValue(definition.name),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
+
 		prototype := constructor.Get("prototype").ToObject(vm)
-		if err := prototype.DefineDataProperty(definition.methodName, vm.ToValue(definition.method),
-			goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := prototype.DefineDataProperty(
+			definition.methodName,
+			vm.ToValue(definition.method),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
-		if err := constructor.DefineDataProperty("prototype", prototype,
-			goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := constructor.DefineDataProperty(
+			"prototype",
+			prototype,
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
-		if err := vm.GlobalObject().DefineDataProperty(definition.name, constructor,
-			goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := vm.GlobalObject().DefineDataProperty(
+			definition.name,
+			constructor,
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
 	}
@@ -103,12 +125,16 @@ func (t *textCodecs) install() error {
 // Constructor arguments are unused, as in the web API.
 func (t *textCodecs) newEncoder(call goja.FunctionCall) goja.Value {
 	t.host.beginCall()
+
 	receiver, ok := call.Argument(0).(*goja.Object)
 	if !ok {
 		t.host.invalidTextInput()
 	}
+
 	t.readOnly(receiver, "encoding", t.host.vm.ToValue("utf-8"))
+
 	t.encoders[receiver] = struct{}{}
+
 	return goja.Undefined()
 }
 
@@ -117,15 +143,18 @@ func (t *textCodecs) newEncoder(call goja.FunctionCall) goja.Value {
 // constructor-call allowance and never invoke authored accessors or coercion.
 func (t *textCodecs) newDecoder(call goja.FunctionCall) goja.Value {
 	t.host.beginCall()
+
 	receiver, ok := call.Argument(0).(*goja.Object)
 	if !ok {
 		t.host.invalidTextInput()
 	}
+
 	if label := call.Argument(1); !goja.IsUndefined(label) {
 		text, ok := label.(goja.String)
 		if !ok {
 			t.host.invalidTextInput()
 		}
+
 		t.host.consumeInput(text.Length())
 		if !t.utf8Label(text) {
 			errValue, err := t.rangeError(nil, t.host.vm.ToValue("Unsupported text encoding"))
@@ -135,6 +164,7 @@ func (t *textCodecs) newDecoder(call goja.FunctionCall) goja.Value {
 			panic(errValue)
 		}
 	}
+
 	options := t.options(call.Argument(2))
 	settings := textDecoderOptions{
 		fatal:     t.booleanOption(options, "fatal"),
@@ -144,6 +174,7 @@ func (t *textCodecs) newDecoder(call goja.FunctionCall) goja.Value {
 	t.readOnly(receiver, "fatal", t.host.vm.ToValue(settings.fatal))
 	t.readOnly(receiver, "ignoreBOM", t.host.vm.ToValue(settings.ignoreBOM))
 	t.decoders[receiver] = settings
+
 	return goja.Undefined()
 }
 
@@ -152,28 +183,36 @@ func (t *textCodecs) newDecoder(call goja.FunctionCall) goja.Value {
 // lone UTF-16 surrogates, reserves exact bytes, and never invokes coercion.
 func (t *textCodecs) encode(call goja.FunctionCall) goja.Value {
 	t.host.beginCall()
+
 	receiver, ok := call.This.(*goja.Object)
 	if !ok {
 		t.host.invalidTextInput()
 	}
+
 	if _, ok := t.encoders[receiver]; !ok {
 		t.host.invalidTextInput()
 	}
+
 	value := call.Argument(0)
 	if goja.IsUndefined(value) {
 		value = t.host.vm.ToValue("")
 	}
+
 	text, ok := value.(goja.String)
 	if !ok {
 		t.host.invalidTextInput()
 	}
+
 	t.host.consumeInput(text.Length())
 	bytes := t.host.encodeUTF8(text)
+
 	result, err := t.buffers.uint8Array(t.host.vm, bytes)
 	if err != nil {
 		t.host.textCodecError(err)
 	}
+
 	t.host.checkContext()
+
 	return result
 }
 
@@ -182,14 +221,17 @@ func (t *textCodecs) encode(call goja.FunctionCall) goja.Value {
 // rejected explicitly instead of silently losing an incomplete byte prefix.
 func (t *textCodecs) decode(call goja.FunctionCall) goja.Value {
 	t.host.beginCall()
+
 	receiver, ok := call.This.(*goja.Object)
 	if !ok {
 		t.host.invalidTextInput()
 	}
+
 	settings, ok := t.decoders[receiver]
 	if !ok {
 		t.host.invalidTextInput()
 	}
+
 	var bytes []byte
 	if value := call.Argument(0); !goja.IsUndefined(value) {
 		bytes, ok = t.buffers.bytes(value)
@@ -197,17 +239,24 @@ func (t *textCodecs) decode(call goja.FunctionCall) goja.Value {
 			t.host.invalidTextInput()
 		}
 	}
+
 	t.host.consumeInput(len(bytes))
 	if t.booleanOption(t.options(call.Argument(1)), "stream") {
 		t.host.invalidTextInput()
 	}
+
 	return t.host.decodeUTF8(bytes, settings.fatal, settings.ignoreBOM)
 }
 
 // readOnly installs constant instance metadata without exposing private state.
 func (t *textCodecs) readOnly(object *goja.Object, name string, value goja.Value) {
-	if err := object.DefineDataProperty(name, value,
-		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+	if err := object.DefineDataProperty(
+		name,
+		value,
+		goja.FLAG_FALSE, // writable
+		goja.FLAG_FALSE, // configurable
+		goja.FLAG_FALSE, // enumerable
+	); err != nil {
 		t.host.textCodecError(err)
 	}
 }
@@ -218,11 +267,14 @@ func (t *textCodecs) options(value goja.Value) *goja.Object {
 	if goja.IsUndefined(value) || goja.IsNull(value) {
 		return nil
 	}
+
 	object, ok := value.(*goja.Object)
-	if !ok || object.ExportType() != t.objectExportType || object.ClassName() != "Object" ||
+	if !ok || object.ExportType() != t.objectExportType ||
+		object.ClassName() != "Object" ||
 		(object.Prototype() != nil && object.Prototype() != t.objectPrototype) {
 		t.host.invalidTextInput()
 	}
+
 	return object
 }
 
@@ -233,13 +285,20 @@ func (t *textCodecs) booleanOption(options *goja.Object, name string) bool {
 	if options == nil {
 		return false
 	}
-	descriptorValue, err := t.propertyDescriptor(goja.Undefined(), options, t.host.vm.ToValue(name))
+
+	descriptorValue, err := t.propertyDescriptor(
+		goja.Undefined(),
+		options,
+		t.host.vm.ToValue(name),
+	)
 	if err != nil {
 		t.host.textCodecError(err)
 	}
+
 	if goja.IsUndefined(descriptorValue) {
 		return false
 	}
+
 	descriptor := descriptorValue.ToObject(t.host.vm)
 	if err := descriptor.SetPrototype(nil); err != nil {
 		t.host.textCodecError(err)
@@ -247,13 +306,17 @@ func (t *textCodecs) booleanOption(options *goja.Object, name string) bool {
 	if descriptor.Get("writable") == nil {
 		t.host.invalidTextInput()
 	}
+
 	value := descriptor.Get("value")
 	if goja.IsUndefined(value) {
 		return false
 	}
-	if _, object := value.(*goja.Object); object || value.ExportType() != reflect.TypeFor[bool]() {
+
+	if _, object := value.(*goja.Object); object ||
+		value.ExportType() != reflect.TypeFor[bool]() {
 		t.host.invalidTextInput()
 	}
+
 	return value.ToBoolean()
 }
 
@@ -268,29 +331,42 @@ func (t *textCodecs) utf8Label(text goja.String) bool {
 		}
 		start++
 	}
+
 	for end > start && base64Whitespace(text.CharAt(end-1)) {
 		if end&base64PollMask == 0 {
 			t.host.checkContext()
 		}
 		end--
 	}
+
 	t.host.checkContext()
+
 	if end-start > len("unicode-1-1-utf-8") {
 		return false
 	}
+
 	normalized := make([]byte, end-start)
 	for i := range normalized {
 		unit := text.CharAt(start + i)
+
 		if unit > 0x7f {
 			return false
 		}
+
 		if unit >= 'A' && unit <= 'Z' {
 			unit += 'a' - 'A'
 		}
+
 		normalized[i] = byte(unit)
 	}
+
 	switch string(normalized) {
-	case "unicode-1-1-utf-8", "unicode11utf8", "unicode20utf8", "utf-8", "utf8", "x-unicode20utf8":
+	case "unicode-1-1-utf-8",
+		"unicode11utf8",
+		"unicode20utf8",
+		"utf-8",
+		"utf8",
+		"x-unicode20utf8":
 		return true
 	default:
 		return false
