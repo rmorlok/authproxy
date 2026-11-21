@@ -5,7 +5,31 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
+
+// getBoundedJavascriptContext admits the raw combined source before loading the
+// connector's helper library, then supplies connection input to the bounded
+// evaluator. Definition/configuration failures retain their causes; authored
+// compilation errors use safe runtime classifications.
+func (c *connection) getBoundedJavascriptContext(
+	ctx context.Context,
+	expression string,
+	limits jsruntime.Limits,
+) (apjs.Context, error) {
+	library, err := c.connector.getBoundedJavascriptLibrary(ctx, expression, limits)
+	if err != nil {
+		return apjs.Context{}, err
+	}
+	jsctx, err := c.getJavascriptContext(ctx, library)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return apjs.Context{}, contextErr
+	}
+	if err != nil {
+		return apjs.Context{}, fmt.Errorf("get javascript context: %w", err)
+	}
+	return jsctx, nil
+}
 
 // EvaluateJavascriptPredicate evaluates a connector condition against copied
 // configuration, labels, and annotations using the shared finite predicate
@@ -20,14 +44,9 @@ import (
 // cancellation takes precedence over errors from that noninterruptible parsing.
 func (c *connection) EvaluateJavascriptPredicate(ctx context.Context, expression string) (bool, error) {
 	limits := apjs.ConnectorPredicateLimits()
-	library, err := c.connector.getBoundedJavascriptLibrary(ctx, expression, limits)
+	jsctx, err := c.getBoundedJavascriptContext(ctx, expression, limits)
 	if err != nil {
 		return false, err
-	}
-
-	jsctx, err := c.getJavascriptContext(ctx, library)
-	if err != nil {
-		return false, fmt.Errorf("get javascript context: %w", err)
 	}
 	return jsctx.EvaluateBooleanWithContext(ctx, expression, limits)
 }

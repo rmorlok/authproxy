@@ -41,7 +41,8 @@ type outputEncoder struct {
 	limits Limits
 
 	// options records the trusted adapter's serialization choices. The default
-	// rejects undefined values; an adapter may omit undefined object properties.
+	// rejects undefined values; an adapter may omit undefined object properties
+	// or encode explicit undefined as null without running JavaScript coercion.
 	options JSONOutputOptions
 
 	// ownKeys is the original Reflect.ownKeys function, captured before authored
@@ -181,7 +182,16 @@ func (s *outputState) value(value goja.Value, depth int) error {
 		return ErrLimitExceeded
 	}
 
-	if value == nil || goja.IsUndefined(value) {
+	if value == nil {
+		return ErrInvalidOutput
+	}
+	if goja.IsUndefined(value) {
+		if s.encoder.options.UndefinedAsNull {
+			// Charge the same structural work and output bytes as an explicit
+			// null. Only actual undefined values qualify; holes and accessors
+			// have already failed their container's property validation.
+			return s.append("null")
+		}
 		return ErrInvalidOutput
 	}
 
@@ -325,6 +335,8 @@ func (s *outputState) properties(
 			continue
 		}
 		if s.encoder.options.OmitUndefinedProperties && goja.IsUndefined(value) {
+			// Omission wins over undefined-to-null conversion for object keys.
+			// Arrays never use this path and retain their element positions.
 			continue
 		}
 
