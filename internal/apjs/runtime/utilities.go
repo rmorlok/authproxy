@@ -12,27 +12,33 @@ import (
 // Programs copy this value with Limits; each evaluation gets fresh counters.
 type UtilityPolicy struct {
 	// Base64 enables atob and btoa during both initialization and execution.
-	// Other planned utility globals are not installed by this flag.
+	// Other utility globals are not installed by this flag.
 	Base64 bool
 
-	// MaxCalls counts all attempted helper calls, including malformed input.
+	// TextCodecs enables UTF-8 TextEncoder and one-shot TextDecoder instances.
+	// Constructors and methods share the same allowances as other selected helpers.
+	TextCodecs bool
+
+	// MaxCalls counts native helper/method entries and codec initialization,
+	// including argument failures that reach them. It also bounds retained
+	// native codec instance metadata; JavaScript errors before entry do not count.
 	MaxCalls int
 
-	// MaxInputBytes counts input code units before scanning or allocating. For
-	// accepted base64/binary strings each code unit represents one ASCII/byte
-	// value. Whitespace and invalid strings still consume their admitted length.
+	// MaxInputBytes counts string UTF-16 code units and buffer bytes before
+	// scanning or allocating. Decoder labels count too; fixed Boolean options
+	// do not. Whitespace and invalid strings consume their admitted length.
 	MaxInputBytes int
 
-	// MaxOutputBytes bounds aggregate reserved result bytes: ASCII characters
-	// for btoa and binary-string code units for atob. Encoding buffers and Goja
-	// UTF-16 storage use bounded multiples of these caps, not a heap quota.
+	// MaxOutputBytes bounds reserved output buffer bytes or string UTF-16 code
+	// units. Native buffers and Goja string storage use bounded multiples of
+	// these caps; instance metadata is bounded by MaxCalls, not a heap quota.
 	MaxOutputBytes int
 }
 
 // validate rejects unlimited work for enabled helpers. Caps are unused when
 // no helpers are selected, so existing zero-valued execution policies still work.
 func (p UtilityPolicy) validate() error {
-	if p.Base64 && (p.MaxCalls <= 0 || p.MaxInputBytes <= 0 || p.MaxOutputBytes <= 0) {
+	if (p.Base64 || p.TextCodecs) && (p.MaxCalls <= 0 || p.MaxInputBytes <= 0 || p.MaxOutputBytes <= 0) {
 		return ErrInvalidInput
 	}
 	return nil
@@ -41,14 +47,20 @@ func (p UtilityPolicy) validate() error {
 // bindings lists enabled utility globals for async declaration checks. Their
 // installation also protects the properties in pure expression/Run profiles.
 func (p UtilityPolicy) bindings() []HostBinding {
+	var bindings []HostBinding
 	if p.Base64 {
-		return []HostBinding{
-			{Name: "atob"},
-			{Name: "btoa"},
-		}
+		bindings = append(bindings,
+			HostBinding{Name: "atob"},
+			HostBinding{Name: "btoa"},
+		)
 	}
-
-	return nil
+	if p.TextCodecs {
+		bindings = append(bindings,
+			HostBinding{Name: "TextEncoder"},
+			HostBinding{Name: "TextDecoder"},
+		)
+	}
+	return bindings
 }
 
 // utilityHost owns one VM's pure-helper accounting and cancellation context.
@@ -59,8 +71,8 @@ type utilityHost struct {
 	vm          *goja.Runtime   // Creates native values and fixed, catchable errors.
 	policy      UtilityPolicy   // Immutable caller-supplied aggregate allowances.
 	calls       int             // Calls admitted before argument validation.
-	inputBytes  int             // Input code units admitted before scanning/copying.
-	outputBytes int             // Result bytes reserved before output allocation.
+	inputBytes  int             // String code units or buffer bytes admitted before scanning/copying.
+	outputBytes int             // Output bytes or string code units reserved before allocation.
 	err         error           // Sticky policy failure checked by Run on every exit.
 }
 
@@ -72,7 +84,7 @@ func installUtilities(
 	vm *goja.Runtime,
 	policy UtilityPolicy,
 ) (*utilityHost, error) {
-	if !policy.Base64 {
+	if !policy.Base64 && !policy.TextCodecs {
 		return nil, nil
 	}
 	if err := ctx.Err(); err != nil {
@@ -84,18 +96,25 @@ func installUtilities(
 		vm:     vm,
 		policy: policy,
 	}
-	for name, helper := range map[string]func(goja.FunctionCall) goja.Value{
-		"atob": host.atob,
-		"btoa": host.btoa,
-	} {
-		if err := vm.GlobalObject().DefineDataProperty(
-			name,
-			vm.ToValue(helper),
-			goja.FLAG_FALSE, // writable
-			goja.FLAG_FALSE, // configurable
-			goja.FLAG_FALSE, // enumerable
-		); err != nil {
-			return nil, ErrInvalidInput
+	if policy.Base64 {
+		for name, helper := range map[string]func(goja.FunctionCall) goja.Value{
+			"atob": host.atob,
+			"btoa": host.btoa,
+		} {
+			if err := vm.GlobalObject().DefineDataProperty(
+				name,
+				vm.ToValue(helper),
+				goja.FLAG_FALSE, // writable
+				goja.FLAG_FALSE, // configurable
+				goja.FLAG_FALSE, // enumerable
+			); err != nil {
+				return nil, ErrInvalidInput
+			}
+		}
+	}
+	if policy.TextCodecs {
+		if err := newTextCodecs(host).install(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -106,20 +125,30 @@ func installUtilities(
 // No JavaScript coercion, getters, proxy traps, or object exports are permitted.
 // Malformed attempts consume call and any already-admitted input allowance.
 func (h *utilityHost) begin(call goja.FunctionCall) goja.String {
+	h.beginCall()
+	text, ok := call.Argument(0).(goja.String)
+	if !ok {
+		h.invalidInput()
+	}
+	h.consumeInput(text.Length())
+	return text
+}
+
+// beginCall charges a native helper entry or codec initialization before validating arguments.
+func (h *utilityHost) beginCall() {
 	h.checkContext()
 	if h.calls >= h.policy.MaxCalls {
 		h.failLimit()
 	}
 	h.calls++
-	text, ok := call.Argument(0).(goja.String)
-	if !ok {
-		h.invalidInput()
-	}
-	if text.Length() > h.policy.MaxInputBytes-h.inputBytes {
+}
+
+// consumeInput admits string code units or buffer bytes before processing them.
+func (h *utilityHost) consumeInput(size int) {
+	if size < 0 || size > h.policy.MaxInputBytes-h.inputBytes {
 		h.failLimit()
 	}
-	h.inputBytes += text.Length()
-	return text
+	h.inputBytes += size
 }
 
 // reserveOutput charges an exact result size before allocation. Callers compute

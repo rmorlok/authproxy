@@ -2,7 +2,9 @@ package javascript_test
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -11,6 +13,99 @@ import (
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/stretchr/testify/require"
 )
+
+// TestToolTextCodecHTTP uses the shared codecs with the Tool's sole connection,
+// preserving native byte ownership and keeping unrelated capabilities disabled.
+func TestToolTextCodecHTTP(t *testing.T) {
+	limits := expressionLimits()
+	limits.Utilities = jsruntime.UtilityPolicy{TextCodecs: true, MaxCalls: 8, MaxInputBytes: 64, MaxOutputBytes: 64}
+	program, err := javascript.CompileTool(`
+		const encoder = new TextEncoder(), decoder = new TextDecoder(undefined, {fatal:true});
+		async function execute(params, context) {
+			const bytes = encoder.encode("café☃");
+			const response = await context.connections[0].fetch("https://provider.example/echo", {
+				method: "POST", body: bytes.buffer
+			});
+			return [decoder.decode(await response.arrayBuffer()), typeof fetch, typeof btoa];
+		}`, nil, limits)
+	require.NoError(t, err)
+	// Pure codec construction works during no-I/O validation with fresh budgets.
+	require.NoError(t, program.Validate(context.Background()))
+	requestBodies := make(chan string, 1)
+	options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+		defer request.Body.Close()
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			return nil, err
+		}
+		requestBodies <- string(body)
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader("café☃"))), nil
+	}, fetchLimits())
+
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+	// UTF-8 bytes cross the existing ArrayBuffer HTTP contract without enabling global fetch.
+	require.NoError(t, err)
+	require.JSONEq(t, `["café☃","undefined","undefined"]`, string(result))
+	select {
+	case body := <-requestBodies:
+		require.Equal(t, "café☃", body)
+	default:
+		t.Fatal("connection did not receive the encoded request")
+	}
+}
+
+// TestToolTextCodecExhaustionStopsHTTP preserves send evidence while preventing
+// a caught encoding limit from enabling or continuing connection requests.
+func TestToolTextCodecExhaustionStopsHTTP(t *testing.T) {
+	for name, test := range map[string]struct {
+		source string
+		calls  int32
+		state  api.ToolExecutionState
+	}{
+		"initialization": {
+			source: `const e = new TextEncoder(); try { e.encode("é"); } catch (_) {}
+				async function execute(params, context) { await context.connections[0].fetch("https://provider.example/items"); return true; }`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"before first request": {
+			source: `async function execute(params, context) {
+				try { new TextEncoder().encode("é"); } catch (_) {}
+				await context.connections[0].fetch("https://provider.example/items"); return true;
+			}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"after first request": {
+			source: `async function execute(params, context) {
+				await context.connections[0].fetch("https://provider.example/first");
+				try { new TextEncoder().encode("é"); } catch (_) {}
+				await context.connections[0].fetch("https://provider.example/second"); return true;
+			}`,
+			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// One output byte cannot hold the two-byte UTF-8 encoding of this character.
+			limits := expressionLimits()
+			limits.Utilities = jsruntime.UtilityPolicy{TextCodecs: true, MaxCalls: 8, MaxInputBytes: 16, MaxOutputBytes: 1}
+			program, err := javascript.CompileTool(test.source, nil, limits)
+			require.NoError(t, err)
+			var calls atomic.Int32
+			options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return fetchResponse(http.StatusOK, http.NoBody), nil
+			}, fetchLimits())
+
+			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+			// The invocation fails without further dispatch, retaining any earlier send evidence.
+			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+			require.Nil(t, result)
+			require.Equal(t, test.calls, calls.Load())
+			require.Equal(t, test.state, options.Session.ExecutionState())
+		})
+	}
+}
 
 // TestToolBase64Policy verifies that a trusted caller can select shared pure
 // helpers without a Tool-specific implementation or additional I/O capability.
