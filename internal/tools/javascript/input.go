@@ -92,12 +92,13 @@ func bindInput(
 	); err != nil {
 		return err
 	}
-	return ctx.Err()
+	return apjsruntime.ChargeWork(ctx, 0)
 }
 
 // inputJSON bounds snapshot serialization before allocating raw JSON fields for
 // either the expression or async input adapter. The response and snapshot share
 // this byte allowance; the subsequent decoder bounds their combined traversal.
+// Adapter serialization also consumes the enclosing execution's shared budget.
 func inputJSON(
 	ctx context.Context,
 	input Input,
@@ -106,7 +107,7 @@ func inputJSON(
 	if ctx == nil || input.Context == nil {
 		return nil, nil, apjsruntime.ErrInvalidInput
 	}
-	if err := ctx.Err(); err != nil {
+	if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
 		return nil, nil, err
 	}
 
@@ -130,8 +131,24 @@ func inputJSON(
 		}
 		return nil, nil, apjsruntime.ErrLimitExceeded
 	}
+	// SnapshotJSON exposes no size preflight. Its own byte/node/depth caps
+	// bound serialization first, then its measured output charges this execution
+	// immediately. These source units also bound serializer scratch by fixed
+	// implementation multiples; this is not a hard heap allocation quota.
+	if err := chargeInputCopy(ctx, len(snapshot)); err != nil {
+		return nil, nil, err
+	}
 
 	return json.RawMessage(snapshot), json.RawMessage(response), nil
+}
+
+// chargeInputCopy admits one bounded native pass over known-size input and its
+// copied storage. It preserves cancellation and terminal shared-budget errors.
+func chargeInputCopy(ctx context.Context, size int) error {
+	if err := apjsruntime.ChargeWork(ctx, size); err != nil {
+		return err
+	}
+	return apjsruntime.ReserveAllocation(ctx, size)
 }
 
 // bindToolGlobals installs protected aliases to already copied native values.

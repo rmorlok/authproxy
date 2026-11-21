@@ -9,15 +9,13 @@ import (
 )
 
 // textCodecTestHost isolates the native conversion algorithms from constructor
-// and input-admission policy; each test gets a fresh VM and output allowance.
+// and input admission; each test gets a fresh VM and shared execution ledger.
 func textCodecTestHost(outputLimit int) *utilityHost {
-	return &utilityHost{
-		ctx: context.Background(),
-		vm:  goja.New(),
-		policy: UtilityPolicy{
-			MaxCalls: 16, MaxInputBytes: 64 << 10, MaxOutputBytes: outputLimit,
-		},
+	ctx, err := WithExecutionBudget(context.Background(), Limits{MaxWorkUnits: 1 << 20, MaxAllocationUnits: outputLimit})
+	if err != nil {
+		panic(err)
 	}
+	return &utilityHost{ctx: ctx, vm: goja.New()}
 }
 
 // textCodecUnits copies UTF-16 units directly so assertions retain supplementary
@@ -55,7 +53,7 @@ func TestTextCodecEncodeUTF8(t *testing.T) {
 
 			// The encoded bytes and reserved allowance agree exactly.
 			require.Equal(t, []byte(test.want), encoded)
-			require.Equal(t, len(test.want), host.outputBytes)
+			require.Equal(t, len(test.want), executionBudgetFromContext(host.ctx).allocationUnits)
 		})
 	}
 }
@@ -93,7 +91,7 @@ func TestTextCodecDecodeUTF8(t *testing.T) {
 
 			// Output is charged in UTF-16 units, including both halves of astral pairs.
 			require.Equal(t, test.want, textCodecUnits(decoded))
-			require.Equal(t, len(test.want), host.outputBytes)
+			require.Equal(t, len(test.want), executionBudgetFromContext(host.ctx).allocationUnits)
 		})
 	}
 }
@@ -136,13 +134,13 @@ func TestTextCodecFatalDecodeReservesNoOutput(t *testing.T) {
 	})
 	require.NotNil(t, exception)
 	require.Nil(t, result)
-	require.Nil(t, host.err)
-	require.Zero(t, host.outputBytes)
+	require.Nil(t, executionBudgetFromContext(host.ctx).err())
+	require.Zero(t, executionBudgetFromContext(host.ctx).allocationUnits)
 
 	// A following valid decode can still use the entire output allowance.
 	result = host.decodeUTF8([]byte("A"), true, false)
 	require.Equal(t, []uint16{'A'}, textCodecUnits(result))
-	require.Equal(t, 1, host.outputBytes)
+	require.Equal(t, 1, executionBudgetFromContext(host.ctx).allocationUnits)
 }
 
 // TestTextCodecFatalDecodeAcceptsReplacementScalar distinguishes a well-formed
@@ -153,7 +151,7 @@ func TestTextCodecFatalDecodeAcceptsReplacementScalar(t *testing.T) {
 	// Fatal mode accepts an authored replacement scalar encoded with valid UTF-8.
 	result := host.decodeUTF8([]byte("\xef\xbf\xbd"), true, false)
 	require.Equal(t, []uint16{0xfffd}, textCodecUnits(result))
-	require.Equal(t, 1, host.outputBytes)
+	require.Equal(t, 1, executionBudgetFromContext(host.ctx).allocationUnits)
 }
 
 // TestTextCodecUTF8OutputReservation rejects an over-budget result before its
@@ -176,8 +174,8 @@ func TestTextCodecUTF8OutputReservation(t *testing.T) {
 			require.NotNil(t, exception)
 			require.Nil(t, encoded)
 			require.Nil(t, decoded)
-			require.ErrorIs(t, host.err, ErrLimitExceeded)
-			require.Zero(t, host.outputBytes)
+			require.ErrorIs(t, executionBudgetFromContext(host.ctx).err(), ErrLimitExceeded)
+			require.Zero(t, executionBudgetFromContext(host.ctx).allocationUnits)
 		})
 	}
 }

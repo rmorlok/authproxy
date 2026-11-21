@@ -58,13 +58,24 @@ func (c Context) transformOptionsWithContext(
 	if err := limits.Validate(); err != nil {
 		return nil, err
 	}
-	runCtx, cancel := context.WithTimeout(ctx, limits.Timeout)
+	budgetCtx, err := jsruntime.WithExecutionBudget(ctx, limits)
+	if err != nil {
+		return nil, err
+	}
+	runCtx, cancel := context.WithTimeout(budgetCtx, limits.Timeout)
 	phase := "input"
 	defer func() {
 		defer cancel()
 		diagnostic := FailureDiagnostic{Phase: phase}
 		if existing, ok := Diagnostic(err); ok {
 			diagnostic = existing
+		}
+		// Detached formatting continues after the VM closes, but it still
+		// belongs to the same execution. A terminal parent-budget failure must
+		// discard its result just as it would during JavaScript evaluation.
+		if budgetErr := jsruntime.ChargeWork(runCtx, 0); budgetErr != nil {
+			err = budgetErr
+			diagnostic.Source, diagnostic.Line, diagnostic.Column = "", 0, 0
 		}
 		// A cancellation during detached conversion still invalidates all output;
 		// caller cancellation wins over the adapter's own policy deadline.
@@ -88,9 +99,20 @@ func (c Context) transformOptionsWithContext(
 		if len(c.vars) > limits.MaxNodes {
 			return nil, jsruntime.ErrLimitExceeded
 		}
+		if err := jsruntime.ReserveAllocation(runCtx, len(c.vars)); err != nil {
+			return nil, err
+		}
+		if err := jsruntime.ReserveAllocation(runCtx, 1); err != nil {
+			return nil, err
+		}
 		vars := make(map[string]any, len(c.vars))
 		for name, value := range c.vars {
-			if err := runCtx.Err(); err != nil {
+			if err := jsruntime.ChargeWork(runCtx, 1); err != nil {
+				return nil, err
+			}
+			// Inserting the copied binding hashes its name even though the
+			// immutable string itself can share storage with the caller.
+			if err := jsruntime.ChargeWork(runCtx, len(name)); err != nil {
 				return nil, err
 			}
 			vars[name] = value
@@ -122,6 +144,14 @@ func dataSourceOptionsFromJSON(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	if err := jsruntime.ChargeWork(ctx, len(encoded)); err != nil {
+		return nil, err
+	}
+	// The encoder already bounded this graph. Its serialized length bounds
+	// the decoder's strings and native slots by fixed multiples.
+	if err := jsruntime.ReserveAllocation(ctx, len(encoded)); err != nil {
+		return nil, err
+	}
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
 	decoder.UseNumber()
 	var value any
@@ -147,9 +177,15 @@ func dataSourceOptionsFromJSON(
 	if err := final.append([]byte("[")); err != nil {
 		return nil, err
 	}
+	if err := jsruntime.ReserveAllocation(ctx, len(items)); err != nil {
+		return nil, err
+	}
 	options := make([]DataSourceOption, 0, len(items))
 	formatter := optionFormatter{ctx: ctx, remaining: limits.MaxOutputBytes}
 	for i, item := range items {
+		if err := jsruntime.ChargeWork(ctx, 1); err != nil {
+			return nil, err
+		}
 		object, ok := item.(map[string]any)
 		if !ok {
 			return nil, jsruntime.ErrInvalidOutput
@@ -205,7 +241,7 @@ func (f *optionFormatter) format(value any) (string, error) {
 // containers. Map sorting matches fmt's lexical Go string-key order; its work
 // is bounded by the encoder's key/node caps and checked again before emission.
 func (f *optionFormatter) value(text *strings.Builder, value any) error {
-	if err := f.ctx.Err(); err != nil {
+	if err := jsruntime.ChargeWork(f.ctx, 1); err != nil {
 		return err
 	}
 	switch value := value.(type) {
@@ -233,12 +269,33 @@ func (f *optionFormatter) value(text *strings.Builder, value any) error {
 		}
 		return f.append(text, "]")
 	case map[string]any:
+		if err := jsruntime.ReserveAllocation(f.ctx, len(value)); err != nil {
+			return err
+		}
 		keys := make([]string, 0, len(value))
 		for key := range value {
-			if err := f.ctx.Err(); err != nil {
+			if err := jsruntime.ChargeWork(f.ctx, 1); err != nil {
 				return err
 			}
 			keys = append(keys, key)
+		}
+		// Admit comparison work before the native sort: one key/character scan
+		// per logarithmic sorting level. This is a logical work allowance, not
+		// an exact comparison count; standard-library sort remains bounded by
+		// the admitted input and observes cancellation at its surrounding checks.
+		for width := 1; width < len(keys); {
+			if err := jsruntime.ChargeWork(f.ctx, len(keys)); err != nil {
+				return err
+			}
+			for _, key := range keys {
+				if err := jsruntime.ChargeWork(f.ctx, len(key)); err != nil {
+					return err
+				}
+			}
+			if width >= len(keys)-width {
+				break
+			}
+			width *= 2
 		}
 		sort.Strings(keys)
 		if err := f.append(text, "map["); err != nil {
@@ -273,6 +330,12 @@ func (f *optionFormatter) append(text *strings.Builder, value string) error {
 	}
 	if len(value) > f.remaining {
 		return jsruntime.ErrLimitExceeded
+	}
+	if err := jsruntime.ChargeWork(f.ctx, len(value)); err != nil {
+		return err
+	}
+	if err := jsruntime.ReserveAllocation(f.ctx, len(value)); err != nil {
+		return err
 	}
 	f.remaining -= len(value)
 	text.WriteString(value)

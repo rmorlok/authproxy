@@ -39,13 +39,15 @@ var toolPublishResponseLimits = httpcodec.ResponseLimits{
 	MaxOutputBytes:        8 << 20,
 	MaxEncodedResultBytes: 12 << 20,
 	Transform: javascript.Limits{
-		MaxSourceBytes: 64 << 10,
-		MaxInputBytes:  8 << 20,
-		MaxOutputBytes: 8 << 20,
-		MaxDepth:       64,
-		MaxNodes:       1_000_000,
-		MaxStackDepth:  256,
-		Timeout:        5 * time.Second,
+		MaxWorkUnits:       256 << 20,
+		MaxAllocationUnits: 256 << 20,
+		MaxSourceBytes:     64 << 10,
+		MaxInputBytes:      8 << 20,
+		MaxOutputBytes:     8 << 20,
+		MaxDepth:           64,
+		MaxNodes:           1_000_000,
+		MaxStackDepth:      256,
+		Timeout:            5 * time.Second,
 	},
 }
 

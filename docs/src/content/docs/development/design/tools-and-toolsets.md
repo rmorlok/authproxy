@@ -30,7 +30,7 @@ contract, not a claim that the package migration or new JavaScript API has shipp
 | --- | --- |
 | Tool authoring | Trusted administrators define tools, execution code, and permission mappings. Agents consume them. |
 | Execution | One Tool belongs to one connection. JavaScript receives exactly one connection object and may make multiple requests through its `fetch` method. Direct global `fetch` is unavailable to Tools. |
-| Shared JavaScript | Generic execution and HTTP budgets live under `internal/apjs`. Other callers may supply multiple connections or explicitly enable direct HTTP; the Tool adapter enables neither. |
+| Shared JavaScript | Generic execution and HTTP budgets live under `internal/apjs`. Shipped pure utilities are always available and consume the execution's shared work/allocation budget. Other callers may supply multiple connections or explicitly enable direct HTTP; the Tool adapter enables neither. |
 | Authorization | Any one declared tool verb can authorize invocation on the connection. The `proxy` verb is neither required nor implicitly granted. |
 | ToolSets | Multiple ToolSets can attach to a connection, each pinned independently to a published generation. |
 | Rollout | Publishing leaves existing assignments pinned. Individual migration actions move one connection's ToolSet assignment. Bulk orchestration remains a host responsibility. |
@@ -544,18 +544,22 @@ Tool ACL check and uses the internal client; it does not call the public
 connection capability and never enables the shared runtime's direct HTTP client.
 
 Keep ordinary transport cancellation tied to the inbound context. Bound total
-execution time, request count, response bytes, input/output bytes, and JavaScript
-stack depth. Proposed starting limits are 60 seconds total, 20 outbound requests,
+execution time, cumulative managed work/allocation, request count, response
+bytes, input/output bytes, and JavaScript stack depth. Proposed starting limits
+are 60 seconds total, 20 outbound requests,
 1 MiB input JSON, and 8 MiB aggregate decoded response/result content, with
 operator-configured ceilings and smaller per-tool overrides. Encoded envelopes
 need a separate limit that accounts for base64 expansion. These are tuning
 defaults, not protocol limits. Each pagination request counts against the tool's
 budget; internal credential recovery remains governed by proxy policy.
 
-The shared runtime owns one execution-wide deadline and HTTP allowance, not an
-independent allowance per client. Every request, response read, and pending
-worker uses that shared accounting. Tool metadata and the supplied connection's
-configuration share the input budget. The generic host reports cumulative
+The shared runtime owns one execution-wide work/allocation budget, deadline,
+and HTTP allowance. Input copying, pure utilities, managed request/response
+conversion, and result encoding consume that same remaining budget. Nested
+helpers or evaluations cannot obtain fresh parent allowances. Request count,
+individual request/response sizes, pending workers, and final result sizes retain
+their own caps within the execution policy. Tool metadata and the supplied
+connection's configuration share the input budget. The generic host reports cumulative
 target-send evidence; the Tool adapter maps that evidence into execution state
 and determines whether the complete Tool action succeeded. A later unsent
 request cannot erase an earlier possible effect.
@@ -663,8 +667,10 @@ in-process trusted-code runtime, not a hard memory-isolated tenant sandbox.
   authenticated proxy's destination and credential precedence rules. Global
   direct `fetch` is absent, including when a connection request fails.
 - Select the bound connector's compiled helper library and install the Tool
-  context aliases. The generic runtime owns reusable utility hosts; it receives
-  no authority to discover additional connections or access credentials.
+  context aliases. The generic runtime always installs its shipped pure utilities,
+  including base64, UTF-8 codecs, and query helpers. Their native work and
+  allocations share the invocation budget with other managed operations. They
+  receive no authority to discover additional connections or access credentials.
 - Install `ToolError(code, message, details)` and `toolResult(...)` through the
   trusted extension contract. These helpers, API content validation, and public
   error/result semantics belong to the Tool adapter.
@@ -676,7 +682,8 @@ in-process trusted-code runtime, not a hard memory-isolated tenant sandbox.
 Compile and validate before publication without live connection capabilities or
 direct HTTP. Initialization and any queued initialization microtasks must finish
 without outbound I/O. Reusing connector libraries does not change their existing
-behavior in other AuthProxy execution contexts.
+connection or credential authority in other AuthProxy execution contexts. Pure
+utility globals are consistently available in all bounded execution profiles.
 
 JSON-compatible ordinary returns become `structuredContent`. Strings also
 produce a text block; objects/arrays need not be duplicated as serialized text

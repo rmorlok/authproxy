@@ -45,24 +45,25 @@ type HTTPOptions struct {
 // pending-worker allowance. Its methods and bindings belong to that VM goroutine;
 // they must not be retained after evaluation. The zero value is not usable.
 type HTTPHost struct {
-	ctx       context.Context                        // Invocation runtime deadline plus host cleanup cancellation.
-	cancel    context.CancelFunc                     // Stops requests and body reads on every exit.
-	vm        *goja.Runtime                          // Accessed exclusively by the owner.
-	options   HTTPOptions                            // Shared admission limits and diagnostics logger.
-	limits    Limits                                 // Bounds response JSON parsing as well as final output.
-	decoder   *JSONDecoder                           // Native JSON decoder captured before authored initialization.
-	enabled   bool                                   // I/O is admitted only after initialization succeeds.
-	nextID    uint64                                 // Monotonic operation identity within this invocation.
-	pending   map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
-	completed chan fetchCompletion                   // Unbuffered ownership handoff from workers.
+	ctx         context.Context                        // Invocation runtime deadline plus host cleanup cancellation.
+	cancel      context.CancelFunc                     // Stops requests and body reads on every exit.
+	vm          *goja.Runtime                          // Accessed exclusively by the owner.
+	options     HTTPOptions                            // Shared admission limits and diagnostics logger.
+	limits      Limits                                 // Bounds response JSON parsing as well as final output.
+	decoder     *JSONDecoder                           // Native JSON decoder captured before authored initialization.
+	formEncoder goja.Callable                          // Protected native query serializer captured during setup; owner-only.
+	enabled     bool                                   // I/O is admitted only after initialization succeeds.
+	nextID      uint64                                 // Monotonic operation identity within this invocation.
+	pending     map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
+	completed   chan fetchCompletion                   // Unbuffered ownership handoff from workers.
 }
 
 // NewHTTPHost captures pristine parsing and starts no work. Call it during
 // AsyncProgram.Evaluate preparation, before any authored code runs, with the
 // evaluation's context and limits. Register Close on AsyncInvocation immediately
 // after construction, then Start and Await, before touching the VM again.
-// Invalid policy or missing parser bindings return ErrInvalidInput without
-// acquiring resources. The caller still owns the HTTP session and its cleanup.
+// Invalid policy or missing parser/utility bindings return ErrInvalidInput
+// without acquiring resources. The caller still owns the HTTP session and cleanup.
 // It must link session cancellation to the evaluation context when session
 // exhaustion or expiry should also interrupt JavaScript that is not awaiting I/O.
 func NewHTTPHost(
@@ -79,6 +80,22 @@ func NewHTTPHost(
 	if err != nil {
 		return nil, err
 	}
+	// Utilities are installed by Run before preparation. Capture the
+	// protected native method now, never a candidate body's toString.
+	// Its private receiver map supplies the genuine-instance check and
+	// shared execution accounting. Keep this closure off worker contexts.
+	constructor, ok := vm.Get("URLSearchParams").(*goja.Object)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	prototype, ok := constructor.Get("prototype").(*goja.Object)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+	formEncoder, ok := goja.AssertFunction(prototype.Get("toString"))
+	if !ok {
+		return nil, ErrInvalidInput
+	}
 	run, cancel := context.WithCancel(ctx)
 
 	if options.Logger == nil {
@@ -86,14 +103,15 @@ func NewHTTPHost(
 	}
 
 	return &HTTPHost{
-		ctx:       run,
-		cancel:    cancel,
-		vm:        vm,
-		options:   options,
-		limits:    limits,
-		decoder:   decoder,
-		pending:   make(map[uint64]func(fetchCompletion) error),
-		completed: make(chan fetchCompletion),
+		ctx:         run,
+		cancel:      cancel,
+		vm:          vm,
+		options:     options,
+		limits:      limits,
+		decoder:     decoder,
+		formEncoder: formEncoder,
+		pending:     make(map[uint64]func(fetchCompletion) error),
+		completed:   make(chan fetchCompletion),
 	}, nil
 }
 
@@ -104,8 +122,12 @@ func (l *HTTPHost) Start() {
 }
 
 // rejected creates a native rejected Promise with a fixed, JavaScript-native
-// error. NewGoError is deliberately avoided because it reflects a Go error.
+// error. Both allocations consume the execution budget even when the caller
+// catches the rejection. NewGoError is avoided because it reflects a Go error.
 func (l *HTTPHost) rejected(err error) goja.Value {
+	helper := utilityHost{ctx: l.ctx, vm: l.vm}
+	helper.beginCall()
+	helper.reserveOutput(2) // One Promise and one fixed-error metadata slot.
 	promise, _, reject := l.vm.NewPromise()
 	_ = reject(l.vm.NewTypeError("%s", fetchErrorMessage(err)))
 	return l.vm.ToValue(promise)
@@ -118,8 +140,16 @@ func (l *HTTPHost) start(
 	work func() fetchCompletion,
 	convert func(fetchCompletion) (goja.Value, error),
 ) (goja.Value, bool) {
+	// This synchronous check closes the interval before the budget watcher
+	// interrupts JavaScript: a caught host error can never launch later I/O.
+	if err := ChargeWork(l.ctx, 1); err != nil {
+		return l.rejected(err), false
+	}
 	if len(l.pending) >= l.options.MaxPendingOperations || l.ctx.Err() != nil {
 		return l.rejected(ErrLimitExceeded), false
+	}
+	if err := ReserveAllocation(l.ctx, 1); err != nil {
+		return l.rejected(err), false
 	}
 
 	promise, resolve, reject := l.vm.NewPromise()
@@ -157,6 +187,8 @@ func (l *HTTPHost) Await() error {
 	select {
 	case <-l.ctx.Done():
 		return l.ctx.Err()
+	case <-executionBudgetDone(l.ctx):
+		return ErrLimitExceeded
 	case done := <-l.completed:
 		callback := l.pending[done.id]
 		delete(l.pending, done.id)

@@ -81,6 +81,10 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 	if _, err := e.Encode(text); err != nil {
 		return "", err
 	}
+	if err := ChargeWork(e.state.ctx, text.Length()); err != nil {
+		e.err = err
+		return "", err
+	}
 	for i := 0; i < text.Length(); i++ {
 		if err := e.state.ctx.Err(); err != nil {
 			e.err = err
@@ -107,9 +111,17 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 
 	// Primitive conversion is bounded by the JSON already charged above. Check
 	// cancellation again after conversion so late cancellation discards the text.
+	if err := ChargeWork(e.state.ctx, text.Length()); err != nil {
+		e.err = err
+		return "", err
+	}
+	if err := ReserveAllocation(e.state.ctx, text.Length()); err != nil {
+		e.err = err
+		return "", err
+	}
 	result := text.String()
 
-	if err := e.state.ctx.Err(); err != nil {
+	if err := ChargeWork(e.state.ctx, 0); err != nil {
 		e.err = err
 		return "", err
 	}

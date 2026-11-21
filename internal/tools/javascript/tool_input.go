@@ -34,9 +34,9 @@ func (p *ToolProgram) prepareInvocation(
 
 	// SnapshotJSON has already bounded these bytes. Split its fixed scopes into
 	// raw documents without converting numeric values or constructing Goja data.
-	var scopes map[string]json.RawMessage
-	if err := json.Unmarshal(snapshot, &scopes); err != nil {
-		return apjsruntime.ErrInvalidInput
+	scopes, err := decodeAsyncInput(ctx, snapshot)
+	if err != nil {
+		return err
 	}
 
 	for _, name := range []string{
@@ -55,11 +55,11 @@ func (p *ToolProgram) prepareInvocation(
 	delete(scopes, "params")
 
 	if session != nil {
-		var connection map[string]json.RawMessage
-		if err := json.Unmarshal(
-			scopes["connection"],
-			&connection,
-		); err != nil || connection == nil {
+		connection, err := decodeAsyncInput(ctx, scopes["connection"])
+		if err != nil {
+			return err
+		}
+		if connection == nil {
 			return apjsruntime.ErrInvalidInput
 		}
 
@@ -69,9 +69,9 @@ func (p *ToolProgram) prepareInvocation(
 		}
 		delete(scopes, "connection")
 
-		metadata, err := encodeAsyncInput(connection)
+		metadata, err := encodeAsyncInput(ctx, connection)
 		if err != nil {
-			return apjsruntime.ErrInvalidInput
+			return err
 		}
 
 		prepared.Connections = []apjsruntime.ConnectionInput{
@@ -86,9 +86,9 @@ func (p *ToolProgram) prepareInvocation(
 	// legacy global. Remove the temporary context field after native copying.
 	scopes["response"] = response
 
-	prepared.Context, err = encodeAsyncInput(scopes)
+	prepared.Context, err = encodeAsyncInput(ctx, scopes)
 	if err != nil {
-		return apjsruntime.ErrInvalidInput
+		return err
 	}
 
 	if err := invocation.PrepareInput(ctx, vm, prepared, p.limits, host); err != nil {
@@ -115,17 +115,55 @@ func (p *ToolProgram) prepareInvocation(
 	if err := bindToolGlobals(vm, invocation.Params, contextObject, responseObject); err != nil {
 		return err
 	}
-	return ctx.Err()
+	return apjsruntime.ChargeWork(ctx, 0)
+}
+
+// decodeAsyncInput splits already-bounded JSON into raw scopes. Admit its byte
+// scan and copied raw fields before unmarshalling; serialized size also bounds
+// the map's native slots by fixed multiples. Parser details remain private.
+func decodeAsyncInput(ctx context.Context, encoded json.RawMessage) (map[string]json.RawMessage, error) {
+	if err := chargeInputCopy(ctx, len(encoded)); err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &fields); err != nil {
+		return nil, apjsruntime.ErrInvalidInput
+	}
+	if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
+		return nil, err
+	}
+	return fields, nil
 }
 
 // encodeAsyncInput reshapes already-bounded raw scopes without HTML escaping.
 // These documents enter a JSON parser, never HTML. Escaping would unnecessarily
 // expand configuration or response strings and could exhaust the input allowance.
-func encodeAsyncInput(fields map[string]json.RawMessage) (json.RawMessage, error) {
+func encodeAsyncInput(ctx context.Context, fields map[string]json.RawMessage) (json.RawMessage, error) {
+	if err := apjsruntime.ChargeWork(ctx, 1); err != nil {
+		return nil, err
+	}
+	if err := apjsruntime.ReserveAllocation(ctx, len(fields)); err != nil {
+		return nil, err
+	}
+	// Fixed Tool scope names and their bounded raw values admit encoder scratch
+	// before allocation. JSON escaping can grow these source units only by a
+	// fixed factor. Charge the detached buffer's exact size once Encode exposes
+	// it, including its temporary trailing newline before that byte is dropped.
+	for name, value := range fields {
+		if err := chargeInputCopy(ctx, len(name)); err != nil {
+			return nil, err
+		}
+		if err := chargeInputCopy(ctx, len(value)); err != nil {
+			return nil, err
+		}
+	}
 	var buffer bytes.Buffer
 	encoder := json.NewEncoder(&buffer)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(fields); err != nil {
+		return nil, apjsruntime.ErrInvalidInput
+	}
+	if err := chargeInputCopy(ctx, buffer.Len()); err != nil {
 		return nil, err
 	}
 

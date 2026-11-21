@@ -2,8 +2,8 @@
 
 This package compiles and evaluates pure expressions and async JavaScript
 programs in fresh Goja VMs. It owns the
-execution deadline, stack limit, interrupt watcher, JSON conversion, and Promise
-rejection tracking. Adapters supply native input and optional host capabilities;
+execution budget, deadline, stack limit, interrupt watcher, JSON conversion,
+and Promise rejection tracking. Adapters supply native input and optional host capabilities;
 the runtime initializes the program, calls it, and waits for its result.
 
 `CompileExpression` prepares one strict expression without running it. The
@@ -15,6 +15,8 @@ limits := runtime.Limits{
     MaxSourceBytes: 64 << 10,
     MaxInputBytes: 64 << 10,
     MaxOutputBytes: 64 << 10,
+    MaxWorkUnits: 64 << 20,
+    MaxAllocationUnits: 64 << 20,
     MaxDepth: 32,
     MaxNodes: 4096,
     MaxStackDepth: 128,
@@ -52,11 +54,10 @@ package. Compilation enforces the source-byte cap, rejects statements that
 escape the single-expression wrapper, and disables source-map loading. Dynamic
 parsing through `eval` or `Function` also has source-map loading disabled.
 
-The preparation callback is trusted integration code. It binds copied JSON and
-any selected pure helpers on the calling goroutine, using the same limits passed
-to compilation. It must honor `runCtx`, return safe errors, and retain no VM
+The preparation callback is trusted integration code. It binds copied JSON on the calling goroutine, using the same limits passed
+to compilation. The runtime has already installed its pure utilities. It must honor `runCtx`, return safe errors, and retain no VM
 values. Input preparation, expression execution, and result conversion all use
-the same deadline. A preparation error prevents the expression from running.
+the same execution budget and deadline. A preparation error prevents the expression from running.
 Pass `nil` for an expression that needs no input. Callers receive detached
 `json.RawMessage` bytes and no partial result on failure.
 
@@ -98,8 +99,8 @@ Moving that read to top-level initialization would fail validation. Declaring
 `let fetch` would fail compilation because the runtime reserves that global.
 
 The caller supplies additional host bindings, including names for disabled
-capabilities. `fetch` is always reserved; an explicit descriptor is allowed but
-cannot preserve enumerability. The compiler copies the descriptors and rejects
+capabilities. `fetch` and the shipped pure utility names are always reserved;
+an explicit descriptor is allowed but cannot preserve enumerability. The compiler copies the descriptors and rejects
 invalid, duplicate, or escaped names. `execute` belongs to the program and cannot
 be a host binding. Initialization makes each host global nonwritable and
 nonconfigurable; absent values become `undefined`. Host bindings are normally
@@ -119,8 +120,8 @@ the program, then checks that `execute` is still async. It returns a callable
 owned by that VM. Its caller must keep the runtime deadline active and gate I/O
 until initialization and its Promise microtasks have completed successfully.
 Use it inside `Run` or `EvaluateJSON`; retain no callable or value after cleanup.
-When utilities are enabled, use the same limits in that enclosing call so it
-installs the helpers and owns their counters before `Initialize` runs.
+Use the same limits in that enclosing call so it installs the pure utilities
+and owns the execution budget before `Initialize` runs.
 
 `PromiseTracker` counts unhandled rejections without inspecting private reasons.
 Install one before authored initialization and defer `Close`. `CheckRejections`
@@ -185,7 +186,7 @@ their late completions. Unhandled rejections are checked at initialization and
 final settlement, allowing handlers installed after an awaited operation.
 
 Preparation, initialization, invocation, host completion, cleanup, and output
-encoding share one deadline. Callers receive only detached JSON; failure or
+encoding share one execution budget and deadline. Callers receive only detached JSON; failure or
 cancellation discards the result. Hosts return safe errors unchanged, while
 authored exceptions and rejection values remain private.
 
@@ -365,7 +366,10 @@ available to trusted host adapters that own their native binding layout.
 
 Fetch accepts an absolute HTTP(S) URL and optional `method`, `headers`, and `body`.
 Headers are a string record; `Host` sets the request's host override. Bodies are
-strings or native `ArrayBuffer` values. The combined request fields must fit
+strings, native `ArrayBuffer` values, or genuine `URLSearchParams` instances. Form bodies are serialized and receive
+`Content-Type: application/x-www-form-urlencoded;charset=UTF-8` unless the caller
+supplied a content type. The serialized body and generated header count toward
+the same request allowance. The combined request fields must fit
 `MaxRequestBytes`; unsupported options fail without dispatch. Responses expose
 `status`, `ok`, `headers.get(name)`, `bodyUsed`, and single-use async `text()`,
 `json()`, and `arrayBuffer()` readers. HTTP status errors resolve normally.
@@ -468,37 +472,87 @@ host even when there are no connections. Initialization cannot dispatch through
 either path; cleanup cancels both, including late responses. The `labels` fetch
 option remains unsupported for direct requests.
 
-## Optional base64 helpers
+## Pure utilities and the execution budget
 
-`atob` and `btoa` are absent by default. A trusted Go caller can enable them with
-explicit allowances on the limits passed to compilation:
+Every bounded VM includes `atob`, `btoa`, `TextEncoder`, `TextDecoder`, and
+`URLSearchParams`. They are available during validation, initialization,
+expressions, async execution, and trusted result conversion. Their global names
+are reserved, nonwritable, nonconfigurable, and non-enumerable. They perform no
+I/O; direct fetch, supplied connections, and authored logging remain separate
+capabilities. `URL` itself is not implemented yet.
+
+`Run` owns the execution's remaining `MaxWorkUnits` and `MaxAllocationUnits`.
+It carries that budget in `runCtx`, which adapters pass through all managed
+operations. Initial input conversion, utilities, result encoding, and managed
+HTTP request/response work consume the same remaining allowances. A nested
+`Run` also respects its own limits and the enclosing execution's remaining
+budget. Entering another helper or package never grants a fresh parent allowance.
+Independent top-level evaluations, including validation, have separate budgets.
+HTTP calls refused before dispatch and repeated response metadata access also
+consume allowance, even when they send no request.
+
+An adapter that performs managed conversion before or after `Run` can call
+`WithExecutionBudget(ctx, limits)` once and pass the returned context through
+that entire operation. `Run` then inherits that parent allowance. Trusted
+adapters charge additional managed work through `ChargeWork` and
+`ReserveAllocation`; both use the context's existing ledger. That ledger holds
+only Go accounting state, never a VM or Goja callback, so HTTP worker contexts
+cannot retain a runtime through it.
+
+The counters describe managed native work and storage:
+
+- A work unit counts a native entry, an admitted byte or UTF-16 code unit to
+  process, or a visited value/property. Scanning the same data again in another
+  operation consumes work again. These are accounting units, not JavaScript
+  instructions or elapsed CPU time.
+- An allocation unit counts a buffer byte, a string UTF-16 code unit, or a
+  native value/tuple slot. Temporary copies, returned strings, and retained
+  state all consume allowance. The units bound storage by fixed multiples;
+  they do not measure the process heap. Charges are cumulative and are not
+  refunded when a temporary is discarded or a query parameter is deleted.
+
+Fixed VM bootstrap, intrinsic capture, and utility binding setup are bounded by
+the implementation and covered by the execution deadline. The cumulative
+counters meter managed operations and data; they do not bill every internal
+setup allocation or instruction.
+
+The caller sets both fields alongside the ordinary limits:
 
 ```go
-limits.Utilities = runtime.UtilityPolicy{
-    Base64: true,
-    MaxCalls: 32,
-    MaxInputBytes: 64 << 10,
-    MaxOutputBytes: 64 << 10,
+limits.MaxWorkUnits = 64 << 20
+limits.MaxAllocationUnits = 64 << 20
+```
+
+Input and final-output byte limits retain their payload meanings. For example,
+a predicate can allow 1 MiB of input but return at most five JSON bytes for a
+Boolean. Intermediate work still shares its execution budget even when the
+result is tiny. Depth, stack, node, HTTP request, and response caps continue to
+bound their respective structures and operations.
+
+Budget exhaustion permanently fails the execution with `ErrLimitExceeded`,
+even if authored code catches an error or a trusted adapter ignores one. No
+later HTTP request can start; earlier sends retain their evidence. Native work
+also observes the shared deadline and caller cancellation. Arbitrary Goja
+allocations and instructions are not fully accounted for. In particular,
+some public reflection APIs allocate key lists before exposing their size.
+This remains a bounded host runtime for trusted code, not a hard heap sandbox.
+
+## Base64 helpers
+
+`atob` and `btoa` operate on **binary strings**, where each character represents
+one byte. For example, `btoa("\u00ff")` returns `"/w=="`, and
+`atob("/w==").charCodeAt(0)` returns `255`. They do not encode Unicode as UTF-8;
+`btoa("雪")` fails because that character does not fit in a byte.
+
+```javascript
+const prefix = btoa("item:");
+async function execute(params, context) {
+    return { encoded: btoa(atob(prefix) + params.id) };
 }
-program, err := runtime.CompileAsync(`
-    const prefix = btoa("item:");
-    async function execute(params, context) {
-        return { encoded: btoa(atob(prefix) + params.id) };
-    }
-`, nil, nil, limits)
 ```
 
 With `params.id` equal to `"42"`, this returns `{"encoded":"aXRlbTo0Mg=="}`.
-The helpers are available during initialization, validation, and execution,
-including pure expressions and trusted result extensions. Each VM gets fresh
-counters; initialization and execution share them. Validation uses its own VM.
-Enabled names are reserved by async compilation, and their global properties
-are nonwritable, nonconfigurable, and non-enumerable.
-
-These helpers operate on **binary strings**, where each character represents
-one byte. For example, `btoa("\u00ff")` returns `"/w=="`, and
-`atob("/w==").charCodeAt(0)` returns `255`. They do not encode Unicode as UTF-8;
-`btoa("雪")` fails because that character does not fit in a byte. `atob` uses
+`atob` uses
 [forgiving base64 decoding](https://infra.spec.whatwg.org/#forgiving-base64-decode):
 it accepts the standard alphabet, optional valid padding, and ASCII tab, LF, FF,
 CR, and space. Unused trailing bits are ignored, so both `"YQ"` and `"YR"`
@@ -509,41 +563,15 @@ values are rejected without invoking coercion or getters. Malformed input raises
 a catchable `TypeError` with fixed text. This differs from browser argument
 coercion and `DOMException` errors; this package does not install a DOM layer.
 
-Both helpers share all three utility allowances:
+Calls and admitted UTF-16 input units consume shared work, including malformed
+attempts and whitespace. The exact result length consumes allocation units
+before allocation: ASCII bytes for `btoa`, binary-string code units for `atob`.
+Malformed input produces no result allocation charge.
 
-- `MaxCalls` includes unsuccessful attempts and empty strings.
-- `MaxInputBytes` counts UTF-16 code units before scanning. Each accepted unit
-  represents one ASCII or binary byte; whitespace and malformed strings still
-  consume their full admitted length.
-- `MaxOutputBytes` reserves exact result length before allocation: ASCII bytes
-  for `btoa`, binary-string code units for `atob`. Malformed input produces no
-  output charge. Native buffers and UTF-16 storage use bounded multiples of
-  these allowances; they are not a heap quota.
+## Text codecs
 
-These allowances are separate from JSON input/output limits and must be positive
-when enabled. Exhaustion interrupts authored execution and returns
-`ErrLimitExceeded` with no result, even inside `try/catch`. No later HTTP call can
-start; requests already sent retain their evidence. Native scans also check the
-execution context. Caller cancellation retains its context error.
-
-Enabling `Base64` grants no I/O and does not enable other utility hosts. Existing
-caller defaults remain unchanged.
-
-## Optional text codecs
-
-`TextEncoder` and `TextDecoder` provide bounded UTF-8 conversion. They are absent
-by default; enable the pair independently of base64:
-
-```go
-limits.Utilities = runtime.UtilityPolicy{
-    TextCodecs: true,
-    MaxCalls: 32,
-    MaxInputBytes: 64 << 10,
-    MaxOutputBytes: 128 << 10,
-}
-```
-
-The constructors work during initialization and no-I/O validation. For example:
+`TextEncoder` and `TextDecoder` provide bounded UTF-8 conversion. The
+constructors also work during initialization and no-I/O validation:
 
 ```javascript
 const encoder = new TextEncoder();
@@ -559,7 +587,7 @@ For `params.text = "café"`, the result is
 `{"utf8":[99,97,102,195,169],"text":"café"}`. Encoding returns a native
 `Uint8Array`; use `Array.from(bytes)` when returning JSON. An already-supplied
 connection can send `body: bytes.buffer`, and a decoder can consume
-`await response.arrayBuffer()`. Selecting codecs does not grant HTTP access.
+`await response.arrayBuffer()`. The codecs grant no HTTP access.
 
 The supported [Encoding Standard](https://encoding.spec.whatwg.org/#api) subset is:
 
@@ -588,29 +616,113 @@ not coerced: boxed strings and non-string encoder inputs fail. Options must be
 ordinary or null-prototype objects containing own data Boolean fields; missing,
 undefined, or null options use defaults. Accessors on recognized fields and
 proxy options fail without running their code. Inherited and unknown fields are
-ignored, and option values are not converted to Booleans. These restrictions intentionally differ from
-browser argument conversion. Error text never contains labels or input data.
+ignored, and option values are not converted to Booleans. These restrictions
+differ from browser argument conversion. Error text never contains labels or
+input data.
 
-All selected utilities share one allowance across initialization and execution:
+Codec construction and native method entries consume shared work, including
+failed argument checks. Each constructed instance also reserves one native
+metadata slot. Their data charges use the execution's same counters:
 
-| Operation | Input allowance | Output allowance |
+| Operation | Additional work units | Allocation units |
 | --- | --- | --- |
 | Decoder label | Supplied UTF-16 code units, including whitespace | None |
-| `encode` | UTF-16 code units | UTF-8 bytes |
+| `encode` | Input UTF-16 code units | UTF-8 bytes |
 | `decode` | Bytes in the supplied buffer/view | UTF-16 code units |
 
-Codec initialization and native method entries consume `MaxCalls`, including
-failed argument checks. This also bounds retained instance metadata. Boolean
-options have constant size and no separate byte charge. Exact output size is
-reserved before allocation; invalid input has no output charge. Native buffers
-and string storage use bounded multiples of the allowances, not a heap quota.
-The JSON input/output caps remain separate. For example, encoding then decoding
-`"é"` uses three input units and three output units in total (one UTF-16 unit and
-two UTF-8 bytes each way).
+Boolean options have constant size and no separate data charge. Exact output
+size is reserved before allocation. These charges accumulate with input copying,
+other helpers, and final result encoding; a codec has no separate allowance.
 
-Limits and cancellation behave like the base64 helpers: periodic native checks,
-one execution deadline, no result after failure, and uncatchable budget
-exhaustion that prevents later HTTP requests while preserving earlier effects.
+## Query strings
+
+`URLSearchParams` parses and edits query strings. Build a query from an existing
+filter and an unencoded search term:
+
+```javascript
+const query = new URLSearchParams("status=open");
+query.append("q", "café + news");
+query.append("status", "new");
+query.toString();
+// "status=open&q=caf%C3%A9+%2B+news&status=new"
+```
+
+The result has no leading `?`. An already-supplied connection can use it with
+`connection.fetch("https://api.example/items?" + query.toString())`.
+
+You can also pass an instance directly as a form POST body:
+
+```javascript
+async function execute(params, context) {
+    const form = new URLSearchParams();
+    form.append("grant_type", "client_credentials");
+    form.append("scope", "read write");
+    return (await context.connections[0].fetch("https://api.example/token", {
+        method: "POST",
+        body: form,
+    })).json();
+}
+```
+
+Fetch sends `grant_type=client_credentials&scope=read+write` with
+`Content-Type: application/x-www-form-urlencoded;charset=UTF-8`. An explicit
+content-type header, including an empty one, is preserved. Fetch uses the
+protected native serializer, so it ignores an instance's overridden `toString`
+and rejects fake or proxy receivers. Serialization and managed HTTP preparation
+consume the same execution budget; the body and inferred header also count
+against the per-request byte cap. Later mutations do not change the request or
+its replay body. This works with connection fetch and an explicitly supplied
+direct fetch. If you pass `body: form.toString()` instead, set the content type
+yourself; plain string bodies do not infer it.
+
+The supported [URL Standard](https://url.spec.whatwg.org/#interface-urlsearchparams)
+subset uses ordered name/value pairs, including duplicates:
+
+| Operation | Behavior |
+| --- | --- |
+| `new URLSearchParams(text)` | Parses a primitive string; omitted or undefined means empty. Removes one initial `?`, skips empty `&` segments, and splits each pair at its first `=`. |
+| `append(name, value)` | Adds another pair at the end. |
+| `set(name, value)` | Replaces the first matching pair and removes later duplicates; appends if absent. |
+| `get(name)` / `getAll(name)` | Returns the first value or null / a new native array of all values. |
+| `has(name, value?)` | Tests for the name, optionally requiring a matching value. |
+| `delete(name, value?)` | Removes all matching pairs. An omitted or undefined value matches any value. |
+| `sort()` | Stably sorts names by UTF-16 code units, preserving the order of equal names. |
+| `size` | Read-only number of pairs, including duplicates. |
+| `toString()` | Serializes using form encoding, preserving the current order. |
+
+Parsing changes `+` to a space and decodes valid `%HH` bytes. Invalid escapes
+stay literal. Malformed UTF-8 uses replacement characters; a BOM remains data.
+Serialization changes spaces to `+` and leaves only ASCII letters, digits,
+`*`, `-`, `.`, and `_` unescaped. Other UTF-8 bytes become uppercase percent
+escapes. For example, `new URLSearchParams("q=a+b%2Bc").get("q")` returns
+`"a b+c"`. Passing a full URL treats it as query text; it does not extract the
+URL's query component.
+
+Methods accept primitive strings, replacing lone UTF-16 surrogates with U+FFFD.
+Mutation arguments are unencoded data: `append("q", "%2B")` serializes as
+`q=%252B`. There is no implicit object or scalar coercion. Object/sequence/copy
+constructors, iterators, `forEach`, and coupling to a `URL` object are not
+implemented. Use `new URLSearchParams(existing.toString())` to copy a query.
+Constructors require `new`; methods require genuine instances from the current
+VM. Invalid arguments or receivers raise a fixed, catchable `TypeError` without
+running their getters, proxy traps, or conversion hooks. Installed global and
+prototype properties are protected against reassignment and redefinition.
+
+Query accounting uses the same execution budget as other managed operations:
+
+- Construction, methods, and `size` reads consume work, including failed native
+  argument checks. Each constructed instance reserves one metadata slot. Supplied UTF-16 code units also consume work. Operations that
+  scan stored state charge its name/value units plus one unit per pair, even
+  when they find a match early. `append` and `size` do not scan. Sort additionally
+  charges each moved tuple and both names in each comparison.
+- Temporary UTF-8 bytes and normalized UTF-16 strings produced during parsing
+  or argument conversion consume allocation units, plus one unit per retained
+  pair. Reads charge returned string units; `getAll` also charges one unit per
+  array element. Serialization charges its exact ASCII length. Sort reserves
+  one scratch slot per pair when there are at least two pairs.
+
+Native parsing, comparison, sorting, and serialization check cancellation.
+Deleting a parameter does not refund either execution allowance.
 
 ## Copying JSON into the runtime
 
@@ -633,21 +745,24 @@ adapters choose defaults and enforce domain shapes such as object-only params.
 Numbers use ordinary JavaScript precision. Invalid UTF-8, unpaired surrogate
 escapes, and numbers that overflow to infinity are rejected.
 
-Each `Decode` call starts fresh counters. HTTP response readers use this for
-their per-body depth/node allowance after the HTTP host has bounded the body
-bytes. They set `MaxBytes` to the accepted body's length, keeping HTTP body
-accounting separate from `Limits.MaxInputBytes`. Decoding still uses `runCtx`
-under the same execution deadline.
+Each `Decode` call has its own byte/depth/node boundary checks. HTTP response
+readers use these for each body after the HTTP host has bounded its bytes. They
+set `MaxBytes` to the accepted body's length, keeping HTTP payload size separate
+from the initial `Limits.MaxInputBytes`. All calls using `runCtx` also consume
+the same cumulative execution work/allocation budget; a new decode does not
+reset it. Standalone decoder calls outside `Run` retain only their explicit
+conversion boundary limits. During execution, adapters must pass `runCtx`.
 
 ## Limits and errors
 
-All required limit fields must be positive; optional utility caps apply only
-when selected. `CompileExpression` and `CompileAsync` enforce
+All limit fields must be positive, including `MaxWorkUnits` and
+`MaxAllocationUnits`. `CompileExpression` and `CompileAsync` enforce
 source bytes; adapters that compile other program types enforce their own cap. All
 input adapters submit their complete batch with the effective JSON limits. The
 decoder enforces those byte/depth/node caps. The runtime enforces timeout, stack
 depth, and the final output's byte/depth/node limits. Input and output have
-separate traversal allowances; a later domain envelope needs its own byte cap.
+separate structural allowances, while all managed conversion work and allocation
+share the execution budget. A later domain envelope needs its own byte cap.
 These are not heap or JavaScript instruction quotas, and native built-ins cannot
 always be interrupted immediately.
 
@@ -673,5 +788,6 @@ or `JSON` cannot replace conversion. Getters and `toJSON` are not called.
 This package depends on Goja and the standard library. It has no imports from
 root `apjs`, `tools`, core, HTTP integration, or schema packages. Domain adapters
 choose input names, capabilities, authorization, and result interpretation.
-The existing root `apjs` connector APIs retain their current behavior until
-their callers are deliberately migrated to explicit budgets and cancellation.
+Bounded root `apjs` connector adapters use the same execution budget and pure
+utilities. Compatibility entry points that do not use this bounded lifecycle
+remain separate APIs.

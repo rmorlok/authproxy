@@ -14,11 +14,156 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestToolSearchParamsHTTP builds an encoded query with shared pure utilities
+// while keeping all outbound work on the Tool's captured connection.
+func TestToolSearchParamsHTTP(t *testing.T) {
+	limits := expressionLimits()
+	program, err := javascript.CompileTool(`
+		const query = new URLSearchParams("status=open");
+		async function execute(params, context) {
+			query.append("q", "café + news");
+			query.append("status", "new");
+			const response = await context.connections[0].fetch("https://provider.example/items?" + query.toString());
+			return [await response.text(), typeof fetch, typeof URL, typeof TextEncoder];
+		}`, nil, limits)
+	require.NoError(t, err)
+	// Query initialization is pure and can run during validation without a connection.
+	require.NoError(t, program.Validate(context.Background()))
+	queries := make(chan string, 1)
+	options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+		queries <- request.URL.RawQuery
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader("ok"))), nil
+	}, fetchLimits())
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+	// Duplicate parameters and escaped user text arrive intact at the configured client.
+	require.NoError(t, err)
+	require.JSONEq(t, `["ok","undefined","undefined","function"]`, string(result))
+	select {
+	case query := <-queries:
+		require.Equal(t, "status=open&q=caf%C3%A9+%2B+news&status=new", query)
+	default:
+		t.Fatal("connection did not receive the query request")
+	}
+}
+
+// TestToolSearchParamsFormBody serializes a genuine instance through the shared
+// fetch host, copying its form data before any worker or later mutation runs.
+func TestToolSearchParamsFormBody(t *testing.T) {
+	limits := expressionLimits()
+	program, err := javascript.CompileTool(`
+		const form = new URLSearchParams("grant_type=client_credentials&scope=first&scope=second");
+		async function execute(params, context) {
+			form.append("audience", "café + news");
+			Object.defineProperty(form, "toString", {get() {throw "must not run";}});
+			const pending = context.connections[0].fetch("https://provider.example/token", {method: "POST", body: form});
+			form.set("scope", "changed after dispatch");
+			const response = await pending;
+			return [await response.text(), typeof fetch];
+		}`, nil, limits)
+	require.NoError(t, err)
+	require.NoError(t, program.Validate(context.Background()))
+	requests := make(chan [4]string, 1)
+	options := fetchOptions(t, context.Background(), func(request *http.Request) (*http.Response, error) {
+		defer request.Body.Close()
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			return nil, err
+		}
+		replay, err := request.GetBody()
+		if err != nil {
+			return nil, err
+		}
+		defer replay.Close()
+		repeated, err := io.ReadAll(replay)
+		if err != nil {
+			return nil, err
+		}
+		requests <- [4]string{request.Method, request.Header.Get("Content-Type"), string(body), string(repeated)}
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader("ok"))), nil
+	}, fetchLimits())
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+	// Both initial send and replay use the same encoded snapshot and inferred header.
+	require.NoError(t, err)
+	require.JSONEq(t, `["ok","undefined"]`, string(result))
+	select {
+	case request := <-requests:
+		const body = "grant_type=client_credentials&scope=first&scope=second&audience=caf%C3%A9+%2B+news"
+		require.Equal(t, [4]string{"POST", "application/x-www-form-urlencoded;charset=UTF-8", body, body}, request)
+	default:
+		t.Fatal("connection did not receive the form request")
+	}
+}
+
+// TestToolSearchParamsExhaustionStopsHTTP preserves earlier send evidence and
+// prevents a caught query-output limit from enabling any subsequent requests.
+func TestToolSearchParamsExhaustionStopsHTTP(t *testing.T) {
+	for name, test := range map[string]struct {
+		source string
+		calls  int32
+		state  api.ToolExecutionState
+	}{
+		"initialization": {
+			source: `const q = new URLSearchParams("x=" + "雪".repeat(8192)); try {q.toString();} catch (_) {}
+				async function execute(params, context) {await context.connections[0].fetch("https://provider.example/items"); return true;}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"before first request": {
+			source: `async function execute(params, context) {
+				const q = new URLSearchParams("x=" + "雪".repeat(8192)); try {q.toString();} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/items"); return true;}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"after first request": {
+			source: `async function execute(params, context) {
+				await context.connections[0].fetch("https://provider.example/first");
+				const q = new URLSearchParams("x=" + "雪".repeat(8192)); try {q.toString();} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/second"); return true;}`,
+			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
+		},
+		"form body before first request": {
+			source: `async function execute(params, context) {
+				const q = new URLSearchParams("x=" + "雪".repeat(8192));
+				try {await context.connections[0].fetch("https://provider.example/form", {method: "POST", body: q});} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/later"); return true;}`,
+			state: api.ToolExecutionStateNotStarted,
+		},
+		"form body after first request": {
+			source: `async function execute(params, context) {
+				await context.connections[0].fetch("https://provider.example/first");
+				const q = new URLSearchParams("x=" + "雪".repeat(8192));
+				try {await context.connections[0].fetch("https://provider.example/form", {method: "POST", body: q});} catch (_) {}
+				await context.connections[0].fetch("https://provider.example/later"); return true;}`,
+			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Input setup and parsed state fit; the serialized form alone exceeds the shared allocation cap.
+			limits := expressionLimits()
+			limits.MaxAllocationUnits = 64 << 10
+			program, err := javascript.CompileTool(test.source, nil, limits)
+			require.NoError(t, err)
+			var calls atomic.Int32
+			options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return fetchResponse(http.StatusOK, http.NoBody), nil
+			}, fetchLimits())
+			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+
+			// The overall invocation fails even though authored code tried to catch the limit.
+			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+			require.Nil(t, result)
+			require.Equal(t, test.calls, calls.Load())
+			require.Equal(t, test.state, options.Session.ExecutionState())
+		})
+	}
+}
+
 // TestToolTextCodecHTTP uses the shared codecs with the Tool's sole connection,
-// preserving native byte ownership and keeping unrelated capabilities disabled.
+// preserving native byte ownership without granting direct network access.
 func TestToolTextCodecHTTP(t *testing.T) {
 	limits := expressionLimits()
-	limits.Utilities = jsruntime.UtilityPolicy{TextCodecs: true, MaxCalls: 8, MaxInputBytes: 64, MaxOutputBytes: 64}
 	program, err := javascript.CompileTool(`
 		const encoder = new TextEncoder(), decoder = new TextDecoder(undefined, {fatal:true});
 		async function execute(params, context) {
@@ -46,7 +191,7 @@ func TestToolTextCodecHTTP(t *testing.T) {
 
 	// UTF-8 bytes cross the existing ArrayBuffer HTTP contract without enabling global fetch.
 	require.NoError(t, err)
-	require.JSONEq(t, `["café☃","undefined","undefined"]`, string(result))
+	require.JSONEq(t, `["café☃","undefined","function"]`, string(result))
 	select {
 	case body := <-requestBodies:
 		require.Equal(t, "café☃", body)
@@ -64,13 +209,13 @@ func TestToolTextCodecExhaustionStopsHTTP(t *testing.T) {
 		state  api.ToolExecutionState
 	}{
 		"initialization": {
-			source: `const e = new TextEncoder(); try { e.encode("é"); } catch (_) {}
+			source: `const e = new TextEncoder(); try { e.encode("雪".repeat(32768)); } catch (_) {}
 				async function execute(params, context) { await context.connections[0].fetch("https://provider.example/items"); return true; }`,
 			state: api.ToolExecutionStateNotStarted,
 		},
 		"before first request": {
 			source: `async function execute(params, context) {
-				try { new TextEncoder().encode("é"); } catch (_) {}
+				try { new TextEncoder().encode("雪".repeat(32768)); } catch (_) {}
 				await context.connections[0].fetch("https://provider.example/items"); return true;
 			}`,
 			state: api.ToolExecutionStateNotStarted,
@@ -78,16 +223,16 @@ func TestToolTextCodecExhaustionStopsHTTP(t *testing.T) {
 		"after first request": {
 			source: `async function execute(params, context) {
 				await context.connections[0].fetch("https://provider.example/first");
-				try { new TextEncoder().encode("é"); } catch (_) {}
+				try { new TextEncoder().encode("雪".repeat(32768)); } catch (_) {}
 				await context.connections[0].fetch("https://provider.example/second"); return true;
 			}`,
 			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			// One output byte cannot hold the two-byte UTF-8 encoding of this character.
+			// Input setup fits, while the encoded byte buffer exceeds the execution allocation cap.
 			limits := expressionLimits()
-			limits.Utilities = jsruntime.UtilityPolicy{TextCodecs: true, MaxCalls: 8, MaxInputBytes: 16, MaxOutputBytes: 1}
+			limits.MaxAllocationUnits = 64 << 10
 			program, err := javascript.CompileTool(test.source, nil, limits)
 			require.NoError(t, err)
 			var calls atomic.Int32
@@ -107,22 +252,21 @@ func TestToolTextCodecExhaustionStopsHTTP(t *testing.T) {
 	}
 }
 
-// TestToolBase64Policy verifies that a trusted caller can select shared pure
-// helpers without a Tool-specific implementation or additional I/O capability.
-func TestToolBase64Policy(t *testing.T) {
+// TestToolBase64Availability verifies that every Tool receives shared pure helpers
+// without a Tool-specific implementation or additional I/O capability.
+func TestToolBase64Availability(t *testing.T) {
 	limits := expressionLimits()
 	program, err := javascript.CompileTool(`async function execute() {
 		return [typeof atob, typeof btoa];
 	}`, nil, limits)
 	require.NoError(t, err)
 
-	// Existing Tool profiles retain the absent-by-default helper surface.
+	// Ordinary Tool profiles expose the standard pure helpers.
 	result, err := program.Evaluate(context.Background(), fetchInput(t))
 	require.NoError(t, err)
-	require.JSONEq(t, `["undefined","undefined"]`, string(result))
+	require.JSONEq(t, `["function","function"]`, string(result))
 
-	// Explicit policy makes the same helpers available in validation and execution.
-	limits.Utilities = jsruntime.UtilityPolicy{Base64: true, MaxCalls: 2, MaxInputBytes: 5, MaxOutputBytes: 5}
+	// The same helpers are available during validation and execution.
 	program, err = javascript.CompileTool(`const encoded = btoa("\xff");
 		async function execute() {
 			return [atob(encoded).charCodeAt(0), typeof fetch, typeof URL, typeof TextEncoder];
@@ -131,10 +275,10 @@ func TestToolBase64Policy(t *testing.T) {
 	require.NoError(t, program.Validate(context.Background()))
 	result, err = program.Evaluate(context.Background(), fetchInput(t))
 	require.NoError(t, err)
-	require.JSONEq(t, `[255,"undefined","undefined","undefined"]`, string(result))
+	require.JSONEq(t, `[255,"undefined","undefined","function"]`, string(result))
 }
 
-// TestToolUtilityExhaustionStopsHTTP checks the utility limit at the real Tool
+// TestToolUtilityExhaustionStopsHTTP checks the shared limit at the real Tool
 // host boundary. Exhaustion stops further effects even inside authored try/catch;
 // already-sent requests retain their evidence when the overall result fails.
 func TestToolUtilityExhaustionStopsHTTP(t *testing.T) {
@@ -144,13 +288,13 @@ func TestToolUtilityExhaustionStopsHTTP(t *testing.T) {
 		state  api.ToolExecutionState
 	}{
 		"initialization": {
-			source: `btoa("a"); try { btoa("b"); } catch (_) {}
+			source: `btoa("a"); try { btoa("a".repeat(65536)); } catch (_) {}
 				async function execute(params, context) { await context.connections[0].fetch("https://provider.example/items"); return true; }`,
 			state: api.ToolExecutionStateNotStarted,
 		},
 		"before first request": {
 			source: `async function execute(params, context) {
-				btoa("a"); try { btoa("b"); } catch (_) {}
+				btoa("a"); try { btoa("a".repeat(65536)); } catch (_) {}
 				await context.connections[0].fetch("https://provider.example/items"); return true;
 			}`,
 			state: api.ToolExecutionStateNotStarted,
@@ -158,16 +302,16 @@ func TestToolUtilityExhaustionStopsHTTP(t *testing.T) {
 		"after first request": {
 			source: `async function execute(params, context) {
 				await context.connections[0].fetch("https://provider.example/first");
-				btoa("a"); try { btoa("b"); } catch (_) {}
+				btoa("a"); try { btoa("a".repeat(65536)); } catch (_) {}
 				await context.connections[0].fetch("https://provider.example/second"); return true;
 			}`,
 			calls: 1, state: api.ToolExecutionStateMayHaveExecuted,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			// One utility call is permitted independently of the HTTP request budget.
+			// Preparation and an earlier send fit; the large conversion exhausts the shared allocation cap.
 			limits := expressionLimits()
-			limits.Utilities = jsruntime.UtilityPolicy{Base64: true, MaxCalls: 1, MaxInputBytes: 16, MaxOutputBytes: 16}
+			limits.MaxAllocationUnits = 64 << 10
 			program, err := javascript.CompileTool(test.source, nil, limits)
 			require.NoError(t, err)
 			var calls atomic.Int32

@@ -45,7 +45,7 @@ func encodeVariables(
 		return nil, err
 	}
 
-	if err := ctx.Err(); err != nil {
+	if err := jsruntime.ChargeWork(ctx, 0); err != nil {
 		return nil, err
 	}
 
@@ -81,6 +81,12 @@ func (e *variableEncoder) value(value any, depth int) error {
 	case json.Number:
 		if len(value) > e.limits.MaxBytes-len(e.bytes) {
 			return jsruntime.ErrLimitExceeded
+		}
+		if err := jsruntime.ChargeWork(e.ctx, len(value)); err != nil {
+			return err
+		}
+		if err := jsruntime.ReserveAllocation(e.ctx, len(value)); err != nil {
+			return err
 		}
 		number, err := value.Float64()
 		if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
@@ -187,7 +193,12 @@ func encodeVariableSlice[V any](e *variableEncoder, values []V, depth int) error
 // node charges traversal work before visiting a value or object key. This also
 // stops recursive/cyclic input before conversion can consume unbounded work.
 func (e *variableEncoder) node() error {
-	if err := e.ctx.Err(); err != nil {
+	if err := jsruntime.ChargeWork(e.ctx, 1); err != nil {
+		return err
+	}
+	// A logical slot bounds constant-size scalar conversion and traversal
+	// metadata; variable-length strings and emitted bytes are charged separately.
+	if err := jsruntime.ReserveAllocation(e.ctx, 1); err != nil {
 		return err
 	}
 	if e.nodes >= e.limits.MaxNodes {
@@ -205,9 +216,21 @@ func (e *variableEncoder) string(value string) error {
 	if remaining < 2 || len(value) > remaining-2 {
 		return jsruntime.ErrLimitExceeded
 	}
+	if err := jsruntime.ChargeWork(e.ctx, len(value)); err != nil {
+		return err
+	}
 
 	if !utf8.ValidString(value) {
 		return jsruntime.ErrInvalidInput
+	}
+	// JSON's escaping expands a string by at most a fixed factor. Reserve its
+	// source units before Marshal allocates scratch, then charge exact emitted
+	// bytes separately when appending the result.
+	if err := jsruntime.ChargeWork(e.ctx, len(value)); err != nil {
+		return err
+	}
+	if err := jsruntime.ReserveAllocation(e.ctx, len(value)+2); err != nil {
+		return err
 	}
 
 	encoded, err := json.Marshal(value)
@@ -227,6 +250,12 @@ func (e *variableEncoder) append(encoded []byte) error {
 
 	if len(encoded) > e.limits.MaxBytes-len(e.bytes) {
 		return jsruntime.ErrLimitExceeded
+	}
+	if err := jsruntime.ChargeWork(e.ctx, len(encoded)); err != nil {
+		return err
+	}
+	if err := jsruntime.ReserveAllocation(e.ctx, len(encoded)); err != nil {
+		return err
 	}
 
 	e.bytes = append(e.bytes, encoded...)

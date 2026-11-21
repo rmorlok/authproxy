@@ -59,7 +59,7 @@ type AsyncProgram struct {
 // a library because they can reach the global object. A helper library cannot
 // declare execute because that entry point belongs to the main program. The
 // caller supplies domain-specific host bindings. The shared fetch name is always
-// reserved, even when direct HTTP is disabled; enabled utility names are reserved
+// reserved, even when direct HTTP is disabled; pure utility names are reserved
 // too. Explicit descriptors may repeat these defaults but cannot preserve
 // enumerability. Malformed binding options return ErrInvalidInput.
 func CompileAsync(
@@ -79,7 +79,7 @@ func CompileAsync(
 
 	// Existing adapters may already reserve these names. Reuse those bindings,
 	// preserving the shared non-enumerable policy and rejecting real duplicates.
-	builtins := append([]HostBinding{{Name: "fetch"}}, limits.Utilities.bindings()...)
+	builtins := append([]HostBinding{{Name: "fetch"}}, utilityBindings()...)
 	for _, builtin := range builtins {
 		found := false
 		for _, binding := range bindings {
@@ -187,14 +187,13 @@ func CompileAsync(
 // runs; missing capabilities remain undefined. Stack policy is applied here.
 // Top-level errors and noncallable entry points return fixed classifications,
 // never source, thrown values, or library diagnostics. Discard vm on failure.
-// When Utilities is enabled, call this low-level method inside Run with the
-// same limits so the helpers and their execution-wide accounting already exist.
+// Call this low-level method inside Run with the same limits so the helpers and their execution-wide accounting already exist.
 // Validate and Evaluate manage that setup automatically.
 func (p *AsyncProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	if p == nil || p.program == nil || vm == nil {
 		return nil, ErrInvalidInput
 	}
-	for _, binding := range p.limits.Utilities.bindings() {
+	for _, binding := range utilityBindings() {
 		if _, ok := goja.AssertFunction(vm.Get(binding.Name)); !ok {
 			return nil, ErrInvalidInput
 		}

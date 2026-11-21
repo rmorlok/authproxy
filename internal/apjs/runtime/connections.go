@@ -100,7 +100,7 @@ func (i *AsyncInvocation) PrepareInput(
 		(host != nil && host.vm != vm) {
 		return ErrInvalidInput
 	}
-	if err := ctx.Err(); err != nil {
+	if err := ChargeWork(ctx, 1); err != nil {
 		return err
 	}
 
@@ -108,6 +108,9 @@ func (i *AsyncInvocation) PrepareInput(
 	// allocating it, including the two default argument/context roots.
 	if limits.MaxNodes < 2 || len(input.Connections) > limits.MaxNodes-2 {
 		return ErrLimitExceeded
+	}
+	if err := ReserveAllocation(ctx, 2+len(input.Connections)); err != nil {
+		return err
 	}
 
 	documents := make([]json.RawMessage, 2, 2+len(input.Connections))
@@ -119,7 +122,7 @@ func (i *AsyncInvocation) PrepareInput(
 	}
 
 	for _, connection := range input.Connections {
-		if err := ctx.Err(); err != nil {
+		if err := ChargeWork(ctx, 1); err != nil {
 			return err
 		}
 		if connection.Dispatcher == nil {
@@ -151,7 +154,11 @@ func (i *AsyncInvocation) PrepareInput(
 		return ErrInvalidInput
 	}
 
-	for _, key := range contextObject.GetOwnPropertyNames() {
+	contextKeys, err := inputPropertyNames(ctx, contextObject)
+	if err != nil {
+		return err
+	}
+	for _, key := range contextKeys {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
@@ -162,10 +169,16 @@ func (i *AsyncInvocation) PrepareInput(
 
 	// Validate every snapshot before binding any capability or exposing input to
 	// the adapter. The decoded graphs are native JSON, with no getters or proxies.
+	if err := ReserveAllocation(ctx, len(input.Connections)); err != nil {
+		return err
+	}
 	connections := make([]*goja.Object, len(input.Connections))
+	if err := ReserveAllocation(ctx, len(connections)); err != nil {
+		return err
+	}
 	seen := make(map[string]bool, len(connections))
 	for index := range connections {
-		if err := ctx.Err(); err != nil {
+		if err := ChargeWork(ctx, 1); err != nil {
 			return err
 		}
 
@@ -174,7 +187,15 @@ func (i *AsyncInvocation) PrepareInput(
 			return err
 		}
 
-		id := connection.Get("id").String()
+		// Identity conversion and map lookup revisit the decoded string.
+		identity := connection.Get("id").(goja.String)
+		if err := ChargeWork(ctx, identity.Length()); err != nil {
+			return err
+		}
+		if err := ReserveAllocation(ctx, identity.Length()); err != nil {
+			return err
+		}
+		id := identity.String()
 		if seen[id] {
 			return ErrInvalidInput
 		}
@@ -194,7 +215,12 @@ func (i *AsyncInvocation) PrepareInput(
 
 	array := vm.NewArray()
 	for index, connection := range connections {
-		if err := ctx.Err(); err != nil {
+		if err := ChargeWork(ctx, 1); err != nil {
+			return err
+		}
+		// Each connection adds an array slot and bounded native capability
+		// metadata. The dispatcher itself stays outside the JavaScript graph.
+		if err := ReserveAllocation(ctx, 3); err != nil {
 			return err
 		}
 
@@ -274,16 +300,46 @@ func inputObject(value goja.Value) (*goja.Object, bool) {
 	return object, ok && object.ClassName() == "Object"
 }
 
+// inputPropertyNames accounts for native key lists used after JSON decoding.
+// Revalidation revisits metadata and creates a Go slice even though the decoded
+// graph already paid its own conversion costs. Reflection exposes size only
+// after materializing the list; admission still precedes further processing.
+func inputPropertyNames(ctx context.Context, object *goja.Object) ([]string, error) {
+	keys := object.GetOwnPropertyNames()
+	if err := ChargeWork(ctx, len(keys)); err != nil {
+		return nil, err
+	}
+	if err := ReserveAllocation(ctx, len(keys)); err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		if err := ChargeWork(ctx, len(key)); err != nil {
+			return nil, err
+		}
+		if err := ReserveAllocation(ctx, len(key)); err != nil {
+			return nil, err
+		}
+	}
+	return keys, nil
+}
+
 // connectionSnapshot validates one already-bounded native JSON object and fills
 // omitted metadata with fixed empty defaults. Unknown fields cannot override a
 // host method, and labels/annotations retain their string-map contract.
 func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value) (*goja.Object, error) {
+	if err := ChargeWork(ctx, 1); err != nil {
+		return nil, err
+	}
 	object, ok := inputObject(value)
 	if !ok {
 		return nil, ErrInvalidInput
 	}
 
-	for _, key := range object.GetOwnPropertyNames() {
+	keys, err := inputPropertyNames(ctx, object)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -317,6 +373,9 @@ func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value)
 
 		value := object.Get(key)
 		if value == nil {
+			if err := ReserveAllocation(ctx, 1); err != nil {
+				return nil, err
+			}
 			if key == "name" || key == "namespace" {
 				value = vm.ToValue("")
 			} else {
@@ -340,7 +399,11 @@ func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value)
 		}
 
 		if key != "cfg" {
-			for _, label := range metadata.GetOwnPropertyNames() {
+			labels, err := inputPropertyNames(ctx, metadata)
+			if err != nil {
+				return nil, err
+			}
+			for _, label := range labels {
 				if err := ctx.Err(); err != nil {
 					return nil, err
 				}

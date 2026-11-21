@@ -50,13 +50,19 @@ type Limits struct {
 	// its context error. Native Goja built-ins cannot be preempted immediately.
 	Timeout time.Duration
 
-	// Utilities opts into pure native helpers with their own aggregate work
-	// allowances. Its zero value preserves the existing standard-global surface.
-	Utilities UtilityPolicy
+	// MaxWorkUnits bounds cumulative managed native operations, inspected
+	// bytes/code units, and visited values across the execution's conversions,
+	// pure utilities, and HTTP hosts. It does not meter JavaScript instructions.
+	MaxWorkUnits int
+
+	// MaxAllocationUnits bounds cumulative managed buffer bytes, string UTF-16
+	// code units, and native value/tuple slots, including intermediate copies.
+	// These logical units bound storage by fixed multiples, not total VM heap
+	// bytes. Initialization, execution, and conversion share one allowance.
+	MaxAllocationUnits int
 }
 
-// Validate rejects missing required bounds or invalid enabled utility policies
-// before VM allocation.
+// Validate rejects missing required bounds before VM allocation.
 // Adapters also use it when compiling programs that capture these limits.
 func (l Limits) Validate() error {
 	if l.MaxSourceBytes <= 0 ||
@@ -65,8 +71,10 @@ func (l Limits) Validate() error {
 		l.MaxDepth <= 0 ||
 		l.MaxNodes <= 0 ||
 		l.MaxStackDepth <= 0 ||
-		l.Timeout <= 0 {
+		l.Timeout <= 0 ||
+		l.MaxWorkUnits <= 0 ||
+		l.MaxAllocationUnits <= 0 {
 		return ErrInvalidInput
 	}
-	return l.Utilities.validate()
+	return nil
 }

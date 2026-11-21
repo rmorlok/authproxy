@@ -17,13 +17,15 @@ import (
 // inputTestLimits keeps input-boundary fixtures independent of execution policy.
 func inputTestLimits() Limits {
 	return Limits{
-		MaxSourceBytes: 1 << 16,
-		MaxInputBytes:  1 << 16,
-		MaxOutputBytes: 1 << 16,
-		MaxDepth:       32,
-		MaxNodes:       1000,
-		MaxStackDepth:  64,
-		Timeout:        time.Second,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     1 << 16,
+		MaxInputBytes:      1 << 16,
+		MaxOutputBytes:     1 << 16,
+		MaxDepth:           32,
+		MaxNodes:           1000,
+		MaxStackDepth:      64,
+		Timeout:            time.Second,
 	}
 }
 
