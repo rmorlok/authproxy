@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/hibiken/asynq"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
@@ -40,7 +41,40 @@ func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.
 	// mock db / encrypt that the test set up). Tests that want a mocked
 	// factory swap it into authMethodFactories themselves.
 	s.authMethodFactories = s.buildAuthMethodFactories()
+
+	allowConnectionToolSetReconcile(ac)
+
 	return s, db, r, h, ac, encrypt
+}
+
+// allowConnectionToolSetReconcile lets a mock asynq client accept the ToolSet
+// membership pass that connection writes request. Tests of those writes are about
+// other behavior, so the pass may be enqueued any number of times without an
+// expectation of its own; other tasks still need one.
+func allowConnectionToolSetReconcile(ac *mockAsynq.MockClient) {
+	ac.EXPECT().
+		EnqueueContext(gomock.Any(), taskOfType(taskTypeReconcileConnectionToolSets), gomock.Any()).
+		Return(nil, nil).
+		AnyTimes()
+}
+
+// taskOfType matches an asynq task by its type name.
+func taskOfType(taskType string) gomock.Matcher {
+	return taskTypeMatcher(taskType)
+}
+
+// taskTypeMatcher is the gomock.Matcher behind taskOfType.
+type taskTypeMatcher string
+
+// Matches reports whether x is an asynq task of the matcher's type.
+func (m taskTypeMatcher) Matches(x any) bool {
+	task, ok := x.(*asynq.Task)
+	return ok && task.Type() == string(m)
+}
+
+// String describes the matcher in gomock failure messages.
+func (m taskTypeMatcher) String() string {
+	return "is an asynq task of type " + string(m)
 }
 
 func TestGetConnectorGenerationIdsForConnections(t *testing.T) {

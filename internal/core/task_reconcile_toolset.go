@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -16,6 +17,28 @@ import (
 )
 
 const taskTypeReconcileToolSet = "core:reconcile_toolset"
+
+// toolSetReconcileCheckpointTTL is how long an interrupted pass's progress stays
+// usable. Each saved page extends it, so it only needs to outlast the gap before
+// a retry or the next sweep picks the pass up again.
+const toolSetReconcileCheckpointTTL = 24 * time.Hour
+
+// toolSetReconcilePhase names the walk a ToolSet pass's checkpoint is in.
+type toolSetReconcilePhase string
+
+const (
+	// toolSetReconcilePhaseAdditions walks selected connections, keyed by connection ID.
+	toolSetReconcilePhaseAdditions toolSetReconcilePhase = "additions"
+	// toolSetReconcilePhaseRemovals walks the ToolSet's bindings, keyed by connection ID.
+	toolSetReconcilePhaseRemovals toolSetReconcilePhase = "removals"
+)
+
+// toolSetReconcileProgress is a ToolSet pass's saved position: the walk it is in,
+// and the key of the last row that walk finished, from PageResult.Position.
+type toolSetReconcileProgress struct {
+	Phase toolSetReconcilePhase `json:"phase"`
+	After string                `json:"after,omitempty"`
+}
 
 // toolSetBindableConnectionStates are the states that can gain a binding. A
 // connection on its way out gains nothing, though one it already has stays until
@@ -110,8 +133,17 @@ func (m *toolSetMembership) selects(connection *database.Connection) bool {
 // connections, leaves installed bindings pinned, and removes nonmatching ones.
 // The pass is idempotent, so a retry repeats only reads for finished work.
 //
+// Both walks are key ordered, and the pass saves its position after every page.
+// A run cut off partway, such as by the task timeout or a worker restart,
+// therefore lets its retry continue rather than start over. The checkpoint is
+// scoped to the selector revision and primary generation the pass read, so a pass
+// for newer state never resumes older progress. Of two concurrent passes for the
+// same state, the one that loses a checkpoint write stops and leaves the work to
+// the other.
+//
 // One connection's failure does not stop the others. Failures are returned
-// together so asynq retries the pass, and stale work (a selector or binding that
+// together so asynq retries the pass, and the checkpoint is cleared first so that
+// retry revisits the failed connections. Stale work (a selector or binding that
 // changed underneath it) is rejected by storage fencing and redone from fresh
 // reads. A deleted ToolSet is a no-op here; its cleanup is separate.
 func (s *service) reconcileToolSet(ctx context.Context, toolSetId apid.ID) error {
@@ -128,15 +160,93 @@ func (s *service) reconcileToolSet(ctx context.Context, toolSetId apid.ID) error
 		return err
 	}
 
-	failures := &toolSetReconcileFailures{}
-	if err := s.reconcileToolSetAdditions(ctx, membership, failures); err != nil {
+	checkpointer := database.NewTaskCheckpointer[toolSetReconcileProgress](
+		s.db,
+		toolSetReconcileCheckpointKey(membership),
+		toolSetReconcileCheckpointTTL,
+	)
+	progress, err := checkpointer.Load(ctx)
+	if errors.Is(err, database.ErrInvalidTaskCheckpointPayload) {
+		// Unreadable progress only costs repeated work; the first save replaces it.
+		s.logger.Warn("starting toolset reconcile over from an unreadable checkpoint", "toolset_id", toolSetId, "error", err)
+		progress, err = nil, nil
+	}
+	if err != nil {
 		return err
 	}
-	if err := s.reconcileToolSetRemovals(ctx, membership, failures); err != nil {
+	if progress == nil {
+		progress = &toolSetReconcileProgress{Phase: toolSetReconcilePhaseAdditions}
+	}
+
+	failures := &toolSetReconcileFailures{}
+	err = s.walkToolSetMembership(ctx, membership, checkpointer, progress, failures)
+	if errors.Is(err, database.ErrTaskCheckpointConflict) {
+		s.logger.Info("toolset reconcile stopped: another pass owns this work", "toolset_id", toolSetId)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// The walk is finished, so its progress is no longer needed. When connections
+	// failed, clearing it also makes the retry revisit them.
+	if err := checkpointer.Clear(ctx); err != nil {
+		if errors.Is(err, database.ErrTaskCheckpointConflict) {
+			s.logger.Info("toolset reconcile finished as another pass took over", "toolset_id", toolSetId)
+			return nil
+		}
 		return err
 	}
 
 	return failures.err(toolSetId)
+}
+
+// toolSetReconcileCheckpointKey scopes a pass's checkpoint to the ToolSet and the
+// selector revision and primary generation it read. Progress through one selector
+// or primary says nothing about another, so a changed one starts a fresh walk.
+func toolSetReconcileCheckpointKey(membership *toolSetMembership) database.TaskCheckpointKey {
+	var generation uint64
+	if membership.plan != nil {
+		generation = membership.plan.generation
+	}
+	return database.TaskCheckpointKey{
+		TaskType: taskTypeReconcileToolSet,
+		Scope: fmt.Sprintf(
+			"%s/selector-%d/primary-%d",
+			membership.logical.Id,
+			membership.logical.SelectorRevision,
+			generation,
+		),
+	}
+}
+
+// walkToolSetMembership runs the additions walk and then the removals walk,
+// starting from progress and saving the position after each page. It returns
+// ErrTaskCheckpointConflict when another pass has taken over the work.
+func (s *service) walkToolSetMembership(
+	ctx context.Context,
+	membership *toolSetMembership,
+	checkpointer *database.TaskCheckpointer[toolSetReconcileProgress],
+	progress *toolSetReconcileProgress,
+	failures *toolSetReconcileFailures,
+) error {
+	// save records the walk and the key it has finished through.
+	save := func(phase toolSetReconcilePhase, position string) error {
+		return checkpointer.Save(ctx, toolSetReconcileProgress{Phase: phase, After: position})
+	}
+
+	if progress.Phase == toolSetReconcilePhaseAdditions {
+		if err := s.reconcileToolSetAdditions(ctx, membership, progress.After, failures, func(position string) error {
+			return save(toolSetReconcilePhaseAdditions, position)
+		}); err != nil {
+			return err
+		}
+		progress = &toolSetReconcileProgress{Phase: toolSetReconcilePhaseRemovals}
+	}
+
+	return s.reconcileToolSetRemovals(ctx, membership, progress.After, failures, func(position string) error {
+		return save(toolSetReconcilePhaseRemovals, position)
+	})
 }
 
 // loadToolSetMembership compiles the selector and the current primary. A stored
@@ -188,16 +298,21 @@ func (s *service) loadToolSetMembership(
 }
 
 // reconcileToolSetAdditions visits every selected connection that may gain a
-// binding. Only a listing failure aborts; connection failures are collected.
+// binding, in connection ID order after the key after, calling saved with each
+// finished page's position. A listing or save failure aborts; connection failures
+// are collected.
 func (s *service) reconcileToolSetAdditions(
 	ctx context.Context,
 	membership *toolSetMembership,
+	after string,
 	failures *toolSetReconcileFailures,
+	saved func(position string) error,
 ) error {
 	builder := s.db.ListConnectionsBuilder().
 		WithDeletedHandling(database.DeletedHandlingExclude).
 		ForStates(toolSetBindableConnectionStates).
-		ForNamespaceMatcher(membership.namespaceMatcher)
+		ForNamespaceMatcher(membership.namespaceMatcher).
+		ResumeAfter(after)
 	if membership.labelSelector != "" {
 		builder = builder.ForLabelSelector(membership.labelSelector)
 	}
@@ -216,7 +331,10 @@ func (s *service) reconcileToolSetAdditions(
 				}
 			}
 
-			return pagination.Continue, ctx.Err()
+			if err := ctx.Err(); err != nil {
+				return pagination.Stop, err
+			}
+			return pagination.Continue, saved(page.Position)
 		},
 	)
 }
@@ -275,11 +393,15 @@ func (s *service) reconcileToolSetConnection(
 // along with their generated Tools. Storage rechecks membership against the
 // captured selector revision, so a stale pass cannot remove a current binding.
 // The binding listing pages by connection ID, so removing bindings during the walk
-// cannot shift the rows after them out of reach.
+// cannot shift the rows after them out of reach. The walk starts after the key
+// after and calls saved with each finished page's position; a listing or save
+// failure aborts it.
 func (s *service) reconcileToolSetRemovals(
 	ctx context.Context,
 	membership *toolSetMembership,
+	after string,
 	failures *toolSetReconcileFailures,
+	saved func(position string) error,
 ) error {
 	logical := membership.logical
 
@@ -287,16 +409,20 @@ func (s *service) reconcileToolSetRemovals(
 		ForToolSetId(logical.Id).
 		ForToolSetNamespaceMatchers([]string{logical.Namespace}).
 		Limit(database.MaxToolSetBindingListLimit).
+		ResumeAfter(after).
 		Enumerate(
 			ctx,
 			func(page pagination.PageResult[database.ToolSetBindingListing]) (pagination.KeepGoing, error) {
 				for i := range page.Results {
 					binding := &page.Results[i]
-					if err := s.removeUnselectedToolSetBinding(ctx, membership, binding); err != nil {
+					if err := s.removeUnselectedToolSetBinding(ctx, membership, &binding.ToolSetBinding); err != nil {
 						failures.record(s, logical.Id, binding.ConnectionId, err)
 					}
 				}
-				return pagination.Continue, ctx.Err()
+				if err := ctx.Err(); err != nil {
+					return pagination.Stop, err
+				}
+				return pagination.Continue, saved(page.Position)
 			},
 		)
 }
@@ -306,7 +432,7 @@ func (s *service) reconcileToolSetRemovals(
 func (s *service) removeUnselectedToolSetBinding(
 	ctx context.Context,
 	membership *toolSetMembership,
-	binding *database.ToolSetBindingListing,
+	binding *database.ToolSetBinding,
 ) error {
 	connection, err := s.db.GetConnection(ctx, binding.ConnectionId)
 	if errors.Is(err, database.ErrNotFound) {
