@@ -27,10 +27,19 @@ func base64TestLimits() jsruntime.Limits {
 // the five ASCII whitespace characters, and unused nonzero trailing bits.
 func TestBase64ForgivingDecode(t *testing.T) {
 	for _, tt := range []struct{ encoded, decoded string }{
-		{"", ""}, {" \t\n\f\r", ""}, {"Zg==", "f"}, {"Zg", "f"},
-		{"Zh==", "f"}, {"Zh", "f"}, {"Zm8=", "fo"}, {"Zm8", "fo"},
-		{"Zm9=", "fo"}, {"Zm9", "fo"}, {"Zm9v", "foo"},
-		{"\tZ\nm\f9\rv ", "foo"}, {" Z g = = ", "f"},
+		{"", ""},
+		{" \t\n\f\r", ""},
+		{"Zg==", "f"},
+		{"Zg", "f"},
+		{"Zh==", "f"},
+		{"Zh", "f"},
+		{"Zm8=", "fo"},
+		{"Zm8", "fo"},
+		{"Zm9=", "fo"},
+		{"Zm9", "fo"},
+		{"Zm9v", "foo"},
+		{"\tZ\nm\f9\rv ", "foo"},
+		{" Z g = = ", "f"},
 	} {
 		t.Run(fmt.Sprintf("%q", tt.encoded), func(t *testing.T) {
 			// JSON quoting embeds control characters without changing the authored argument.
