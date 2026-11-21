@@ -526,8 +526,91 @@ when enabled. Exhaustion interrupts authored execution and returns
 start; requests already sent retain their evidence. Native scans also check the
 execution context. Caller cancellation retains its context error.
 
-This policy grants no I/O. It does not enable URL, text codec, or console hosts,
-and existing caller defaults remain unchanged.
+Enabling `Base64` grants no I/O and does not enable other utility hosts. Existing
+caller defaults remain unchanged.
+
+## Optional text codecs
+
+`TextEncoder` and `TextDecoder` provide bounded UTF-8 conversion. They are absent
+by default; enable the pair independently of base64:
+
+```go
+limits.Utilities = runtime.UtilityPolicy{
+    TextCodecs: true,
+    MaxCalls: 32,
+    MaxInputBytes: 64 << 10,
+    MaxOutputBytes: 128 << 10,
+}
+```
+
+The constructors work during initialization and no-I/O validation. For example:
+
+```javascript
+const encoder = new TextEncoder();
+const decoder = new TextDecoder("utf-8", {fatal: true});
+
+async function execute(params, context) {
+    const bytes = encoder.encode(params.text);
+    return { utf8: Array.from(bytes), text: decoder.decode(bytes) };
+}
+```
+
+For `params.text = "café"`, the result is
+`{"utf8":[99,97,102,195,169],"text":"café"}`. Encoding returns a native
+`Uint8Array`; use `Array.from(bytes)` when returning JSON. An already-supplied
+connection can send `body: bytes.buffer`, and a decoder can consume
+`await response.arrayBuffer()`. Selecting codecs does not grant HTTP access.
+
+The supported [Encoding Standard](https://encoding.spec.whatwg.org/#api) subset is:
+
+- `new TextEncoder().encode(text)` accepts a primitive string and returns UTF-8
+  bytes. Omitted or undefined input means empty text. Lone UTF-16 surrogates
+  become U+FFFD; valid pairs encode as one scalar. `encodeInto` is not installed.
+- `new TextDecoder(label, {fatal, ignoreBOM})` supports UTF-8 only. The label
+  defaults to `"utf-8"`; accepted aliases are `utf8`, `unicode-1-1-utf-8`,
+  `unicode11utf8`, `unicode20utf8`, and `x-unicode20utf8`, with ASCII case folding
+  and surrounding ASCII whitespace ignored. Other encodings raise a fixed
+  `RangeError`.
+- `decoder.decode(input)` accepts a native `ArrayBuffer` or any native typed
+  array/DataView, reading only that view's byte range. Omitted or undefined input
+  means empty bytes; null, detached buffers, proxies, and lookalikes are rejected.
+  Malformed UTF-8 becomes replacement characters, grouping incomplete valid
+  prefixes: bytes `E2 82` produce one U+FFFD. `fatal: true` instead raises a fixed
+  `TypeError` without reserving partial output.
+- By default, an initial UTF-8 BOM is stripped. `ignoreBOM: true` preserves it.
+  Each decode call starts fresh; `{stream: false}` is accepted, but
+  `{stream: true}` is rejected. Streaming and legacy encodings are not implemented.
+
+Constructors require `new`. Their globals and prototype methods are read-only;
+instances expose read-only `encoding` (`"utf-8"`), plus `fatal` and `ignoreBOM`
+on decoders. Methods require genuine codec receivers from this VM. Inputs are
+not coerced: boxed strings and non-string encoder inputs fail. Options must be
+ordinary or null-prototype objects containing own data Boolean fields; missing,
+undefined, or null options use defaults. Accessors on recognized fields and
+proxy options fail without running their code. Inherited and unknown fields are
+ignored, and option values are not converted to Booleans. These restrictions intentionally differ from
+browser argument conversion. Error text never contains labels or input data.
+
+All selected utilities share one allowance across initialization and execution:
+
+| Operation | Input allowance | Output allowance |
+| --- | --- | --- |
+| Decoder label | Supplied UTF-16 code units, including whitespace | None |
+| `encode` | UTF-16 code units | UTF-8 bytes |
+| `decode` | Bytes in the supplied buffer/view | UTF-16 code units |
+
+Codec initialization and native method entries consume `MaxCalls`, including
+failed argument checks. This also bounds retained instance metadata. Boolean
+options have constant size and no separate byte charge. Exact output size is
+reserved before allocation; invalid input has no output charge. Native buffers
+and string storage use bounded multiples of the allowances, not a heap quota.
+The JSON input/output caps remain separate. For example, encoding then decoding
+`"é"` uses three input units and three output units in total (one UTF-16 unit and
+two UTF-8 bytes each way).
+
+Limits and cancellation behave like the base64 helpers: periodic native checks,
+one execution deadline, no result after failure, and uncatchable budget
+exhaustion that prevents later HTTP requests while preserving earlier effects.
 
 ## Copying JSON into the runtime
 
