@@ -42,8 +42,12 @@ func (p UtilityPolicy) validate() error {
 // installation also protects the properties in pure expression/Run profiles.
 func (p UtilityPolicy) bindings() []HostBinding {
 	if p.Base64 {
-		return []HostBinding{{Name: "atob"}, {Name: "btoa"}}
+		return []HostBinding{
+			{Name: "atob"},
+			{Name: "btoa"},
+		}
 	}
+
 	return nil
 }
 
@@ -63,23 +67,38 @@ type utilityHost struct {
 // installUtilities binds selected native functions before any trusted adapter
 // callback or authored initialization. It exposes no Go objects, I/O, or logger.
 // Helpers are non-enumerable, non-writable, and non-configurable in every profile.
-func installUtilities(ctx context.Context, vm *goja.Runtime, policy UtilityPolicy) (*utilityHost, error) {
+func installUtilities(
+	ctx context.Context,
+	vm *goja.Runtime,
+	policy UtilityPolicy,
+) (*utilityHost, error) {
 	if !policy.Base64 {
 		return nil, nil
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	host := &utilityHost{ctx: ctx, vm: vm, policy: policy}
+
+	host := &utilityHost{
+		ctx:    ctx,
+		vm:     vm,
+		policy: policy,
+	}
 	for name, helper := range map[string]func(goja.FunctionCall) goja.Value{
-		"atob": host.atob, "btoa": host.btoa,
+		"atob": host.atob,
+		"btoa": host.btoa,
 	} {
 		if err := vm.GlobalObject().DefineDataProperty(
-			name, vm.ToValue(helper), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE,
+			name,
+			vm.ToValue(helper),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
 		); err != nil {
 			return nil, ErrInvalidInput
 		}
 	}
+
 	return host, nil
 }
 
