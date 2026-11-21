@@ -57,6 +57,11 @@ func CompileTool(source string, library *apjs.Library, limits Limits) (*ToolProg
 // the checked async execute binding. The caller owns a fresh VM, keeps its
 // deadline active, and gates I/O until initialization and its rejection checks
 // succeed. The returned callable belongs to that VM and must not outlive it.
+// When Utilities is enabled, call Initialize inside apjsruntime.Run with the
+// same limits supplied to CompileTool. Run installs the selected helpers and
+// owns their execution-wide budgets. A bare VM without those helpers returns
+// apjsruntime.ErrInvalidInput.
+// Validate, Evaluate, and EvaluateWithHTTP manage that setup automatically.
 func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
 	if p == nil || p.program == nil {
 		return nil, apjsruntime.ErrInvalidInput

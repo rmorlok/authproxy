@@ -49,9 +49,14 @@ type Limits struct {
 	// conversion. Policy expiry is ErrLimitExceeded; caller cancellation keeps
 	// its context error. Native Goja built-ins cannot be preempted immediately.
 	Timeout time.Duration
+
+	// Utilities opts into pure native helpers with their own aggregate work
+	// allowances. Its zero value preserves the existing standard-global surface.
+	Utilities UtilityPolicy
 }
 
-// Validate rejects omitted or unlimited policy values before VM allocation.
+// Validate rejects missing required bounds or invalid enabled utility policies
+// before VM allocation.
 // Adapters also use it when compiling programs that capture these limits.
 func (l Limits) Validate() error {
 	if l.MaxSourceBytes <= 0 ||
@@ -63,5 +68,5 @@ func (l Limits) Validate() error {
 		l.Timeout <= 0 {
 		return ErrInvalidInput
 	}
-	return nil
+	return l.Utilities.validate()
 }

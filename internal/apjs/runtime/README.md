@@ -119,6 +119,8 @@ the program, then checks that `execute` is still async. It returns a callable
 owned by that VM. Its caller must keep the runtime deadline active and gate I/O
 until initialization and its Promise microtasks have completed successfully.
 Use it inside `Run` or `EvaluateJSON`; retain no callable or value after cleanup.
+When utilities are enabled, use the same limits in that enclosing call so it
+installs the helpers and owns their counters before `Initialize` runs.
 
 `PromiseTracker` counts unhandled rejections without inspecting private reasons.
 Install one before authored initialization and defer `Close`. `CheckRejections`
@@ -466,6 +468,67 @@ host even when there are no connections. Initialization cannot dispatch through
 either path; cleanup cancels both, including late responses. The `labels` fetch
 option remains unsupported for direct requests.
 
+## Optional base64 helpers
+
+`atob` and `btoa` are absent by default. A trusted Go caller can enable them with
+explicit allowances on the limits passed to compilation:
+
+```go
+limits.Utilities = runtime.UtilityPolicy{
+    Base64: true,
+    MaxCalls: 32,
+    MaxInputBytes: 64 << 10,
+    MaxOutputBytes: 64 << 10,
+}
+program, err := runtime.CompileAsync(`
+    const prefix = btoa("item:");
+    async function execute(params, context) {
+        return { encoded: btoa(atob(prefix) + params.id) };
+    }
+`, nil, nil, limits)
+```
+
+With `params.id` equal to `"42"`, this returns `{"encoded":"aXRlbTo0Mg=="}`.
+The helpers are available during initialization, validation, and execution,
+including pure expressions and trusted result extensions. Each VM gets fresh
+counters; initialization and execution share them. Validation uses its own VM.
+Enabled names are reserved by async compilation, and their global properties
+are nonwritable, nonconfigurable, and non-enumerable.
+
+These helpers operate on **binary strings**, where each character represents
+one byte. For example, `btoa("\u00ff")` returns `"/w=="`, and
+`atob("/w==").charCodeAt(0)` returns `255`. They do not encode Unicode as UTF-8;
+`btoa("雪")` fails because that character does not fit in a byte. `atob` uses
+[forgiving base64 decoding](https://infra.spec.whatwg.org/#forgiving-base64-decode):
+it accepts the standard alphabet, optional valid padding, and ASCII tab, LF, FF,
+CR, and space. Unused trailing bits are ignored, so both `"YQ"` and `"YR"`
+decode to `"a"`. URL-safe `-` and `_` are rejected.
+
+Both functions accept only primitive strings. Objects, boxed strings, and other
+values are rejected without invoking coercion or getters. Malformed input raises
+a catchable `TypeError` with fixed text. This differs from browser argument
+coercion and `DOMException` errors; this package does not install a DOM layer.
+
+Both helpers share all three utility allowances:
+
+- `MaxCalls` includes unsuccessful attempts and empty strings.
+- `MaxInputBytes` counts UTF-16 code units before scanning. Each accepted unit
+  represents one ASCII or binary byte; whitespace and malformed strings still
+  consume their full admitted length.
+- `MaxOutputBytes` reserves exact result length before allocation: ASCII bytes
+  for `btoa`, binary-string code units for `atob`. Malformed input produces no
+  output charge. Native buffers and UTF-16 storage use bounded multiples of
+  these allowances; they are not a heap quota.
+
+These allowances are separate from JSON input/output limits and must be positive
+when enabled. Exhaustion interrupts authored execution and returns
+`ErrLimitExceeded` with no result, even inside `try/catch`. No later HTTP call can
+start; requests already sent retain their evidence. Native scans also check the
+execution context. Caller cancellation retains its context error.
+
+This policy grants no I/O. It does not enable URL, text codec, or console hosts,
+and existing caller defaults remain unchanged.
+
 ## Copying JSON into the runtime
 
 Create a `JSONDecoder` before authored code or libraries run. It captures the
@@ -495,7 +558,8 @@ under the same execution deadline.
 
 ## Limits and errors
 
-All limit fields must be positive. `CompileExpression` and `CompileAsync` enforce
+All required limit fields must be positive; optional utility caps apply only
+when selected. `CompileExpression` and `CompileAsync` enforce
 source bytes; adapters that compile other program types enforce their own cap. All
 input adapters submit their complete batch with the effective JSON limits. The
 decoder enforces those byte/depth/node caps. The runtime enforces timeout, stack

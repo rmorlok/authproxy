@@ -160,7 +160,7 @@ if err := tool.Validate(ctx); err != nil {
 `CompileTool` supplies the Tool host policy to the shared compiler, which checks
 syntax, the entry-point declaration, reserved names, and combined source size.
 It never runs authored code. `Validate` runs library
-initialization followed by Tool initialization in a fresh VM with no host
+initialization followed by Tool initialization in a fresh VM with no I/O
 capabilities or connection data. It checks that `execute` is still an async
 function after top-level code runs but does not call it; replacing the declaration
 with a synchronous function fails. Publication has no `cfg`, `params`, or other
@@ -188,12 +188,22 @@ are non-enumerable; existing captured input bindings remain enumerable. Global
 Tool, expression, and connector library parsing, including dynamic
 `eval`/`Function` parsing, do not load source maps.
 
+`atob` and `btoa` also remain absent by default. A trusted Go caller can select
+`limits.Utilities` to enable the shared runtime's
+[bounded base64 helpers](../../apjs/runtime/README.md#optional-base64-helpers).
+The same policy applies during validation, initialization, and execution;
+enabling it grants no HTTP capability. Utility exhaustion stops execution before
+any later request while preserving evidence of requests already sent.
+
 `Initialize(vm)` delegates to the shared async initializer. The invocation
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start
 its own timeout. Most callers should use `Evaluate` or `EvaluateWithHTTP` for the
-complete bounded lifecycle described below. `ToolError`/`toolResult` helpers and
+complete bounded lifecycle described below. When `Utilities` is enabled, call
+`Initialize` inside `apjsruntime.Run` with the same limits passed to `CompileTool`;
+`Run` installs the helpers and owns their counters. `Validate`, `Evaluate`, and
+`EvaluateWithHTTP` handle that setup automatically. `ToolError`/`toolResult` helpers and
 invocation-service integration remain separate work.
 
 ## Evaluate an async Tool
@@ -432,8 +442,9 @@ canceled caller request. If both contexts have expired, the caller's error wins.
 
 ## Limits and lifecycle
 
-Every limit must be positive. The caller resolves operator ceilings before
-compilation; this package supplies no unlimited defaults.
+Every required limit must be positive; optional utility caps apply when enabled.
+The caller resolves operator ceilings before compilation; this package supplies
+no unlimited defaults.
 
 - `MaxSourceBytes` bounds authored UTF-8 source before parsing. For Tools, the
   script and connector helper library share this allowance.

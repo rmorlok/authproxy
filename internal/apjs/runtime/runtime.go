@@ -79,6 +79,9 @@ func EvaluateJSONWithOptions(
 // interrupt watcher. It is also used for initialization validation that returns
 // no data. Work and ordinary VM access stay on the calling goroutine. Only the
 // thread-safe Interrupt method runs elsewhere; no VM or value may escape work.
+// Selected pure utilities are installed before work with fresh aggregate budgets
+// shared by initialization and execution. Utility-budget exhaustion interrupts
+// authored execution; ordinary malformed helper input remains catchable.
 //
 // The callback must honor runCtx during Go work, enforce any source/input bounds,
 // and convert authored errors with EvaluationError. Its safe host classifications
@@ -113,6 +116,7 @@ func Run(
 		case <-stop:
 		}
 	}()
+	var utilities *utilityHost
 	defer func() {
 		// Join before discarding the VM so no late interrupt outlives this work.
 		close(stop)
@@ -127,11 +131,18 @@ func Run(
 				panic(recovered)
 			}
 		}
+		if utilities != nil && utilities.err != nil {
+			err = utilities.err
+		}
 		if contextErr := contextError(ctx, runCtx); contextErr != nil {
 			err = contextErr
 		}
 	}()
 
+	utilities, err = installUtilities(runCtx, vm, limits.Utilities)
+	if err != nil {
+		return err
+	}
 	return work(runCtx, vm)
 }
 
