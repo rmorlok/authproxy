@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
@@ -177,4 +179,113 @@ func TestBase64Cancellation(t *testing.T) {
 	got, err = evaluateSource(context.Background(), limits, source)
 	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 	require.Nil(t, got)
+}
+
+// base64PrimitiveString avoids an embedded field named String shadowing the
+// String method required by goja.Value.
+type base64PrimitiveString = goja.String
+
+// base64CancelString cancels a real context partway through a native scan.
+// Embedding a primitive string retains its normal behavior while CharAt makes
+// the cancellation point deterministic without timers or another goroutine.
+type base64CancelString struct {
+	base64PrimitiveString
+	cancel      context.CancelFunc // Cancels the caller and its runtime context.
+	cancelAfter int                // Code-unit reads before cancellation begins.
+	reads       int                // Reads completed on the VM owner goroutine.
+}
+
+// CharAt cancels at the selected read and then preserves the underlying unit.
+func (s *base64CancelString) CharAt(index int) uint16 {
+	s.reads++
+	if s.reads == s.cancelAfter {
+		s.cancel()
+	}
+	return s.base64PrimitiveString.CharAt(index)
+}
+
+// TestBase64CancellationDuringNativeWork stops inside either native pass on a
+// large input, without depending on a polling interval or wall-clock timing.
+func TestBase64CancellationDuringNativeWork(t *testing.T) {
+	text := strings.Repeat("A", 64<<10)
+	for _, helper := range []string{"atob", "btoa"} {
+		for _, phase := range []struct {
+			name          string
+			cancelAfter   int
+			fullPassReads int
+		}{
+			{"validation", 128, len(text)},
+			{"conversion", len(text) + 128, 2 * len(text)},
+		} {
+			t.Run(helper+"/"+phase.name, func(t *testing.T) {
+				// Both helpers accept this input and have enough budget for a full result.
+				limits := base64TestLimits()
+				limits.Timeout = 10 * time.Second
+				limits.MaxInputBytes = len(text)
+				limits.Utilities.MaxInputBytes = len(text)
+				limits.Utilities.MaxOutputBytes = 2 * len(text)
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				reads := 0
+				got, err := jsruntime.EvaluateJSON(ctx, limits, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
+					// Keep the wrapped primitive and helper entirely inside their owning VM.
+					input := &base64CancelString{
+						base64PrimitiveString: vm.ToValue(text).(goja.String), cancel: cancel, cancelAfter: phase.cancelAfter,
+					}
+					defer func() { reads = input.reads }()
+					call, ok := goja.AssertFunction(vm.Get(helper))
+					require.True(t, ok)
+					value, err := call(goja.Undefined(), input)
+					return value, jsruntime.EvaluationError(err)
+				})
+
+				// Cancellation occurs during work and prevents the active pass from finishing.
+				require.ErrorIs(t, err, context.Canceled)
+				require.Nil(t, got)
+				require.GreaterOrEqual(t, reads, phase.cancelAfter)
+				require.Less(t, reads, phase.fullPassReads)
+			})
+		}
+	}
+}
+
+// BenchmarkBase64LargeInput measures complete evaluations of one-mebibyte
+// helper inputs, returning only their lengths so output JSON stays small.
+func BenchmarkBase64LargeInput(b *testing.B) {
+	for _, test := range []struct {
+		helper string
+		input  string
+		length int
+	}{
+		{"btoa", strings.Repeat("a", 1<<20), base64.StdEncoding.EncodedLen(1 << 20)},
+		{"atob", strings.Repeat("YWFh", 1<<18), 3 << 18},
+	} {
+		b.Run(test.helper, func(b *testing.B) {
+			// Compile once; every evaluation still gets its own VM and finite allowances.
+			limits := base64TestLimits()
+			limits.Timeout = 10 * time.Second
+			limits.MaxInputBytes = len(test.input)
+			limits.Utilities.MaxCalls = 1
+			limits.Utilities.MaxInputBytes = len(test.input)
+			limits.Utilities.MaxOutputBytes = 2 * len(test.input)
+			program, err := jsruntime.CompileExpression(test.helper+"(data).length", limits)
+			require.NoError(b, err)
+			want := fmt.Sprint(test.length)
+			b.ReportAllocs()
+			b.SetBytes(int64(len(test.input)))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// The trusted preparation callback supplies the known, bounded native fixture.
+				got, err := program.Evaluate(context.Background(), func(_ context.Context, vm *goja.Runtime) error {
+					return vm.Set("data", test.input)
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+				if string(got) != want {
+					b.Fatalf("unexpected result length: %s", got)
+				}
+			}
+		})
+	}
 }

@@ -6,6 +6,10 @@ import "github.com/dop251/goja"
 // helpers. URL-safe characters are deliberately not accepted by atob.
 const base64Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
+// base64PollMask checks cancellation every 4096 input units or output bytes,
+// avoiding context polling on every unit. Each loop also checks its final chunk.
+const base64PollMask = 4096 - 1
+
 // atob performs WHATWG forgiving-base64 decoding on one primitive string and
 // returns a binary string whose UTF-16 units preserve decoded byte values.
 // Input is charged before validation; exact output is reserved before allocation.
@@ -15,7 +19,9 @@ func (h *utilityHost) atob(call goja.FunctionCall) goja.Value {
 	length := input.Length()
 	dataUnits, padding := 0, 0
 	for i := 0; i < length; i++ {
-		h.checkContext()
+		if i&base64PollMask == 0 {
+			h.checkContext()
+		}
 		unit := input.CharAt(i)
 		if base64Whitespace(unit) {
 			continue
@@ -32,6 +38,7 @@ func (h *utilityHost) atob(call goja.FunctionCall) goja.Value {
 		}
 		dataUnits++
 	}
+	h.checkContext()
 
 	// Padding is optional, but when present it must complete a four-unit
 	// group. One remaining data unit cannot supply a complete decoded byte.
@@ -54,7 +61,9 @@ func (h *utilityHost) atob(call goja.FunctionCall) goja.Value {
 	var bits uint
 	position := 0
 	for i := 0; i < length; i++ {
-		h.checkContext()
+		if i&base64PollMask == 0 {
+			h.checkContext()
+		}
 		unit := input.CharAt(i)
 		if base64Whitespace(unit) {
 			continue
@@ -71,6 +80,7 @@ func (h *utilityHost) atob(call goja.FunctionCall) goja.Value {
 			position++
 		}
 	}
+	h.checkContext()
 	// Forgiving decoding discards the final two or four bits; unlike strict
 	// canonical decoding it accepts both "YQ" and "YR" as the byte for "a".
 	result := goja.StringFromUTF16(output)
@@ -85,11 +95,14 @@ func (h *utilityHost) btoa(call goja.FunctionCall) goja.Value {
 	input := h.begin(call)
 	length := input.Length()
 	for i := 0; i < length; i++ {
-		h.checkContext()
+		if i&base64PollMask == 0 {
+			h.checkContext()
+		}
 		if input.CharAt(i) > 0xff {
 			h.invalidInput()
 		}
 	}
+	h.checkContext()
 
 	groups := length / 3
 	if length%3 != 0 {
@@ -103,7 +116,11 @@ func (h *utilityHost) btoa(call goja.FunctionCall) goja.Value {
 	output := make([]byte, outputLength)
 
 	for source, target := 0, 0; source < length; target += 4 {
-		h.checkContext()
+		// Output advances by four bytes, so it reaches each polling boundary;
+		// the three-unit input stride would skip most of those boundaries.
+		if target&base64PollMask == 0 {
+			h.checkContext()
+		}
 		count := min(3, length-source)
 		first := input.CharAt(source)
 		var second, third uint16
@@ -124,6 +141,7 @@ func (h *utilityHost) btoa(call goja.FunctionCall) goja.Value {
 		}
 		source += count
 	}
+	h.checkContext()
 
 	result := h.vm.ToValue(string(output))
 	h.checkContext()

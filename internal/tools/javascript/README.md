@@ -200,7 +200,10 @@ caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start
 its own timeout. Most callers should use `Evaluate` or `EvaluateWithHTTP` for the
-complete bounded lifecycle described below. `ToolError`/`toolResult` helpers and
+complete bounded lifecycle described below. When `Utilities` is enabled, call
+`Initialize` inside `apjsruntime.Run` with the same limits passed to `CompileTool`;
+`Run` installs the helpers and owns their counters. `Validate`, `Evaluate`, and
+`EvaluateWithHTTP` handle that setup automatically. `ToolError`/`toolResult` helpers and
 invocation-service integration remain separate work.
 
 ## Evaluate an async Tool
