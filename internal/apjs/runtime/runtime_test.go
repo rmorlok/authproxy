@@ -17,7 +17,9 @@ import (
 // runtimeLimits supplies explicit policy while leaving room for ordinary examples.
 func runtimeLimits() jsruntime.Limits {
 	return jsruntime.Limits{
-		MaxSourceBytes: 64 << 10, MaxInputBytes: 64 << 10, MaxOutputBytes: 64 << 10,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     64 << 10, MaxInputBytes: 64 << 10, MaxOutputBytes: 64 << 10,
 		MaxDepth: 32, MaxNodes: 4096, MaxStackDepth: 128, Timeout: 2 * time.Second,
 	}
 }
@@ -295,6 +297,24 @@ func TestRuntimeCancellationDiscardsSuccessfulWork(t *testing.T) {
 	})
 	require.ErrorIs(t, err, context.Canceled)
 	require.NotErrorIs(t, err, jsruntime.ErrLimitExceeded)
+}
+
+// TestRuntimePolicyExpiryBeforeBudgetAdmission preserves the runtime's safe
+// limit category even when its deadline expires before the watcher is installed.
+func TestRuntimePolicyExpiryBeforeBudgetAdmission(t *testing.T) {
+	limits := runtimeLimits()
+	limits.Timeout = time.Nanosecond
+
+	// The runtime's own deadline remains a limit failure during early setup.
+	err := jsruntime.Run(context.Background(), limits, func(context.Context, *goja.Runtime) error { return nil })
+	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
+
+	// An already canceled caller still takes precedence over the expired policy.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = jsruntime.Run(ctx, limits, func(context.Context, *goja.Runtime) error { return nil })
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 // TestRuntimeInterruptsBusyJavaScript distinguishes host policy expiry from caller cancellation.

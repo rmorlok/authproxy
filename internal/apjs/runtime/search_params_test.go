@@ -9,14 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// searchParamsLimits selects query-string helpers with room for ordinary fixtures.
-func searchParamsLimits() jsruntime.Limits {
-	limits := runtimeLimits()
-	limits.Utilities = jsruntime.UtilityPolicy{
-		URLSearchParams: true, MaxCalls: 256, MaxInputBytes: 65536, MaxOutputBytes: 65536,
-	}
-	return limits
-}
+// searchParamsLimits provides room for ordinary fixtures.
+func searchParamsLimits() jsruntime.Limits { return runtimeLimits() }
 
 // TestSearchParamsFormParsing preserves tuple order and applies form encoding
 // rather than interpreting the input as a URL or a general URI component.

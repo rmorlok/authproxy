@@ -2,6 +2,7 @@ package runtime_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"testing"
@@ -11,54 +12,60 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// utilityLimits enables both base64 helpers with one invocation-wide allowance.
-func utilityLimits() jsruntime.Limits {
-	limits := runtimeLimits()
-	limits.Utilities = jsruntime.UtilityPolicy{
-		Base64: true, MaxCalls: 16, MaxInputBytes: 256, MaxOutputBytes: 256,
+// utilityLimits gives all pure helpers a generous shared execution allowance.
+func utilityLimits() jsruntime.Limits { return runtimeLimits() }
+
+// runUtilitySource isolates native utility accounting from JSON result conversion.
+// Its authored fixtures return ordinary data; test-only export happens on the VM
+// owner and returns detached JSON, never a live runtime value.
+func runUtilitySource(ctx context.Context, limits jsruntime.Limits, source string) ([]byte, error) {
+	var result []byte
+	err := jsruntime.Run(ctx, limits, func(_ context.Context, vm *goja.Runtime) error {
+		value, err := vm.RunString(source)
+		if err != nil {
+			return jsruntime.EvaluationError(err)
+		}
+		result, err = json.Marshal(value.Export())
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
-	return limits
+	return result, nil
 }
 
-// TestUtilityInvalidPolicy rejects enabled helpers without positive bounded allowances.
-func TestUtilityInvalidPolicy(t *testing.T) {
-	for name, change := range map[string]func(*jsruntime.UtilityPolicy){
-		"missing calls":  func(p *jsruntime.UtilityPolicy) { p.MaxCalls = 0 },
-		"negative calls": func(p *jsruntime.UtilityPolicy) { p.MaxCalls = -1 },
-		"missing input":  func(p *jsruntime.UtilityPolicy) { p.MaxInputBytes = 0 },
-		"negative input": func(p *jsruntime.UtilityPolicy) { p.MaxInputBytes = -1 },
-		"missing output": func(p *jsruntime.UtilityPolicy) { p.MaxOutputBytes = 0 },
-		"negative output": func(p *jsruntime.UtilityPolicy) {
-			p.MaxOutputBytes = -1
-		},
+// TestUtilityInvalidLimits rejects missing cumulative execution allowances.
+func TestUtilityInvalidLimits(t *testing.T) {
+	for name, change := range map[string]func(*jsruntime.Limits){
+		"missing work":        func(p *jsruntime.Limits) { p.MaxWorkUnits = 0 },
+		"negative work":       func(p *jsruntime.Limits) { p.MaxWorkUnits = -1 },
+		"missing allocation":  func(p *jsruntime.Limits) { p.MaxAllocationUnits = 0 },
+		"negative allocation": func(p *jsruntime.Limits) { p.MaxAllocationUnits = -1 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			limits := utilityLimits()
-			change(&limits.Utilities)
-			// Compilation and low-level execution both reject invalid policy before work.
+			change(&limits)
+			// Invalid execution policy fails before installing or evaluating helpers.
 			_, err := jsruntime.CompileExpression(`btoa("a")`, limits)
 			require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
 			called := false
-			err = jsruntime.Run(context.Background(), limits, func(context.Context, *goja.Runtime) error {
-				called = true
-				return nil
-			})
+			err = jsruntime.Run(context.Background(), limits, func(context.Context, *goja.Runtime) error { called = true; return nil })
 			require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
 			require.False(t, called)
 		})
 	}
 }
 
-// TestUtilityAvailability keeps pure helpers optional across expression and async profiles.
+// TestUtilityAvailability installs pure helpers in every managed expression and async profile.
 func TestUtilityAvailability(t *testing.T) {
-	// Existing callers retain fresh VMs without the optional base64 globals.
-	expression, err := jsruntime.CompileExpression(`[typeof atob, typeof btoa]`, runtimeLimits())
+	// Ordinary execution profiles install the complete pure-helper surface.
+	expression, err := jsruntime.CompileExpression(`[typeof atob, typeof btoa, typeof TextEncoder, typeof TextDecoder, typeof URLSearchParams]`, runtimeLimits())
 	require.NoError(t, err)
 	result, err := expression.Evaluate(context.Background(), nil)
 	require.NoError(t, err)
-	require.JSONEq(t, `["undefined", "undefined"]`, string(result))
+	require.JSONEq(t, `["function", "function", "function", "function", "function"]`, string(result))
 
-	// Enabled helpers are available during validation initialization and execution.
+	// Helpers are available during validation, initialization, and execution.
 	limits := utilityLimits()
 	program, err := jsruntime.CompileAsync(`
 		const initialized = btoa("hi");
@@ -70,7 +77,7 @@ func TestUtilityAvailability(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `"hi"`, string(result))
 
-	// Pure expressions select the same helpers without an async or Tool adapter.
+	// Pure expressions receive the same helpers without an async or Tool adapter.
 	expression, err = jsruntime.CompileExpression(`atob(btoa("hello"))`, limits)
 	require.NoError(t, err)
 	result, err = expression.Evaluate(context.Background(), nil)
@@ -84,7 +91,7 @@ func TestUtilityExtendedAsync(t *testing.T) {
 	extension := brandedResultExtension()
 	install := extension.Install
 	extension.Install = func(ctx context.Context, vm *goja.Runtime) (jsruntime.ResultInterpreter[extensionOutcome], error) {
-		// Trusted extension setup sees the same selected utility hosts as execute.
+		// Trusted extension setup sees the same pure utility hosts as execute.
 		value, err := vm.RunString(`atob(btoa("ready"))`)
 		if err != nil {
 			return jsruntime.ResultInterpreter[extensionOutcome]{}, jsruntime.EvaluationError(err)
@@ -105,7 +112,7 @@ func TestUtilityExtendedAsync(t *testing.T) {
 	require.JSONEq(t, `"ok"`, string(result.Fields[0]))
 }
 
-// TestUtilityReservedBindings protects enabled names without restricting disabled generic programs.
+// TestUtilityReservedBindings protects all installed names in every execution profile.
 func TestUtilityReservedBindings(t *testing.T) {
 	for name, test := range map[string]struct{ source, library string }{
 		"source lexical": {`const atob = 1; async function execute() {}`, ""},
@@ -113,15 +120,10 @@ func TestUtilityReservedBindings(t *testing.T) {
 		"library":        {`async function execute() {}`, `function atob() {}`},
 	} {
 		t.Run(name, func(t *testing.T) {
-			// Authored global declarations cannot replace enabled utility hosts.
+			// Authored global declarations cannot replace the standard utility hosts.
 			library := asyncLibrary(t, test.library)
 			_, err := jsruntime.CompileAsync(test.source, library, nil, utilityLimits())
 			require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
-
-			// Disabled utilities leave generic programs free to define their own helpers.
-			program, err := jsruntime.CompileAsync(test.source, library, nil, runtimeLimits())
-			require.NoError(t, err)
-			require.NoError(t, program.Validate(context.Background()))
 		})
 	}
 
@@ -152,37 +154,23 @@ func TestUtilityReservedBindings(t *testing.T) {
 	require.JSONEq(t, `[2,[false,false,false],[false,false,false],"ok"]`, string(result))
 }
 
-// TestUtilityAggregateLimits makes caught failures unable to restore a utility allowance.
+// TestUtilityAggregateLimits makes caught failures unable to replenish shared
+// execution work or allocation allowances, including malformed native attempts.
 func TestUtilityAggregateLimits(t *testing.T) {
 	for name, test := range map[string]struct {
-		policy jsruntime.UtilityPolicy
-		body   string
+		work, allocation int
+		body             string
 	}{
-		"calls include malformed attempts": {
-			jsruntime.UtilityPolicy{Base64: true, MaxCalls: 1, MaxInputBytes: 256, MaxOutputBytes: 256},
-			`try { atob("%"); } catch (_) {} try { btoa("a"); } catch (_) {}`,
-		},
-		"aggregate input": {
-			jsruntime.UtilityPolicy{Base64: true, MaxCalls: 16, MaxInputBytes: 2, MaxOutputBytes: 256},
-			`btoa("a"); try { btoa("bb"); } catch (_) {}`,
-		},
-		"malformed input still consumes allowance": {
-			jsruntime.UtilityPolicy{Base64: true, MaxCalls: 16, MaxInputBytes: 2, MaxOutputBytes: 256},
-			`try { atob("%%"); } catch (_) {} try { btoa("a"); } catch (_) {}`,
-		},
-		"aggregate output": {
-			jsruntime.UtilityPolicy{Base64: true, MaxCalls: 16, MaxInputBytes: 256, MaxOutputBytes: 7},
-			`btoa("a"); try { btoa("b"); } catch (_) {}`,
-		},
+		"entry work includes malformed attempts": {1, 256, `try {atob(null);} catch (_) {} try {btoa("");} catch (_) {}`},
+		"aggregate scanning":                     {4, 256, `btoa("a"); try {btoa("bb");} catch (_) {}`},
+		"malformed input keeps its work":         {4, 256, `try {atob("%%");} catch (_) {} try {btoa("a");} catch (_) {}`},
+		"aggregate allocation":                   {256, 7, `btoa("a"); try {btoa("b");} catch (_) {}`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			limits := utilityLimits()
-			limits.Utilities = test.policy
-			expression, err := jsruntime.CompileExpression(`(() => {`+test.body+`; return "hidden failure"; })()`, limits)
-			require.NoError(t, err)
-
-			// Catching the helper's exception cannot publish a successful result.
-			result, err := expression.Evaluate(context.Background(), nil)
+			limits.MaxWorkUnits, limits.MaxAllocationUnits = test.work, test.allocation
+			// Catching a helper failure cannot make the enclosing execution successful.
+			result, err := runUtilitySource(context.Background(), limits, `(() => {`+test.body+`; return "hidden failure";})()`)
 			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 			require.Nil(t, result)
 		})
@@ -192,7 +180,7 @@ func TestUtilityAggregateLimits(t *testing.T) {
 // TestUtilityBudgetSpansInitialization shares one allowance through initialization and execute.
 func TestUtilityBudgetSpansInitialization(t *testing.T) {
 	limits := utilityLimits()
-	limits.Utilities.MaxCalls = 1
+	limits.MaxWorkUnits = 3
 	for name, source := range map[string]string{
 		"initialization": `const initialized = btoa("hi");
 			try { atob(initialized); } catch (_) {} async function execute() { return true; }`,
@@ -212,7 +200,8 @@ func TestUtilityBudgetSpansInitialization(t *testing.T) {
 			started := false
 			result, err := program.Evaluate(context.Background(), func(ctx context.Context, vm *goja.Runtime, invocation *jsruntime.AsyncInvocation) error {
 				invocation.Start = func() { started = true }
-				return asyncInput(limits)(ctx, vm, invocation)
+				invocation.Params, invocation.Context = goja.Undefined(), goja.Undefined()
+				return nil
 			})
 			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 			require.Nil(t, result)
@@ -222,18 +211,18 @@ func TestUtilityBudgetSpansInitialization(t *testing.T) {
 	}
 }
 
-// TestUtilityPolicyCaptureAndIsolation gives validation and every concurrent VM their own counters.
-func TestUtilityPolicyCaptureAndIsolation(t *testing.T) {
+// TestUtilityLimitsCaptureAndIsolation gives validation and every concurrent VM their own counters.
+func TestUtilityLimitsCaptureAndIsolation(t *testing.T) {
 	limits := utilityLimits()
-	limits.Utilities = jsruntime.UtilityPolicy{Base64: true, MaxCalls: 2, MaxInputBytes: 6, MaxOutputBytes: 6}
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 256, 256
 	program, err := jsruntime.CompileAsync(`
 		const initialized = btoa("hi");
 		async function execute() { return atob(initialized); }
 	`, nil, nil, limits)
 	require.NoError(t, err)
 
-	// Mutating caller-owned policy cannot remove helpers from the compiled program.
-	limits.Utilities = jsruntime.UtilityPolicy{}
+	// Mutating caller-owned limits cannot replace the compiled execution allowance.
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 1, 1
 	require.NoError(t, program.Validate(context.Background()))
 	errors := make(chan error, 8)
 	var workers sync.WaitGroup
@@ -261,7 +250,7 @@ func TestUtilityLowLevelInitialize(t *testing.T) {
 	program, err := jsruntime.CompileAsync(`const initialized = btoa("hi"); async function execute() {}`, nil, nil, limits)
 	require.NoError(t, err)
 
-	// Bare VMs cannot silently initialize with a missing utility policy or hosts.
+	// Bare VMs cannot silently initialize without the managed utility hosts.
 	_, err = program.Initialize(goja.New())
 	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
 
@@ -279,7 +268,7 @@ func TestUtilityLowLevelInitialize(t *testing.T) {
 // TestUtilityCancellationPreservesCallerError applies cancellation after caught budget exhaustion.
 func TestUtilityCancellationPreservesCallerError(t *testing.T) {
 	limits := utilityLimits()
-	limits.Utilities.MaxCalls = 1
+	limits.MaxWorkUnits = 2
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

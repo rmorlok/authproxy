@@ -24,7 +24,9 @@ import (
 func transformResponseLimits() httpcodec.ResponseLimits {
 	limits := responseLimits()
 	limits.Transform = javascript.Limits{
-		MaxSourceBytes: 4096, MaxInputBytes: 32768, MaxOutputBytes: 16384,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     4096, MaxInputBytes: 32768, MaxOutputBytes: 16384,
 		MaxDepth: 32, MaxNodes: 10000, MaxStackDepth: 128, Timeout: 2 * time.Second,
 	}
 	return limits

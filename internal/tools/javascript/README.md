@@ -36,6 +36,8 @@ limits := javascript.Limits{
     MaxSourceBytes: 4096,
     MaxInputBytes:  64 * 1024,
     MaxOutputBytes: 16 * 1024,
+    MaxWorkUnits: 64 << 20,
+    MaxAllocationUnits: 64 << 20,
     MaxDepth:      32,
     MaxNodes:      4096,
     MaxStackDepth: 128,
@@ -188,25 +190,23 @@ are non-enumerable; existing captured input bindings remain enumerable. Global
 Tool, expression, and connector library parsing, including dynamic
 `eval`/`Function` parsing, do not load source maps.
 
-`atob`, `btoa`, `TextEncoder`, `TextDecoder`, and `URLSearchParams` also remain absent by default.
-A trusted Go caller can select `limits.Utilities.Base64`,
-`limits.Utilities.TextCodecs`, or `limits.Utilities.URLSearchParams` with explicit
-allowances to enable the shared runtime's
-[base64 helpers](../../apjs/runtime/README.md#optional-base64-helpers),
-[UTF-8 codecs](../../apjs/runtime/README.md#optional-text-codecs), or
-[query helpers](../../apjs/runtime/README.md#optional-query-strings).
-The same policy applies during validation, initialization, and execution;
-enabling it grants no HTTP capability. Utility exhaustion stops execution before
-any later request while preserving evidence of requests already sent.
+Every bounded Tool VM includes the shared runtime's
+[base64 helpers](../../apjs/runtime/README.md#base64-helpers),
+[UTF-8 codecs](../../apjs/runtime/README.md#text-codecs), and
+[query helpers](../../apjs/runtime/README.md#query-strings). Their names are
+reserved during validation, initialization, and execution. They grant no HTTP
+capability. All managed utility, input/result conversion, and HTTP work consumes
+the execution's shared `MaxWorkUnits` and `MaxAllocationUnits`. Exhaustion stops
+execution before any later request while preserving earlier send evidence.
 
 `Initialize(vm)` delegates to the shared async initializer. The invocation
 caller installs capabilities and copied input, owns a fresh VM on one goroutine,
 and keeps a deadline active through initialization and execution. The returned
 callable belongs to that VM. Initialization sets the stack cap but does not start
 its own timeout. Most callers should use `Evaluate` or `EvaluateWithHTTP` for the
-complete bounded lifecycle described below. When `Utilities` is enabled, call
-`Initialize` inside `apjsruntime.Run` with the same limits passed to `CompileTool`;
-`Run` installs the helpers and owns their counters. `Validate`, `Evaluate`, and
+complete bounded lifecycle described below. Call `Initialize` inside
+`apjsruntime.Run` with the same limits passed to `CompileTool`; `Run` installs
+the pure utilities and owns the execution budget. `Validate`, `Evaluate`, and
 `EvaluateWithHTTP` handle that setup automatically. `ToolError`/`toolResult` helpers and
 invocation-service integration remain separate work.
 
@@ -361,7 +361,7 @@ The supported Fetch subset is explicit:
 | `connection.fetch(url, init)` | Absolute HTTP(S) URL string; optional own `method`, `headers`, and `body` fields. Unsupported fields are rejected. |
 | Request method | `DELETE`, `GET`, `HEAD`, `OPTIONS`, `POST`, and `PUT` are normalized to uppercase. `CONNECT`, `TRACE`, and `TRACK` are rejected regardless of case. Other methods retain their spelling. |
 | Request headers | Own enumerable string values. `Host` overrides the request host; framing and hop-by-hop headers remain transport-owned. |
-| Request body | String, `ArrayBuffer`, or genuine `URLSearchParams` when enabled, copied before dispatch. Form instances serialize automatically and default to `application/x-www-form-urlencoded;charset=UTF-8` unless a content type was supplied. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
+| Request body | String, `ArrayBuffer`, or genuine `URLSearchParams`, copied before dispatch. Form instances serialize automatically and default to `application/x-www-form-urlencoded;charset=UTF-8` unless a content type was supplied. Serialize JSON with `JSON.stringify` and set its content type explicitly. Typed arrays are not accepted directly. |
 | Response metadata | Read-only `status`, `ok`, `bodyUsed`, and `headers.get(name)`. Header lookup is case-insensitive and returns null for a missing or filtered header. |
 | Response body | Single-use async `text()`, `json()`, or `arrayBuffer()`. A second admitted read rejects. If worker admission is refused, `bodyUsed` stays false and the read can be retried after other work finishes. |
 
@@ -446,7 +446,7 @@ canceled caller request. If both contexts have expired, the caller's error wins.
 
 ## Limits and lifecycle
 
-Every required limit must be positive; optional utility caps apply when enabled.
+Every limit must be positive, including the cumulative work and allocation caps.
 The caller resolves operator ceilings before compilation; this package supplies
 no unlimited defaults.
 
@@ -454,6 +454,11 @@ no unlimited defaults.
   script and connector helper library share this allowance.
 - `MaxInputBytes` bounds the serialized snapshot and response together.
 - `MaxOutputBytes` bounds emitted JSON, including punctuation and escaping.
+- `MaxWorkUnits` bounds cumulative managed work across preparation, initialization,
+  utility calls, HTTP conversion, and result encoding. Entries, admitted data
+  units, and visited values/properties consume this allowance.
+- `MaxAllocationUnits` bounds cumulative managed buffers, strings, and native
+  metadata slots across those same operations. It is not a live heap-byte cap.
 - `MaxDepth` bounds nested JSON values, with the root at depth zero.
 - `MaxNodes` bounds JSON values and object property inspections. Combined input
   and output each receive this allowance; it is not a JavaScript instruction count.
@@ -463,7 +468,12 @@ no unlimited defaults.
   `Validate`. An earlier caller deadline wins.
 
 The JSON input/output limits apply to expression and Tool evaluation; Tool
-validation receives no input and returns no result data.
+validation receives no input and returns no result data. Validation is a separate
+execution. Within an execution, calling a helper or decoding another response
+never resets cumulative work or allocation counters. An enclosing execution
+budget also constrains nested evaluations. See the shared runtime's
+[accounting contract](../../apjs/runtime/README.md#pure-utilities-and-the-execution-budget)
+for units and adapter responsibilities.
 
 A watcher interrupts busy JavaScript loops on cancellation and is joined before
 evaluation or validation returns. It uses only Goja's thread-safe interrupt

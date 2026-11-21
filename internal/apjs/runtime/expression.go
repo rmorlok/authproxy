@@ -62,12 +62,12 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 
 // Evaluate binds optional input, executes the expression, and converts its
 // result to detached JSON under one deadline. A nil prepare callback installs no
-// adapter bindings; selected pure utilities remain available. Unsupported output,
+// adapter bindings; pure utilities remain available. Unsupported output,
 // including Promises, fails with ErrInvalidOutput; cancellation or failure returns
 // no partial JSON.
 //
 // prepare is trusted adapter code, called before the expression. It may bind
-// copied native JSON and selected pure helpers, but must not install I/O or live
+// copied native JSON and use the installed pure helpers, but must not install I/O or live
 // connection capabilities. It must honor runCtx, enforce the captured input
 // limits (for example with JSONDecoder), and return only safe errors. VM access
 // stays on the calling goroutine and neither the VM nor its values may escape.

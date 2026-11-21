@@ -16,7 +16,9 @@ import (
 // dimension without accidentally testing a different limit first.
 func outputTestLimits() Limits {
 	return Limits{
-		MaxSourceBytes: 64 << 10, MaxInputBytes: 64 << 10, MaxOutputBytes: 64 << 10,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     64 << 10, MaxInputBytes: 64 << 10, MaxOutputBytes: 64 << 10,
 		MaxDepth: 32, MaxNodes: 4096, MaxStackDepth: 128, Timeout: time.Second,
 	}
 }

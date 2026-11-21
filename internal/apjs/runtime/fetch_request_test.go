@@ -24,6 +24,46 @@ func fetchRequestCall(t *testing.T, vm *goja.Runtime, source string) goja.Functi
 	return call
 }
 
+// TestPrepareFetchRequestMetadataUsesExecutionBudget charges all reflected
+// metadata even when the request will be rejected before reading its values.
+func TestPrepareFetchRequestMetadataUsesExecutionBudget(t *testing.T) {
+	for _, scenario := range []struct {
+		name, init string
+	}{
+		{"init symbols", `record`},
+		{"header symbols", `{headers: record}`},
+		{"label symbols", `{labels: record}`},
+		{"unknown option name", `{["x".repeat(256)]: "unused"}`},
+		{"names after invalid header", `{"headers": {"bad header": "", ["x".repeat(256)]: "unused"}}`},
+		{"names after invalid label", `{"labels": {first: 1, ["x".repeat(256)]: "unused"}}`},
+	} {
+		for _, dimension := range []string{"work", "allocation"} {
+			t.Run(scenario.name+"/"+dimension, func(t *testing.T) {
+				// Build authored metadata before the native conversion under test.
+				vm := goja.New()
+				_, err := vm.RunString(`const record = {}; for (let i = 0; i < 64; i++) record[Symbol()] = "";`)
+				require.NoError(t, err)
+				call := fetchRequestCall(t, vm, `"https://example.test", `+scenario.init)
+				limits := Limits{MaxWorkUnits: 4096, MaxAllocationUnits: 4096}
+				if dimension == "work" {
+					limits.MaxWorkUnits = 100
+				} else {
+					limits.MaxAllocationUnits = 64
+				}
+				ctx, err := WithExecutionBudget(context.Background(), limits)
+				require.NoError(t, err)
+
+				// The reflected metadata exhausts the shared allowance before
+				// ordinary validation can return a catchable malformed-input error.
+				request, labels, err := prepareFetchRequest(ctx, vm, call, 4096, true, nil)
+				require.ErrorIs(t, err, ErrLimitExceeded)
+				require.Nil(t, request)
+				require.Nil(t, labels)
+			})
+		}
+	}
+}
+
 // TestPrepareFetchRequestConstruction preserves authored HTTP data and replay semantics.
 func TestPrepareFetchRequestConstruction(t *testing.T) {
 	vm := goja.New()
@@ -243,9 +283,9 @@ func TestPrepareFetchRequestCancellationAndGetters(t *testing.T) {
 func fetchRequestFormRuntime(t *testing.T) (*goja.Runtime, goja.Callable) {
 	t.Helper()
 	vm := goja.New()
-	_, err := installUtilities(context.Background(), vm, UtilityPolicy{
-		URLSearchParams: true, MaxCalls: 64, MaxInputBytes: 4096, MaxOutputBytes: 4096,
-	})
+	ctx, err := WithExecutionBudget(context.Background(), Limits{MaxWorkUnits: 65536, MaxAllocationUnits: 65536})
+	require.NoError(t, err)
+	_, err = installUtilities(ctx, vm)
 	require.NoError(t, err)
 	prototype := vm.Get("URLSearchParams").ToObject(vm).Get("prototype").ToObject(vm)
 	encode, ok := goja.AssertFunction(prototype.Get("toString"))

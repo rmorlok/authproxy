@@ -17,6 +17,9 @@ This design records the November 6, 2026 architecture amendment to
 responsibilities and execution contracts for contributors. The JavaScript
 shapes and ownership rules below are the target contract; Go type and method
 names can be refined during implementation without changing those rules.
+The November 21, 2026 amendment makes shipped pure utilities part of every
+bounded VM and places cumulative managed work/allocation accounting under one
+execution-owned budget.
 
 The implementation starts with code already present in `internal/apjs`,
 `internal/tools/javascript`, and `internal/tools/httphost` at main commit
@@ -177,7 +180,7 @@ explicitly selects the libraries and aliases appropriate to its execution.
 ### Pure expressions
 
 A pure expression uses the same fresh VM, input/output conversion, and runtime
-limits. It receives only copied JSON data and explicitly selected pure helpers.
+limits. It receives copied JSON data and all shipped pure utilities.
 It has no connection methods, direct fetch, async HTTP workers, or implicit Tool
 result helpers. A Promise is not a JSON expression result. Domain adapters can
 preserve existing expression bindings such as `response`, `cfg`, and `params`.
@@ -199,17 +202,26 @@ No initialization path, including async work, can send a request.
 
 ### Reusable utility hosts
 
-The planned `URL`, `URLSearchParams`, `TextEncoder`, `TextDecoder`, and text/base64
-helpers (`atob`/`btoa`) belong to the shared runtime rather than the Tool adapter.
-They perform no I/O and must bound host-side input/output allocations. They can
-be implemented in separate slices; reserving a name does not make that utility
-available. Their supported behavior must be documented when implemented.
+Every bounded VM receives the implemented pure utilities: `URLSearchParams`,
+`TextEncoder`, `TextDecoder`, `atob`, and `btoa`. Their names are reserved and
+protected before authored initialization. Pure expressions, connector helpers,
+validation, and async execution use the same utility surface. There are no
+per-utility enable flags. `URL` remains a planned helper; reserving a future name
+does not make its implementation available. Each helper documents its supported
+semantics rather than promising complete browser or Node compatibility.
 
-A structured diagnostic logger is also a generic host supplied by trusted Go
-code, using the existing logging/telemetry configuration. Bound authored log
-records and preserve fixed execution attribution. Do not automatically log
-arguments, configuration, credentials, HTTP bodies, or result payloads. Pure
-expression profiles receive only selected pure helpers, not the logger.
+Pure utilities perform no I/O. Their work and temporary/retained allocations
+consume the execution's shared budget together with input conversion, output
+conversion, and managed HTTP operations. They receive neither an independent
+allowance nor a new allowance for each call. The caller defines one execution
+policy; lower layers inherit its remaining budget.
+
+A structured diagnostic logger is a separate generic capability supplied by
+trusted Go code, using the existing logging/telemetry configuration. Bound
+authored log records under the execution policy and preserve fixed attribution.
+Do not automatically log arguments, configuration, credentials, HTTP bodies, or
+result payloads. Pure expression profiles receive the pure utilities without a
+logger or HTTP capability.
 
 ## HTTP capability contract
 
@@ -236,8 +248,12 @@ deadline, and aggregate allowances. Tools never enable global `fetch`.
 The initial request contract is a primitive absolute HTTP(S) URL and an optional
 object with `method`, `headers`, and `body`. Default method is GET. Headers are
 string-valued own properties; the existing Host override behavior is retained.
-Body is a string or native ArrayBuffer. JSON requests use `JSON.stringify`
-explicitly. Unsupported options are rejected, not silently ignored. Preserve
+Body is a string, native ArrayBuffer, or genuine `URLSearchParams` instance.
+Form instances use the bounded native serializer and infer
+`application/x-www-form-urlencoded;charset=UTF-8` only when no content type was
+supplied. The form conversion consumes the execution budget, and the body plus
+inferred header count against the request-byte cap. JSON requests use
+`JSON.stringify` explicitly. Unsupported options are rejected, not silently ignored. Preserve
 the existing Fetch method normalization and CONNECT/TRACE/TRACK exclusions.
 
 The response exposes `status`, `ok`, `headers.get(name)`, `bodyUsed`, and async
@@ -275,9 +291,10 @@ fetch, with no additional runtime enable flag; omission adds no request labels.
 
 ## Budgets and execution evidence
 
-One execution owns one deadline, one HTTP budget, and one aggregate evidence
-tracker. Connection handles and direct fetch are dispatch choices under that
-owner, not independent sessions with fresh allowances. The Go-only HTTP package
+One execution owns one cumulative managed-work/allocation budget, one deadline,
+one HTTP allowance, and one aggregate evidence tracker. Connection handles and
+direct fetch are dispatch choices under that owner; they share its remaining
+allowances. The Go-only HTTP package
 also supports a single-client declarative HTTP executor under the same rules.
 
 | Limit | Accounting scope |
@@ -285,6 +302,8 @@ also supports a single-client declarative HTTP executor under the same rules.
 | Source bytes | Entry point/expression plus supplied libraries, before compilation. |
 | Timeout and optional earlier policy deadline | Initial input copy, initialization, execution, waiting for I/O, and result conversion. Never restarted per connection or request. |
 | Stack depth | JavaScript call depth in the owned VM. |
+| Managed work (`MaxWorkUnits`) | Native entries, admitted bytes/UTF-16 code units, and visited values/properties across input conversion, utility operations, managed HTTP work, and result conversion. Reprocessing data consumes work again. |
+| Managed allocation (`MaxAllocationUnits`) | Cumulative buffer bytes, string UTF-16 code units, and native value/metadata slots across those same operations. Temporary copies and retained state are charged; discarding them does not refund allowance. |
 | Input bytes/nodes/depth | Combined initial params, extra context, and all connection snapshots. Host functions are not serialized input; aliases do not duplicate snapshots. |
 | Output bytes/nodes/depth | One final JSON value or the whole payload selected by a trusted result extension. No per-field reset. |
 | Logical request count | Shared across every connection and direct dispatch. Admitted calls remain charged even when later proven unsent. Credential retries/redirects remain governed by the supplied client's policy. |
@@ -294,13 +313,36 @@ also supports a single-client declarative HTTP executor under the same rules.
 | Stream bytes | Per response before host decompression; not a wire-byte limit because the supplied client may already decompress. |
 | Response header bytes | Per copied header map, including entry overhead. |
 
-Input and output have separate traversal counters. Each response JSON parse has
-its own depth/node allowance under the aggregate decoded-byte budget. These
-counters bound host conversion work, not JavaScript instructions. Invalid
-requests rejected before logical dispatch consume no request count; admitted
-requests are never refunded. Per-request rejections can be caught by the
-script; execution-wide timeout or aggregate response exhaustion cannot be
-caught to obtain a fresh budget. Creating another handle never adds allowance.
+Input/output byte caps describe the data crossing those boundaries, rather than
+all intermediate data. Their depth/node checks remain separate structural caps.
+Each response JSON parse has its own depth/node cap and its payload consumes the
+aggregate HTTP decoded-byte allowance. Every such conversion also consumes the
+same remaining execution work/allocation budget. Repeating a decode, creating a
+helper instance, or entering another package never resets that cumulative budget.
+
+`Run` establishes this budget on its execution context. An adapter that performs
+managed conversion before or after `Run` can use `WithExecutionBudget` around the
+whole operation. Nested `Run` calls respect their own ceilings and every parent
+execution's remaining allowance. The ledger is Go-only accounting state with no
+VM or Goja callback references, so passing cancellation/accounting context to an
+HTTP worker cannot retain a VM through the budget. Trusted native adapters use
+`ChargeWork` and `ReserveAllocation` against that same context.
+
+Work and allocation units are deterministic accounting measures, not a count of
+JavaScript instructions or live heap bytes. They bound managed native work and
+storage by fixed multiples. Goja built-ins and public reflection APIs may still
+allocate before the host can inspect the resulting size; this design does not
+provide a complete VM heap meter. Fixed VM bootstrap, intrinsic capture, and
+utility binding setup have implementation-bounded cost rather than per-data
+charges. The shared deadline still applies throughout.
+
+Invalid requests rejected before logical dispatch consume no HTTP request
+count; admitted requests are never refunded. Work and allocations already
+admitted remain charged even if a request is rejected. Per-request rejections
+can be caught by the script; execution-wide work/allocation exhaustion, timeout,
+or aggregate response exhaustion cannot be caught to continue effects or obtain
+a fresh budget. Any cumulative-budget failure permanently fails the enclosing
+execution, including when a trusted adapter ignores the returned error.
 
 Evidence describes outbound sends, not business-action completion. Client
 adapters report known-unsent, possibly-sent, or confirmed-sent outcomes across

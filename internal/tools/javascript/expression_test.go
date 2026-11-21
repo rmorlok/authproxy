@@ -19,13 +19,15 @@ import (
 // expressionLimits gives normal examples ample room while keeping every limit explicit.
 func expressionLimits() javascript.Limits {
 	return javascript.Limits{
-		MaxSourceBytes: 64 << 10,
-		MaxInputBytes:  64 << 10,
-		MaxOutputBytes: 64 << 10,
-		MaxDepth:       32,
-		MaxNodes:       10000,
-		MaxStackDepth:  128,
-		Timeout:        2 * time.Second,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     64 << 10,
+		MaxInputBytes:      64 << 10,
+		MaxOutputBytes:     64 << 10,
+		MaxDepth:           32,
+		MaxNodes:           10000,
+		MaxStackDepth:      128,
+		Timeout:            2 * time.Second,
 	}
 }
 

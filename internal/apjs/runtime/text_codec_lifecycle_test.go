@@ -13,32 +13,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestTextCodecPolicy keeps the new hosts opt-in with explicit positive bounds.
-func TestTextCodecPolicy(t *testing.T) {
+// TestTextCodecAvailability exposes both codecs in every execution and reserves their names.
+func TestTextCodecAvailability(t *testing.T) {
 	result, err := evaluateSource(context.Background(), runtimeLimits(), `[typeof TextEncoder, typeof TextDecoder]`)
 	require.NoError(t, err)
-	require.JSONEq(t, `["undefined","undefined"]`, string(result))
-
-	for _, change := range []func(*jsruntime.UtilityPolicy){
-		func(p *jsruntime.UtilityPolicy) { p.MaxCalls = 0 },
-		func(p *jsruntime.UtilityPolicy) { p.MaxInputBytes = 0 },
-		func(p *jsruntime.UtilityPolicy) { p.MaxOutputBytes = 0 },
-	} {
-		// Text-only policies must not bypass the same validation used for base64.
-		limits := textCodecTestLimits()
-		change(&limits.Utilities)
-		_, err := jsruntime.CompileExpression(`0`, limits)
-		require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
-	}
+	require.JSONEq(t, `["function","function"]`, string(result))
 	for _, name := range []string{"TextEncoder", "TextDecoder"} {
-		// Enabled names are reserved in source and libraries; disabled generic code may own them.
+		// The runtime and helper library share the same protected built-in names.
 		source := "const " + name + " = 1; async function execute() {}"
-		_, err := jsruntime.CompileAsync(source, nil, nil, textCodecTestLimits())
+		_, err := jsruntime.CompileAsync(source, nil, nil, runtimeLimits())
 		require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
-		_, err = jsruntime.CompileAsync(`async function execute() {}`, asyncLibrary(t, "var "+name+";"), nil, textCodecTestLimits())
+		_, err = jsruntime.CompileAsync(`async function execute() {}`, asyncLibrary(t, "var "+name+";"), nil, runtimeLimits())
 		require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
-		_, err = jsruntime.CompileAsync(source, nil, nil, runtimeLimits())
-		require.NoError(t, err)
 	}
 }
 
@@ -48,35 +34,27 @@ func TestTextCodecSharedBudgets(t *testing.T) {
 	for _, test := range []struct {
 		name, source, want   string
 		calls, input, output int
-		base64               bool
 	}{
-		{"UTF-8", `const e = new TextEncoder(), d = new TextDecoder(); d.decode(e.encode("é"));`, `"é"`, 4, 3, 3, false},
-		{"supplementary units", `const e = new TextEncoder(), d = new TextDecoder(); d.decode(e.encode("😀"));`, `"😀"`, 4, 6, 6, false},
-		{"base64 combined", `const e = new TextEncoder(), d = new TextDecoder(); d.decode(e.encode("x")) + atob(btoa("x"));`, `"xx"`, 6, 7, 7, true},
-		{"decoder label", `new TextDecoder(" UTF8 ").decode(new Uint8Array([65]));`, `"A"`, 2, 7, 1, false},
+		{"UTF-8", `const e = new TextEncoder(), d = new TextDecoder(); d.decode(e.encode("é"));`, `"é"`, 4, 3, 5},
+		{"supplementary units", `const e = new TextEncoder(), d = new TextDecoder(); d.decode(e.encode("😀"));`, `"😀"`, 4, 6, 8},
+		{"base64 combined", `const e = new TextEncoder(), d = new TextDecoder(); d.decode(e.encode("x")) + atob(btoa("x"));`, `"xx"`, 6, 7, 9},
+		{"decoder label", `new TextDecoder(" UTF8 ").decode(new Uint8Array([65]));`, `"A"`, 2, 7, 2},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			limits := textCodecTestLimits()
-			limits.Utilities = jsruntime.UtilityPolicy{
-				TextCodecs: true, Base64: test.base64, MaxCalls: test.calls,
-				MaxInputBytes: test.input, MaxOutputBytes: test.output,
-			}
+			limits.MaxWorkUnits = test.calls + test.input
+			limits.MaxAllocationUnits = test.output
 			// One evaluation consumes the exact shared allowances without resetting between helpers.
-			result, err := evaluateSource(context.Background(), limits, test.source)
+			result, err := runUtilitySource(context.Background(), limits, test.source)
 			require.NoError(t, err)
 			require.JSONEq(t, test.want, string(result))
-			for _, reduce := range []func(*jsruntime.UtilityPolicy){
-				func(p *jsruntime.UtilityPolicy) { p.MaxCalls-- },
-				func(p *jsruntime.UtilityPolicy) { p.MaxInputBytes-- },
-				func(p *jsruntime.UtilityPolicy) { p.MaxOutputBytes-- },
+			for _, reduce := range []func(*jsruntime.Limits){
+				func(p *jsruntime.Limits) { p.MaxWorkUnits-- },
+				func(p *jsruntime.Limits) { p.MaxAllocationUnits-- },
 			} {
 				tight := limits
-				reduce(&tight.Utilities)
-				// All enabled caps must remain positive, including the one-unit output example.
-				if tight.Utilities.MaxOutputBytes == 0 {
-					continue
-				}
-				result, err = evaluateSource(context.Background(), tight,
+				reduce(&tight)
+				result, err = runUtilitySource(context.Background(), tight,
 					`try {`+test.source+`} catch (_) {} "must not escape";`)
 				require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 				require.Nil(t, result)
@@ -104,15 +82,14 @@ func TestTextCodecMalformedAccounting(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			limits := textCodecTestLimits()
-			limits.Utilities.MaxCalls = test.calls
-			limits.Utilities.MaxInputBytes = test.input
-			limits.Utilities.MaxOutputBytes = 1
-			// Recoverable failure reserves no output, so the final valid byte still fits.
-			result, err := evaluateSource(context.Background(), limits, test.source)
+			limits.MaxWorkUnits = test.calls + test.input
+			limits.MaxAllocationUnits = 2
+			// Failed attempts retain work charges; the successful decoder and result still fit.
+			result, err := runUtilitySource(context.Background(), limits, test.source)
 			require.NoError(t, err)
 			require.JSONEq(t, `"A"`, string(result))
-			limits.Utilities.MaxCalls--
-			result, err = evaluateSource(context.Background(), limits, test.source)
+			limits.MaxWorkUnits--
+			result, err = runUtilitySource(context.Background(), limits, test.source)
 			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 			require.Nil(t, result)
 		})
@@ -124,7 +101,7 @@ func TestTextCodecMalformedAccounting(t *testing.T) {
 func TestTextCodecInitializationBudget(t *testing.T) {
 	for _, initializationFailure := range []bool{false, true} {
 		limits := textCodecTestLimits()
-		limits.Utilities.MaxCalls = 2
+		limits.MaxWorkUnits = 3
 		source := `const e = new TextEncoder(); const bytes = e.encode("a");`
 		if initializationFailure {
 			source += `try { new TextDecoder(); } catch (_) {}`
@@ -141,7 +118,8 @@ func TestTextCodecInitializationBudget(t *testing.T) {
 		started := false
 		result, err := program.Evaluate(context.Background(), func(ctx context.Context, vm *goja.Runtime, invocation *jsruntime.AsyncInvocation) error {
 			invocation.Start = func() { started = true }
-			return asyncInput(limits)(ctx, vm, invocation)
+			invocation.Params, invocation.Context = goja.Undefined(), goja.Undefined()
+			return nil
 		})
 		// A caught limit cannot produce output or enable hosts after failed initialization.
 		require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
@@ -151,15 +129,14 @@ func TestTextCodecInitializationBudget(t *testing.T) {
 }
 
 // TestTextCodecConcurrentIsolation gives each evaluation independent branded
-// receivers and budgets, using the immutable policy captured by compilation.
+// receivers and budgets, using the immutable limits captured by compilation.
 func TestTextCodecConcurrentIsolation(t *testing.T) {
 	limits := textCodecTestLimits()
-	limits.Utilities.MaxCalls = 4
-	limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = 4, 4
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 256, 256
 	program, err := jsruntime.CompileAsync(`const e = new TextEncoder(), d = new TextDecoder();
 		async function execute() { return d.decode(e.encode("雪")); }`, nil, nil, limits)
 	require.NoError(t, err)
-	limits.Utilities = jsruntime.UtilityPolicy{}
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 1, 1
 	require.NoError(t, program.Validate(context.Background()))
 
 	// Concurrent evaluations reuse compiled code, never codec objects or counters.
@@ -189,7 +166,7 @@ func TestTextEncoderNativeCancellation(t *testing.T) {
 	text := strings.Repeat("A", 64<<10)
 	for _, cancelAfter := range []int{128, len(text) + 128} {
 		limits := textCodecTestLimits()
-		limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = len(text), len(text)
+		limits.MaxWorkUnits, limits.MaxAllocationUnits = len(text)+2, len(text)+1
 		ctx, cancel := context.WithCancel(context.Background())
 		reads := 0
 		result, err := jsruntime.EvaluateJSON(ctx, limits, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
@@ -218,11 +195,10 @@ func TestTextEncoderNativeCancellation(t *testing.T) {
 }
 
 // TestTextDecoderDeadline keeps repeated native decoding under the caller and
-// execution deadlines, independent of the much larger utility allowances.
+// execution deadlines, independent of the much larger execution allowances.
 func TestTextDecoderDeadline(t *testing.T) {
 	limits := textCodecTestLimits()
-	limits.Utilities.MaxCalls = 1 << 30
-	limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = 1<<30, 1<<30
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 1<<30, 1<<30
 	source := `const decoder = new TextDecoder(), bytes = new Uint8Array(65536);
 		for (;;) { decoder.decode(bytes); }`
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)

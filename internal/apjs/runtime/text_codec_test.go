@@ -11,14 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// textCodecTestLimits selects UTF-8 helpers with room for ordinary text fixtures.
-func textCodecTestLimits() jsruntime.Limits {
-	limits := runtimeLimits()
-	limits.Utilities = jsruntime.UtilityPolicy{
-		TextCodecs: true, MaxCalls: 64, MaxInputBytes: 4096, MaxOutputBytes: 4096,
-	}
-	return limits
-}
+// textCodecTestLimits provides room for ordinary text fixtures.
+func textCodecTestLimits() jsruntime.Limits { return runtimeLimits() }
 
 // TestTextEncoderUTF8 replaces unpaired UTF-16 surrogates while preserving valid
 // scalar values and emits a real native Uint8Array rather than a reflected slice.

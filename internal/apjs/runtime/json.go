@@ -12,7 +12,8 @@ import (
 )
 
 // JSONLimits bounds one batch of native JSON conversion. Initial inputs share
-// one batch; independently bounded HTTP bodies each receive a fresh allowance.
+// one batch; independently bounded HTTP bodies each receive fresh boundary caps.
+// All conversions also consume their context's cumulative execution budget.
 // All fields must be positive. These caps do not limit the VM's heap usage.
 type JSONLimits struct {
 	// MaxBytes bounds the combined serialized documents, including whitespace.
@@ -65,8 +66,9 @@ func NewJSONDecoder(vm *goja.Runtime) (*JSONDecoder, error) {
 //
 // Callers must keep document bytes stable until Decode returns and pass all
 // initial inputs in one call so their allowances are not reset. Each subsequent
-// call starts fresh counters, suitable for a separately bounded response body.
-// Call within Run/EvaluateJSON using its runCtx to share the execution deadline;
+// call starts fresh boundary counters, suitable for a separately bounded response
+// body, but never resets the context's cumulative work/allocation allowance.
+// Call within Run/EvaluateJSON using its runCtx to share that budget and deadline;
 // this helper does not start a timeout or interrupt watcher. Failures return
 // safe classifications or ctx.Err() and no partial values.
 func (d *JSONDecoder) Decode(
@@ -79,6 +81,9 @@ func (d *JSONDecoder) Decode(
 		return nil, ErrInvalidInput
 	}
 	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := ChargeWork(ctx, 1); err != nil {
 		return nil, err
 	}
 	if len(documents) > limits.MaxNodes {
@@ -105,9 +110,18 @@ func (d *JSONDecoder) Decode(
 	}
 
 	// Validation bounds the slice length too: every document consumes a node.
+	if err := ReserveAllocation(ctx, len(documents)); err != nil {
+		return nil, err
+	}
 	values := make([]goja.Value, len(documents))
 	for i, document := range documents {
-		if err := ctx.Err(); err != nil {
+		// Native parsing scans the document again and creates its own input
+		// string and graph. Serialized bytes bound decoded string storage by a
+		// fixed multiple; validated nodes already reserved native value slots.
+		if err := ChargeWork(ctx, len(document)); err != nil {
+			return nil, err
+		}
+		if err := ReserveAllocation(ctx, len(document)); err != nil {
 			return nil, err
 		}
 		value, err := d.parse(goja.Undefined(), d.vm.ToValue(string(document)))
@@ -116,16 +130,16 @@ func (d *JSONDecoder) Decode(
 		}
 		values[i] = value
 	}
-	if err := ctx.Err(); err != nil {
+	if err := ChargeWork(ctx, 0); err != nil {
 		return nil, err
 	}
 	return values, nil
 }
 
-// inputParseError preserves cancellation while withholding native JSON parser
-// diagnostics, which can contain private configuration keys or response text.
+// inputParseError preserves cancellation and cumulative budget failures while
+// withholding native parser diagnostics, which may contain private input text.
 func inputParseError(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
+	if err := ChargeWork(ctx, 0); err != nil {
 		return err
 	}
 	return ErrInvalidInput
@@ -143,8 +157,19 @@ type inputBudget struct {
 // validate requires exactly one UTF-8 JSON document and validates its
 // values without retaining a second decoded Go object graph.
 func (b *inputBudget) validate(encoded []byte) error {
+	// UTF-8 validation and token decoding each scan the admitted bytes. Reserve
+	// token/string scratch before the standard decoder can allocate it.
+	if err := ChargeWork(b.ctx, len(encoded)); err != nil {
+		return err
+	}
 	if !utf8.Valid(encoded) {
 		return ErrInvalidInput
+	}
+	if err := ChargeWork(b.ctx, len(encoded)); err != nil {
+		return err
+	}
+	if err := ReserveAllocation(b.ctx, len(encoded)); err != nil {
+		return err
 	}
 
 	decoder := json.NewDecoder(bytes.NewReader(encoded))
@@ -171,6 +196,9 @@ func (b *inputBudget) validate(encoded []byte) error {
 // them avoids changing input values; valid pairs and literal backslash-u text
 // retain ordinary JSON behavior. This scan does not parse JSON structure.
 func validateInputSurrogates(ctx context.Context, encoded []byte) error {
+	if err := ChargeWork(ctx, len(encoded)); err != nil {
+		return err
+	}
 	inString := false
 	for i := 0; i < len(encoded); i++ {
 		if err := ctx.Err(); err != nil {
@@ -236,6 +264,12 @@ func (b *inputBudget) value(
 	if depth > b.limits.MaxDepth || b.nodes >= b.limits.MaxNodes {
 		return ErrLimitExceeded
 	}
+	if err := ChargeWork(b.ctx, 1); err != nil {
+		return err
+	}
+	if err := ReserveAllocation(b.ctx, 1); err != nil {
+		return err
+	}
 	b.nodes++
 	token, err := decoder.Token()
 	if err != nil {
@@ -259,6 +293,12 @@ func (b *inputBudget) value(
 				}
 				if b.nodes >= b.limits.MaxNodes {
 					return ErrLimitExceeded
+				}
+				if err := ChargeWork(b.ctx, 1); err != nil {
+					return err
+				}
+				if err := ReserveAllocation(b.ctx, 1); err != nil {
+					return err
 				}
 				b.nodes++
 				key, err := decoder.Token()

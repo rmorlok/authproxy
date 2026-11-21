@@ -46,7 +46,8 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 	values := toolPolicyInt(settings.MaxValues, 1_000_000)
 
 	// Arguments, copied configuration, response-transform input, and the result
-	// envelope have separate budgets. Raising one never silently raises another.
+	// envelope retain separate size limits. The transform also has one shared
+	// work/allocation allowance across its conversions and pure utilities.
 	return httpexec.Limits{
 		Render: render.Limits{
 			MaxBytes: toolPolicyBytes(settings.MaxRenderBytes, 8<<20),
@@ -66,13 +67,15 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 			MaxOutputBytes:        outputBytes,
 			MaxEncodedResultBytes: toolPolicyBytes(settings.MaxEncodedResultBytes, 16<<20),
 			Transform: javascript.Limits{
-				MaxSourceBytes: sourceBytes,
-				MaxInputBytes:  toolPolicyBytes(settings.MaxTransformInputBytes, 16<<20),
-				MaxOutputBytes: outputBytes,
-				MaxDepth:       depth,
-				MaxNodes:       values,
-				MaxStackDepth:  toolPolicyInt(settings.MaxStackDepth, 256),
-				Timeout:        timeout,
+				MaxWorkUnits:       256 << 20,
+				MaxAllocationUnits: 256 << 20,
+				MaxSourceBytes:     sourceBytes,
+				MaxInputBytes:      toolPolicyBytes(settings.MaxTransformInputBytes, 16<<20),
+				MaxOutputBytes:     outputBytes,
+				MaxDepth:           depth,
+				MaxNodes:           values,
+				MaxStackDepth:      toolPolicyInt(settings.MaxStackDepth, 256),
+				Timeout:            timeout,
 			},
 		},
 		HTTP: aphttp.Limits{

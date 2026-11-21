@@ -69,7 +69,7 @@ func TestSearchParamASCIIEncoding(t *testing.T) {
 		"+%21%22%23%24%25%26%27%28%29*%2B%2C-.%2F0123456789%3A%3B%3C%3D%3E%3F" +
 		"%40ABCDEFGHIJKLMNOPQRSTUVWXYZ%5B%5C%5D%5E_%60abcdefghijklmnopqrstuvwxyz%7B%7C%7D%7E%7F"
 	require.Equal(t, want, got)
-	require.Equal(t, len(want), host.outputBytes)
+	require.Equal(t, len(want), executionBudgetFromContext(host.ctx).allocationUnits)
 }
 
 // TestSearchParamScalarNormalization normalizes UTF-16 before query parsing or
@@ -99,9 +99,9 @@ func TestSearchParamCodecAccounting(t *testing.T) {
 	host := textCodecTestHost(parsedUnits + len(serialized))
 
 	pairs := host.parseSearchParams(host.vm.ToValue(input).(goja.String))
-	require.Equal(t, parsedUnits, host.outputBytes)
+	require.Equal(t, parsedUnits, executionBudgetFromContext(host.ctx).allocationUnits)
 	require.Equal(t, serialized, host.serializeSearchParams(pairs).String())
-	require.Equal(t, parsedUnits+len(serialized), host.outputBytes)
+	require.Equal(t, parsedUnits+len(serialized), executionBudgetFromContext(host.ctx).allocationUnits)
 
 	// A one-unit short result cannot allocate or return even a partial string.
 	host = textCodecTestHost(parsedUnits + len(serialized) - 1)
@@ -110,8 +110,8 @@ func TestSearchParamCodecAccounting(t *testing.T) {
 	exception := host.vm.Try(func() { result = host.serializeSearchParams(pairs) })
 	require.NotNil(t, exception)
 	require.Nil(t, result)
-	require.ErrorIs(t, host.err, ErrLimitExceeded)
-	require.Equal(t, parsedUnits, host.outputBytes)
+	require.ErrorIs(t, executionBudgetFromContext(host.ctx).err(), ErrLimitExceeded)
+	require.Equal(t, parsedUnits, executionBudgetFromContext(host.ctx).allocationUnits)
 }
 
 // searchParamCancelContext cancels a real context at a chosen polling boundary
@@ -138,7 +138,7 @@ func TestSearchParamCodecCancellation(t *testing.T) {
 	for _, serialize := range []bool{false, true} {
 		t.Run(map[bool]string{false: "percent decode", true: "serialize"}[serialize], func(t *testing.T) {
 			host := textCodecTestHost(1 << 20)
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(host.ctx)
 			defer cancel()
 			polling := &searchParamCancelContext{Context: ctx, cancel: cancel, cancelAfter: 2}
 			host.ctx = polling
@@ -160,7 +160,7 @@ func TestSearchParamCodecCancellation(t *testing.T) {
 			require.Nil(t, result)
 			require.ErrorIs(t, ctx.Err(), context.Canceled)
 			require.Equal(t, 2, polling.checks)
-			require.Zero(t, host.outputBytes)
+			require.Zero(t, executionBudgetFromContext(host.ctx).allocationUnits)
 		})
 	}
 }
@@ -170,7 +170,7 @@ func TestSearchParamCodecCancellation(t *testing.T) {
 func TestSearchParamComparisonCancellation(t *testing.T) {
 	host := textCodecTestHost(1 << 20)
 	params := newSearchParams(host)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(host.ctx)
 	defer cancel()
 	polling := &searchParamCancelContext{Context: ctx, cancel: cancel, cancelAfter: 2}
 	host.ctx = polling
@@ -184,7 +184,27 @@ func TestSearchParamComparisonCancellation(t *testing.T) {
 	require.Equal(t, 42, result)
 	require.ErrorIs(t, ctx.Err(), context.Canceled)
 	require.Equal(t, 2, polling.checks)
-	require.Nil(t, host.err)
+	require.Nil(t, executionBudgetFromContext(host.ctx).err())
+}
+
+// searchParamWorkCancelContext cancels after a precise amount of native work,
+// independently of how many times accounting checks the context along the way.
+type searchParamWorkCancelContext struct {
+	context.Context
+	cancel        context.CancelFunc // Cancels when the selected amount of work is reached.
+	budget        *executionBudget   // The shared ledger observed by this native-only test.
+	cancelAtUnits int                // Admitted work at which the next check cancels.
+}
+
+// Err cancels after the chosen tuple move, then returns the real context error.
+func (c *searchParamWorkCancelContext) Err() error {
+	c.budget.state.mu.Lock()
+	work := c.budget.workUnits
+	c.budget.state.mu.Unlock()
+	if work >= c.cancelAtUnits {
+		c.cancel()
+	}
+	return c.Context.Err()
 }
 
 // TestSearchParamSortTailCancellation reaches a merge's comparison-free tail.
@@ -194,7 +214,7 @@ func TestSearchParamSortTailCancellation(t *testing.T) {
 	const pairCount = 2 * textCodecPollInterval
 	const previousPasses = 12 // Widths 1 through 2048 precede the final width-4096 merge.
 	host := textCodecTestHost(1 << 20)
-	host.policy.MaxInputBytes = 1 << 20
+	executionBudgetFromContext(host.ctx).maxWorkUnits = 1 << 20
 	params := newSearchParams(host)
 	receiver := host.vm.NewObject()
 	empty := host.vm.ToValue("").(goja.String)
@@ -203,13 +223,14 @@ func TestSearchParamSortTailCancellation(t *testing.T) {
 		state.pairs[index] = searchParam{name: empty, value: empty}
 	}
 	params.instances[receiver] = state
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(host.ctx)
 	defer cancel()
-	// Each completed pass checks twice for tuple moves and once for each of
-	// pairCount/2 empty-name comparisons. The final check is the tail boundary.
-	polling := &searchParamCancelContext{
-		Context: ctx, cancel: cancel,
-		cancelAfter: 2 + (previousPasses+1)*(2+pairCount/2),
+	// The final merge consumes its left half, then admits one right-half move.
+	// Canceling on the next check proves even the comparison-free tail polls.
+	const cancelAtUnits = 1 + pairCount + previousPasses*pairCount + pairCount/2 + 1
+	polling := &searchParamWorkCancelContext{
+		Context: ctx, cancel: cancel, budget: executionBudgetFromContext(host.ctx),
+		cancelAtUnits: cancelAtUnits,
 	}
 	host.ctx = polling
 	var result goja.Value
@@ -218,14 +239,12 @@ func TestSearchParamSortTailCancellation(t *testing.T) {
 	require.NotNil(t, exception)
 	require.Nil(t, result)
 	require.ErrorIs(t, ctx.Err(), context.Canceled)
-	require.Equal(t, polling.cancelAfter, polling.checks)
 
-	// Scratch slots were admitted once. Cancellation stops before the first
-	// final-tail move, after the earlier full passes and final left-half moves.
-	require.Equal(t, pairCount, host.outputBytes)
-	require.Equal(t, pairCount+previousPasses*pairCount+pairCount/2, host.inputBytes)
-	require.Equal(t, 1, host.calls)
-	require.Nil(t, host.err)
+	// Scratch slots were admitted once; the earlier passes, left half, and first
+	// final-tail move consumed work before cancellation stopped the next move.
+	require.Equal(t, pairCount, executionBudgetFromContext(host.ctx).allocationUnits)
+	require.Equal(t, cancelAtUnits, executionBudgetFromContext(host.ctx).workUnits)
+	require.Nil(t, executionBudgetFromContext(host.ctx).err())
 }
 
 // TestSearchParamMutationReleasesRemovedReferences checks the backing storage,
@@ -289,6 +308,6 @@ func TestSearchParamTraversalCostOverflow(t *testing.T) {
 	require.Equal(t, maximum, state.scanUnits)
 	exception := host.vm.Try(func() { params.addUnits(state, pair) })
 	require.NotNil(t, exception)
-	require.ErrorIs(t, host.err, ErrLimitExceeded)
+	require.ErrorIs(t, executionBudgetFromContext(host.ctx).err(), ErrLimitExceeded)
 	require.Equal(t, maximum, state.scanUnits)
 }

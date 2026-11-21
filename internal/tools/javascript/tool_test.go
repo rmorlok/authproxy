@@ -1,6 +1,7 @@
 package javascript_test
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -110,44 +111,53 @@ func TestToolChecksLibraryGlobalsWithoutChangingConnectorPolicy(t *testing.T) {
 			return local(fetch);
 		}
 	`, library)
-	execute, err := program.Initialize(goja.New())
+	// Low-level initialization receives the same managed pure helpers as evaluation.
+	err := apjsruntime.Run(context.Background(), expressionLimits(), func(_ context.Context, vm *goja.Runtime) error {
+		execute, err := program.Initialize(vm)
+		require.NoError(t, err)
+		require.Equal(t, int64(7), toolValue(t, execute).ToInteger())
+		return nil
+	})
 	require.NoError(t, err)
-	require.Equal(t, int64(7), toolValue(t, execute).ToInteger())
 }
 
 // TestToolInitializationPreservesHostBindings keeps a caller-installed capability intact.
 func TestToolInitializationPreservesHostBindings(t *testing.T) {
-	vm := goja.New()
-	calls := 0
-	require.NoError(t, vm.Set("fetch", func() string { calls++; return "host-response" }))
-	// Mirror captured input bindings: they are already immutable and enumerable.
-	inputNames := []string{"params", "context", "response", "cfg", "labels", "annotations"}
-	for _, name := range inputNames {
-		require.NoError(t, vm.GlobalObject().DefineDataProperty(
-			name, vm.NewObject(), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE,
-		))
-	}
-	library := toolLibrary(t, `delete globalThis.fetch; globalThis.fetch = () => "replacement";`)
-	program := compileTool(t, `async function execute() { return fetch(); }`, library)
+	// Keep setup and assertions on the owner of the managed VM and its helpers.
+	err := apjsruntime.Run(context.Background(), expressionLimits(), func(_ context.Context, vm *goja.Runtime) error {
+		calls := 0
+		require.NoError(t, vm.Set("fetch", func() string { calls++; return "host-response" }))
+		// Mirror captured input bindings: they are already immutable and enumerable.
+		inputNames := []string{"params", "context", "response", "cfg", "labels", "annotations"}
+		for _, name := range inputNames {
+			require.NoError(t, vm.GlobalObject().DefineDataProperty(
+				name, vm.NewObject(), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE,
+			))
+		}
+		library := toolLibrary(t, `delete globalThis.fetch; globalThis.fetch = () => "replacement";`)
+		program := compileTool(t, `async function execute() { return fetch(); }`, library)
 
-	// Initialization protects the host before sloppy helper assignments, without calling execute.
-	execute, err := program.Initialize(vm)
+		// Initialization protects the host before sloppy helper assignments, without calling execute.
+		execute, err := program.Initialize(vm)
+		require.NoError(t, err)
+		require.Zero(t, calls)
+		require.Equal(t, "host-response", toolValue(t, execute).String())
+		require.Equal(t, 1, calls)
+
+		// Capabilities stay hidden from enumeration; existing input visibility is preserved.
+		require.NotContains(t, vm.GlobalObject().Keys(), "fetch")
+		for _, name := range inputNames {
+			require.Contains(t, vm.GlobalObject().Keys(), name)
+		}
+
+		// Host globals are immutable before either helper or Tool initialization runs.
+		_, err = vm.RunString(`"use strict"; fetch = () => "replacement";`)
+		require.Error(t, err)
+		require.Equal(t, "host-response", toolValue(t, execute).String())
+		require.Equal(t, 2, calls)
+		return nil
+	})
 	require.NoError(t, err)
-	require.Zero(t, calls)
-	require.Equal(t, "host-response", toolValue(t, execute).String())
-	require.Equal(t, 1, calls)
-
-	// Capabilities stay hidden from enumeration; existing input visibility is preserved.
-	require.NotContains(t, vm.GlobalObject().Keys(), "fetch")
-	for _, name := range inputNames {
-		require.Contains(t, vm.GlobalObject().Keys(), name)
-	}
-
-	// Host globals are immutable before either helper or Tool initialization runs.
-	_, err = vm.RunString(`"use strict"; fetch = () => "replacement";`)
-	require.Error(t, err)
-	require.Equal(t, "host-response", toolValue(t, execute).String())
-	require.Equal(t, 2, calls)
 }
 
 // TestToolRejectsMissingPolicyAndRuntime rejects incomplete calls without leaking source text.

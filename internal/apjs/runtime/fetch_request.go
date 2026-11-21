@@ -21,7 +21,7 @@ import (
 // enumerable string properties, and body supports strings or native ArrayBuffers.
 // A nonnil formEncoder adds genuine URLSearchParams bodies; it must be the
 // protected native serializer captured before authored code, never a value read
-// from the body. It owns receiver validation and shared utility allowances.
+// from the body. It owns receiver validation and shares the execution budget.
 // Connection bindings also accept labels when allowLabels is true. They are
 // detached string maps charged to the same byte allowance; the adapter validates
 // their domain-specific key/value rules before worker dispatch.
@@ -43,6 +43,9 @@ func prepareFetchRequest(
 	if ctx == nil || vm == nil || maxBytes <= 0 || len(call.Arguments) > 2 {
 		return nil, nil, ErrInvalidInput
 	}
+	if err := ChargeWork(ctx, 1); err != nil {
+		return nil, nil, err
+	}
 
 	budget := fetchRequestBudget{
 		ctx:       ctx,
@@ -62,13 +65,19 @@ func prepareFetchRequest(
 
 	if initValue := call.Argument(1); !goja.IsUndefined(initValue) && !goja.IsNull(initValue) {
 		init, ok := initValue.(*goja.Object)
-		if !ok || init.ClassName() != "Object" || len(init.Symbols()) != 0 {
+		if !ok || init.ClassName() != "Object" {
 			return nil, nil, ErrInvalidInput
+		}
+		if err := budget.rejectSymbols(init); err != nil {
+			return nil, nil, err
 		}
 
 		// Validate all names before evaluating getters so unsupported options
 		// cannot silently acquire a different meaning from browser fetch.
 		keys := init.GetOwnPropertyNames()
+		if err := budget.inspectKeys(keys); err != nil {
+			return nil, nil, err
+		}
 		for _, key := range keys {
 			if key != "method" &&
 				key != "headers" &&
@@ -161,6 +170,43 @@ type fetchRequestBudget struct {
 	remaining int             // Bytes still available before another detached copy.
 }
 
+// rejectSymbols charges a reflected symbol list even when it makes the record
+// invalid. Repeated malformed calls must not bypass shared metadata accounting.
+func (b *fetchRequestBudget) rejectSymbols(object *goja.Object) error {
+	symbols := object.Symbols()
+	if err := ChargeWork(b.ctx, len(symbols)); err != nil {
+		return err
+	}
+	if err := ReserveAllocation(b.ctx, len(symbols)); err != nil {
+		return err
+	}
+	if len(symbols) != 0 {
+		return ErrInvalidInput
+	}
+	return nil
+}
+
+// inspectKeys accounts for the complete reflected key list before validating
+// individual entries. This includes names after an invalid entry that would
+// otherwise be skipped despite already being materialized by Goja reflection.
+func (b *fetchRequestBudget) inspectKeys(keys []string) error {
+	if err := ChargeWork(b.ctx, len(keys)); err != nil {
+		return err
+	}
+	if err := ReserveAllocation(b.ctx, len(keys)); err != nil {
+		return err
+	}
+	for _, key := range keys {
+		if err := ChargeWork(b.ctx, len(key)); err != nil {
+			return err
+		}
+		if err := ReserveAllocation(b.ctx, len(key)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // consume reserves bytes without overflow and preserves caller cancellation.
 func (b *fetchRequestBudget) consume(size int) error {
 	if err := b.ctx.Err(); err != nil {
@@ -169,6 +215,12 @@ func (b *fetchRequestBudget) consume(size int) error {
 
 	if size > b.remaining {
 		return ErrLimitExceeded
+	}
+	if err := ChargeWork(b.ctx, size); err != nil {
+		return err
+	}
+	if err := ReserveAllocation(b.ctx, size); err != nil {
+		return err
 	}
 
 	b.remaining -= size
@@ -187,6 +239,9 @@ func (b *fetchRequestBudget) string(value goja.Value) (string, error) {
 
 	if s.Length() > b.remaining {
 		return "", ErrLimitExceeded
+	}
+	if err := ChargeWork(b.ctx, s.Length()); err != nil {
+		return "", err
 	}
 
 	size := 0
@@ -233,14 +288,24 @@ func (b *fetchRequestBudget) headers(value goja.Value) (http.Header, string, err
 	}
 
 	object, ok := value.(*goja.Object)
-	if !ok || object.ClassName() != "Object" || len(object.Symbols()) != 0 {
+	if !ok || object.ClassName() != "Object" {
 		return nil, "", ErrInvalidInput
+	}
+	if err := b.rejectSymbols(object); err != nil {
+		return nil, "", err
 	}
 
 	var host string
 	seen := make(map[string]bool)
 
-	for _, name := range object.Keys() {
+	keys := object.Keys()
+	if err := b.inspectKeys(keys); err != nil {
+		return nil, "", err
+	}
+	if err := ReserveAllocation(b.ctx, len(keys)); err != nil {
+		return nil, "", err
+	}
+	for _, name := range keys {
 		if err := b.consume(len(name)); err != nil {
 			return nil, "", err
 		}
@@ -303,12 +368,22 @@ func (b *fetchRequestBudget) labels(value goja.Value) (map[string]string, error)
 	}
 
 	object, ok := value.(*goja.Object)
-	if !ok || object.ClassName() != "Object" || len(object.Symbols()) != 0 {
+	if !ok || object.ClassName() != "Object" {
 		return nil, ErrInvalidInput
+	}
+	if err := b.rejectSymbols(object); err != nil {
+		return nil, err
 	}
 
 	labels := make(map[string]string)
-	for _, name := range object.Keys() {
+	keys := object.Keys()
+	if err := b.inspectKeys(keys); err != nil {
+		return nil, err
+	}
+	if err := ReserveAllocation(b.ctx, len(keys)); err != nil {
+		return nil, err
+	}
+	for _, name := range keys {
 		if err := b.consume(len(name)); err != nil {
 			return nil, err
 		}
@@ -326,7 +401,7 @@ func (b *fetchRequestBudget) labels(value goja.Value) (map[string]string, error)
 
 // body constructs a replayable reader and optional inferred content type after
 // bounding its data. URLSearchParams uses only the captured native serializer;
-// its output counts against both utility and request allowances. ArrayBuffer's
+// its output counts against the execution and request allowances. ArrayBuffer's
 // exported bytes alias the VM, so they are cloned before a worker can use them.
 // Typed arrays are intentionally unsupported; callers may pass an ArrayBuffer.
 func (b *fetchRequestBudget) body(value goja.Value, formEncoder goja.Callable) (io.Reader, string, error) {

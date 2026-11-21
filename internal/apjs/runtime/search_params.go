@@ -14,7 +14,7 @@ var searchParamsConstructorFactory = goja.MustCompile("", `(function (initialize
 	};
 })`, true)
 
-// searchParams owns one VM's branded query objects. MaxCalls bounds instances;
+// searchParams owns one VM's branded query objects. Execution work bounds entries;
 // shared output allowances bound their retained strings and tuple storage.
 type searchParams struct {
 	host      *utilityHost                        // Owns the execution's shared counters and deadline.
@@ -96,6 +96,7 @@ func (p *searchParams) initialize(call goja.FunctionCall) goja.Value {
 	p.host.consumeInput(text.Length())
 	state := &searchParamsState{pairs: p.host.parseSearchParams(text)}
 	p.recount(state)
+	p.host.reserveOutput(1) // Retained native receiver metadata.
 	p.instances[receiver] = state
 	return goja.Undefined()
 }
