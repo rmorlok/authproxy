@@ -40,9 +40,17 @@ func (*outputRejectionError) Unwrap() error { return ErrInvalidOutput }
 // Execution limits and cancellation must retain their own classifications.
 func RejectOutput(reason OutputRejectionReason) error {
 	for _, known := range [...]OutputRejectionReason{
-		OutputUnsupportedValue, OutputUnsupportedObject, OutputCustomPrototype,
-		OutputAccessor, OutputCycle, OutputSymbolKey, OutputArrayShape,
-		OutputInvalidString, OutputReflectionFailure, OutputUnexpectedType, OutputInvalidShape,
+		OutputUnsupportedValue,
+		OutputUnsupportedObject,
+		OutputCustomPrototype,
+		OutputAccessor,
+		OutputCycle,
+		OutputSymbolKey,
+		OutputArrayShape,
+		OutputInvalidString,
+		OutputReflectionFailure,
+		OutputUnexpectedType,
+		OutputInvalidShape,
 	} {
 		if reason == known {
 			// Retain the canonical constant, not a caller substring that might
@@ -50,6 +58,7 @@ func RejectOutput(reason OutputRejectionReason) error {
 			return &outputRejectionError{reason: known}
 		}
 	}
+
 	return ErrInvalidOutput
 }
 
