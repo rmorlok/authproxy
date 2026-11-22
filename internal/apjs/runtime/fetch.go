@@ -61,7 +61,10 @@ func (l *HTTPHost) fetch(
 ) goja.Value {
 	// Refused calls still enter native code. Charge before the gates so repeated
 	// initialization or saturation failures cannot bypass execution accounting.
-	helper := utilityHost{ctx: l.ctx, vm: l.vm}
+	helper := utilityHost{
+		ctx: l.ctx,
+		vm:  l.vm,
+	}
 	helper.beginCall()
 	if !l.enabled {
 		return l.rejected(ErrEvaluation)

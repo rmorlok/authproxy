@@ -20,12 +20,16 @@ func (l *HTTPHost) responseValue(response *aphttp.Response) (goja.Value, error) 
 	if err := ReserveAllocation(l.ctx, 8); err != nil {
 		return nil, err
 	}
+
 	object, headers := l.vm.NewObject(), l.vm.NewObject()
 
 	get := func(call goja.FunctionCall) goja.Value {
 		// Fixed errors and interruption follow the same owner-only convention
 		// as pure helpers; the ledger itself contains no runtime reference.
-		helper := utilityHost{ctx: l.ctx, vm: l.vm}
+		helper := utilityHost{
+			ctx: l.ctx,
+			vm:  l.vm,
+		}
 		helper.beginCall()
 		name, ok := call.Argument(0).(goja.String)
 		if !ok || name.Length() > l.options.MaxRequestBytes {
