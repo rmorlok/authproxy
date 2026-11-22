@@ -30,36 +30,63 @@ type searchParamsState struct {
 
 // newSearchParams creates isolated receiver branding before authored code runs.
 func newSearchParams(host *utilityHost) *searchParams {
-	return &searchParams{host: host, instances: make(map[*goja.Object]*searchParamsState)}
+	return &searchParams{
+		host:      host,
+		instances: make(map[*goja.Object]*searchParamsState),
+	}
 }
 
 // install exposes a protected constructor, methods, and read-only size getter.
 // The string-only surface deliberately omits coercion, iterators, and callbacks.
 func (p *searchParams) install() error {
 	vm := p.host.vm
+
 	value, err := vm.RunProgram(searchParamsConstructorFactory)
 	if err != nil {
 		return EvaluationError(err)
 	}
+
 	factory, _ := goja.AssertFunction(value)
+
 	value, err = factory(goja.Undefined(), vm.ToValue(p.initialize))
 	if err != nil {
 		return EvaluationError(err)
 	}
+
 	constructor := value.ToObject(vm)
 	prototype := constructor.Get("prototype").ToObject(vm)
+
 	for name, method := range map[string]func(goja.FunctionCall) goja.Value{
-		"append": p.append, "set": p.set, "delete": p.delete,
-		"get": p.get, "getAll": p.getAll, "has": p.has,
-		"sort": p.sort, "toString": p.toString,
+		"append":   p.append,
+		"set":      p.set,
+		"delete":   p.delete,
+		"get":      p.get,
+		"getAll":   p.getAll,
+		"has":      p.has,
+		"sort":     p.sort,
+		"toString": p.toString,
 	} {
-		if err := prototype.DefineDataProperty(name, vm.ToValue(method), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := prototype.DefineDataProperty(
+			name,
+			vm.ToValue(method),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
 	}
-	if err := prototype.DefineAccessorProperty("size", vm.ToValue(p.size), goja.Undefined(), goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+
+	if err := prototype.DefineAccessorProperty(
+		"size",
+		vm.ToValue(p.size),
+		goja.Undefined(),
+		goja.FLAG_FALSE, // configurable
+		goja.FLAG_FALSE, // enumerable
+	); err != nil {
 		return ErrInvalidInput
 	}
+
 	for _, property := range []struct {
 		object *goja.Object
 		name   string
@@ -70,7 +97,13 @@ func (p *searchParams) install() error {
 		{prototype, "constructor", constructor},
 		{vm.GlobalObject(), "URLSearchParams", constructor},
 	} {
-		if err := property.object.DefineDataProperty(property.name, property.value, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE); err != nil {
+		if err := property.object.DefineDataProperty(
+			property.name,
+			property.value,
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
 			return ErrInvalidInput
 		}
 	}
@@ -81,23 +114,30 @@ func (p *searchParams) install() error {
 // state. Failed construction consumes admitted work but retains no instance.
 func (p *searchParams) initialize(call goja.FunctionCall) goja.Value {
 	p.host.beginCall()
+
 	receiver, ok := call.Argument(0).(*goja.Object)
 	if !ok {
 		p.invalidInput()
 	}
+
 	input := call.Argument(1)
 	if goja.IsUndefined(input) {
 		input = p.host.vm.ToValue("")
 	}
+
 	text, ok := input.(goja.String)
 	if !ok {
 		p.invalidInput()
 	}
+
 	p.host.consumeInput(text.Length())
-	state := &searchParamsState{pairs: p.host.parseSearchParams(text)}
+	state := &searchParamsState{
+		pairs: p.host.parseSearchParams(text),
+	}
 	p.recount(state)
 	p.host.reserveOutput(1) // Retained native receiver metadata.
 	p.instances[receiver] = state
+
 	return goja.Undefined()
 }
 
@@ -105,14 +145,17 @@ func (p *searchParams) initialize(call goja.FunctionCall) goja.Value {
 // reading their properties or invoking authored traps.
 func (p *searchParams) begin(call goja.FunctionCall) *searchParamsState {
 	p.host.beginCall()
+
 	receiver, ok := call.This.(*goja.Object)
 	if !ok {
 		p.invalidInput()
 	}
+
 	state, ok := p.instances[receiver]
 	if !ok {
 		p.invalidInput()
 	}
+
 	return state
 }
 
@@ -123,17 +166,24 @@ func (p *searchParams) argument(value goja.Value) goja.String {
 	if !ok {
 		p.invalidInput()
 	}
+
 	p.host.consumeInput(text.Length())
+
 	return p.host.searchParamString(text)
 }
 
 // append adds a pair at the end without scanning existing tuples.
 func (p *searchParams) append(call goja.FunctionCall) goja.Value {
 	state := p.begin(call)
-	pair := searchParam{p.argument(call.Argument(0)), p.argument(call.Argument(1))}
+	pair := searchParam{
+		name:  p.argument(call.Argument(0)),
+		value: p.argument(call.Argument(1)),
+	}
 	p.host.reserveOutput(1)
 	p.addUnits(state, pair)
+
 	state.pairs = append(state.pairs, pair)
+
 	return goja.Undefined()
 }
 
@@ -141,9 +191,14 @@ func (p *searchParams) append(call goja.FunctionCall) goja.Value {
 // the position of unrelated pairs. Missing names append a new tuple.
 func (p *searchParams) set(call goja.FunctionCall) goja.Value {
 	state := p.begin(call)
-	pair := searchParam{p.argument(call.Argument(0)), p.argument(call.Argument(1))}
+	pair := searchParam{
+		name:  p.argument(call.Argument(0)),
+		value: p.argument(call.Argument(1)),
+	}
+
 	p.host.consumeInput(state.scanUnits)
 	retained, found := 0, false
+
 	for i, existing := range state.pairs {
 		p.poll(i)
 		if p.compare(existing.name, pair.name) == 0 {
@@ -155,33 +210,43 @@ func (p *searchParams) set(call goja.FunctionCall) goja.Value {
 		state.pairs[retained] = existing
 		retained++
 	}
+
 	clear(state.pairs[retained:])
+
 	state.pairs = state.pairs[:retained]
 	if !found {
 		p.host.reserveOutput(1)
 		state.pairs = append(state.pairs, pair)
 	}
+
 	p.recount(state)
+
 	return goja.Undefined()
 }
 
 // filterArguments normalizes the name and optional value used by has/delete.
 // An explicitly undefined value has the same meaning as omitting it.
-func (p *searchParams) filterArguments(call goja.FunctionCall) (goja.String, goja.String) {
+func (p *searchParams) filterArguments(
+	call goja.FunctionCall,
+) (goja.String, goja.String) {
 	name := p.argument(call.Argument(0))
+
 	var value goja.String
 	if !goja.IsUndefined(call.Argument(1)) {
 		value = p.argument(call.Argument(1))
 	}
+
 	return name, value
 }
 
 // delete removes matching names, optionally restricted to a matching value.
 func (p *searchParams) delete(call goja.FunctionCall) goja.Value {
 	state := p.begin(call)
+
 	name, value := p.filterArguments(call)
 	p.host.consumeInput(state.scanUnits)
 	retained := 0
+
 	for i, pair := range state.pairs {
 		p.poll(i)
 		if p.matches(pair, name, value) {
@@ -190,10 +255,12 @@ func (p *searchParams) delete(call goja.FunctionCall) goja.Value {
 		state.pairs[retained] = pair
 		retained++
 	}
+
 	// Release removed references even when the backing slice is retained.
 	clear(state.pairs[retained:])
 	state.pairs = state.pairs[:retained]
 	p.recount(state)
+
 	return goja.Undefined()
 }
 
