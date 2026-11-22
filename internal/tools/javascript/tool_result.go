@@ -70,7 +70,10 @@ var toolResultFactory = goja.MustCompile("tool-result-helper.js", `
     const prototype = freeze(create(null));
     const errorPrototype = freeze(create(null));
     return {
-        has, get, errorHas, errorGet,
+        has, 
+        get, 
+        errorHas, 
+        errorGet,
         helper: function toolResult(payload) {
             admitResult();
             if (arguments.length !== 1) throw new Invalid("toolResult requires one payload");
@@ -289,6 +292,7 @@ func decodeToolPayload(ctx context.Context, encoded []byte, target any) error {
 		}
 		return apjsruntime.RejectOutput(apjsruntime.OutputInvalidString)
 	}
+
 	// Encoded bytes bound decoded strings and native slots by fixed multiples.
 	// Charge decoding and canonical validation separately before native work.
 	for range 2 {
@@ -299,8 +303,10 @@ func decodeToolPayload(ctx context.Context, encoded []byte, target any) error {
 			return err
 		}
 	}
+
 	if err := util.DecodeJSONStrict(encoded, target); err != nil {
 		return apjsruntime.RejectOutput(apjsruntime.OutputInvalidShape)
 	}
+
 	return apjsruntime.ChargeWork(ctx, 0)
 }
