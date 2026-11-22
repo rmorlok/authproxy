@@ -165,7 +165,7 @@ func (s *outputState) encode(value goja.Value) (json.RawMessage, error) {
 	if exception := s.encoder.vm.Try(
 		func() { err = s.value(value, 0) },
 	); exception != nil {
-		return nil, ErrInvalidOutput
+		return nil, RejectOutput(OutputReflectionFailure)
 	}
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func (s *outputState) value(value goja.Value, depth int) error {
 	}
 
 	if value == nil {
-		return ErrInvalidOutput
+		return RejectOutput(OutputUnsupportedValue)
 	}
 	if goja.IsUndefined(value) {
 		if s.encoder.options.UndefinedAsNull {
@@ -198,7 +198,7 @@ func (s *outputState) value(value goja.Value, depth int) error {
 			// have already failed their container's property validation.
 			return s.append("null")
 		}
-		return ErrInvalidOutput
+		return RejectOutput(OutputUnsupportedValue)
 	}
 
 	if goja.IsNull(value) {
@@ -214,7 +214,7 @@ func (s *outputState) value(value goja.Value, depth int) error {
 	}
 
 	if _, ok := value.(*goja.Symbol); ok {
-		return ErrInvalidOutput
+		return RejectOutput(OutputUnsupportedValue)
 	}
 
 	switch value.ExportType().Kind() {
@@ -225,12 +225,12 @@ func (s *outputState) value(value goja.Value, depth int) error {
 	case reflect.Float64:
 		number := value.ToFloat()
 		if math.IsNaN(number) || math.IsInf(number, 0) {
-			return ErrInvalidOutput
+			return RejectOutput(OutputUnsupportedValue)
 		}
 		return s.append(strconv.FormatFloat(number, 'g', -1, 64))
 	default:
 		// BigInt and any future non-JSON primitive must not silently change type.
-		return ErrInvalidOutput
+		return RejectOutput(OutputUnsupportedValue)
 	}
 }
 
@@ -247,17 +247,17 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 
 	if !isArray &&
 		(exportType != e.objectExportType || object.ClassName() != "Object") {
-		return ErrInvalidOutput
+		return RejectOutput(OutputUnsupportedObject)
 	}
 
 	prototype := object.Prototype()
 	if prototype != nil && ((!isArray && prototype != e.objectPrototype) ||
 		(isArray && prototype != e.arrayPrototype)) {
-		return ErrInvalidOutput
+		return RejectOutput(OutputCustomPrototype)
 	}
 
 	if s.active[object] {
-		return ErrInvalidOutput
+		return RejectOutput(OutputCycle)
 	}
 	if err := ReserveAllocation(s.ctx, 1); err != nil {
 		return err
@@ -342,7 +342,7 @@ func (s *outputState) properties(
 
 		key, ok := keys.Get(strconv.FormatInt(i, 10)).(goja.String)
 		if !ok {
-			return ErrInvalidOutput
+			return RejectOutput(OutputSymbolKey)
 		}
 
 		value, enumerable, err := s.property(object, key)
@@ -389,7 +389,7 @@ func (s *outputState) array(
 	depth int,
 ) error {
 	if keyCount != length+1 {
-		return ErrInvalidOutput
+		return RejectOutput(OutputArrayShape)
 	}
 
 	for i := int64(0); i < keyCount; i++ {
@@ -399,7 +399,7 @@ func (s *outputState) array(
 
 		key, ok := keys.Get(strconv.FormatInt(i, 10)).(goja.String)
 		if !ok {
-			return ErrInvalidOutput
+			return RejectOutput(OutputSymbolKey)
 		}
 		if err := ChargeWork(s.ctx, key.Length()); err != nil {
 			return err
@@ -414,7 +414,7 @@ func (s *outputState) array(
 		}
 
 		if !key.SameAs(s.encoder.vm.ToValue(expected)) {
-			return ErrInvalidOutput
+			return RejectOutput(OutputArrayShape)
 		}
 	}
 
@@ -466,7 +466,7 @@ func (s *outputState) property(
 
 	descriptor, ok := descriptorValue.(*goja.Object)
 	if !ok {
-		return nil, false, ErrInvalidOutput
+		return nil, false, RejectOutput(OutputReflectionFailure)
 	}
 
 	if err := descriptor.SetPrototype(nil); err != nil {
@@ -476,7 +476,7 @@ func (s *outputState) property(
 	// Accessor descriptors always have get/set and no writable field, including
 	// accessors whose getter and setter are both undefined.
 	if descriptor.Get("writable") == nil {
-		return nil, false, ErrInvalidOutput
+		return nil, false, RejectOutput(OutputAccessor)
 	}
 
 	return descriptor.Get("value"), descriptor.Get("enumerable").ToBoolean(), nil
@@ -490,7 +490,7 @@ func outputReflectionError(err error) error {
 		*goja.StackOverflowError:
 		panic(err)
 	default:
-		return ErrInvalidOutput
+		return RejectOutput(OutputReflectionFailure)
 	}
 }
 

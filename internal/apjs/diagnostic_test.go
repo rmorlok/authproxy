@@ -126,10 +126,11 @@ func TestFailureDiagnosticDoesNotCoerceThrownValues(t *testing.T) {
 // TestFailureDiagnosticOutputOmitsPropertyNames identifies the conversion stage
 // without logging secret-derived property names or invoking rejected accessors.
 func TestFailureDiagnosticOutputOmitsPropertyNames(t *testing.T) {
-	for _, source := range []string{
-		`new Date(0)`,
-		`({[cfg.secret]: function() {}})`,
-		`({get [cfg.secret]() { for (;;) {} }})`,
+	for source, reason := range map[string]jsruntime.OutputRejectionReason{
+		`new Date(0)`:                                             jsruntime.OutputUnexpectedType,
+		`({[cfg.secret]: function() {}})`:                         jsruntime.OutputUnsupportedObject,
+		`({get [cfg.secret]() { for (;;) {} }})`:                  jsruntime.OutputAccessor,
+		`const result = {}; result[cfg.secret] = result; result;`: jsruntime.OutputCycle,
 	} {
 		// Neither a root rejection nor an encoder rejection can expose a JSON path.
 		_, err := NewContext(nil, map[string]any{"cfg": map[string]any{"secret": "privateDetail"}}).
@@ -137,7 +138,77 @@ func TestFailureDiagnosticOutputOmitsPropertyNames(t *testing.T) {
 		require.ErrorIs(t, err, jsruntime.ErrInvalidOutput)
 		diagnostic, ok := Diagnostic(err)
 		require.True(t, ok)
-		require.Equal(t, FailureDiagnostic{Category: jsruntime.ErrInvalidOutput.Error(), Phase: "output"}, diagnostic)
+		require.Equal(t, FailureDiagnostic{
+			Category: jsruntime.ErrInvalidOutput.Error(), Phase: "output", OutputReason: reason,
+		}, diagnostic)
+		require.NotContains(t, fmt.Sprintf("%+v %v", diagnostic, err), "privateDetail")
+	}
+}
+
+// TestFailureDiagnosticOutputReasonsAcrossAdapters covers root-contract failures
+// and nested shared-encoder errors retained through detached option conversion.
+func TestFailureDiagnosticOutputReasonsAcrossAdapters(t *testing.T) {
+	for _, test := range []struct {
+		name, kind, source string
+		reason             jsruntime.OutputRejectionReason
+	}{
+		{"object root", "object", `"privateDetail"`, jsruntime.OutputUnexpectedType},
+		{"predicate root", "boolean", `({[cfg.secret]: true})`, jsruntime.OutputUnexpectedType},
+		{"options root", "options", `({[cfg.secret]: true})`, jsruntime.OutputInvalidShape},
+		{"option item", "options", `["privateDetail"]`, jsruntime.OutputInvalidShape},
+		{"missing option field", "options", `[{value: "privateDetail"}]`, jsruntime.OutputInvalidShape},
+		{"nested option accessor", "options", `[{value: {get [cfg.secret]() {for (;;) {}}}, label: "label"}]`, jsruntime.OutputAccessor},
+		{"nested option cycle", "options", `const value = {}; value[cfg.secret] = value; [{value, label: "label"}]`, jsruntime.OutputCycle},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Each adapter sees a private key/value, but diagnoses only its fixed contract failure.
+			jsctx := NewContext(nil, map[string]any{"cfg": map[string]any{"secret": "privateDetail"}})
+			var err error
+			switch test.kind {
+			case "object":
+				_, err = jsctx.EvaluateObjectJSONWithContext(context.Background(), test.source, boundedObjectTestLimits())
+			case "boolean":
+				_, err = jsctx.EvaluateBooleanWithContext(context.Background(), test.source, boundedObjectTestLimits())
+			case "options":
+				_, err = jsctx.TransformOptionsWithContext(context.Background(), test.source, boundedObjectTestLimits())
+			}
+
+			// TransformOptions wraps the evaluation error again after native JSON conversion.
+			require.ErrorIs(t, err, jsruntime.ErrInvalidOutput)
+			require.EqualError(t, err, jsruntime.ErrInvalidOutput.Error())
+			diagnostic, ok := Diagnostic(fmt.Errorf("trusted wrapper: %w", err))
+			require.True(t, ok)
+			require.Equal(t, test.reason, diagnostic.OutputReason)
+			require.Equal(t, "output", diagnostic.Phase)
+			require.NotContains(t, fmt.Sprintf("%+v %v", diagnostic, err), "privateDetail")
+			require.Same(t, jsruntime.ErrInvalidOutput, errors.Unwrap(err))
+		})
+	}
+}
+
+// TestFailureDiagnosticOutputReasonRewrapping carries only a still-relevant
+// reason through connector wrappers and clears stale metadata on replacement.
+func TestFailureDiagnosticOutputReasonRewrapping(t *testing.T) {
+	original := withFailureDiagnostic(jsruntime.RejectOutput(jsruntime.OutputCycle), FailureDiagnostic{Phase: "output"})
+	previous, ok := Diagnostic(original)
+	require.True(t, ok)
+
+	// A second trusted wrapper preserves the already-sanitized conversion reason.
+	err := withFailureDiagnostic(fmt.Errorf("trusted wrapper: %w", original), FailureDiagnostic{Phase: "output"})
+	diagnostic, ok := Diagnostic(err)
+	require.True(t, ok)
+	require.Equal(t, previous, diagnostic)
+
+	for _, final := range []error{
+		context.Canceled, context.DeadlineExceeded, jsruntime.ErrLimitExceeded,
+		jsruntime.ErrEvaluation, jsruntime.ErrInvalidOutput, errors.New("privateDetail"),
+	} {
+		// A saved output reason must not survive replacement by a different failure.
+		err := withFailureDiagnostic(final, previous)
+		diagnostic, ok := Diagnostic(err)
+		require.True(t, ok)
+		require.Empty(t, diagnostic.OutputReason)
+		require.NotContains(t, fmt.Sprintf("%+v %v", diagnostic, err), "privateDetail")
 	}
 }
 
@@ -150,7 +221,7 @@ func TestFailureDiagnosticCancellation(t *testing.T) {
 	_, err := NewContext(nil, nil).evaluateJSONWithContext(ctx, "({})", boundedObjectTestLimits(), jsruntime.JSONOutputOptions{},
 		func(context.Context, *goja.Runtime, goja.Value) (goja.Value, error) {
 			cancel()
-			return nil, jsruntime.ErrInvalidOutput
+			return nil, jsruntime.RejectOutput(jsruntime.OutputCycle)
 		})
 	require.ErrorIs(t, err, context.Canceled)
 	diagnostic, ok := Diagnostic(err)
@@ -165,6 +236,17 @@ func TestFailureDiagnosticCancellation(t *testing.T) {
 	diagnostic, ok = Diagnostic(err)
 	require.True(t, ok)
 	require.Equal(t, FailureDiagnostic{Category: jsruntime.ErrLimitExceeded.Error(), Phase: "execute"}, diagnostic)
+
+	// A timeout after a trusted converter observes rejection likewise discards its reason.
+	_, err = NewContext(nil, nil).evaluateJSONWithContext(context.Background(), "({})", limits, jsruntime.JSONOutputOptions{},
+		func(runCtx context.Context, _ *goja.Runtime, _ goja.Value) (goja.Value, error) {
+			<-runCtx.Done()
+			return nil, jsruntime.RejectOutput(jsruntime.OutputCycle)
+		})
+	require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+	diagnostic, ok = Diagnostic(err)
+	require.True(t, ok)
+	require.Empty(t, diagnostic.OutputReason)
 }
 
 // TestFailureDiagnosticConcurrentReuse keeps each evaluation's stage and

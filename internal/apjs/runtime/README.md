@@ -935,10 +935,56 @@ accessors, proxies, sparse arrays, and non-finite numbers. Reflection intrinsics
 are captured before the callback, so authored changes to `Object`, `Reflect`,
 or `JSON` cannot replace conversion. Getters and `toJSON` are not called.
 
+### Output-rejection reasons
+
+`OutputReason(err)` lets trusted Go callers distinguish rejected output without
+changing the error shown to API clients. For example, an expression returning
+`({get count() { return 12; }})` fails with `OutputAccessor`; the getter is never
+called:
+
+```go
+result, err := program.Evaluate(ctx, nil)
+if reason, ok := runtime.OutputReason(err); ok {
+    logger.WarnContext(ctx, "JavaScript output rejected", "output_reason", reason)
+}
+```
+
+The error text remains `JavaScript result is not a supported JSON value`, and
+`errors.Is(err, runtime.ErrInvalidOutput)` still succeeds. The extractor also
+works through ordinary error wrappers. Expressions, async results, and trusted
+`ResultEncoder` conversions use the same reasons. A result encoder keeps its
+first failure even if an extension ignores it or attempts another conversion.
+
+| Reason | Meaning |
+| --- | --- |
+| `unsupported-value` | A non-JSON primitive, such as undefined, a symbol, BigInt, or a non-finite number. |
+| `unsupported-object` | An unsupported object kind, such as a function, Proxy, or reflected Go value. |
+| `custom-prototype` | An object or array has an unsupported prototype. |
+| `accessor` | A property uses a getter or setter instead of a data value. |
+| `cycle` | An object repeats on the current traversal path. |
+| `symbol-key` | An object has a symbol property key. |
+| `array-shape` | An array is sparse or has unsupported extra properties. |
+| `invalid-string` | Typed UTF-8 text contains an unpaired UTF-16 surrogate; raw JSON still preserves its escape. |
+| `reflection-failure` | Native property metadata could not be read safely. |
+| `unexpected-type` | A trusted adapter requires another root type, such as an object, boolean, or string. |
+| `invalid-shape` | A trusted adapter rejects the structure of otherwise supported data. |
+
+Adapters can return `RejectOutput(reason)` for their own output contract checks.
+It accepts only these fixed reasons; an unknown reason is discarded and produces
+the ordinary `ErrInvalidOutput` without diagnostic metadata.
+
+Reasons contain no values, source, property names, array indices, or retained VM
+state. Paths are intentionally omitted: keys can contain private data, and
+redacted paths would not reliably identify the field. Limit failures have no
+output-rejection reason. If cancellation, timeout, or shared-budget exhaustion
+overrides a rejection, the final error has no stale reason. These diagnostics
+do not enable automatic logging or change the accepted output values.
+
 ## Package boundary
 
-This package depends on Goja and the standard library. It has no imports from
-root `apjs`, `tools`, core, HTTP integration, or schema packages. Domain adapters
+This package uses Goja, the pinned URL parser, and the neutral HTTP primitives
+under `internal/apjs/http`. It has no imports from root `apjs`, `tools`, core,
+configured HTTP-client integration, or schema packages. Domain adapters
 choose input names, capabilities, authorization, and result interpretation.
 Bounded root `apjs` connector adapters use the same execution budget and pure
 utilities. Compatibility entry points that do not use this bounded lifecycle
