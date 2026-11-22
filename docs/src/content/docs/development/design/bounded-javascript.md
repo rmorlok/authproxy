@@ -235,12 +235,34 @@ so the host bounds its input through admission and checks cancellation before
 and after the call. URL components and later reads consume the same shared
 budget as other helpers.
 
-A structured diagnostic logger is a separate generic capability supplied by
-trusted Go code, using the existing logging/telemetry configuration. Bound
-authored log records under the execution policy and preserve fixed attribution.
-Do not automatically log arguments, configuration, credentials, HTTP bodies, or
-result payloads. Pure expression profiles receive the pure utilities without a
-logger or HTTP capability.
+### Authored structured logging
+
+Async adapters can supply `AsyncInvocation.Logger`, an existing `*slog.Logger`
+with captured host attribution. This explicitly enables the protected `console`
+subset: `debug`, `info`, `log`, `warn`, and `error`, each taking a primitive string
+message and an optional plain JSON field object. A nil logger leaves `console`
+unavailable; pure expressions and validation receive no authored logging host.
+
+Records use the fixed message `"JavaScript authored log"` and put authored
+content under `javascript.message` and `javascript.fields`. Fields are detached
+structured Go data, so authored keys cannot replace host identity or trace
+attributes. The supplied execution context and logger preserve the existing
+logging/telemetry configuration; no new provider or toggle is introduced.
+
+Logging is gated until initialization and Promise checks succeed, and closes
+before cleanup and result interpretation. Record conversion uses captured
+intrinsics without invoking getters, proxies, coercion, or `toJSON`. Combined
+message/field bytes and nodes obey the existing output boundaries, and all
+conversion and emission work consumes the execution's shared budget. Even
+suppressed levels validate and charge their records. Malformed calls fail with
+fixed errors; exhaustion prevents later effects. Trusted synchronous handlers
+must honor context and return promptly.
+
+Only explicitly authored messages and fields are emitted. Arguments,
+configuration, credentials, HTTP bodies, results, and exceptions are never
+logged automatically. See the [runtime logging contract and examples](https://github.com/rmorlok/authproxy/blob/main/internal/apjs/runtime/README.md#authored-structured-logging)
+for the supported subset. Tool adapter wiring and safe output-rejection reasons
+remain separate work.
 
 ## HTTP capability contract
 

@@ -1,6 +1,6 @@
 // Package runtime provides a bounded Goja lifecycle, native JSON conversion,
-// and optional asynchronous HTTP bindings for trusted host adapters. It has no
-// Tool, connection lookup, authorization, or HTTP-client selection policy.
+// and optional HTTP and authored logging bindings for trusted host adapters.
+// It has no Tool, connection lookup, authorization, or HTTP-client selection policy.
 package runtime
 
 import (
@@ -32,6 +32,7 @@ type Limits struct {
 	MaxInputBytes int
 
 	// MaxOutputBytes bounds emitted JSON, including punctuation and escaping.
+	// It also bounds each authored log record's combined message/fields encoding.
 	// A domain adapter's final result envelope needs a separate byte allowance.
 	MaxOutputBytes int
 
@@ -39,7 +40,8 @@ type Limits struct {
 	MaxDepth int
 
 	// MaxNodes bounds JSON values and object property inspections, separately
-	// for combined input and output. It does not count JavaScript instructions.
+	// for combined input, output, and each authored log record. It does not count
+	// JavaScript instructions.
 	MaxNodes int
 
 	// MaxStackDepth bounds JavaScript function call depth, including recursion.
@@ -52,7 +54,8 @@ type Limits struct {
 
 	// MaxWorkUnits bounds cumulative managed native operations, inspected
 	// bytes/code units, and visited values across the execution's conversions,
-	// pure utilities, and HTTP hosts. It does not meter JavaScript instructions.
+	// pure utilities, HTTP, and authored logging. It does not meter JavaScript
+	// instructions.
 	MaxWorkUnits int
 
 	// MaxAllocationUnits bounds cumulative managed buffer bytes, string UTF-16

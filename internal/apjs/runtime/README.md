@@ -190,6 +190,89 @@ encoding share one execution budget and deadline. Callers receive only detached 
 cancellation discards the result. Hosts return safe errors unchanged, while
 authored exceptions and rejection values remain private.
 
+## Authored structured logging
+
+Async execution can receive an explicit logging capability. The adapter supplies
+its existing `*slog.Logger` through `AsyncInvocation.Logger`; a nil logger leaves
+`console` unavailable. There is no fallback to the process default logger.
+Pure expressions and validation receive no authored logger.
+
+For example, an adapter can capture the job's identity in its configured logger
+before running the program:
+
+```go
+jobLogger := logger.With("job_id", "sync-example")
+result, err := program.Evaluate(ctx, func(
+    runCtx context.Context, vm *goja.Runtime, invocation *runtime.AsyncInvocation,
+) error {
+    invocation.Logger = jobLogger
+    return invocation.PrepareInput(runCtx, vm, runtime.AsyncInput{
+        Params: json.RawMessage(`{"count":12}`),
+    }, limits, nil)
+})
+```
+
+The program can then report a selected event:
+
+```javascript
+async function execute(params, context) {
+    console.info("Page processed", {count: params.count, complete: true});
+    return {processed: params.count};
+}
+```
+
+The record's top-level message is always `"JavaScript authored log"`. Authored
+content is nested beneath `javascript`, separate from the host's attribution:
+
+```json
+{
+  "msg": "JavaScript authored log",
+  "job_id": "sync-example",
+  "javascript": {
+    "message": "Page processed",
+    "fields": {"count": 12, "complete": true}
+  }
+}
+```
+
+`console.debug`, `info`, `log`, `warn`, and `error` take a primitive string message
+and an optional plain JSON object of fields. `log` uses the info level. Omitting
+fields, or passing `undefined`, omits the `fields` attribute. Nested objects,
+dense arrays, strings, finite numbers, booleans, and null are supported inside
+the field object. A top-level array or null, extra arguments, accessors, proxies,
+cycles, and other unsupported values raise a fixed, catchable `TypeError`.
+Methods return `undefined`; there is no format-string interpolation or arbitrary
+argument printing. String decoding replaces lone UTF-16 surrogates with U+FFFD.
+
+The runtime captures conversion intrinsics before authored code runs. It does
+not call coercion hooks, getters, or `toJSON`, and passes only detached Go data
+to the logger. `console` and its methods are protected; borrowing a method keeps
+its original logger. Authored keys such as `trace_id`, `connection_id`, or `level`
+stay inside `javascript.fields` and cannot replace host attribution. Keep trusted
+attributes outside the reserved `javascript` group. Passing `runCtx` to `LogAttrs`
+preserves the existing logging/telemetry pipeline's trace
+context; the runtime creates no telemetry provider or configuration toggle.
+
+Logging becomes available only after initialization and its Promise checks
+succeed. It closes before host cleanup and result interpretation. Earlier
+records remain emitted if later execution fails. The runtime never logs input,
+configuration, credentials, HTTP bodies, results, or exception text automatically;
+only the values explicitly passed to these methods become authored log content.
+
+Each record shares `MaxOutputBytes` and `MaxNodes` across its message and fields;
+each value starts at depth zero under `MaxDepth`. Conversion and emission consume
+the execution's cumulative work/allocation budget, including temporary JSON and
+the detached Go tree. Disabling a level in the logger suppresses emission but
+still validates, converts, and charges the call. Budget exhaustion is terminal;
+catching an error cannot permit another log or HTTP request. Native JSON decoding
+is bounded by the admitted record and checks cancellation before and after it.
+The supplied logging handler is trusted synchronous code: it must honor context
+and return promptly, since the runtime cannot interrupt a blocked handler.
+
+The HTTP host's `HTTPOptions.Logger` remains its separate internal diagnostic
+sink. Supplying that option does not enable `console`, and Tool adapters do not
+yet expose this authored logging capability.
+
 ## Trusted result extensions
 
 Use `CompileExtendedAsync` when an adapter needs a typed Go result instead of
