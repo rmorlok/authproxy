@@ -112,18 +112,22 @@ func TestAsyncIgnoresSourceMapResources(t *testing.T) {
 	require.NoError(t, program.Validate(context.Background()))
 
 	// Initialize also disables a caller-supplied loader before any authored code runs.
-	err := jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
-		loads := 0
-		vm.SetParserOptions(parser.WithSourceMapLoader(func(string) ([]byte, error) {
-			loads++
-			return nil, fmt.Errorf("source maps must not be loaded")
-		}))
-		execute, err := program.Initialize(vm)
-		require.NoError(t, err)
-		require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
-		require.Zero(t, loads)
-		return nil
-	})
+	err := jsruntime.Run(
+		context.Background(),
+		runtimeLimits(),
+		func(_ context.Context, vm *goja.Runtime) error {
+			loads := 0
+			vm.SetParserOptions(parser.WithSourceMapLoader(func(string) ([]byte, error) {
+				loads++
+				return nil, fmt.Errorf("source maps must not be loaded")
+			}))
+			execute, err := program.Initialize(vm)
+			require.NoError(t, err)
+			require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
+			require.Zero(t, loads)
+			return nil
+		},
+	)
 	require.NoError(t, err)
 }
 
@@ -167,17 +171,21 @@ func TestAsyncReusesHelperProgramInFreshRuntimes(t *testing.T) {
 		t.Run(fmt.Sprintf("runtime-%d", i), func(t *testing.T) {
 			t.Parallel()
 			// The immutable programs can be shared; each VM owns its helper state.
-			err := jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
-				execute, err := program.Initialize(vm)
-				require.NoError(t, err)
-				require.Equal(t, "contact:1", asyncValue(t, execute).String())
-				require.Equal(t, "contact:2", asyncValue(t, execute).String())
+			err := jsruntime.Run(
+				context.Background(),
+				runtimeLimits(),
+				func(_ context.Context, vm *goja.Runtime) error {
+					execute, err := program.Initialize(vm)
+					require.NoError(t, err)
+					require.Equal(t, "contact:1", asyncValue(t, execute).String())
+					require.Equal(t, "contact:2", asyncValue(t, execute).String())
 
-				// Validation uses another private VM without mutating this invocation's state.
-				require.NoError(t, program.Validate(context.Background()))
-				require.Equal(t, "contact:3", asyncValue(t, execute).String())
-				return nil
-			})
+					// Validation uses another private VM without mutating this invocation's state.
+					require.NoError(t, program.Validate(context.Background()))
+					require.Equal(t, "contact:3", asyncValue(t, execute).String())
+					return nil
+				},
+			)
 			require.NoError(t, err)
 		})
 	}
@@ -390,20 +398,24 @@ func TestAsyncHostBindingsAreCallerOwned(t *testing.T) {
 	bindings[0].Name = "different"
 	bindings[0].PreserveEnumerable = false
 	bindings[1].PreserveEnumerable = true
-	err = jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
-		require.NoError(t, vm.Set("custom", "input"))
-		require.NoError(t, vm.Set("capability", "host"))
-		execute, err := program.Initialize(vm)
-		require.NoError(t, err)
-		require.Equal(t, "input:host", asyncValue(t, execute).String())
+	err = jsruntime.Run(
+		context.Background(),
+		runtimeLimits(),
+		func(_ context.Context, vm *goja.Runtime) error {
+			require.NoError(t, vm.Set("custom", "input"))
+			require.NoError(t, vm.Set("capability", "host"))
+			execute, err := program.Initialize(vm)
+			require.NoError(t, err)
+			require.Equal(t, "input:host", asyncValue(t, execute).String())
 
-		// Data bindings keep existing visibility; capabilities become non-enumerable.
-		require.Contains(t, vm.GlobalObject().Keys(), "custom")
-		require.NotContains(t, vm.GlobalObject().Keys(), "capability")
-		_, err = vm.RunString(`"use strict"; custom = "changed";`)
-		require.Error(t, err)
-		return nil
-	})
+			// Data bindings keep existing visibility; capabilities become non-enumerable.
+			require.Contains(t, vm.GlobalObject().Keys(), "custom")
+			require.NotContains(t, vm.GlobalObject().Keys(), "capability")
+			_, err = vm.RunString(`"use strict"; custom = "changed";`)
+			require.Error(t, err)
+			return nil
+		},
+	)
 	require.NoError(t, err)
 }
 

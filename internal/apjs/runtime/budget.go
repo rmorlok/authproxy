@@ -43,6 +43,7 @@ func WithExecutionBudget(ctx context.Context, limits Limits) (context.Context, e
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	parent := executionBudgetFromContext(ctx)
 	var state *executionBudgetState
 	if parent != nil {
@@ -53,10 +54,14 @@ func WithExecutionBudget(ctx context.Context, limits Limits) (context.Context, e
 	} else {
 		state = &executionBudgetState{done: make(chan struct{})}
 	}
+
 	budget := &executionBudget{
-		state: state, parent: parent,
-		maxWorkUnits: limits.MaxWorkUnits, maxAllocationUnits: limits.MaxAllocationUnits,
+		state:              state,
+		parent:             parent,
+		maxWorkUnits:       limits.MaxWorkUnits,
+		maxAllocationUnits: limits.MaxAllocationUnits,
 	}
+
 	return context.WithValue(ctx, executionBudgetKey{}, budget), nil
 }
 
@@ -66,7 +71,9 @@ func executionBudgetFromContext(ctx context.Context) *executionBudget {
 	if ctx == nil {
 		return nil
 	}
+
 	budget, _ := ctx.Value(executionBudgetKey{}).(*executionBudget)
+
 	return budget
 }
 
@@ -76,6 +83,7 @@ func executionBudgetDone(ctx context.Context) <-chan struct{} {
 	if budget := executionBudgetFromContext(ctx); budget != nil {
 		return budget.state.done
 	}
+
 	return nil
 }
 
@@ -102,12 +110,15 @@ func chargeExecution(ctx context.Context, work, allocation int) error {
 	if ctx == nil || work < 0 || allocation < 0 {
 		return ErrInvalidInput
 	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+
 	if budget := executionBudgetFromContext(ctx); budget != nil {
 		return budget.charge(work, allocation)
 	}
+
 	return nil
 }
 
@@ -117,19 +128,24 @@ func chargeExecution(ctx context.Context, work, allocation int) error {
 func (b *executionBudget) charge(work, allocation int) error {
 	b.state.mu.Lock()
 	defer b.state.mu.Unlock()
+
 	if b.state.exhausted {
 		return ErrLimitExceeded
 	}
+
 	for scope := b; scope != nil; scope = scope.parent {
-		if work > scope.maxWorkUnits-scope.workUnits || allocation > scope.maxAllocationUnits-scope.allocationUnits {
+		if work > scope.maxWorkUnits-scope.workUnits ||
+			allocation > scope.maxAllocationUnits-scope.allocationUnits {
 			b.exhaustLocked()
 			return ErrLimitExceeded
 		}
 	}
+
 	for scope := b; scope != nil; scope = scope.parent {
 		scope.workUnits += work
 		scope.allocationUnits += allocation
 	}
+
 	return nil
 }
 
