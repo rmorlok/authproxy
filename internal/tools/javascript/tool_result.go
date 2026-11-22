@@ -63,8 +63,10 @@ var toolResultFactory = goja.MustCompile("tool-result-helper.js", `
 // Ordinary rejections remain private execution failures; ToolError is separate.
 func toolResultExtension() apjsruntime.ResultExtension[*Result] {
 	return apjsruntime.ResultExtension[*Result]{
-		Bindings: []apjsruntime.HostBinding{{Name: "toolResult"}},
-		Install:  installToolResult,
+		Bindings: []apjsruntime.HostBinding{
+			{Name: "toolResult"},
+		},
+		Install: installToolResult,
 	}
 }
 
@@ -78,12 +80,17 @@ type toolResultInterpreter struct {
 // installToolResult installs the pure helper before authored initialization in
 // both validation and evaluation. Discarded handles do not stay alive through a
 // Go registry, but every creation still consumes the execution's shared budget.
-func installToolResult(ctx context.Context, vm *goja.Runtime) (apjsruntime.ResultInterpreter[*Result], error) {
+func installToolResult(
+	ctx context.Context,
+	vm *goja.Runtime,
+) (apjsruntime.ResultInterpreter[*Result], error) {
 	var empty apjsruntime.ResultInterpreter[*Result]
+
 	value, err := vm.RunProgram(toolResultFactory)
 	if err != nil {
 		return empty, apjsruntime.EvaluationError(err)
 	}
+
 	factory, _ := goja.AssertFunction(value)
 	admit := vm.ToValue(func(goja.FunctionCall) goja.Value {
 		err := apjsruntime.ChargeWork(ctx, 1)
@@ -98,19 +105,25 @@ func installToolResult(ctx context.Context, vm *goja.Runtime) (apjsruntime.Resul
 			vm.Interrupt(err)
 			panic(vm.NewTypeError("tool result budget exhausted"))
 		}
+
 		return goja.Undefined()
 	})
+
 	value, err = factory(goja.Undefined(), admit)
 	if err != nil {
 		return empty, apjsruntime.EvaluationError(err)
 	}
+
 	registry := value.ToObject(vm)
 	has, _ := goja.AssertFunction(registry.Get("has"))
 	get, _ := goja.AssertFunction(registry.Get("get"))
+
 	if err := vm.Set("toolResult", registry.Get("helper")); err != nil {
 		return empty, apjsruntime.ErrInvalidInput
 	}
+
 	interpreter := &toolResultInterpreter{has: has, get: get}
+
 	return apjsruntime.ResultInterpreter[*Result]{Fulfilled: interpreter.fulfilled}, nil
 }
 
@@ -118,24 +131,32 @@ func installToolResult(ctx context.Context, vm *goja.Runtime) (apjsruntime.Resul
 // MaxOutputBytes counts the ordinary JSON or the entire authored helper payload,
 // including media and metadata. Derived text and the trusted envelope still need
 // the executor's separate limit on the complete serialized invocation result.
-func (i *toolResultInterpreter) fulfilled(ctx context.Context, value goja.Value, encoder *apjsruntime.ResultEncoder) (*Result, error) {
+func (i *toolResultInterpreter) fulfilled(
+	ctx context.Context,
+	value goja.Value,
+	encoder *apjsruntime.ResultEncoder,
+) (*Result, error) {
 	branded, err := i.has(goja.Undefined(), value)
 	if err != nil {
 		return nil, apjsruntime.EvaluationError(err)
 	}
+
 	if branded.ToBoolean() {
 		value, err = i.get(goja.Undefined(), value)
 		if err != nil {
 			return nil, apjsruntime.EvaluationError(err)
 		}
 	}
+
 	encoded, err := encoder.Encode(value)
 	if err != nil {
 		return nil, err
 	}
+
 	if err := apjsruntime.ReserveAllocation(ctx, 1); err != nil {
 		return nil, err
 	}
+
 	result := &Result{Content: []api.ToolContentBlock{}}
 	if !branded.ToBoolean() {
 		result.StructuredContent = common.RawJSON(encoded)
@@ -146,21 +167,28 @@ func (i *toolResultInterpreter) fulfilled(ctx context.Context, value goja.Value,
 			if err := apjsruntime.ChargeWork(ctx, len(encoded)); err != nil {
 				return nil, err
 			}
+
 			for range 2 {
 				if err := apjsruntime.ReserveAllocation(ctx, len(encoded)); err != nil {
 					return nil, err
 				}
 			}
+
 			if err := apjsruntime.ReserveAllocation(ctx, 1); err != nil {
 				return nil, err
 			}
+
 			// Unlike Go's JSON decoder, Unquote rejects lone UTF-16 units
 			// instead of silently changing them to replacement characters.
 			text, err := strconv.Unquote(string(encoded))
 			if err != nil {
 				return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidString)
 			}
-			result.Content = append(result.Content, api.ToolContentBlock{Type: api.ToolContentTypeText, Text: &text})
+
+			result.Content = append(result.Content, api.ToolContentBlock{
+				Type: api.ToolContentTypeText,
+				Text: &text,
+			})
 		}
 	} else {
 		if encoded[0] != '{' {
@@ -202,8 +230,10 @@ func (i *toolResultInterpreter) fulfilled(ctx context.Context, value goja.Value,
 			}
 		}
 	}
+
 	if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
