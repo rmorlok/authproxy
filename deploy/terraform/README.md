@@ -1,12 +1,13 @@
 # Terraform: AuthProxy AWS infrastructure
 
-Three-module layout for AWS infrastructure:
+Module layout for AWS infrastructure:
 
 ```
 deploy/terraform/
-├── bootstrap/   # S3 state bucket + DynamoDB lock table (local state, one-time)
-├── eks/         # VPC, EKS, IAM OIDC, Route53 (S3 remote state)
-└── blog/       # Private S3 + CloudFront blog, Route53 records, GH deploy role
+├── bootstrap/    # S3 state bucket + DynamoDB lock table (local state, one-time)
+├── eks/          # VPC, EKS, IAM OIDC, Route 53
+├── blog/         # Private S3 + CloudFront blog, Route 53 records, GitHub deploy role
+└── apex-redirect/ # Temporary CloudFront redirect from authproxy.net to the docs
 ```
 
 | Module        | Backend          | Apply order | Why                                            |
@@ -14,6 +15,7 @@ deploy/terraform/
 | `bootstrap/`  | local            | First       | Creates the resources the eks/ backend uses    |
 | `eks/`        | S3 (from bootstrap) | Second   | The main infrastructure                        |
 | `blog/`       | S3 (from bootstrap) | After EKS | Static blog; reads the existing Route53 zone and GitHub OIDC provider |
+| [`apex-redirect/`](apex-redirect/) | S3 (from bootstrap) | After EKS | Temporary apex redirect; uses the existing Route 53 zone |
 
 See each module's README for details. This file covers the cross-module
 apply procedure and one-time manual steps. For ongoing operations
