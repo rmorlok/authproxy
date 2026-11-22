@@ -202,19 +202,38 @@ No initialization path, including async work, can send a request.
 
 ### Reusable utility hosts
 
-Every bounded VM receives the implemented pure utilities: `URLSearchParams`,
+Every bounded VM receives the implemented pure utilities: `URL`, `URLSearchParams`,
 `TextEncoder`, `TextDecoder`, `atob`, and `btoa`. Their names are reserved and
 protected before authored initialization. Pure expressions, connector helpers,
 validation, and async execution use the same utility surface. There are no
-per-utility enable flags. `URL` remains a planned helper; reserving a future name
-does not make its implementation available. Each helper documents its supported
-semantics rather than promising complete browser or Node compatibility.
+per-utility enable flags. Each helper documents its supported semantics rather
+than promising complete browser or Node compatibility.
+
+`new URL(input, base?)` parses an HTTP(S) URL from primitive strings and retains
+immutable parsed state.
+For example, `new URL("../contacts", "https://api.example/v1/users/").href`
+is `"https://api.example/v1/contacts"`. A supplied base must also be HTTP(S),
+even when the input is absolute. Read-only component getters and explicit
+`toString()`/`toJSON()` serialization are supported. Setters, static parse
+helpers, and linked `searchParams` are not. `URLSearchParams` remains an
+independent query helper. Pass `.href` to fetch or return it in a result:
+neither fetch nor the safe result converter implicitly serializes a URL object.
+See the [runtime's supported URL surface](https://github.com/rmorlok/authproxy/blob/main/internal/apjs/runtime/README.md#urls)
+for the full contract.
 
 Pure utilities perform no I/O. Their work and temporary/retained allocations
 consume the execution's shared budget together with input conversion, output
 conversion, and managed HTTP operations. They receive neither an independent
 allowance nor a new allowance for each call. The caller defines one execution
 policy; lower layers inherit its remaining budget.
+
+URL parsing reserves a conservative quadratic work and allocation allowance
+before entering the native parser, including the serialized base when resolving
+a relative URL. This covers repeated prefix copies in the pinned parser.
+Normalization polls cancellation; the native parser has no cancellation hook,
+so the host bounds its input through admission and checks cancellation before
+and after the call. URL components and later reads consume the same shared
+budget as other helpers.
 
 A structured diagnostic logger is a separate generic capability supplied by
 trusted Go code, using the existing logging/telemetry configuration. Bound

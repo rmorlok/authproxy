@@ -105,8 +105,9 @@ change never persists to the snapshot or another evaluation. Compiled programs
 and immutable snapshots may be reused concurrently. No Go maps, structs,
 methods, connection handles, or credentials are reflected into the runtime.
 
-Only standard Goja language facilities are available. There is no `fetch`,
-timer, module loader, filesystem, process environment, or application logger.
+Standard Goja language facilities and the shared runtime's pure utilities are
+available. There is no `fetch`, timer, module loader, filesystem, process
+environment, or application logger.
 The [HTTP response mapper](../httpcodec/README.md#response-transforms) uses this
 runtime for `transformJavascript`, preparing the response object and converting
 the projection into a rich result. Expressions do not receive connector helper
@@ -192,7 +193,8 @@ Tool, expression, and connector library parsing, including dynamic
 
 Every bounded Tool VM includes the shared runtime's
 [base64 helpers](../../apjs/runtime/README.md#base64-helpers),
-[UTF-8 codecs](../../apjs/runtime/README.md#text-codecs), and
+[UTF-8 codecs](../../apjs/runtime/README.md#text-codecs),
+[HTTP(S) URL parsing](../../apjs/runtime/README.md#urls), and
 [query helpers](../../apjs/runtime/README.md#query-strings). Their names are
 reserved during validation, initialization, and execution. They grant no HTTP
 capability. All managed utility, input/result conversion, and HTTP work consumes
@@ -366,7 +368,9 @@ The supported Fetch subset is explicit:
 | Response body | Single-use async `text()`, `json()`, or `arrayBuffer()`. A second admitted read rejects. If worker admission is refused, `bodyUsed` stays false and the read can be retried after other work finishes. |
 
 There are no `Request`/`Headers` constructors, streaming readers, cloning,
-per-request abort signals, timers, or URL/text/base64 helpers in this slice.
+per-request abort signals, or timers. Use `new URL(path, base).href` to resolve a
+URL before passing its primitive string to fetch; URL objects are not accepted
+as request URLs. Return `.href` explicitly when including a URL in a Tool result.
 JSON parsing uses the captured native parser and the runtime's depth/node limits.
 Binary reads preserve bytes; text reads decode UTF-8 with replacement for invalid
 sequences. Known sensitive response headers are filtered by the HTTP session.

@@ -222,7 +222,7 @@ func TestSearchParamsConstructorAndBrands(t *testing.T) {
 }
 
 // TestSearchParamsProtectedSurface retains the installed helper contract while
-// leaving unsupported iteration and general URL functionality unavailable.
+// leaving unsupported query iteration unavailable.
 func TestSearchParamsProtectedSurface(t *testing.T) {
 	source := `(() => {"use strict";
 		const p = new URLSearchParams("x=1");
@@ -253,7 +253,7 @@ func TestSearchParamsProtectedSurface(t *testing.T) {
 	// Read-only host properties resist reassignment and descriptor replacement.
 	got, err := evaluateSource(context.Background(), searchParamsLimits(), source)
 	require.NoError(t, err)
-	require.JSONEq(t, `[true,true,true,1,"x=1",["undefined","undefined","undefined","undefined","undefined","undefined"]]`, string(got))
+	require.JSONEq(t, `[true,true,true,1,"x=1",["function","undefined","undefined","undefined","undefined","undefined"]]`, string(got))
 }
 
 // TestSearchParamsNativeResults builds independent native arrays without
