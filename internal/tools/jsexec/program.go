@@ -39,7 +39,11 @@ type Program struct {
 // Schema compilation is synchronous and still needs the separately tracked
 // evaluation/compilation work bound before public invocation can be enabled.
 // Compiler errors are for trusted callers, not model-facing ToolResult messages.
-func Compile(definition toolschema.ToolDefinition, library *apjs.Library, limits Limits) (*Program, error) {
+func Compile(
+	definition toolschema.ToolDefinition,
+	library *apjs.Library,
+	limits Limits,
+) (*Program, error) {
 	if definition.Javascript == nil || definition.ProxyHTTP != nil {
 		return nil, errors.New("JavaScript Tool requires only the javascript executor")
 	}
@@ -59,6 +63,7 @@ func Compile(definition toolschema.ToolDefinition, library *apjs.Library, limits
 		copy := *library
 		capturedLibrary = &copy
 	}
+
 	script, err := javascript.CompileTool(*definition.Javascript, capturedLibrary, limits.Runtime)
 	if err != nil {
 		return nil, fmt.Errorf("JavaScript Tool source: %w", err)
