@@ -304,6 +304,10 @@ func (h *RemoteAuthProxy) ForceConnectorGenerationState(t *testing.T, connectorI
 	return updated
 }
 
+// InitiateOAuth2Connection starts an OAuth2 connection as the user actor in
+// ConnectionNamespace and returns its id and the provider redirect URL. The
+// connection is disconnected when the test finishes; see
+// cleanupConnectionOnTestEnd.
 func (h *RemoteAuthProxy) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToURL string) (connectionID, redirectURL string) {
 	t.Helper()
 
@@ -314,13 +318,18 @@ func (h *RemoteAuthProxy) InitiateOAuth2Connection(t *testing.T, connectorID api
 		returnToURL,
 	), true, http.StatusOK, &action)
 	require.NotNil(t, action.Status)
+	require.NotEmpty(t, action.Metadata.Target.ID)
+	h.cleanupConnectionOnTestEnd(t, action.Metadata.Target.ID)
 	require.Equal(t, schemaapi.ConnectionSetupResponseTypeRedirect, action.Status.Type)
 	require.NotEmpty(t, action.Status.RedirectURL)
-	require.NotEmpty(t, action.Metadata.Target.ID)
 	require.Equal(t, h.ConnectionNamespace, h.GetConnection(t, action.Metadata.Target.ID).Metadata.Namespace)
 	return action.Metadata.Target.ID, action.Status.RedirectURL
 }
 
+// InitiateAPIKeyConnection starts an API-key connection as the user actor in
+// ConnectionNamespace and returns its id and the credentials form step. The
+// connection is disconnected when the test finishes; see
+// cleanupConnectionOnTestEnd.
 func (h *RemoteAuthProxy) InitiateAPIKeyConnection(t *testing.T, connectorID apid.ID) (connectionID, stepID string) {
 	t.Helper()
 
@@ -331,11 +340,36 @@ func (h *RemoteAuthProxy) InitiateAPIKeyConnection(t *testing.T, connectorID api
 		"",
 	), true, http.StatusOK, &action)
 	require.NotNil(t, action.Status)
+	require.NotEmpty(t, action.Metadata.Target.ID)
+	h.cleanupConnectionOnTestEnd(t, action.Metadata.Target.ID)
 	require.Equal(t, schemaapi.ConnectionSetupResponseTypeForm, action.Status.Type)
 	require.NotEmpty(t, action.Status.StepID)
-	require.NotEmpty(t, action.Metadata.Target.ID)
 	require.Equal(t, h.ConnectionNamespace, h.GetConnection(t, action.Metadata.Target.ID).Metadata.Namespace)
 	return action.Metadata.Target.ID, action.Status.StepID
+}
+
+// cleanupConnectionOnTestEnd registers a test cleanup that disconnects
+// connectionID. Remote rigs run against long-lived deployments, so a leaked
+// connection would keep refreshing tokens against the provider indefinitely.
+// It is registered as soon as the connection exists, before any assertion can
+// stop the test, and runs before earlier-registered cleanups such as actor
+// deletion, so the user actor can still authorize the request.
+func (h *RemoteAuthProxy) cleanupConnectionOnTestEnd(t *testing.T, connectionID string) {
+	t.Helper()
+	t.Cleanup(func() {
+		h.DisconnectConnection(t, connectionID)
+	})
+}
+
+// DisconnectConnection asks the server to disconnect connectionID as the user
+// actor. The server revokes credentials and soft-deletes the connection in a
+// background workflow, so this returns without waiting for it to finish. A 404
+// is accepted because the connection may already be gone.
+func (h *RemoteAuthProxy) DisconnectConnection(t *testing.T, connectionID string) {
+	t.Helper()
+
+	endpoint := h.PublicURL + "/api/v1/connections/" + url.PathEscape(connectionID) + "/_disconnect"
+	h.doSignedAllowing(t, h.UserActorExternalID, h.UserActorNamespace, http.MethodPost, endpoint, connectionDisconnectAction(connectionID), true, []int{http.StatusOK, http.StatusNotFound}, nil)
 }
 
 func (h *RemoteAuthProxy) GetConnection(t *testing.T, connectionID string) connectionschema.Connection {

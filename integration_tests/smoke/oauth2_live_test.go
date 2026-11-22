@@ -91,7 +91,8 @@ func smokeUserPermissions(connectionNamespace string) []aschema.Permission {
 		{
 			Namespace: connectionNamespace,
 			Resources: []string{"connections"},
-			Verbs:     []string{"create", "get", "proxy"},
+			// disconnect lets the rig remove each connection on test cleanup.
+			Verbs: []string{"create", "get", "proxy", "disconnect"},
 		},
 	}
 }
@@ -130,7 +131,9 @@ func TestSmokePermissionsRespectActorHierarchy(t *testing.T) {
 }
 
 // newRemoteSmokeRig provisions per-run smoke admin and user actors whose
-// connections live in a per-run namespace under root.smoke. Smoke runs never
+// connections live in a per-run namespace under root.smoke. The rig
+// disconnects every connection it initiates on cleanup; the per-run namespace
+// itself remains because the API has no namespace deletion. Smoke runs never
 // create namespaces, actors, or connections under root.demo, which holds the
 // interactive demo's data; tests that exercise a seeded root.demo connector
 // connect through a root.smoke copy of it instead.
