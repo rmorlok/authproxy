@@ -58,10 +58,10 @@ type AsyncProgram struct {
 // unbraced conditional declarations of reserved names are rejected anywhere in
 // a library because they can reach the global object. A helper library cannot
 // declare execute because that entry point belongs to the main program. The
-// caller supplies domain-specific host bindings. The shared fetch name is always
-// reserved, even when direct HTTP is disabled; pure utility names are reserved
-// too. Explicit descriptors may repeat these defaults but cannot preserve
-// enumerability. Malformed binding options return ErrInvalidInput.
+// caller supplies domain-specific host bindings. The shared fetch and console
+// names are always reserved, even without those capabilities; pure utility names
+// are reserved too. Explicit descriptors may repeat these defaults but cannot
+// preserve enumerability. Malformed binding options return ErrInvalidInput.
 func CompileAsync(
 	source string,
 	library CompiledLibrary,
@@ -79,7 +79,7 @@ func CompileAsync(
 
 	// Existing adapters may already reserve these names. Reuse those bindings,
 	// preserving the shared non-enumerable policy and rejecting real duplicates.
-	builtins := append([]HostBinding{{Name: "fetch"}}, utilityBindings()...)
+	builtins := append([]HostBinding{{Name: "fetch"}, {Name: "console"}}, utilityBindings()...)
 	for _, builtin := range builtins {
 		found := false
 		for _, binding := range bindings {

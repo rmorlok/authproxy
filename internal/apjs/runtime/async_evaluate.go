@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/dop251/goja"
 )
@@ -19,6 +20,17 @@ type AsyncInvocation struct {
 	// Context is the second execute argument, with the same ownership as Params.
 	// Adapters decide its shape and any global aliases; the runtime adds none.
 	Context goja.Value
+
+	// Logger optionally enables structured console logging during execute. Nil
+	// leaves console undefined; it never falls back to the default logger. Supply
+	// the application's instrumented logger with trusted attribution already
+	// bound using With outside the reserved javascript group. Authored fields
+	// are nested there and cannot replace those attributes. The runtime owns the
+	// emission gate, separate from Start/Close: initialization, cleanup, and result
+	// conversion cannot log.
+	// Handlers receive detached Go data and runCtx synchronously and must return
+	// promptly. They must not retain or access VM state.
+	Logger *slog.Logger
 
 	// Start enables optional host capabilities only after initialization and its
 	// Promise jobs succeed. Hosts must refuse I/O before this callback runs.
@@ -101,11 +113,13 @@ func (p *AsyncProgram) evaluate(
 ) error {
 	tracker := NewPromiseTracker(vm)
 	defer tracker.Close()
+	logging := newLogHost(runCtx, vm, p.limits)
 
 	// Register cleanup before installing helpers or preparing hosts, including
 	// partial preparation failure and interrupts during subsequent VM calls.
 	invocation := &AsyncInvocation{}
 	closeHost := func() {
+		logging.close()
 		if close := invocation.Close; close != nil {
 			invocation.Close = nil
 			close()
@@ -123,6 +137,9 @@ func (p *AsyncProgram) evaluate(
 
 	if invocation.Params == nil || invocation.Context == nil {
 		return ErrInvalidInput
+	}
+	if err := logging.install(invocation.Logger); err != nil {
+		return err
 	}
 
 	if err := runCtx.Err(); err != nil {
@@ -145,6 +162,7 @@ func (p *AsyncProgram) evaluate(
 	if invocation.Start != nil {
 		invocation.Start()
 	}
+	logging.start()
 
 	root, err := tracker.callAsync(execute, invocation.Params, invocation.Context)
 	if err != nil {
