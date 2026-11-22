@@ -26,8 +26,19 @@ type Result struct {
 	// Ordinary strings also produce one text block; other ordinary values do not.
 	Content []api.ToolContentBlock `json:"content" yaml:"content"`
 
-	// Provider is optional administrator-selected extension metadata. When
-	// present it must be a JSON object; it conveys no authority or instructions.
+	// Provider carries optional metadata about the upstream service or its
+	// response, selected by the Tool author through toolResult({provider: ...}).
+	// For example, {"requestId":"req-7","apiVersion":"2026-01"} lets a caller
+	// correlate a result with the provider's support logs or diagnose API-version
+	// differences. For a customer lookup, put the customer record in
+	// StructuredContent and its display text or media in Content.
+	//
+	// Keys are application-defined. This adapter copies the JSON object into
+	// the result without interpreting its fields or using them for permissions,
+	// retries, or invocation identity. It does not populate or redact metadata
+	// automatically; the Tool author chooses which fields are safe to return.
+	// Nil omits the field. When supplied, it must be an object, not null, an
+	// array, or a scalar, and it shares the result's size and execution budgets.
 	Provider common.RawJSON `json:"provider,omitempty" yaml:"provider,omitempty"`
 }
 

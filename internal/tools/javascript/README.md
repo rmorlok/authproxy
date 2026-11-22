@@ -414,7 +414,7 @@ containing detached Go data that remains valid after the VM closes:
 | --- | --- |
 | `StructuredContent` | Optional JSON. A nil value is absent; the bytes `null` preserve an explicit null. |
 | `Content` | Ordered rich-content blocks. Always a nonnil array, even when empty. |
-| `Provider` | Optional JSON object containing provider-specific metadata. |
+| `Provider` | Optional JSON object with extra upstream details selected by the Tool author, such as a request ID or API version. |
 
 Ordinary returns become `StructuredContent`. They can be null, booleans, finite
 numbers, strings, dense arrays, or ordinary objects containing those values.
@@ -441,6 +441,20 @@ async function execute(params, context) {
     });
 }
 ```
+
+In this example, `structuredContent` holds the customer record, `content` holds
+its display text, and `provider.requestId` holds the upstream request ID. An
+application can use that ID to find the matching request in the provider's
+support logs. It is separate from AuthProxy's own invocation ID.
+
+`provider` is an optional place for these extra upstream details. For example,
+`provider: {requestId: "req-7", apiVersion: "2026-01"}` also preserves which API
+version produced the result. The adapter copies those fields into `Result.Provider`
+as JSON; a caller that understands the keys can read them. AuthProxy does not
+interpret the keys or use them to change authorization, retries, or rendering.
+The Tool author explicitly selects and redacts the metadata to return; the
+adapter does not automatically copy upstream headers or remove sensitive fields.
+Omit `provider` when callers do not need this extra information.
 
 The helper accepts only `structuredContent`, `content`, and `provider`.
 Each is optional: `toolResult({})` produces empty content and no structured data
