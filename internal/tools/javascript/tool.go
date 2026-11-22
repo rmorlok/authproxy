@@ -44,11 +44,21 @@ type ToolProgram struct {
 // declaration conflicts, and safe error classifications come from the shared
 // compiler; invocation still supplies params and captured context positionally.
 func CompileTool(source string, library *apjs.Library, limits Limits) (*ToolProgram, error) {
-	program, err := apjsruntime.CompileExtendedAsync(source, library, toolHostBindings, limits, toolResultExtension())
+	program, err := apjsruntime.CompileExtendedAsync(
+		source,
+		library,
+		toolHostBindings,
+		limits,
+		toolResultExtension(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	return &ToolProgram{program: program, limits: limits}, nil
+
+	return &ToolProgram{
+		program: program,
+		limits:  limits,
+	}, nil
 }
 
 // Validate runs bounded initialization with no inputs or I/O and without calling
@@ -58,5 +68,6 @@ func (p *ToolProgram) Validate(ctx context.Context) error {
 	if p == nil || p.program == nil {
 		return apjsruntime.ErrInvalidInput
 	}
+
 	return p.program.Validate(ctx)
 }
