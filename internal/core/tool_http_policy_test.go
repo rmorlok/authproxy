@@ -44,8 +44,8 @@ func TestToolHTTPInvocationPolicyDefaults(t *testing.T) {
 		Response: httpcodec.ResponseLimits{MaxSourceBytes: 256 << 10, MaxResponseBytes: 8 << 20,
 			MaxOutputBytes: 8 << 20, MaxEncodedResultBytes: 16 << 20,
 			Transform: javascript.Limits{
-				MaxWorkUnits:       256 << 20,
-				MaxAllocationUnits: 256 << 20, MaxSourceBytes: 256 << 10, MaxInputBytes: 16 << 20,
+				MaxWorkUnits:       16*(24<<20) + 32*1_000_000,
+				MaxAllocationUnits: 16*(24<<20) + 32*1_000_000, MaxSourceBytes: 256 << 10, MaxInputBytes: 16 << 20,
 				MaxOutputBytes: 8 << 20, MaxDepth: 64, MaxNodes: 1_000_000, MaxStackDepth: 256, Timeout: time.Minute}},
 		HTTP: aphttp.Limits{Timeout: time.Minute, MaxRequests: 20,
 			MaxResponseBytes: 8 << 20, MaxStreamBytes: 8 << 20, MaxHeaderBytes: 64 << 10},
@@ -105,8 +105,8 @@ func TestToolHTTPInvocationPolicyConfigured(t *testing.T) {
 		Response: httpcodec.ResponseLimits{MaxSourceBytes: 10 << 10, MaxResponseBytes: 3 << 10,
 			MaxOutputBytes: 4 << 10, MaxEncodedResultBytes: 5 << 10,
 			Transform: javascript.Limits{
-				MaxWorkUnits:       256 << 20,
-				MaxAllocationUnits: 256 << 20, MaxSourceBytes: 10 << 10, MaxInputBytes: 7 << 10,
+				MaxWorkUnits:       16*(11<<10) + 32*3000,
+				MaxAllocationUnits: 16*(11<<10) + 32*3000, MaxSourceBytes: 10 << 10, MaxInputBytes: 7 << 10,
 				MaxOutputBytes: 4 << 10, MaxDepth: 12, MaxNodes: 3000, MaxStackDepth: 48, Timeout: 3 * time.Second}},
 		HTTP: aphttp.Limits{Timeout: 3 * time.Second, MaxRequests: 4,
 			MaxResponseBytes: 3 << 10, MaxStreamBytes: 8 << 10, MaxHeaderBytes: 9 << 10},

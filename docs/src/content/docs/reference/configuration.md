@@ -158,6 +158,15 @@ configuration or a response makes the transform input large. Raising
 limits. A 16 MiB result allowance fits base64 encoding of 8 MiB of binary content
 with room for metadata, but heavily escaped text can need more space.
 
+Response transforms also share cumulative work and allocation budgets across
+input preparation, pure utilities, and result conversion. Each budget is derived
+from the resolved operator limits as
+`16 * (maxTransformInputBytes + maxOutputBytes) + 32 * maxValues`, using byte
+counts for the size fields. Raising those settings therefore raises the allowance
+for native scans, copies, and metadata processing. Repeated or expensive utility
+calls can still exhaust it. A combination too large to fit the runtime's integer
+range is rejected when the invocation policy is resolved.
+
 Nesting and value counts bound data processing; they do not count JavaScript
 instructions or JSON Schema evaluation steps. The timeout interrupts supported
 work and HTTP I/O, but cannot preempt synchronous schema-library evaluation.
