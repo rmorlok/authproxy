@@ -38,7 +38,7 @@ type ListToolSetGenerationsExecutor interface {
 	Enumerate(context.Context, pagination.EnumerateCallback[ToolSet]) error
 }
 
-// ListToolSetGenerationsBuilder pages one ToolSet's generations, newest first
+// ListToolSetGenerationsBuilder pages one ToolSet's generations, oldest first
 // unless OrderBy is set. ForToolSetId is required.
 type ListToolSetGenerationsBuilder interface {
 	ListToolSetGenerationsExecutor

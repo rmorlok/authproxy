@@ -1,14 +1,11 @@
 package javascript
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
-	"math"
-	"unicode/utf8"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
@@ -22,61 +19,36 @@ func bindInput(
 	input Input,
 	limits Limits,
 ) error {
-	if ctx == nil || vm == nil || input.Context == nil {
-		return ErrInvalidInput
+	if vm == nil {
+		return apjsruntime.ErrInvalidInput
 	}
-	if err := ctx.Err(); err != nil {
+	snapshot, response, err := inputJSON(ctx, input, limits)
+	if err != nil {
 		return err
 	}
 
-	response := input.Response
-	if response == nil {
-		response = []byte("{}")
+	// The shared decoder charges both documents before constructing native
+	// values. Tool-specific object shapes and aliases remain this adapter's job.
+	decoder, err := apjsruntime.NewJSONDecoder(vm)
+	if err != nil {
+		return err
 	}
-	if len(response) >= limits.MaxInputBytes {
-		return ErrLimitExceeded
-	}
-
-	// Share the serialized byte allowance with snapshot encoding; the response
-	// consumes the same budget even when it contains only an empty object.
-	snapshot, err := input.Context.SnapshotJSON(ctx, render.Limits{
-		MaxBytes: limits.MaxInputBytes - len(response),
+	values, err := decoder.Decode(ctx, apjsruntime.JSONLimits{
+		MaxBytes: limits.MaxInputBytes,
 		MaxDepth: limits.MaxDepth,
-		MaxSteps: limits.MaxNodes,
-	})
+		MaxNodes: limits.MaxNodes,
+	}, json.RawMessage(snapshot), json.RawMessage(response))
 	if err != nil {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		return ErrLimitExceeded
-	}
-
-	// Count values across both documents before JSON.parse constructs its
-	// object graph. The snapshot encoder already bounds its own traversal.
-	budget := inputBudget{ctx: ctx, limits: limits}
-	if err := budget.validateObject(snapshot); err != nil {
 		return err
 	}
-	if err := budget.validateObject(response); err != nil {
-		return err
+	rootObject, ok := values[0].(*goja.Object)
+	if !ok || rootObject.ClassName() != "Object" {
+		return apjsruntime.ErrInvalidInput
 	}
-
-	parse, ok := goja.AssertFunction(vm.Get("JSON").ToObject(vm).Get("parse"))
-	if !ok {
-		return ErrInvalidInput
+	responseValue, ok := values[1].(*goja.Object)
+	if !ok || responseValue.ClassName() != "Object" {
+		return apjsruntime.ErrInvalidInput
 	}
-
-	root, err := parse(goja.Undefined(), vm.ToValue(string(snapshot)))
-	if err != nil {
-		return inputParseError(ctx)
-	}
-
-	responseValue, err := parse(goja.Undefined(), vm.ToValue(string(response)))
-	if err != nil {
-		return inputParseError(ctx)
-	}
-
-	rootObject := root.ToObject(vm)
 
 	// A zero render.Context has no captured scopes. Only snapshots created by
 	// render.NewContext supply every required object, including empty scopes.
@@ -89,7 +61,7 @@ func bindInput(
 		"tool",
 	} {
 		if _, ok := rootObject.Get(name).(*goja.Object); !ok {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 
@@ -108,19 +80,92 @@ func bindInput(
 			goja.FLAG_TRUE,
 			goja.FLAG_TRUE,
 		); err != nil {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 
-	// Each alias is the identical native object stored in context, not a new
-	// wrapper or copy. No Go map, slice, struct, or function enters the VM.
+	if err := bindToolGlobals(
+		vm,
+		rootObject.Get("params"),
+		contextObject,
+		responseValue,
+	); err != nil {
+		return err
+	}
+	return apjsruntime.ChargeWork(ctx, 0)
+}
+
+// inputJSON bounds snapshot serialization before allocating raw JSON fields for
+// either the expression or async input adapter. The response and snapshot share
+// this byte allowance; the subsequent decoder bounds their combined traversal.
+// Adapter serialization also consumes the enclosing execution's shared budget.
+func inputJSON(
+	ctx context.Context,
+	input Input,
+	limits Limits,
+) (json.RawMessage, json.RawMessage, error) {
+	if ctx == nil || input.Context == nil {
+		return nil, nil, apjsruntime.ErrInvalidInput
+	}
+	if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
+		return nil, nil, err
+	}
+
+	response := input.Response
+	if response == nil {
+		response = []byte("{}")
+	}
+
+	if len(response) >= limits.MaxInputBytes {
+		return nil, nil, apjsruntime.ErrLimitExceeded
+	}
+
+	snapshot, err := input.Context.SnapshotJSON(ctx, render.Limits{
+		MaxBytes: limits.MaxInputBytes - len(response),
+		MaxDepth: limits.MaxDepth,
+		MaxSteps: limits.MaxNodes,
+	})
+	if err != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		return nil, nil, apjsruntime.ErrLimitExceeded
+	}
+	// SnapshotJSON exposes no size preflight. Its own byte/node/depth caps
+	// bound serialization first, then its measured output charges this execution
+	// immediately. These source units also bound serializer scratch by fixed
+	// implementation multiples; this is not a hard heap allocation quota.
+	if err := chargeInputCopy(ctx, len(snapshot)); err != nil {
+		return nil, nil, err
+	}
+
+	return json.RawMessage(snapshot), json.RawMessage(response), nil
+}
+
+// chargeInputCopy admits one bounded native pass over known-size input and its
+// copied storage. It preserves cancellation and terminal shared-budget errors.
+func chargeInputCopy(ctx context.Context, size int) error {
+	if err := apjsruntime.ChargeWork(ctx, size); err != nil {
+		return err
+	}
+	return apjsruntime.ReserveAllocation(ctx, size)
+}
+
+// bindToolGlobals installs protected aliases to already copied native values.
+// Aliases share their context objects and incur no second input copy or charge.
+func bindToolGlobals(
+	vm *goja.Runtime,
+	params goja.Value,
+	contextObject *goja.Object,
+	response *goja.Object,
+) error {
 	globals := []struct {
 		name  string
 		value goja.Value
 	}{
-		{"params", rootObject.Get("params")},
+		{"params", params},
 		{"context", contextObject},
-		{"response", responseValue},
+		{"response", response},
 		{"cfg", contextObject.Get("cfg")},
 		{"labels", contextObject.Get("labels")},
 		{"annotations", contextObject.Get("annotations")},
@@ -130,173 +175,13 @@ func bindInput(
 		if err := vm.GlobalObject().DefineDataProperty(
 			global.name,
 			global.value,
-			goja.FLAG_FALSE,
-			goja.FLAG_FALSE,
-			goja.FLAG_TRUE,
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_TRUE,  // enumerable
 		); err != nil {
-			return ErrInvalidInput
+			return apjsruntime.ErrInvalidInput
 		}
 	}
 
-	return ctx.Err()
-}
-
-// inputParseError preserves cancellation while withholding native JSON parser
-// diagnostics, which can contain private configuration keys or response text.
-func inputParseError(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return ErrInvalidInput
-}
-
-// inputBudget validates the two encoded input documents with shared accounting.
-// Each JSON value, including a container, and each object property name consumes
-// one node. Document roots have depth zero; property names do not add depth.
-type inputBudget struct {
-	ctx    context.Context
-	limits Limits
-	nodes  int
-}
-
-// validateObject requires exactly one UTF-8 object document and validates its
-// values without retaining a second decoded Go object graph.
-func (b *inputBudget) validateObject(encoded []byte) error {
-	if !utf8.Valid(encoded) {
-		return ErrInvalidInput
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(encoded))
-	decoder.UseNumber()
-
-	if err := b.value(decoder, 0, true); err != nil {
-		return err
-	}
-
-	if _, err := decoder.Token(); err != io.EOF {
-		return ErrInvalidInput
-	}
-
-	if err := validateInputSurrogates(b.ctx, encoded); err != nil {
-		return err
-	}
-
-	return b.ctx.Err()
-}
-
-// validateInputSurrogates rejects unpaired escaped UTF-16 surrogate units in
-// already validated JSON strings and keys. Goja's native JSON.parse uses Go's
-// JSON decoder, which would silently replace those units with U+FFFD. Rejecting
-// them avoids changing input values; valid pairs and literal backslash-u text
-// retain ordinary JSON behavior. This scan does not parse JSON structure.
-func validateInputSurrogates(ctx context.Context, encoded []byte) error {
-	inString := false
-	for i := 0; i < len(encoded); i++ {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		if encoded[i] == '"' {
-			inString = !inString
-			continue
-		}
-		if !inString || encoded[i] != '\\' {
-			continue
-		}
-		i++
-		if encoded[i] != 'u' {
-			continue
-		}
-		unit := inputHexUnit(encoded[i+1 : i+5])
-		i += 4
-		if unit >= 0xdc00 && unit <= 0xdfff {
-			return ErrInvalidInput
-		}
-		if unit < 0xd800 || unit > 0xdbff {
-			continue
-		}
-		if i+6 >= len(encoded) || encoded[i+1] != '\\' || encoded[i+2] != 'u' {
-			return ErrInvalidInput
-		}
-		low := inputHexUnit(encoded[i+3 : i+7])
-		if low < 0xdc00 || low > 0xdfff {
-			return ErrInvalidInput
-		}
-		i += 6
-	}
-	return nil
-}
-
-// inputHexUnit reads four known hexadecimal digits from validated JSON syntax.
-func inputHexUnit(digits []byte) uint16 {
-	var value uint16
-	for _, digit := range digits {
-		value <<= 4
-		switch {
-		case digit >= '0' && digit <= '9':
-			value += uint16(digit - '0')
-		case digit >= 'a' && digit <= 'f':
-			value += uint16(digit-'a') + 10
-		default:
-			value += uint16(digit-'A') + 10
-		}
-	}
-	return value
-}
-
-// value consumes one JSON value, enforcing work/depth limits before descending.
-// Finite JSON numbers use ordinary JavaScript Number precision when parsed.
-func (b *inputBudget) value(
-	decoder *json.Decoder,
-	depth int,
-	objectRoot bool,
-) error {
-	if err := b.ctx.Err(); err != nil {
-		return err
-	}
-	if depth > b.limits.MaxDepth || b.nodes >= b.limits.MaxNodes {
-		return ErrLimitExceeded
-	}
-	b.nodes++
-	token, err := decoder.Token()
-	if err != nil {
-		return ErrInvalidInput
-	}
-	if objectRoot && token != json.Delim('{') {
-		return ErrInvalidInput
-	}
-
-	switch token := token.(type) {
-	case json.Number:
-		number, err := token.Float64()
-		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
-			return ErrInvalidInput
-		}
-	case json.Delim:
-		if token != '{' && token != '[' {
-			return ErrInvalidInput
-		}
-		for decoder.More() {
-			if token == '{' {
-				if err := b.ctx.Err(); err != nil {
-					return err
-				}
-				if b.nodes >= b.limits.MaxNodes {
-					return ErrLimitExceeded
-				}
-				b.nodes++
-				key, err := decoder.Token()
-				if _, ok := key.(string); err != nil || !ok {
-					return ErrInvalidInput
-				}
-			}
-			if err := b.value(decoder, depth+1, false); err != nil {
-				return err
-			}
-		}
-		closing, err := decoder.Token()
-		if err != nil || (token == '{' && closing != json.Delim('}')) || (token == '[' && closing != json.Delim(']')) {
-			return ErrInvalidInput
-		}
-	}
 	return nil
 }

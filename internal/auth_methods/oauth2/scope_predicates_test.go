@@ -2,12 +2,16 @@ package oauth2
 
 import (
 	"context"
+	"errors"
 	"net/url"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
@@ -25,6 +29,234 @@ import (
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
 	"gopkg.in/h2non/gock.v1"
 )
+
+// scopePredicateConnection records the connection evaluator boundary without
+// requiring JavaScript execution for scope ordering and error propagation tests.
+type scopePredicateConnection struct {
+	*mockCore.Connection
+	evaluate func(context.Context, string) (bool, error)
+}
+
+// EvaluateJavascriptPredicate delegates to the test's assertion callback.
+func (c *scopePredicateConnection) EvaluateJavascriptPredicate(ctx context.Context, source string) (bool, error) {
+	return c.evaluate(ctx, source)
+}
+
+// GetJavascriptContext catches accidental use of the legacy unbounded path.
+func (c *scopePredicateConnection) GetJavascriptContext(context.Context) (apjs.Context, error) {
+	panic("scope predicates must use the bounded connection evaluator")
+}
+
+// TestEffectiveScopes_EvaluationOrder verifies lazy evaluation, caller context
+// propagation, and preservation of declaration copies when requirements resolve.
+func TestEffectiveScopes_EvaluationOrder(t *testing.T) {
+	// Excluded scopes must never evaluate their required predicate.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var sources []string
+	connection := &scopePredicateConnection{
+		Connection: &mockCore.Connection{},
+		evaluate: func(gotCtx context.Context, source string) (bool, error) {
+			require.Same(t, ctx, gotCtx)
+			sources = append(sources, source)
+			return source == "include", nil
+		},
+	}
+	o := &oAuth2Connection{
+		connection: connection,
+		auth: &sconfig.AuthOAuth2{Scopes: []sconfig.Scope{
+			{Id: "read"},
+			{Id: "excluded", If: &common.Predicate{Javascript: "exclude"}, Required: sconfig.NewScopeRequiredPredicate(&common.Predicate{Javascript: "must not run"})},
+			{Id: "activity", If: &common.Predicate{Javascript: "include"}, Required: sconfig.NewScopeRequiredPredicate(&common.Predicate{Javascript: "optional"})},
+		}},
+	}
+	declared := o.auth.Scopes[2].Clone()
+
+	got, err := o.effectiveScopes(ctx)
+	require.NoError(t, err)
+
+	// Resolve included requirements in order without rewriting the declarations.
+	assert.Equal(t, []string{"exclude", "include", "optional"}, sources)
+	require.Len(t, got, 2)
+	assert.Equal(t, "read", got[0].Id)
+	assert.Equal(t, "activity", got[1].Id)
+	require.NotNil(t, got[1].Required.Bool)
+	assert.False(t, *got[1].Required.Bool)
+	assert.Nil(t, got[1].Required.Predicate)
+	assert.Equal(t, declared, o.auth.Scopes[2])
+	assert.NotSame(t, o.auth.Scopes[2].If, got[1].If)
+	assert.NotSame(t, o.auth.Scopes[2].Required, got[1].Required)
+}
+
+// TestEffectiveScopes_StaticScopesSkipJavascript ensures literal requirements
+// and omitted scopes do not depend on a usable JavaScript context or evaluator.
+func TestEffectiveScopes_StaticScopesSkipJavascript(t *testing.T) {
+	// Preserve the existing Boolean precedence for a declaration with both forms.
+	both := sconfig.NewScopeRequiredBool(false)
+	both.Predicate = &common.Predicate{Javascript: "must not run"}
+	for name, auth := range map[string]*sconfig.AuthOAuth2{
+		"no auth":   nil,
+		"no scopes": {},
+		"static scopes": {Scopes: []sconfig.Scope{
+			{Id: "default"},
+			{Id: "optional", Required: sconfig.NewScopeRequiredBool(false)},
+			{Id: "boolean precedence", Required: both},
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := &oAuth2Connection{
+				connection: &scopePredicateConnection{
+					Connection: &mockCore.Connection{},
+					evaluate: func(context.Context, string) (bool, error) {
+						t.Fatal("static scopes must not evaluate JavaScript")
+						return false, nil
+					},
+				},
+				auth: auth,
+			}
+
+			got, err := o.effectiveScopes(context.Background())
+			require.NoError(t, err)
+			if auth == nil || len(auth.Scopes) == 0 {
+				assert.Nil(t, got)
+				return
+			}
+
+			// Static output keeps defaults and literal values without aliases.
+			require.Len(t, got, 3)
+			assert.Nil(t, got[0].Required)
+			assert.False(t, *got[1].Required.Bool)
+			assert.NotSame(t, auth.Scopes[1].Required.Bool, got[1].Required.Bool)
+			assert.False(t, *got[2].Required.Bool)
+			assert.Nil(t, got[2].Required.Predicate)
+			assert.NotNil(t, both.Predicate)
+		})
+	}
+}
+
+// TestEffectiveScopes_PredicateErrorCause retains evaluator errors while adding
+// the scope identity and which predicate failed.
+func TestEffectiveScopes_PredicateErrorCause(t *testing.T) {
+	want := errors.New("connection configuration unavailable")
+	for _, required := range []bool{false, true} {
+		field := "if"
+		scope := sconfig.Scope{Id: "activity", If: &common.Predicate{Javascript: "source"}}
+		if required {
+			field = "required"
+			scope.If = nil
+			scope.Required = sconfig.NewScopeRequiredPredicate(&common.Predicate{Javascript: "source"})
+		}
+		t.Run(field, func(t *testing.T) {
+			// A connection preparation failure must remain distinguishable to callers.
+			o := &oAuth2Connection{
+				connection: &scopePredicateConnection{
+					Connection: &mockCore.Connection{},
+					evaluate:   func(context.Context, string) (bool, error) { return false, want },
+				},
+				auth: &sconfig.AuthOAuth2{Scopes: []sconfig.Scope{scope}},
+			}
+			got, err := o.effectiveScopes(context.Background())
+			assert.Nil(t, got)
+			require.ErrorIs(t, err, want)
+			assert.Contains(t, err.Error(), `scope "activity" `+field+".javascript")
+		})
+	}
+}
+
+// TestEffectiveScopes_BoundedPredicates exercises both dynamic scope fields
+// through the real bounded mock evaluator, including cancellation and privacy.
+func TestEffectiveScopes_BoundedPredicates(t *testing.T) {
+	for _, required := range []bool{false, true} {
+		field := "if"
+		if required {
+			field = "required"
+		}
+		t.Run(field, func(t *testing.T) {
+			for _, tc := range []struct {
+				name          string
+				source        string
+				configuration map[string]any
+				cancel        bool
+				deadline      bool
+				want          error
+			}{
+				{name: "execution budget", source: "for (;;) {}", want: jsruntime.ErrLimitExceeded},
+				{name: "source budget", source: strings.Repeat(" ", apjs.ConnectorPredicateLimits().MaxSourceBytes) + "true", want: jsruntime.ErrLimitExceeded},
+				{name: "input budget", source: "true", configuration: map[string]any{"padding": strings.Repeat("x", apjs.ConnectorPredicateLimits().MaxInputBytes)}, want: jsruntime.ErrLimitExceeded},
+				{name: "private throw", source: `throw new Error(cfg.secret)`, configuration: map[string]any{"secret": "privateScopeDetail"}, want: jsruntime.ErrEvaluation},
+				{name: "private syntax", source: "privateScopeDetail = ;", want: jsruntime.ErrInvalidSource},
+				{name: "canceled", source: "true", cancel: true, want: context.Canceled},
+				{name: "deadline during execution", source: "for (;;) {}", deadline: true, want: context.DeadlineExceeded},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					// Apply the same failure scenario independently to inclusion and required status.
+					scope := sconfig.Scope{Id: "activity"}
+					predicate := &common.Predicate{Javascript: tc.source}
+					if required {
+						scope.Required = sconfig.NewScopeRequiredPredicate(predicate)
+					} else {
+						scope.If = predicate
+					}
+					o := &oAuth2Connection{
+						connection: &mockCore.Connection{Configuration: tc.configuration},
+						auth:       &sconfig.AuthOAuth2{Scopes: []sconfig.Scope{scope}},
+					}
+					ctx, cancel := context.WithCancel(context.Background())
+					defer cancel()
+					if tc.cancel {
+						cancel()
+					}
+					if tc.deadline {
+						var stop context.CancelFunc
+						ctx, stop = context.WithTimeout(ctx, 50*time.Millisecond)
+						defer stop()
+					}
+
+					got, err := o.effectiveScopes(ctx)
+
+					// Fail closed with a classified error and no authored or private details.
+					assert.Nil(t, got)
+					require.ErrorIs(t, err, tc.want)
+					assert.Contains(t, err.Error(), `scope "activity" `+field+".javascript")
+					assert.NotContains(t, err.Error(), "privateScopeDetail")
+				})
+			}
+		})
+	}
+}
+
+// TestEffectiveScopes_PredicateInputsAreIsolated ensures one predicate cannot
+// mutate connection metadata observed by the next predicate or its Go owner.
+func TestEffectiveScopes_PredicateInputsAreIsolated(t *testing.T) {
+	// Use statement-list completion and Boolean wrappers while mutating every input map.
+	connection := &mockCore.Connection{
+		Configuration: map[string]any{"nested": map[string]any{"enabled": true}},
+		Labels:        map[string]string{"env": "prod"},
+		Annotations:   map[string]string{"tier": "gold"},
+	}
+	o := &oAuth2Connection{
+		connection: connection,
+		auth: &sconfig.AuthOAuth2{Scopes: []sconfig.Scope{
+			{
+				Id:       "mutates",
+				If:       &common.Predicate{Javascript: `cfg.nested.enabled = false; labels.env = "dev"; annotations.tier = "silver"; new Boolean(true);`},
+				Required: sconfig.NewScopeRequiredPredicate(&common.Predicate{Javascript: `new Boolean(!cfg.nested.enabled);`}),
+			},
+			{Id: "fresh", If: &common.Predicate{Javascript: `cfg.nested.enabled && labels.env === "prod" && annotations.tier === "gold";`}},
+		}},
+	}
+
+	got, err := o.effectiveScopes(context.Background())
+	require.NoError(t, err)
+
+	// Each later evaluation sees the original metadata, and host maps remain intact.
+	require.Len(t, got, 2)
+	assert.False(t, *got[0].Required.Bool)
+	assert.Equal(t, "fresh", got[1].Id)
+	assert.Equal(t, map[string]any{"nested": map[string]any{"enabled": true}}, connection.Configuration)
+	assert.Equal(t, map[string]string{"env": "prod"}, connection.Labels)
+	assert.Equal(t, map[string]string{"tier": "gold"}, connection.Annotations)
+}
 
 func TestEffectiveScopes_UsesConnectionPredicateContext(t *testing.T) {
 	o := &oAuth2Connection{

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/stretchr/testify/require"
@@ -16,13 +17,15 @@ import (
 // inputTestLimits keeps input-boundary fixtures independent of execution policy.
 func inputTestLimits() Limits {
 	return Limits{
-		MaxSourceBytes: 1 << 16,
-		MaxInputBytes:  1 << 16,
-		MaxOutputBytes: 1 << 16,
-		MaxDepth:       32,
-		MaxNodes:       1000,
-		MaxStackDepth:  64,
-		Timeout:        time.Second,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     1 << 16,
+		MaxInputBytes:      1 << 16,
+		MaxOutputBytes:     1 << 16,
+		MaxDepth:           32,
+		MaxNodes:           1000,
+		MaxStackDepth:      64,
+		Timeout:            time.Second,
 	}
 }
 
@@ -124,7 +127,7 @@ func TestBindInputRejectsInvalidJSON(t *testing.T) {
 			// Invalid response documents fail before any input globals are exposed.
 			vm := goja.New()
 			err := bindInput(context.Background(), vm, Input{Context: inputTestContext(t, render.Input{}), Response: common.RawJSON(response)}, inputTestLimits())
-			require.ErrorIs(t, err, ErrInvalidInput)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 			require.NotContains(t, err.Error(), "private-field")
 			require.NotContains(t, err.Error(), "private-value")
 			require.Nil(t, vm.Get("params"))
@@ -134,21 +137,8 @@ func TestBindInputRejectsInvalidJSON(t *testing.T) {
 	// Valid JSON numbers that overflow JavaScript are rejected in context too.
 	snapshot := inputTestContext(t, render.Input{Cfg: map[string]any{"private-field": json.Number("1e400")}})
 	err := bindInput(context.Background(), goja.New(), Input{Context: snapshot}, inputTestLimits())
-	require.ErrorIs(t, err, ErrInvalidInput)
+	require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 	require.NotContains(t, err.Error(), "private-field")
-}
-
-func TestBindInputNumericSemantics(t *testing.T) {
-	// JavaScript consumes ordinary Number values, including rounding beyond its
-	// safe integer range and underflow to finite zero.
-	snapshot := inputTestContext(t, render.Input{Params: map[string]any{
-		"integer":  json.Number("9007199254740993"),
-		"fraction": json.Number("1.25"),
-		"tiny":     json.Number("1e-400"),
-	}})
-	vm := goja.New()
-	require.NoError(t, bindInput(context.Background(), vm, Input{Context: snapshot}, inputTestLimits()))
-	require.True(t, inputTestRun(t, vm, `typeof params.integer === "number" && params.integer === 9007199254740992 && params.fraction === 1.25 && params.tiny === 0`).ToBoolean())
 }
 
 func TestExpressionPreservesStringIdentifiers(t *testing.T) {
@@ -169,27 +159,6 @@ func TestExpressionPreservesStringIdentifiers(t *testing.T) {
 	require.JSONEq(t, `{"inputId":"18446744073709551615","responseId":"9007199254740993"}`, string(result))
 }
 
-func TestBindInputSurrogateEscapes(t *testing.T) {
-	for _, response := range []string{
-		`{"body":"\ud800"}`, `{"body":"\udfff"}`,
-		`{"\ud800":"value"}`, `{"\udc00":"value"}`,
-		`{"body":"\ud800\u0041"}`, `{"body":"\ud800\\udc00"}`,
-	} {
-		t.Run(response, func(t *testing.T) {
-			// Unpaired units are valid JSON syntax, but native JSON.parse would
-			// replace them. Reject rather than silently changing keys or values.
-			err := bindInput(context.Background(), goja.New(), Input{Context: inputTestContext(t, render.Input{}), Response: common.RawJSON(response)}, inputTestLimits())
-			require.ErrorIs(t, err, ErrInvalidInput)
-		})
-	}
-
-	// Paired units, ordinary Unicode, and literal backslash-u sequences survive.
-	response := common.RawJSON(`{"body":"\uD83D\uDE00","\ud83d\ude00":"paired key","literal":"\\ud800","escaped":"quoted\" text","unicode":"é"}`)
-	vm := goja.New()
-	require.NoError(t, bindInput(context.Background(), vm, Input{Context: inputTestContext(t, render.Input{}), Response: response}, inputTestLimits()))
-	require.True(t, inputTestRun(t, vm, `response.body === "😀" && response["😀"] === "paired key" && response.literal === "\\ud800" && response.escaped === 'quoted" text' && response.unicode === "é"`).ToBoolean())
-}
-
 func TestBindInputCombinedLimits(t *testing.T) {
 	// Count encoded snapshot and response bytes together, including JSON escapes.
 	snapshot := inputTestContext(t, render.Input{Params: map[string]any{"value": "quoted\nvalue"}})
@@ -200,7 +169,7 @@ func TestBindInputCombinedLimits(t *testing.T) {
 	limits.MaxInputBytes = len(encoded) + len(response)
 	require.NoError(t, bindInput(context.Background(), goja.New(), Input{Context: snapshot, Response: response}, limits))
 	limits.MaxInputBytes--
-	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: snapshot, Response: response}, limits), ErrLimitExceeded)
+	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: snapshot, Response: response}, limits), apjsruntime.ErrLimitExceeded)
 
 	// Empty input has seven snapshot values, six keys, and one response object.
 	empty := inputTestContext(t, render.Input{})
@@ -209,30 +178,30 @@ func TestBindInputCombinedLimits(t *testing.T) {
 	limits.MaxDepth = 1
 	require.NoError(t, bindInput(context.Background(), goja.New(), Input{Context: empty}, limits))
 	limits.MaxNodes = 13
-	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: empty}, limits), ErrLimitExceeded)
+	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: empty}, limits), apjsruntime.ErrLimitExceeded)
 
 	// Depth applies to snapshot and response roots with the same zero origin.
 	limits = inputTestLimits()
 	limits.MaxDepth = 1
-	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: empty, Response: common.RawJSON(`{"body":[1]}`)}, limits), ErrLimitExceeded)
+	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: empty, Response: common.RawJSON(`{"body":[1]}`)}, limits), apjsruntime.ErrLimitExceeded)
 	nested := inputTestContext(t, render.Input{Params: map[string]any{"value": true}})
-	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: nested}, limits), ErrLimitExceeded)
+	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: nested}, limits), apjsruntime.ErrLimitExceeded)
 
 	// A response that alone exhausts the byte cap is rejected before snapshotting.
 	limits = inputTestLimits()
 	limits.MaxInputBytes = 32
 	err = bindInput(context.Background(), goja.New(), Input{Context: empty, Response: common.RawJSON(strings.Repeat(" ", 32))}, limits)
-	require.ErrorIs(t, err, ErrLimitExceeded)
+	require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 }
 
 func TestBindInputRequiredArgumentsAndCancellation(t *testing.T) {
 	// Missing and zero snapshots cannot provide a valid invocation object.
 	limits := inputTestLimits()
 	valid := Input{Context: inputTestContext(t, render.Input{})}
-	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{}, limits), ErrInvalidInput)
-	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: &render.Context{}}, limits), ErrInvalidInput)
-	require.ErrorIs(t, bindInput(nil, goja.New(), valid, limits), ErrInvalidInput)
-	require.ErrorIs(t, bindInput(context.Background(), nil, valid, limits), ErrInvalidInput)
+	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{}, limits), apjsruntime.ErrInvalidInput)
+	require.ErrorIs(t, bindInput(context.Background(), goja.New(), Input{Context: &render.Context{}}, limits), apjsruntime.ErrInvalidInput)
+	require.ErrorIs(t, bindInput(nil, goja.New(), valid, limits), apjsruntime.ErrInvalidInput)
+	require.ErrorIs(t, bindInput(context.Background(), nil, valid, limits), apjsruntime.ErrInvalidInput)
 
 	// An already canceled invocation neither encodes nor exposes inputs.
 	canceled, cancel := context.WithCancel(context.Background())
@@ -240,32 +209,4 @@ func TestBindInputRequiredArgumentsAndCancellation(t *testing.T) {
 	vm := goja.New()
 	require.ErrorIs(t, bindInput(canceled, vm, valid, limits), context.Canceled)
 	require.Nil(t, vm.Get("params"))
-}
-
-// FuzzInputJSON exercises malformed strings, delimiters, and surrogate escapes
-// without allocating a VM. Accepted documents must remain valid object JSON.
-func FuzzInputJSON(f *testing.F) {
-	for _, seed := range []string{
-		`{}`, `{"body":"\ud800"}`, `{"body":"\ud83d\ude00"}`,
-		`{"body":"\\ud800"}`, `{"body":[null,false,1.25,{"key":"text"}]}`,
-		`{"body":"escaped\"quote"}`, `{"body":1e400}`, `{"body":`,
-	} {
-		f.Add([]byte(seed))
-	}
-	f.Fuzz(func(t *testing.T, encoded []byte) {
-		if len(encoded) > 4096 {
-			return
-		}
-		budget := inputBudget{ctx: context.Background(), limits: inputTestLimits()}
-		if err := budget.validateObject(encoded); err != nil {
-			require.True(t, err == ErrInvalidInput || err == ErrLimitExceeded)
-			return
-		}
-
-		// A successful boundary never admits a scalar, trailing value, or syntax
-		// error that would fail the subsequent native object parse.
-		var object map[string]json.RawMessage
-		require.NoError(t, json.Unmarshal(encoded, &object))
-		require.NotNil(t, object)
-	})
 }

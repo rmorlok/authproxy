@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -103,42 +104,44 @@ func TestToolResultPreservesRichBlocks(t *testing.T) {
 // TestToolResultRejectsInvalidPayloads keeps malformed rich output and private diagnostics out of results.
 func TestToolResultRejectsInvalidPayloads(t *testing.T) {
 	for name, value := range map[string]string{
-		"null content":      `toolResult({content: null})`,
-		"nonarray content":  `toolResult({content: {}})`,
-		"null block":        `toolResult({content: [null]})`,
-		"unknown block":     `toolResult({content: [{type: "unknown"}]})`,
-		"unknown block key": `toolResult({content: [{type: "text", text: "ok", private: true}]})`,
-		"missing text":      `toolResult({content: [{type: "text"}]})`,
-		"mixed variant":     `toolResult({content: [{type: "text", text: "private", data: "AA=="}]})`,
-		"invalid base64":    `toolResult({content: [{type: "image", mimeType: "image/png", data: "private"}]})`,
-		"relative resource": `toolResult({content: [{type: "resource_link", uri: "private/path", name: "file"}]})`,
-		"invalid priority":  `toolResult({content: [{type: "text", text: "ok", annotations: {priority: 2}}]})`,
-		"null provider":     `toolResult({provider: null})`,
-		"array provider":    `toolResult({provider: []})`,
-		"unknown field":     `toolResult({private: true})`,
-		"tool identity":     `toolResult({toolId: ""})`,
-		"revision":          `toolResult({revision: 0})`,
-		"invocation":        `toolResult({invocationId: ""})`,
-		"metadata":          `toolResult({metadata: {}})`,
-		"error":             `toolResult({error: null})`,
-		"error flag":        `toolResult({isError: false})`,
-		"execution state":   `toolResult({executionState: "completed"})`,
-		"nonfinite data":    `toolResult({structuredContent: NaN})`,
-		"cyclic data":       `toolResult({structuredContent: (() => {const v = {}; v.self = v; return v;})()})`,
-		"getter":            `toolResult({get content() { throw "private"; }})`,
-		"proxy":             `toolResult(new Proxy({}, {ownKeys() { throw "private"; }}))`,
-		"toJSON":            `toolResult({toJSON() { throw "private"; }})`,
-		"nested helper":     `({value: toolResult({})})`,
-		"forged helper":     `Object.create(Object.getPrototypeOf(toolResult({})))`,
-		"proxied helper":    `new Proxy(toolResult({}), {})`,
-		"lone text unit":    `toolResult({content: [{type: "text", text: "\ud800"}]})`,
-		"lone plain unit":   `"\ud800"`,
+		"null content":         `toolResult({content: null})`,
+		"nonarray content":     `toolResult({content: {}})`,
+		"null block":           `toolResult({content: [null]})`,
+		"unknown block":        `toolResult({content: [{type: "unknown"}]})`,
+		"unknown block key":    `toolResult({content: [{type: "text", text: "ok", private: true}]})`,
+		"missing text":         `toolResult({content: [{type: "text"}]})`,
+		"mixed variant":        `toolResult({content: [{type: "text", text: "private", data: "AA=="}]})`,
+		"invalid base64":       `toolResult({content: [{type: "image", mimeType: "image/png", data: "private"}]})`,
+		"relative resource":    `toolResult({content: [{type: "resource_link", uri: "private/path", name: "file"}]})`,
+		"invalid priority":     `toolResult({content: [{type: "text", text: "ok", annotations: {priority: 2}}]})`,
+		"null provider":        `toolResult({provider: null})`,
+		"array provider":       `toolResult({provider: []})`,
+		"unknown field":        `toolResult({private: true})`,
+		"tool identity":        `toolResult({toolId: ""})`,
+		"revision":             `toolResult({revision: 0})`,
+		"invocation":           `toolResult({invocationId: ""})`,
+		"metadata":             `toolResult({metadata: {}})`,
+		"error":                `toolResult({error: null})`,
+		"error flag":           `toolResult({isError: false})`,
+		"execution state":      `toolResult({executionState: "completed"})`,
+		"nonfinite data":       `toolResult({structuredContent: NaN})`,
+		"cyclic data":          `toolResult({structuredContent: (() => {const v = {}; v.self = v; return v;})()})`,
+		"getter":               `toolResult({get content() { throw "private"; }})`,
+		"proxy":                `toolResult(new Proxy({}, {ownKeys() { throw "private"; }}))`,
+		"toJSON":               `toolResult({toJSON() { throw "private"; }})`,
+		"nested helper":        `({value: toolResult({})})`,
+		"forged helper":        `Object.create(Object.getPrototypeOf(toolResult({})))`,
+		"proxied helper":       `new Proxy(toolResult({}), {})`,
+		"lone text unit":       `toolResult({content: [{type: "text", text: "\ud800"}]})`,
+		"lone plain unit":      `"\ud800"`,
+		"lone structured unit": `toolResult({structuredContent: "\ud800"})`,
+		"lone provider key":    `toolResult({provider: {["\ud800"]: true}})`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			// Invalid content must fail atomically without copying validation or getter text.
 			program := compileTool(t, "async function execute() { return "+value+"; }", nil)
 			result, err := program.Evaluate(context.Background(), fetchInput(t))
-			require.ErrorIs(t, err, javascript.ErrInvalidOutput)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidOutput)
 			require.Nil(t, result)
 			require.NotContains(t, err.Error(), "private")
 		})
@@ -163,7 +166,7 @@ func TestToolResultBoundsWholePayload(t *testing.T) {
 
 			// Limits reject the complete result rather than returning truncated blocks or JSON.
 			result, err := program.Evaluate(context.Background(), fetchInput(t))
-			require.ErrorIs(t, err, javascript.ErrLimitExceeded)
+			require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 			require.Nil(t, result)
 		})
 	}
@@ -262,7 +265,7 @@ func TestToolResultWithHTTP(t *testing.T) {
 		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader(`{"title":"Fetched report"}`))), nil
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		const body = await (await fetch("https://provider.example/report")).json();
+		const body = await (await context.connections[0].fetch("https://provider.example/report")).json();
 		return toolResult({structuredContent: body, content: [{type: "text", text: body.title}]});
 	}`, nil)
 
@@ -272,4 +275,23 @@ func TestToolResultWithHTTP(t *testing.T) {
 	require.JSONEq(t, `{"title":"Fetched report"}`, string(result.StructuredContent))
 	require.Len(t, result.Content, 1)
 	require.Equal(t, "Fetched report", *result.Content[0].Text)
+}
+
+// TestToolResultUnicode preserves valid Unicode and escaped text while keeping
+// ordinary structured JSON's lossless escape behavior separate from typed text.
+func TestToolResultUnicode(t *testing.T) {
+	// The generic JSON boundary preserves lone units inside an ordinary object.
+	ordinary := evaluateRichResult(t, compileTool(t, `async function execute() {
+		return {value: "\ud800"};
+	}`, nil))
+	require.Equal(t, `{"value":"\ud800"}`, string(ordinary.StructuredContent))
+
+	// Pairs become UTF-8 text; literal backslash-u text is not a surrogate escape.
+	rich := evaluateRichResult(t, compileTool(t, `async function execute() {
+		return toolResult({content: [{type: "text", text: "\ud83d\ude00 \\ud800"}],
+			structuredContent: {"é": "\ud83d\ude00"}, provider: {literal: "\\ud800"}});
+	}`, nil))
+	require.Equal(t, "😀 \\ud800", *rich.Content[0].Text)
+	require.JSONEq(t, `{"é":"😀"}`, string(rich.StructuredContent))
+	require.JSONEq(t, `{"literal":"\\ud800"}`, string(rich.Provider))
 }

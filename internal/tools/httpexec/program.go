@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
 )
@@ -20,7 +20,7 @@ type Limits struct {
 	Render     render.Limits            // Context copying and complete request rendering.
 	Validation validation.Limits        // Argument and structured-output JSON validation.
 	Response   httpcodec.ResponseLimits // Response mapping, projection, and result envelope.
-	HTTP       httphost.Limits          // Total invocation timeout and bounded connection I/O.
+	HTTP       aphttp.Limits            // Total invocation timeout and bounded connection I/O.
 }
 
 // Program owns one HTTP definition's compiled request, response, and schemas.

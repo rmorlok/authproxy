@@ -50,6 +50,7 @@ func TestContextSnapshot(t *testing.T) {
 			"note": "original",
 		},
 		ConnectionID:        "cxn_example",
+		ConnectionName:      "Captured",
 		ConnectionNamespace: "root.product.user",
 		ToolID:              "tol_example",
 		Revision:            9007199254740993,
@@ -66,11 +67,11 @@ func TestContextSnapshot(t *testing.T) {
 	input.Cfg["nested"].(map[string]any)["region"] = "eu"
 	input.Labels["team"], input.Annotations["note"] = "red", "changed"
 	generation, catalog = 8, 13
-	result := renderText(t, `{{#params.items}}{{name}}{{/params.items}} {{cfg.nested.region}} {{labels.team}} {{annotations.note}} {{connection.id}} {{connection.namespace}} {{tool.id}} {{tool.revision}} {{tool.toolSetId}} {{tool.toolSetGeneration}} {{tool.catalogRevision}}`, data)
-	require.Equal(t, "original us blue original cxn_example root.product.user tol_example 9007199254740993 tls_example 7 12", result)
+	result := renderText(t, `{{#params.items}}{{name}}{{/params.items}} {{cfg.nested.region}} {{labels.team}} {{annotations.note}} {{connection.id}} {{connection.name}} {{connection.namespace}} {{tool.id}} {{tool.revision}} {{tool.toolSetId}} {{tool.toolSetGeneration}} {{tool.catalogRevision}}`, data)
+	require.Equal(t, "original us blue original cxn_example Captured root.product.user tol_example 9007199254740993 tls_example 7 12", result)
 
 	// The safe connection projection contains only identity, never runtime handles.
-	require.JSONEq(t, `{"id":"cxn_example","namespace":"root.product.user"}`, renderText(t, `{{json.connection}}`, data))
+	require.JSONEq(t, `{"id":"cxn_example","name":"Captured","namespace":"root.product.user"}`, renderText(t, `{{json.connection}}`, data))
 }
 
 func TestContextEncodings(t *testing.T) {

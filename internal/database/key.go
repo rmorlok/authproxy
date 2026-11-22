@@ -80,6 +80,7 @@ func IsValidKeyState[T string | KeyState](state T) bool {
 type KeyOrderByField string
 
 const (
+	KeyOrderById        KeyOrderByField = "id"
 	KeyOrderByState     KeyOrderByField = "state"
 	KeyOrderByCreatedAt KeyOrderByField = "created_at"
 	KeyOrderByUpdatedAt KeyOrderByField = "updated_at"
@@ -87,7 +88,8 @@ const (
 
 func IsValidKeyOrderByField[T string | KeyOrderByField](field T) bool {
 	switch KeyOrderByField(field) {
-	case KeyOrderByState,
+	case KeyOrderById,
+		KeyOrderByState,
 		KeyOrderByCreatedAt,
 		KeyOrderByUpdatedAt:
 		return true

@@ -5,77 +5,16 @@ package javascript
 
 import (
 	"context"
-	"errors"
-	"strings"
-	"time"
-	"unicode/utf8"
 
 	"github.com/dop251/goja"
-	"github.com/dop251/goja/ast"
-	"github.com/dop251/goja/parser"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
-// These errors classify failures without disclosing authored code, connection
-// configuration, thrown values, or JavaScript stacks to invocation callers.
-var (
-	ErrInvalidSource = errors.New("invalid JavaScript source")
-	ErrInvalidInput  = errors.New("invalid JavaScript input")
-	ErrInvalidOutput = errors.New("JavaScript result is not a supported JSON value")
-	ErrLimitExceeded = errors.New("JavaScript execution limit exceeded")
-	ErrEvaluation    = errors.New("JavaScript execution failed")
-)
-
-// Limits contains resolved positive caps for a compiled expression or Tool.
-// Callers apply operator ceilings before compilation. Tool initialization uses
-// the source, stack, and timeout caps; expression and Tool evaluation also use
-// the JSON input/output caps. These limits are not a hard memory quota.
-type Limits struct {
-	// MaxSourceBytes bounds authored UTF-8 source before parsing. For Tools,
-	// this includes both the entry-point script and connector helper library.
-	MaxSourceBytes int
-
-	// MaxInputBytes bounds serialized snapshot and response JSON together.
-	MaxInputBytes int
-
-	// MaxOutputBytes bounds ordinary output JSON or the complete authored
-	// toolResult payload, including quotes, escaping, and base64 data. Derived
-	// text blocks and the final invocation envelope need their own byte allowance.
-	MaxOutputBytes int
-
-	// MaxDepth bounds JSON value nesting; the root is depth zero.
-	MaxDepth int
-
-	// MaxNodes bounds JSON values and object property inspections, separately
-	// for the combined input and output. It does not count JavaScript bytecode.
-	MaxNodes int
-
-	// MaxStackDepth bounds JavaScript function call depth, including recursion.
-	MaxStackDepth int
-
-	// Timeout covers input binding, initialization, execution, promise settlement,
-	// and result conversion in Evaluate, or just initialization in Validate.
-	// Initialize instead requires its caller to enforce a deadline.
-	// Expiry returns ErrLimitExceeded; caller cancellation/deadlines retain their
-	// context error. Native Goja built-ins cannot be preempted; cancellation is
-	// checked again before any result is returned.
-	Timeout time.Duration
-}
-
-// validate disallows omitted or unlimited policy values.
-func (l Limits) validate() error {
-	if l.MaxSourceBytes <= 0 ||
-		l.MaxInputBytes <= 0 ||
-		l.MaxOutputBytes <= 0 ||
-		l.MaxDepth <= 0 ||
-		l.MaxNodes <= 0 ||
-		l.MaxStackDepth <= 0 ||
-		l.Timeout <= 0 {
-		return ErrInvalidInput
-	}
-	return nil
-}
+// Limits is the shared execution and JSON conversion policy. Tool callers still
+// resolve operator ceilings and authored caps before compiling their programs.
+type Limits = apjsruntime.Limits
 
 // Input supplies a captured safe invocation snapshot and optional response data.
 // Neither field exposes a connection handle, credentials, or arbitrary Go objects.
@@ -95,45 +34,21 @@ type Input struct {
 // always creates a fresh VM, so callers can reuse it concurrently. It has no
 // asynchronous host, connector helper library, or network capability.
 type Expression struct {
-	program *goja.Program
-	limits  Limits
+	// program owns compilation, fresh-VM execution, and JSON output conversion.
+	program *apjsruntime.Expression
+
+	// limits is the same captured policy used by the Tool input adapter.
+	limits Limits
 }
 
-// CompileExpression parses exactly one strict JavaScript expression without
-// executing authored code. Function-call expressions and IIFEs are allowed;
-// statements cannot escape the expression wrapper. Syntax failures are safe
-// classifications rather than parser messages containing source text.
+// CompileExpression prepares a shared pure expression with Tool input bindings.
+// Compilation never executes authored code and returns safe classifications for
+// invalid source or policy. The effective limits are copied for input binding.
 func CompileExpression(source string, limits Limits) (*Expression, error) {
-	if err := limits.validate(); err != nil {
+	program, err := apjsruntime.CompileExpression(source, limits)
+	if err != nil {
 		return nil, err
 	}
-	if len(source) > limits.MaxSourceBytes {
-		return nil, ErrLimitExceeded
-	}
-	if !utf8.ValidString(source) || strings.TrimSpace(source) == "" {
-		return nil, ErrInvalidSource
-	}
-
-	parsed, err := parser.ParseFile(
-		nil, // fileSet
-		"tool-expression.js",
-		"(\n"+source+"\n)",
-		0, // mode
-		parser.WithDisableSourceMaps,
-	)
-	if err != nil || len(parsed.Body) != 1 {
-		return nil, ErrInvalidSource
-	}
-
-	if _, ok := parsed.Body[0].(*ast.ExpressionStatement); !ok {
-		return nil, ErrInvalidSource
-	}
-
-	program, err := goja.CompileAST(parsed, true)
-	if err != nil {
-		return nil, ErrInvalidSource
-	}
-
 	return &Expression{program: program, limits: limits}, nil
 }
 
@@ -143,8 +58,8 @@ func CompileExpression(source string, limits Limits) (*Expression, error) {
 // this is not a precision-preserving raw JSON passthrough.
 //
 // Cancellation and the configured timeout remain active through conversion.
-// A configured timeout is ErrLimitExceeded; caller cancellation/deadlines keep
-// ctx.Err(), taking precedence if both have expired before evaluation returns.
+// A configured timeout is apjsruntime.ErrLimitExceeded; caller cancellation and
+// deadlines keep ctx.Err(), taking precedence if both expire before return.
 // Only the interrupt watcher accesses the VM from another goroutine, through
 // Goja's thread-safe Interrupt method. Thrown values and stacks are never exposed.
 func (e *Expression) Evaluate(
@@ -152,32 +67,11 @@ func (e *Expression) Evaluate(
 	input Input,
 ) (common.RawJSON, error) {
 	if e == nil || e.program == nil || ctx == nil {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 
-	return evaluateJSON(ctx, e.limits, input, func(_ context.Context, vm *goja.Runtime) (goja.Value, error) {
-		value, err := vm.RunProgram(e.program)
-		if err != nil {
-			return nil, runtimeEvaluationError(err)
-		}
-		return value, nil
+	result, err := e.program.Evaluate(ctx, func(runCtx context.Context, vm *goja.Runtime) error {
+		return bindInput(runCtx, vm, input, e.limits)
 	})
-}
-
-// expressionContextError distinguishes caller cancellation from the runtime's
-// own execution-time limit. The caller's error wins when both contexts are done.
-// runCtx is private and only canceled independently by the configured timeout
-// until runtime cleanup, so its remaining error means a policy limit.
-func expressionContextError(ctx, runCtx context.Context) error {
-	if runCtx.Err() != nil {
-		// Read the caller after observing the child: inherited cancellation
-		// must already be visible there, even if it arrived during this check.
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		return ErrLimitExceeded
-	}
-
-	// The caller can be canceled before that cancellation reaches its child.
-	return ctx.Err()
+	return common.RawJSON(result), err
 }

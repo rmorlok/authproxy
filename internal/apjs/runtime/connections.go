@@ -1,0 +1,431 @@
+package runtime
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+
+	"github.com/dop251/goja"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
+)
+
+// AsyncInput supplies detached JSON and already-authorized HTTP capabilities for
+// execute(params, context). Keep its bytes and slice stable during preparation.
+// Authorization, safe metadata selection, and client attribution belong to the
+// caller; this package never looks up a connection from its metadata.
+type AsyncInput struct {
+	// Params accepts any JSON value. Omitted bytes become an empty object.
+	Params json.RawMessage
+
+	// Context contains extra JSON object fields, such as domain metadata. Omitted
+	// bytes become an empty object; the connections property is reserved.
+	Context json.RawMessage
+
+	// Connections preserves caller order. All snapshots share the initial input
+	// allowance with Params and Context; each ID must be nonempty and unique.
+	Connections []ConnectionInput
+
+	// DirectDispatch optionally supplies global fetch without connection
+	// authentication. Nil disables it; there is no default client or fallback.
+	// It has HTTPHost.BindFetch's ownership contract and must use a direct client
+	// bound to the same HTTP session as Connections. The adapter fixes attribution
+	// and instrumentation. Tool callers must leave this nil.
+	DirectDispatch func(*http.Request) (*aphttp.Response, error)
+}
+
+// ConnectionDispatcher supplies an already admitted connection's HTTP capability
+// and request-label policy. Its implementation belongs to the domain adapter so
+// the runtime does not import connection models or label-schema packages. It must
+// support concurrent requests; validation may overlap earlier dispatch workers.
+type ConnectionDispatcher interface {
+	// ValidateLabels runs on the VM owner before launching a worker. It must
+	// reject malformed/protected labels, perform no I/O, and neither mutate nor
+	// retain the detached map. Errors become fixed invalid-input rejections.
+	ValidateLabels(map[string]string) error
+
+	// DoWithLabels runs off the VM goroutine with HTTPHost.BindFetch's request,
+	// response, and ownership contract. It must preserve captured attribution
+	// and use the shared execution session. Labels are per-call detached data;
+	// neither this method nor validation may select another connection.
+	DoWithLabels(*http.Request, map[string]string) (*aphttp.Response, error)
+}
+
+// ConnectionInput pairs a captured JSON snapshot with its private HTTP dispatch
+// capability. Snapshot edits in JavaScript never alter or select the dispatcher.
+type ConnectionInput struct {
+	// Snapshot is an object with id, name, namespace, cfg, labels, annotations.
+	// id is a required nonempty string; missing name/namespace default to "".
+	// cfg is a JSON object; labels/annotations are string maps. Missing objects
+	// default to {}; explicit null and unknown top-level fields are rejected.
+	Snapshot json.RawMessage
+
+	// Dispatcher supplies fixed HTTP authority and validates request labels.
+	// Use one HTTP session for shared request/response budgets, deadline, and
+	// evidence. It must capture no VM values and cannot be nil.
+	Dispatcher ConnectionDispatcher
+}
+
+// connectionBrand marks a capability independently of its enumerable metadata.
+// It is nonconfigurable on a frozen object, so authored code cannot remove it.
+// The bounded output encoder rejects symbol keys even when non-enumerable;
+// copying selected string-keyed metadata creates ordinary data, not authority.
+var connectionBrand = goja.NewSymbol("AuthProxy connection")
+
+// PrepareInput copies a complete initial input batch and sets the invocation's
+// native Params and Context only on success. Call it during Evaluate preparation,
+// before authored code runs, with the evaluation's VM, context, and limits.
+// Adapters may bind aliases to these same copied objects. It installs a protected
+// global fetch only when the caller explicitly supplies DirectDispatch.
+//
+// The resulting context always has a read-only ordered connections array. Its
+// members and their top-level properties are frozen; nested metadata stays
+// mutable and private to this VM. Fetch methods retain their captured dispatcher
+// when borrowed, and connection objects cannot be returned as generic JSON.
+//
+// A host is required when connections or direct HTTP are supplied. It must belong
+// to this VM, and its Close/Start/Await must already be registered on the invocation.
+// This helper owns no session or worker lifecycle and never enables I/O.
+func (i *AsyncInvocation) PrepareInput(
+	ctx context.Context,
+	vm *goja.Runtime,
+	input AsyncInput,
+	limits Limits,
+	host *HTTPHost,
+) error {
+	if i == nil ||
+		ctx == nil ||
+		vm == nil ||
+		limits.Validate() != nil ||
+		((len(input.Connections) != 0 || input.DirectDispatch != nil) && host == nil) ||
+		(host != nil && host.vm != vm) {
+		return ErrInvalidInput
+	}
+
+	if err := ChargeWork(ctx, 1); err != nil {
+		return err
+	}
+
+	// Every document consumes at least one node. Bound the document slice before
+	// allocating it, including the two default argument/context roots.
+	if limits.MaxNodes < 2 || len(input.Connections) > limits.MaxNodes-2 {
+		return ErrLimitExceeded
+	}
+
+	if err := ReserveAllocation(ctx, 2+len(input.Connections)); err != nil {
+		return err
+	}
+
+	documents := make([]json.RawMessage, 2, 2+len(input.Connections))
+	documents[0], documents[1] = input.Params, input.Context
+	for index := range documents {
+		if documents[index] == nil {
+			documents[index] = json.RawMessage(`{}`)
+		}
+	}
+
+	for _, connection := range input.Connections {
+		if err := ChargeWork(ctx, 1); err != nil {
+			return err
+		}
+
+		if connection.Dispatcher == nil {
+			return ErrInvalidInput
+		}
+
+		documents = append(documents, connection.Snapshot)
+	}
+
+	decoder, err := NewJSONDecoder(vm)
+	if err != nil {
+		return err
+	}
+
+	values, err := decoder.Decode(
+		ctx,
+		JSONLimits{
+			MaxBytes: limits.MaxInputBytes,
+			MaxDepth: limits.MaxDepth,
+			MaxNodes: limits.MaxNodes,
+		},
+		documents...,
+	)
+	if err != nil {
+		return err
+	}
+
+	contextObject, ok := inputObject(values[1])
+	if !ok {
+		return ErrInvalidInput
+	}
+
+	contextKeys, err := inputPropertyNames(ctx, contextObject)
+	if err != nil {
+		return err
+	}
+
+	for _, key := range contextKeys {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if key == "connections" {
+			return ErrInvalidInput
+		}
+	}
+
+	// Validate every snapshot before binding any capability or exposing input to
+	// the adapter. The decoded graphs are native JSON, with no getters or proxies.
+	if err := ReserveAllocation(ctx, len(input.Connections)); err != nil {
+		return err
+	}
+
+	connections := make([]*goja.Object, len(input.Connections))
+	if err := ReserveAllocation(ctx, len(connections)); err != nil {
+		return err
+	}
+
+	seen := make(map[string]bool, len(connections))
+	for index := range connections {
+		if err := ChargeWork(ctx, 1); err != nil {
+			return err
+		}
+
+		connection, err := connectionSnapshot(ctx, vm, values[index+2])
+		if err != nil {
+			return err
+		}
+
+		// Identity conversion and map lookup revisit the decoded string.
+		identity := connection.Get("id").(goja.String)
+
+		if err := ChargeWork(ctx, identity.Length()); err != nil {
+			return err
+		}
+
+		if err := ReserveAllocation(ctx, identity.Length()); err != nil {
+			return err
+		}
+
+		id := identity.String()
+		if seen[id] {
+			return ErrInvalidInput
+		}
+
+		seen[id] = true
+		connections[index] = connection
+	}
+
+	freeze, ok := goja.AssertFunction(
+		vm.Get("Object").
+			ToObject(vm).
+			Get("freeze"),
+	)
+	if !ok {
+		return ErrInvalidInput
+	}
+
+	array := vm.NewArray()
+	for index, connection := range connections {
+		if err := ChargeWork(ctx, 1); err != nil {
+			return err
+		}
+
+		// Each connection adds an array slot and bounded native capability
+		// metadata. The dispatcher itself stays outside the JavaScript graph.
+		if err := ReserveAllocation(ctx, 3); err != nil {
+			return err
+		}
+
+		fetch, err := host.BindConnectionFetch(input.Connections[index].Dispatcher)
+		if err != nil {
+			return err
+		}
+
+		if err := connection.DefineDataProperty(
+			"fetch",
+			vm.ToValue(fetch),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
+			return ErrInvalidInput
+		}
+		if err := connection.DefineDataPropertySymbol(
+			connectionBrand,
+			vm.ToValue(true),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
+			return ErrInvalidInput
+		}
+
+		if _, err := freeze(goja.Undefined(), connection); err != nil {
+			return ErrInvalidInput
+		}
+
+		if err := array.Set(vm.ToValue(index).String(), connection); err != nil {
+			return ErrInvalidInput
+		}
+	}
+
+	if _, err := freeze(goja.Undefined(), array); err != nil {
+		return ErrInvalidInput
+	}
+
+	if err := contextObject.DefineDataProperty("connections", array, goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE); err != nil {
+		return ErrInvalidInput
+	}
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// This is a separate captured capability, never selected from a connection or
+	// used as its fallback. Binding through the same host shares pending workers
+	// and keeps direct I/O disabled throughout initialization and its microtasks.
+	if input.DirectDispatch != nil {
+		fetch, err := host.BindFetch(input.DirectDispatch)
+		if err != nil {
+			return err
+		}
+		if err := vm.GlobalObject().DefineDataProperty(
+			"fetch",
+			vm.ToValue(fetch),
+			goja.FLAG_FALSE, // writable
+			goja.FLAG_FALSE, // configurable
+			goja.FLAG_FALSE, // enumerable
+		); err != nil {
+			return ErrInvalidInput
+		}
+	}
+
+	i.Params, i.Context = values[0], contextObject
+
+	return nil
+}
+
+// inputObject recognizes object-shaped values from the bounded JSON decoder.
+// It is not a validator for arbitrary authored or reflected Go objects.
+func inputObject(value goja.Value) (*goja.Object, bool) {
+	object, ok := value.(*goja.Object)
+	return object, ok && object.ClassName() == "Object"
+}
+
+// inputPropertyNames accounts for native key lists used after JSON decoding.
+// Revalidation revisits metadata and creates a Go slice even though the decoded
+// graph already paid its own conversion costs. Reflection exposes size only
+// after materializing the list; admission still precedes further processing.
+func inputPropertyNames(ctx context.Context, object *goja.Object) ([]string, error) {
+	keys := object.GetOwnPropertyNames()
+	if err := ChargeWork(ctx, len(keys)); err != nil {
+		return nil, err
+	}
+	if err := ReserveAllocation(ctx, len(keys)); err != nil {
+		return nil, err
+	}
+
+	for _, key := range keys {
+		if err := ChargeWork(ctx, len(key)); err != nil {
+			return nil, err
+		}
+		if err := ReserveAllocation(ctx, len(key)); err != nil {
+			return nil, err
+		}
+	}
+
+	return keys, nil
+}
+
+// connectionSnapshot validates one already-bounded native JSON object and fills
+// omitted metadata with fixed empty defaults. Unknown fields cannot override a
+// host method, and labels/annotations retain their string-map contract.
+func connectionSnapshot(ctx context.Context, vm *goja.Runtime, value goja.Value) (*goja.Object, error) {
+	if err := ChargeWork(ctx, 1); err != nil {
+		return nil, err
+	}
+	object, ok := inputObject(value)
+	if !ok {
+		return nil, ErrInvalidInput
+	}
+
+	keys, err := inputPropertyNames(ctx, object)
+	if err != nil {
+		return nil, err
+	}
+	for _, key := range keys {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		switch key {
+		case "id",
+			"name",
+			"namespace",
+			"cfg",
+			"labels",
+			"annotations":
+		default:
+			return nil, ErrInvalidInput
+		}
+	}
+
+	id, ok := object.Get("id").(goja.String)
+	if !ok || id.Length() == 0 {
+		return nil, ErrInvalidInput
+	}
+
+	for _, key := range []string{
+		"name",
+		"namespace",
+		"cfg",
+		"labels",
+		"annotations",
+	} {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		value := object.Get(key)
+		if value == nil {
+			if err := ReserveAllocation(ctx, 1); err != nil {
+				return nil, err
+			}
+			if key == "name" || key == "namespace" {
+				value = vm.ToValue("")
+			} else {
+				value = vm.NewObject()
+			}
+			if err := object.Set(key, value); err != nil {
+				return nil, ErrInvalidInput
+			}
+		}
+
+		if key == "name" || key == "namespace" {
+			if _, ok := value.(goja.String); !ok {
+				return nil, ErrInvalidInput
+			}
+			continue
+		}
+
+		metadata, ok := inputObject(value)
+		if !ok {
+			return nil, ErrInvalidInput
+		}
+
+		if key != "cfg" {
+			labels, err := inputPropertyNames(ctx, metadata)
+			if err != nil {
+				return nil, err
+			}
+			for _, label := range labels {
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
+				if _, ok := metadata.Get(label).(goja.String); !ok {
+					return nil, ErrInvalidInput
+				}
+			}
+		}
+	}
+
+	return object, nil
+}

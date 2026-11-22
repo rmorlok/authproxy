@@ -791,3 +791,60 @@ func TestOAuth2Tokens_RefreshTokenExpiryRoundTrip(t *testing.T) {
 	require.True(t, expiresAt.Equal(*got.RefreshTokenExpiresAt))
 	require.True(t, refreshAt.Equal(*got.RefreshTokenRefreshAt))
 }
+
+// TestEnumerateOAuth2TokensExpiringWithinWhileRefreshing covers a scan whose tokens
+// are refreshed while it runs, as refresh workers do once the scan enqueues them. A
+// refresh replaces the token with one that no longer expires soon, taking it out of
+// the scan's filter, so an offset scan skips the tokens that move up.
+func TestEnumerateOAuth2TokensExpiringWithinWhileRefreshing(t *testing.T) {
+	now := time.Date(2023, time.November, 5, 6, 0, 0, 0, time.UTC)
+	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+
+	// Each configured connection has a token expiring within the scan's window.
+	const connectionCount = 10
+	insertToken := func(connectionId apid.ID, expiresAt time.Time) {
+		_, err := db.InsertOAuth2Token(
+			ctx,
+			connectionId,
+			nil,
+			encfield.EncryptedField{ID: "dek_test", Data: "refreshToken"},
+			encfield.EncryptedField{ID: "dek_test", Data: "accessToken"},
+			&expiresAt,
+			OAuth2RefreshTokenExpiry{},
+			"scope1",
+			"scope1",
+			nil,
+		)
+		require.NoError(t, err)
+	}
+	for i := 0; i < connectionCount; i++ {
+		connectionId := apid.New(apid.PrefixConnection)
+		require.NoError(t, db.CreateConnection(ctx, &Connection{
+			Id:                  connectionId,
+			Namespace:           "root",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               ConnectionStateConfigured,
+		}))
+		insertToken(connectionId, now.Add(15*time.Minute))
+	}
+
+	// Each page's tokens are refreshed to a far expiry before the next page is read.
+	visits := make(map[apid.ID]int)
+	s := db.(*service)
+	err := s.enumerateOAuth2TokensExpiringWithin(ctx, time.Hour, 3, func(tokens []*OAuth2TokenWithConnection, _ bool) (pagination.KeepGoing, error) {
+		for _, token := range tokens {
+			visits[token.Token.ConnectionId]++
+			insertToken(token.Token.ConnectionId, now.Add(24*time.Hour))
+		}
+		return pagination.Continue, nil
+	})
+	require.NoError(t, err)
+
+	// One scan reaches every connection's token exactly once.
+	require.Len(t, visits, connectionCount)
+	for connectionId, count := range visits {
+		require.Equal(t, 1, count, connectionId)
+	}
+}

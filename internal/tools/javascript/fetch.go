@@ -3,14 +3,15 @@ package javascript
 import (
 	"context"
 	"log/slog"
-	"net/http"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
 // FetchOptions supplies the already authorized connection and host-side policy.
-// No connection or credential object is exposed to JavaScript.
+// JavaScript receives only its copied metadata and a bound fetch capability,
+// never a live Go connection or credentials.
 type FetchOptions struct {
 	// Session belongs to this invocation. Its configured client fixes connection
 	// identity and attribution; it also owns cumulative HTTP budgets and send
@@ -18,8 +19,8 @@ type FetchOptions struct {
 	// caller can still read ExecutionState or call the idempotent Close afterward.
 	Session *httphost.Session
 
-	// MaxRequestBytes bounds the combined URL, method, headers, and body of each
-	// request before handing a detached copy to an HTTP worker.
+	// MaxRequestBytes bounds the combined URL, method, headers, body, and request
+	// label keys/values before handing detached data to an HTTP worker.
 	MaxRequestBytes int
 
 	// MaxPendingOperations bounds concurrent fetch and body-read workers before
@@ -32,10 +33,12 @@ type FetchOptions struct {
 	Logger *slog.Logger
 }
 
-// EvaluateWithHTTP evaluates a Tool with connection-bound fetch and bounded,
-// single-use response readers. The caller must authorize and validate the Tool
-// before transferring a session dedicated to this invocation. Validate and ordinary
-// Evaluate remain free of I/O. Fetch is unavailable during initialization.
+// EvaluateWithHTTP evaluates a Tool with exactly one entry in context.connections
+// and bounded, single-use response readers, returning the same detached Result
+// as Evaluate. The caller must authorize and validate
+// the Tool before transferring a session dedicated to this invocation. Validate
+// and ordinary Evaluate remain free of I/O. Connection fetch is unavailable during
+// initialization, and global fetch remains undefined throughout execution.
 //
 // All Goja access stays on the calling goroutine. HTTP workers exchange detached
 // Go data; evaluation cancels its requests and schedules unread-body cleanup on
@@ -69,7 +72,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 		options.Session.Context() == nil ||
 		options.MaxRequestBytes <= 0 ||
 		options.MaxPendingOperations <= 0 {
-		return nil, ErrInvalidInput
+		return nil, apjsruntime.ErrInvalidInput
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -85,37 +88,24 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	stop := context.AfterFunc(options.Session.Context(), cancel)
 	defer func() { stop(); cancel() }()
 
-	result, err := evaluateResult(
+	result, err := p.program.Evaluate(
 		parent,
-		p.limits,
-		input,
-		func(runCtx context.Context, vm *goja.Runtime) (goja.Value, error) {
-			loop := newFetchLoop(runCtx, vm, options, p.limits)
-			defer loop.close()
-
-			if err := vm.Set("fetch", loop.fetch); err != nil {
-				return nil, ErrInvalidInput
-			}
-
-			tracker := newPromiseTracker(vm)
-			defer tracker.close()
-
-			execute, err := p.Initialize(vm)
+		func(runCtx context.Context, vm *goja.Runtime, invocation *apjsruntime.AsyncInvocation) error {
+			host, err := apjsruntime.NewHTTPHost(runCtx, vm, apjsruntime.HTTPOptions{
+				MaxRequestBytes:      options.MaxRequestBytes,
+				MaxPendingOperations: options.MaxPendingOperations,
+				Logger:               options.Logger,
+			}, p.limits)
 			if err != nil {
-				return nil, err
+				return err
 			}
+			// Register cleanup before touching the VM again: preparation can be
+			// interrupted after creating the host but before returning it.
+			invocation.Close = host.Close
+			invocation.Start = host.Start
+			invocation.Await = host.Await
 
-			if err := tracker.checkRejections(); err != nil {
-				return nil, err
-			}
-
-			loop.enabled = true
-			root, err := callTool(vm, execute)
-
-			if err != nil {
-				return nil, err
-			}
-			return loop.settle(root, tracker)
+			return p.prepareInvocation(runCtx, vm, invocation, input, host, options.Session)
 		},
 	)
 	if contextErr := ctx.Err(); contextErr != nil {
@@ -126,47 +116,4 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	}
 
 	return result, err
-}
-
-// fetch validates and detaches authored request values on the VM goroutine.
-// Even malformed input becomes a rejected Promise, with no private exception
-// text. No worker is launched before initialization and admission complete.
-func (l *fetchLoop) fetch(call goja.FunctionCall) goja.Value {
-	if !l.enabled {
-		return l.rejected(ErrEvaluation)
-	}
-	if len(l.pending) >= l.options.MaxPendingOperations {
-		return l.rejected(ErrLimitExceeded)
-	}
-
-	var req *http.Request
-	var err error
-	if exception := l.vm.Try(func() {
-		req, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes)
-	}); exception != nil {
-		return l.rejected(ErrInvalidInput)
-
-	}
-	if err != nil {
-		return l.rejected(err)
-	}
-
-	// The worker captures only the session and detached request, never l or VM
-	// values. It can finish safely even after evaluation has disposed its runtime.
-	session := l.options.Session
-	promise, admitted := l.start(func() fetchCompletion {
-		response, err := session.Do(req)
-		return fetchCompletion{response: response, err: err}
-	}, func(done fetchCompletion) (goja.Value, error) {
-		if done.err != nil {
-			return nil, done.err
-		}
-		return l.responseValue(done.response)
-	})
-
-	if !admitted && req.Body != nil {
-		_ = req.Body.Close()
-	}
-
-	return promise
 }

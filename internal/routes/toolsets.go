@@ -197,7 +197,7 @@ func (r *ToolSetsRoutes) create(gctx *gin.Context) {
 
 	var req toolsetschema.ToolSet
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -245,7 +245,7 @@ func (r *ToolSetsRoutes) list(gctx *gin.Context) {
 
 	var req ListToolSetsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -323,7 +323,7 @@ func (r *ToolSetsRoutes) update(gctx *gin.Context) {
 
 	var req toolsetschema.ToolSetPatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -402,14 +402,14 @@ func (r *ToolSetsRoutes) delete(gctx *gin.Context) {
 }
 
 // @Summary		List toolset generations
-// @Description	List a ToolSet's generations, newest first by default. Each projects the current shared connection selector.
+// @Description	List a ToolSet's generations, oldest first by default. Each projects the current shared connection selector.
 // @Tags			toolsets
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string	true	"ToolSet ID"
 // @Param			cursor	query		string	false	"Pagination cursor"
 // @Param			limit	query		integer	false	"Maximum number of results to return (default 50, max 100)"
-// @Param			orderBy	query		string	false	"Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to newest generation first."
+// @Param			orderBy	query		string	false	"Order by generation, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to generation ascending (oldest first)."
 // @Success		200		{object}	schemaapiopenapi.ListToolSetsResponseJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -424,7 +424,7 @@ func (r *ToolSetsRoutes) listGenerations(gctx *gin.Context) {
 
 	var req ListToolSetGenerationsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -539,7 +539,7 @@ func (r *ToolSetsRoutes) createGeneration(gctx *gin.Context) {
 	if gctx.Request.ContentLength != 0 {
 		var req toolsetschema.ToolSetPatch
 		if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+			apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -583,7 +583,7 @@ func (r *ToolSetsRoutes) updateGeneration(gctx *gin.Context) {
 
 	var req toolsetschema.ToolSetPatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

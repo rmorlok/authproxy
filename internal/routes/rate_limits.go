@@ -189,7 +189,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 
 	var req rlschema.RateLimit
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -224,7 +224,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 }
 
 // @Summary		List rate limits
-// @Description	List rate limits with optional filtering and pagination
+// @Description	List rate limits with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
@@ -233,7 +233,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:desc')"
+// @Param			orderBy		query		string	false	"Order by id, namespace, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	schemaapiopenapi.ListRateLimitsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -246,7 +246,7 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 
 	var req ListRateLimitsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -347,7 +347,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 
 	var req rlschema.RateLimitPatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -371,7 +371,7 @@ func (r *RateLimitsRoutes) update(gctx *gin.Context) {
 
 	updated, err := req.ApplyTo(rl.GetResource(), nil)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -480,7 +480,7 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 
 	var req schemaapi.RateLimitDryRunAction
 	if err := apgin.BindActionJSON(gctx, &req, schemaapi.RateLimitDryRunActionKind); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}

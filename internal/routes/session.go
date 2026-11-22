@@ -73,7 +73,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 
 	var req SessionInitiateParams
 	if err := apgin.BindJSONBody(gctx, &req); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err))
 		return
 	}
 

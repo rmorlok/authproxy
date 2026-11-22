@@ -6,6 +6,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
 
 var reservedRuntimeVars = map[string]struct{}{
@@ -28,10 +29,21 @@ type Library struct {
 // would give connector authors a server-side file read and existence oracle
 // through the returned parse error.
 func compileSource(name, source string) (*goja.Program, error) {
-	parsed, err := goja.Parse(name, source, parser.WithDisableSourceMaps)
+	// Parse directly so validation can read structured positions. goja.Parse
+	// flattens parser errors into a message and discards their position fields.
+	parsed, err := parser.ParseFile(
+		nil, // fileSet
+		name,
+		source,
+		0, // mode
+		parser.WithDisableSourceMaps,
+	)
 	if err != nil {
-		return nil, err
+		// Preserve the legacy diagnostic prefix while retaining the structured
+		// parser cause for the definition-validation adapter.
+		return nil, fmt.Errorf("SyntaxError: %w", err)
 	}
+
 	return goja.CompileAST(parsed, false)
 }
 
@@ -74,15 +86,18 @@ func CompileAndValidateLibrary(source string) (*Library, error) {
 	return library, nil
 }
 
-// ValidateExpressionSyntax parses a connector-authored expression without
-// executing it. This is useful for expressions that depend on runtime variables
-// and cannot be safely evaluated while the connector definition is validated.
-func ValidateExpressionSyntax(expression string) error {
-	if strings.TrimSpace(expression) == "" {
-		return fmt.Errorf("expression is required")
+// CheckCombinedSource checks raw library and expression bytes against a shared
+// positive allowance before parsing or reusing compiled code. Raw strings let
+// pre-compilation callers count whitespace that a legacy compiler may discard.
+// The subtraction avoids overflowing a combined length. Errors disclose only
+// the configured allowance, never source; runtime adapters may retain just the
+// error category while definition validation exposes the safe limit detail.
+func CheckCombinedSource(librarySource, expression string, maxSourceBytes int) error {
+	if maxSourceBytes <= 0 {
+		return jsruntime.ErrInvalidInput
 	}
-	if _, err := compileSource("expression.js", expression); err != nil {
-		return fmt.Errorf("compile JavaScript expression: %w", err)
+	if len(expression) > maxSourceBytes || len(librarySource) > maxSourceBytes-len(expression) {
+		return fmt.Errorf("%w: combined source exceeds %d bytes", jsruntime.ErrLimitExceeded, maxSourceBytes)
 	}
 	return nil
 }
@@ -143,12 +158,25 @@ func (l *Library) Run(vm *goja.Runtime) error {
 	return nil
 }
 
+// validateReservedRuntimeVars rejects libraries that claim an injected global.
+// The legacy error names the conflicting global; bounded callers choose whether
+// that fixed name is appropriate for their validation or evaluation boundary.
 func validateReservedRuntimeVars(vm *goja.Runtime) error {
+	if name := findReservedRuntimeVar(vm); name != "" {
+		return fmt.Errorf("JS library defines reserved runtime variable %q", name)
+	}
+	return nil
+}
+
+// findReservedRuntimeVar returns one conflicting name from the fixed host-owned
+// set, or an empty string. Reading a global may invoke authored getters; callers
+// must apply their own execution limits and exception handling.
+func findReservedRuntimeVar(vm *goja.Runtime) string {
 	for name := range reservedRuntimeVars {
 		value := vm.Get(name)
 		if value != nil && !goja.IsUndefined(value) {
-			return fmt.Errorf("JS library defines reserved runtime variable %q", name)
+			return name
 		}
 	}
-	return nil
+	return ""
 }

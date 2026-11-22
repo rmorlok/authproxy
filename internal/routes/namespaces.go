@@ -131,7 +131,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 
 	var req namespace.Namespace
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -182,7 +182,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 }
 
 // @Summary		List namespaces
-// @Description	List namespaces with optional filtering and pagination
+// @Description	List namespaces with optional filtering and pagination. Results are ordered by path unless orderBy is set.
 // @Tags			namespaces
 // @Accept			json
 // @Produce		json
@@ -193,7 +193,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace path pattern"
 // @Param			name			query		string	false	"Filter by exact final path segment"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'path:asc')"
+// @Param			orderBy		query		string	false	"Order by path, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'path desc'). Defaults to path."
 // @Success		200				{object}	schemaapiopenapi.ListNamespacesResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -206,7 +206,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 
 	var req ListNamespacesRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -345,7 +345,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 
 	var req namespace.NamespacePatch
 	if err := apgin.BindResourceJSON(gctx, &req, meta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithResponseMsg("invalid request body")))
 		val.MarkErrorReturn()
 		return
 	}
@@ -372,7 +372,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	before := ns.GetResource()
 	_, err = req.ApplyTo(before, nil)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}

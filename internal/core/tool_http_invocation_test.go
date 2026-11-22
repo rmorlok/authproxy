@@ -64,7 +64,8 @@ func expectHTTPToolTransport(t *testing.T, f *toolAuthorizationFixture, actorLab
 		require.Equal(t, actorLabels, a.GetLabels())
 		return factory
 	})
-	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory)
+	// Empty labels select the same factory at capture and at request dispatch.
+	factory.EXPECT().ForLabels(gomock.Nil()).Return(factory).Times(2)
 	factory.EXPECT().NewHTTPClient().Return(&http.Client{Transport: send})
 }
 

@@ -138,8 +138,22 @@ type ReEncryptedFieldUpdate struct {
 	NewValue      encfield.EncryptedField
 }
 
+// reEncryptionPageSize is the number of rows EnumerateFieldsRequiringReEncryption
+// reads per page.
+const reEncryptionPageSize = 100
+
 func (s *service) EnumerateFieldsRequiringReEncryption(
 	ctx context.Context,
+	callback func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error),
+) error {
+	return s.enumerateFieldsRequiringReEncryption(ctx, reEncryptionPageSize, callback)
+}
+
+// enumerateFieldsRequiringReEncryption is EnumerateFieldsRequiringReEncryption with
+// a configurable page size, so tests can span several pages with few rows.
+func (s *service) enumerateFieldsRequiringReEncryption(
+	ctx context.Context,
+	pageSize uint64,
 	callback func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 ) error {
 	regs := GetEncryptedFieldRegistrations()
@@ -151,16 +165,19 @@ func (s *service) EnumerateFieldsRequiringReEncryption(
 	for regIdx, reg := range regs {
 		isLastReg := regIdx == len(regs)-1
 
-		const pageSize = 100
-		offset := uint64(0)
+		// after is the primary key of the last row read from this table, or nil before
+		// the first page. Paging by key rather than offset matters here: callers
+		// re-encrypt each page before reading the next, which takes those rows out of
+		// the query's filter, and an offset would then skip the rows that moved up.
+		var after []any
 
 		for {
-			targets, totalRows, err := s.queryReEncryptionPage(ctx, reg, pageSize, offset)
+			targets, totalRows, lastKey, err := s.queryReEncryptionPage(ctx, reg, pageSize, after)
 			if err != nil {
 				return fmt.Errorf("failed to query re-encryption page for table %s: %w", reg.Table, err)
 			}
 
-			lastPageForTable := totalRows <= pageSize
+			lastPageForTable := uint64(totalRows) <= pageSize
 			isLastPage := isLastReg && lastPageForTable
 
 			keepGoing, err := callback(targets, isLastPage)
@@ -172,21 +189,25 @@ func (s *service) EnumerateFieldsRequiringReEncryption(
 				break
 			}
 
-			offset += pageSize
+			after = lastKey
 		}
 	}
 
 	return nil
 }
 
-// queryReEncryptionPage queries one page of rows needing re-encryption for a registration.
-// Returns the targets found and the total number of rows returned by the query (before field-level filtering).
+// queryReEncryptionPage queries one page of rows needing re-encryption for a
+// registration, in primary key order, starting after the row whose primary key values
+// are after (nil starts at the beginning). It returns the targets found, the number of
+// rows the query returned before field-level filtering (up to pageSize+1, so callers
+// can tell whether more rows follow), and the primary key values of the last row in
+// the page, to pass as after for the next page.
 func (s *service) queryReEncryptionPage(
 	ctx context.Context,
 	reg EncryptedFieldRegistration,
 	pageSize uint64,
-	offset uint64,
-) ([]ReEncryptionTarget, int, error) {
+	after []any,
+) ([]ReEncryptionTarget, int, []any, error) {
 	// Build select columns: PK cols (qualified) + encrypted cols (qualified) + target DEK ID.
 	var selectCols []string
 	for _, pk := range reg.PrimaryKeyCols {
@@ -253,18 +274,20 @@ func (s *service) queryReEncryptionPage(
 		q = q.Where(sq.Or(orConditions))
 	}
 
-	// Order and paginate
+	// Order and paginate by primary key, continuing after the previous page's last row.
 	var orderCols []string
 	for _, pk := range reg.PrimaryKeyCols {
 		orderCols = append(orderCols, reg.Table+"."+pk)
 	}
+	if len(after) > 0 {
+		q = q.Where(primaryKeyAfter(orderCols, after))
+	}
 	q = q.OrderBy(strings.Join(orderCols, ", ")).
-		Limit(pageSize + 1).
-		Offset(offset)
+		Limit(pageSize + 1)
 
 	rows, err := q.RunWith(s.db).Query()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, nil, err
 	}
 	defer rows.Close()
 
@@ -292,14 +315,29 @@ func (s *service) queryReEncryptionPage(
 		scanDest = append(scanDest, &rd.targetDEKId)
 
 		if err := rows.Scan(scanDest...); err != nil {
-			return nil, 0, err
+			return nil, 0, nil, err
+		}
+		// Drivers may scan text as []byte. Compared as a parameter, SQLite orders a
+		// blob after every text value, so the next page's key must be text.
+		for i, v := range rd.pkValues {
+			if b, ok := v.([]byte); ok {
+				rd.pkValues[i] = string(b)
+			}
 		}
 		allRows = append(allRows, rd)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, nil, err
 	}
 
 	totalRows := len(allRows)
 	if totalRows > int(pageSize) {
 		allRows = allRows[:pageSize]
+	}
+
+	var lastKey []any
+	if len(allRows) > 0 {
+		lastKey = allRows[len(allRows)-1].pkValues
 	}
 
 	// Build targets: one per field per row where that field mismatches
@@ -323,7 +361,20 @@ func (s *service) queryReEncryptionPage(
 		}
 	}
 
-	return targets, totalRows, nil
+	return targets, totalRows, lastKey, nil
+}
+
+// primaryKeyAfter restricts a query to rows whose primary key sorts after values, in
+// the lexicographic order of cols that ORDER BY cols uses. cols are qualified column
+// names and values their values for one row, in the same order. A composite key uses
+// a row-value comparison, which both SQLite and PostgreSQL support and which compares
+// with the same collation as ORDER BY.
+func primaryKeyAfter(cols []string, values []any) sq.Sqlizer {
+	if len(cols) == 1 {
+		return sq.Gt{cols[0]: values[0]}
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(values)), ", ")
+	return sq.Expr(fmt.Sprintf("(%s) > (%s)", strings.Join(cols, ", "), placeholders), values...)
 }
 
 // BatchUpdateReEncryptedFields replaces captured encrypted values only on live

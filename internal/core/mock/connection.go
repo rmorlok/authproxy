@@ -61,6 +61,12 @@ func (unconfiguredHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	return nil, ErrMockHTTPClientNotConfigured
 }
 
+// DoWithLabels reports the same missing scenario configuration as Do while
+// preserving outgoing body ownership, regardless of the supplied labels.
+func (c unconfiguredHTTPClient) DoWithLabels(req *http.Request, _ map[string]string) (*http.Response, error) {
+	return c.Do(req)
+}
+
 func (m *Connection) GetId() apid.ID {
 	return m.Id
 }
@@ -291,6 +297,18 @@ func (m *Connection) GetJavascriptContext(ctx context.Context) (apjs.Context, er
 			"annotations": annotations,
 		},
 	), nil
+}
+
+// EvaluateJavascriptPredicate applies the real bounded predicate adapter to the
+// mock's explicitly supplied library and data. Like GetJavascriptContext, it
+// does not derive a library from ConnectorValue. Input mutations remain local
+// to each evaluation and the supplied context controls cancellation.
+func (m *Connection) EvaluateJavascriptPredicate(ctx context.Context, expression string) (bool, error) {
+	jsctx, err := m.GetJavascriptContext(ctx)
+	if err != nil {
+		return false, err
+	}
+	return jsctx.EvaluateBooleanWithContext(ctx, expression, apjs.ConnectorPredicateLimits())
 }
 
 func (m *Connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {

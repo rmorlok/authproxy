@@ -181,6 +181,125 @@ func TestResourceSnapshotTask_DeletedResourcesDoNotAppearInLaterSlices(t *testin
 	require.Empty(t, secondRateLimitSamples)
 }
 
+// pageRecordingStore records the IDs of each page of connection, connector and
+// connector generation samples the snapshot stores, before passing it on, so a test
+// can see how the snapshot paged through the database.
+type pageRecordingStore struct {
+	ResourceSampleStore
+	connectionPages          [][]apid.ID
+	connectorPages           [][]apid.ID
+	connectorGenerationPages [][]apid.ID
+}
+
+func (s *pageRecordingStore) StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error {
+	ids := make([]apid.ID, 0, len(samples))
+	for _, sample := range samples {
+		ids = append(ids, sample.ResourceID)
+	}
+	s.connectionPages = append(s.connectionPages, ids)
+	return s.ResourceSampleStore.StoreConnectionResourceSamples(ctx, samples)
+}
+
+func (s *pageRecordingStore) StoreConnectorResourceSamples(ctx context.Context, samples []*ConnectorResourceSample) error {
+	ids := make([]apid.ID, 0, len(samples))
+	for _, sample := range samples {
+		ids = append(ids, sample.ResourceID)
+	}
+	s.connectorPages = append(s.connectorPages, ids)
+	return s.ResourceSampleStore.StoreConnectorResourceSamples(ctx, samples)
+}
+
+func (s *pageRecordingStore) StoreConnectorGenerationResourceSamples(ctx context.Context, samples []*ConnectorGenerationResourceSample) error {
+	ids := make([]apid.ID, 0, len(samples))
+	for _, sample := range samples {
+		ids = append(ids, sample.ResourceID)
+	}
+	s.connectorGenerationPages = append(s.connectorGenerationPages, ids)
+	return s.ResourceSampleStore.StoreConnectorGenerationResourceSamples(ctx, samples)
+}
+
+// requireKeyOrderedPages asserts that pages, joined, are exactly the IDs of table in
+// the database's own ID order, in pages of at most pageSize. That is the shape of a
+// walk by key, where each page continues after the last ID of the one before; an offset
+// walk in creation order would not follow ID order. The order is read from the
+// database because PostgreSQL compares text by collation, not Go byte order.
+func requireKeyOrderedPages(t *testing.T, rawDB *sql.DB, table string, pages [][]apid.ID, pageSize int) {
+	t.Helper()
+	rows, err := rawDB.Query(fmt.Sprintf("SELECT id FROM %s WHERE deleted_at IS NULL ORDER BY id ASC", table))
+	require.NoError(t, err)
+	defer rows.Close()
+	var want []apid.ID
+	for rows.Next() {
+		var id apid.ID
+		require.NoError(t, rows.Scan(&id))
+		want = append(want, id)
+	}
+	require.NoError(t, rows.Err())
+
+	var got []apid.ID
+	for _, page := range pages {
+		require.LessOrEqual(t, len(page), pageSize)
+		got = append(got, page...)
+	}
+	require.Equal(t, want, got)
+}
+
+// TestResourceSnapshotTask_ReadsEachRowOnceByKey covers #1037: the snapshot walks each
+// listing by key, so every row is read once rather than re-scanned under an offset.
+func TestResourceSnapshotTask_ReadsEachRowOnceByKey(t *testing.T) {
+	const (
+		pageSize = 10
+		rowCount = 25
+	)
+	ctx, mainDB, rawDB, store, _, handler := newResourceSnapshotTestHarness(t)
+	recorder := &pageRecordingStore{ResourceSampleStore: store}
+	handler.store = recorder
+	handler.batchSize = pageSize
+
+	// Rows are created with descending timestamps, so creation order (the old
+	// offset walk's order for connections) disagrees with ID order.
+	base := time.Date(2026, time.May, 29, 12, 0, 0, 0, time.UTC)
+	connectors := make(map[apid.ID]bool, rowCount)
+	for i := 0; i < rowCount; i++ {
+		createdCtx := apctx.NewBuilder(ctx).WithClock(clock.NewFakeClock(base.Add(-time.Duration(i) * time.Minute))).Build()
+		connID := apid.New(apid.PrefixConnection)
+		require.NoError(t, mainDB.CreateConnection(createdCtx, &database.Connection{
+			Id:                  connID,
+			Namespace:           "root.metrics",
+			ConnectorId:         apid.New(apid.PrefixConnector),
+			ConnectorGeneration: 1,
+			State:               database.ConnectionStateConfigured,
+		}))
+
+		// Each connector has one generation, so it yields one connector sample and one
+		// generation sample.
+		connectorID := apid.New(apid.PrefixConnector)
+		insertConnectorGeneration(t, rawDB, connectorID, "root.metrics", 1, database.ConnectorGenerationStatePrimary)
+		connectors[connectorID] = true
+	}
+
+	// One snapshot spans three pages of each listing.
+	require.NoError(t, handler.SnapshotResources(ctx, base))
+
+	// Connections and connectors are read by ID, each once.
+	requireKeyOrderedPages(t, rawDB, database.ConnectionsTable, recorder.connectionPages, pageSize)
+	requireKeyOrderedPages(t, rawDB, database.ConnectorsTable, recorder.connectorPages, pageSize)
+
+	// Generation samples are identified by connector, and the walk follows generation
+	// row IDs, so only check that each generation is read once in full pages.
+	seen := make(map[apid.ID]int)
+	for _, page := range recorder.connectorGenerationPages {
+		require.LessOrEqual(t, len(page), pageSize)
+		for _, id := range page {
+			seen[id]++
+		}
+	}
+	require.Len(t, seen, rowCount)
+	for id := range connectors {
+		require.Equal(t, 1, seen[id], id)
+	}
+}
+
 func TestResourceSnapshotTask_CronUsesConfiguredInterval(t *testing.T) {
 	handler := NewResourceSnapshotTaskHandler(
 		nil,

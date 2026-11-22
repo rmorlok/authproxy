@@ -1,16 +1,26 @@
 package core
 
 import (
+	"errors"
+	"math"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
+)
+
+// Tool transform budgets allow repeated native conversion passes and metadata
+// visits while keeping utility work finite. These factors apply equally to work
+// and allocation units; neither dimension measures actual VM heap usage.
+const (
+	toolTransformUnitsPerByte = 16
+	toolTransformUnitsPerNode = 32
 )
 
 // toolHTTPInvocationPolicy resolves server configuration into a complete HTTP
@@ -44,9 +54,24 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 	sourceBytes := toolPolicyBytes(settings.MaxResponseSourceBytes, 256<<10)
 	depth := toolPolicyInt(settings.MaxDepth, 64)
 	values := toolPolicyInt(settings.MaxValues, 1_000_000)
+	transform := javascript.Limits{
+		MaxSourceBytes: sourceBytes,
+		MaxInputBytes:  toolPolicyBytes(settings.MaxTransformInputBytes, 16<<20),
+		MaxOutputBytes: outputBytes,
+		MaxDepth:       depth,
+		MaxNodes:       values,
+		MaxStackDepth:  toolPolicyInt(settings.MaxStackDepth, 256),
+		Timeout:        timeout,
+	}
+	units, err := toolTransformBudget(transform)
+	if err != nil {
+		return httpexec.Limits{}, err
+	}
+	transform.MaxWorkUnits, transform.MaxAllocationUnits = units, units
 
 	// Arguments, copied configuration, response-transform input, and the result
-	// envelope have separate budgets. Raising one never silently raises another.
+	// envelope retain separate size limits. The transform also has one shared
+	// work/allocation allowance across its conversions and pure utilities.
 	return httpexec.Limits{
 		Render: render.Limits{
 			MaxBytes: toolPolicyBytes(settings.MaxRenderBytes, 8<<20),
@@ -65,17 +90,9 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 			MaxResponseBytes:      responseBytes,
 			MaxOutputBytes:        outputBytes,
 			MaxEncodedResultBytes: toolPolicyBytes(settings.MaxEncodedResultBytes, 16<<20),
-			Transform: javascript.Limits{
-				MaxSourceBytes: sourceBytes,
-				MaxInputBytes:  toolPolicyBytes(settings.MaxTransformInputBytes, 16<<20),
-				MaxOutputBytes: outputBytes,
-				MaxDepth:       depth,
-				MaxNodes:       values,
-				MaxStackDepth:  toolPolicyInt(settings.MaxStackDepth, 256),
-				Timeout:        timeout,
-			},
+			Transform:             transform,
 		},
-		HTTP: httphost.Limits{
+		HTTP: aphttp.Limits{
 			Timeout:          timeout,
 			MaxRequests:      toolPolicyInt(settings.MaxRequests, 20),
 			MaxResponseBytes: int64(responseBytes),
@@ -83,6 +100,30 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 			MaxHeaderBytes:   toolPolicyBytes(settings.MaxResponseHeaderBytes, 64<<10),
 		},
 	}, nil
+}
+
+// toolTransformBudget derives each cumulative allowance from the resolved
+// input/output byte and node caps: 16*(input+output) + 32*nodes. The byte factor
+// covers repeated native scans/copies; the node factor covers parsed values and
+// inspected metadata. Remaining units are available to pure utilities, but
+// arbitrary repeated helper calls can still exhaust the execution's allowance.
+// Reject unrepresentable policies before multiplication/addition can overflow.
+func toolTransformBudget(limits javascript.Limits) (int, error) {
+	units := 0
+	for _, term := range []struct {
+		value  int // Resolved byte or node cap, before scaling.
+		factor int // Logical work/allocation units per byte or node.
+	}{
+		{limits.MaxInputBytes, toolTransformUnitsPerByte},
+		{limits.MaxOutputBytes, toolTransformUnitsPerByte},
+		{limits.MaxNodes, toolTransformUnitsPerNode},
+	} {
+		if term.value <= 0 || term.value > (math.MaxInt-units)/term.factor {
+			return 0, errors.New("tool response-transform input, output, and value limits cannot form a representable execution budget")
+		}
+		units += term.value * term.factor
+	}
+	return units, nil
 }
 
 // toolPolicyBytes converts a validated byte allowance to the executor's int

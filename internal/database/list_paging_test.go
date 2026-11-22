@@ -10,6 +10,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
@@ -55,6 +56,39 @@ type keysetListing struct {
 	// ordered attempts a resume position together with an explicit order. It is
 	// nil for a listing that offers no order.
 	ordered func(ctx context.Context, db DB) error
+	// defaultPages follows offset pages with no order chosen, as an API caller does,
+	// and returns every row's key in the order received. It is nil for a listing that
+	// always pages by key, such as ToolSet bindings.
+	defaultPages func(t *testing.T, ctx context.Context, db DB) []string
+}
+
+// offsetKeys follows a listing from its first offset page through each cursor and
+// returns every row's key in the order received. Offset pages report no position.
+func offsetKeys[T any, E interface {
+	FetchPage(context.Context) pagination.PageResult[T]
+}](
+	t *testing.T,
+	ctx context.Context,
+	first pagination.PageResult[T],
+	fromCursor func(context.Context, string) (E, error),
+	key func(T) string,
+) []string {
+	t.Helper()
+	var keys []string
+	page := first
+	for {
+		require.NoError(t, page.Error)
+		require.Empty(t, page.Position)
+		for _, row := range page.Results {
+			keys = append(keys, key(row))
+		}
+		if page.Cursor == "" {
+			return keys
+		}
+		executor, err := fromCursor(ctx, page.Cursor)
+		require.NoError(t, err)
+		page = executor.FetchPage(ctx)
+	}
 }
 
 // keysetListings returns every listing that supports ResumeAfter.
@@ -65,6 +99,12 @@ func keysetListings() []keysetListing {
 	rateLimitKey := func(r RateLimit) string { return string(r.Id) }
 	actorKey := func(a *Actor) string { return string(a.Id) }
 	bindingKey := func(b ToolSetBindingListing) string { return string(b.ConnectionId) }
+	connectorKey := func(c ConnectorWithDefinition) string { return string(c.Id) }
+	generationKey := func(c ConnectorWithDefinition) string { return string(c.DefinitionGenerationId) }
+
+	// generationConnectors maps each seeded generation row id to its connector, so
+	// remove can delete the connector that owns it.
+	generationConnectors := make(map[string]apid.ID)
 
 	// toolSet is the parent the binding rows share, created with the first row of
 	// each fresh database.
@@ -79,6 +119,9 @@ func keysetListings() []keysetListing {
 	return []keysetListing{
 		{
 			name: "connections",
+			defaultPages: func(t *testing.T, ctx context.Context, db DB) []string {
+				return offsetKeys(t, ctx, db.ListConnectionsBuilder().Limit(keysetPageSize).FetchPage(ctx), db.ListConnectionsFromCursor, connectionKey)
+			},
 			seed: func(t *testing.T, ctx context.Context, db DB, _ int) string {
 				id := apid.New(apid.PrefixConnection)
 				require.NoError(t, db.CreateConnection(ctx, &Connection{
@@ -108,6 +151,9 @@ func keysetListings() []keysetListing {
 		},
 		{
 			name: "namespaces",
+			defaultPages: func(t *testing.T, ctx context.Context, db DB) []string {
+				return offsetKeys(t, ctx, db.ListNamespacesBuilder().Limit(keysetPageSize).FetchPage(ctx), db.ListNamespacesFromCursor, namespaceKey)
+			},
 			seed: func(t *testing.T, ctx context.Context, db DB, i int) string {
 				path := fmt.Sprintf("root.keyset%03d", i)
 				require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: path, State: NamespaceStateActive}))
@@ -131,6 +177,9 @@ func keysetListings() []keysetListing {
 		},
 		{
 			name: "keys",
+			defaultPages: func(t *testing.T, ctx context.Context, db DB) []string {
+				return offsetKeys(t, ctx, db.ListKeysBuilder().Limit(keysetPageSize).FetchPage(ctx), db.ListKeysFromCursor, encryptionKey)
+			},
 			seed: func(t *testing.T, ctx context.Context, db DB, _ int) string {
 				id := apid.New(apid.PrefixKey)
 				require.NoError(t, db.CreateKey(ctx, &Key{Id: id, Namespace: "root", State: KeyStateActive}))
@@ -154,6 +203,9 @@ func keysetListings() []keysetListing {
 		},
 		{
 			name: "rate limits",
+			defaultPages: func(t *testing.T, ctx context.Context, db DB) []string {
+				return offsetKeys(t, ctx, db.ListRateLimitsBuilder().Limit(keysetPageSize).FetchPage(ctx), db.ListRateLimitsFromCursor, rateLimitKey)
+			},
 			seed: func(t *testing.T, ctx context.Context, db DB, _ int) string {
 				id := apid.New(apid.PrefixRateLimit)
 				require.NoError(t, db.CreateRateLimit(ctx, &RateLimit{Id: id, Namespace: "root", Definition: validDef()}))
@@ -177,6 +229,9 @@ func keysetListings() []keysetListing {
 		},
 		{
 			name: "actors",
+			defaultPages: func(t *testing.T, ctx context.Context, db DB) []string {
+				return offsetKeys(t, ctx, db.ListActorsBuilder().Limit(keysetPageSize).FetchPage(ctx), db.ListActorsFromCursor, actorKey)
+			},
 			seed: func(t *testing.T, ctx context.Context, db DB, _ int) string {
 				id := apid.New(apid.PrefixActor)
 				require.NoError(t, db.CreateActor(ctx, &Actor{Id: id, Namespace: "root", ExternalId: id.String()}))
@@ -195,6 +250,60 @@ func keysetListings() []keysetListing {
 				return db.ListActorsBuilder().
 					ResumeAfter("").
 					OrderBy(ActorOrderByCreatedAt, pagination.OrderByAsc).
+					FetchPage(ctx).Error
+			},
+		},
+		{
+			// Each row is a connector with one generation. Deleting the connector takes it
+			// out of the listing.
+			name: "connectors",
+			defaultPages: func(t *testing.T, ctx context.Context, db DB) []string {
+				return offsetKeys(t, ctx, db.ListConnectorsBuilder().Limit(keysetPageSize).FetchPage(ctx), db.ListConnectorsFromCursor, connectorKey)
+			},
+			seed: func(t *testing.T, ctx context.Context, db DB, i int) string {
+				connector := testConnectorWithDefinition(apid.New(apid.PrefixConnector), "root", scommon.ResourceName(fmt.Sprintf("keyset-%03d", i)), 1)
+				require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
+				return string(connector.Id)
+			},
+			remove: func(ctx context.Context, db DB, key string) error {
+				return db.DeleteConnector(ctx, apid.ID(key))
+			},
+			enumerate: func(db DB) pagination.EnumerateFunc[string] {
+				return asKeys(db.ListConnectorsBuilder().Limit(keysetPageSize).Enumerate, connectorKey)
+			},
+			resume: func(db DB, position string) pagination.EnumerateFunc[string] {
+				return asKeys(db.ListConnectorsBuilder().Limit(keysetPageSize).ResumeAfter(position).Enumerate, connectorKey)
+			},
+			ordered: func(ctx context.Context, db DB) error {
+				return db.ListConnectorsBuilder().
+					ResumeAfter("").
+					OrderBy(ConnectorOrderByCreatedAt, pagination.OrderByAsc).
+					FetchPage(ctx).Error
+			},
+		},
+		{
+			// Each row is the only generation of its own connector, keyed by the
+			// generation row id. Deleting the connector hides the generation.
+			name: "connector generations",
+			seed: func(t *testing.T, ctx context.Context, db DB, i int) string {
+				connector := testConnectorWithDefinition(apid.New(apid.PrefixConnector), "root", scommon.ResourceName(fmt.Sprintf("keyset-%03d", i)), 1)
+				require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
+				generationConnectors[string(connector.DefinitionGenerationId)] = connector.Id
+				return string(connector.DefinitionGenerationId)
+			},
+			remove: func(ctx context.Context, db DB, key string) error {
+				return db.DeleteConnector(ctx, generationConnectors[key])
+			},
+			enumerate: func(db DB) pagination.EnumerateFunc[string] {
+				return asKeys(db.ListConnectorGenerationsBuilder().Limit(keysetPageSize).Enumerate, generationKey)
+			},
+			resume: func(db DB, position string) pagination.EnumerateFunc[string] {
+				return asKeys(db.ListConnectorGenerationsBuilder().Limit(keysetPageSize).ResumeAfter(position).Enumerate, generationKey)
+			},
+			ordered: func(ctx context.Context, db DB) error {
+				return db.ListConnectorGenerationsBuilder().
+					ResumeAfter("").
+					OrderBy(ConnectorGenerationOrderByGeneration, pagination.OrderByAsc).
 					FetchPage(ctx).Error
 			},
 		},
@@ -234,6 +343,40 @@ func keysetListings() []keysetListing {
 				return asKeys(bindings(db).ResumeAfter(position).Enumerate, bindingKey)
 			},
 		},
+	}
+}
+
+// TestFetchPageDefaultsToKeyOrder covers API paging with no order chosen: offset
+// pages list rows in key order, the same sequence a key-ordered walk returns, rather
+// than in creation order or whatever order the database happens to produce.
+func TestFetchPageDefaultsToKeyOrder(t *testing.T) {
+	for _, listing := range keysetListings() {
+		if listing.defaultPages == nil {
+			continue
+		}
+		t.Run(listing.name, func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+
+			// Rows are created newest first by clock, so creation order disagrees with
+			// key order.
+			base := time.Date(2024, time.March, 1, 12, 0, 0, 0, time.UTC)
+			for i := 0; i < keysetRowCount; i++ {
+				ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(base.Add(-time.Duration(i) * time.Minute))).Build()
+				listing.seed(t, ctx, db, i)
+			}
+			ctx := reconcileTestCtx()
+
+			// The key-ordered walk gives the database's own key order.
+			var byKey []string
+			err := listing.resume(db, "")(ctx, func(page pagination.PageResult[string]) (pagination.KeepGoing, error) {
+				byKey = append(byKey, page.Results...)
+				return pagination.Continue, nil
+			})
+			require.NoError(t, err)
+
+			// Offset pages with no order chosen return exactly that sequence.
+			require.Equal(t, byKey, listing.defaultPages(t, ctx, db))
+		})
 	}
 }
 
@@ -467,9 +610,52 @@ func TestListPaging(t *testing.T) {
 		p.setLimit(2)
 		p.setOrder(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
 
-		// The caller's order replaces the default.
+		// The caller's order replaces the default, and the key breaks ties in the same
+		// direction.
 		sqlStr, _ := toSql(t, &p, "created_at ASC", "id ASC")
-		require.Equal(t, "SELECT * FROM t ORDER BY created_at DESC LIMIT 3 OFFSET 0", sqlStr)
+		require.Equal(t, "SELECT * FROM t ORDER BY created_at DESC, id DESC LIMIT 3 OFFSET 0", sqlStr)
+	})
+
+	t.Run("offset mode adds no tie-breaker when ordering by the key", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setLimit(2)
+		p.setOrder(ConnectionOrderById, pagination.OrderByDesc)
+
+		// The key is already unique, so it is not repeated.
+		sqlStr, _ := toSql(t, &p)
+		require.Equal(t, "SELECT * FROM t ORDER BY id DESC LIMIT 3 OFFSET 0", sqlStr)
+	})
+
+	t.Run("offset mode defaults to key order", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setLimit(2)
+
+		// A listing with no default order of its own lists by key, ascending.
+		sqlStr, _ := toSql(t, &p)
+		require.Equal(t, "SELECT * FROM t ORDER BY id ASC LIMIT 3 OFFSET 0", sqlStr)
+	})
+
+	t.Run("applyOrdered maps the caller's order to the listing's clauses", func(t *testing.T) {
+		var p listPaging[ConnectionOrderByField]
+		p.setLimit(2)
+		p.setOrder(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
+		clauses := func(field ConnectionOrderByField, direction string) []string {
+			return []string{"x." + string(field) + " " + direction, "x.id " + direction}
+		}
+
+		// In offset mode the mapped clauses, tie-breaker included, replace the field name.
+		sqlStr, _, err := p.applyOrdered(sq.Select("*").From("t x"), "x.id", clauses).ToSql()
+		require.NoError(t, err)
+		require.Equal(t, "SELECT * FROM t x ORDER BY x.created_at DESC, x.id DESC LIMIT 3 OFFSET 0", sqlStr)
+
+		// In key mode the mapping is unused, so it pages by the qualified key.
+		var keyed listPaging[ConnectionOrderByField]
+		keyed.setLimit(2)
+		keyed.resumeAfter("b")
+		sqlStr, args, err := keyed.applyOrdered(sq.Select("*").From("t x"), "x.id", clauses).ToSql()
+		require.NoError(t, err)
+		require.Equal(t, "SELECT * FROM t x WHERE x.id > ? ORDER BY x.id ASC LIMIT 3", sqlStr)
+		require.Equal(t, []any{"b"}, args)
 	})
 
 	t.Run("offset mode advances by the rows returned", func(t *testing.T) {
@@ -483,9 +669,9 @@ func TestListPaging(t *testing.T) {
 		require.Empty(t, position)
 		require.Equal(t, uint64(2), p.Offset)
 
-		// The next query skips the rows already returned.
+		// The next query skips the rows already returned, in the default key order.
 		sqlStr, _ := toSql(t, &p)
-		require.Equal(t, "SELECT * FROM t LIMIT 3 OFFSET 2", sqlStr)
+		require.Equal(t, "SELECT * FROM t ORDER BY id ASC LIMIT 3 OFFSET 2", sqlStr)
 
 		// A short final page reports no more.
 		page, hasMore, _ = nextPage(&p, []string{"c"}, key)
@@ -570,4 +756,48 @@ func TestListPaging(t *testing.T) {
 		require.NoError(t, json.Unmarshal(encoded, &decoded))
 		require.Equal(t, filters.listPaging, decoded.listPaging)
 	})
+}
+
+// TestConnectorGenerationsDefaultOrder covers the generation listing's default order:
+// generations grouped by connector, in connector key order, oldest generation first.
+func TestConnectorGenerationsDefaultOrder(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	ctx := reconcileTestCtx()
+
+	// Two connectors each have three generations.
+	const generationsPerConnector = 3
+	for i := 0; i < 2; i++ {
+		id := apid.New(apid.PrefixConnector)
+		for generation := uint64(1); generation <= generationsPerConnector; generation++ {
+			connector := testConnectorWithDefinition(id, "root", scommon.ResourceName(fmt.Sprintf("ordered-%d", i)), generation)
+			require.NoError(t, db.UpsertConnectorGeneration(ctx, connector))
+		}
+	}
+
+	// The connector listing's key order gives the expected grouping.
+	connectors := db.ListConnectorsBuilder().ResumeAfter("").FetchPage(ctx)
+	require.NoError(t, connectors.Error)
+	require.Len(t, connectors.Results, 2)
+	type connectorGeneration struct {
+		id         apid.ID
+		generation uint64
+	}
+	var want []connectorGeneration
+	for _, connector := range connectors.Results {
+		for generation := uint64(1); generation <= generationsPerConnector; generation++ {
+			want = append(want, connectorGeneration{connector.Id, generation})
+		}
+	}
+
+	// Offset pages with no order chosen follow it, across page boundaries.
+	keys := offsetKeys(t, ctx,
+		db.ListConnectorGenerationsBuilder().Limit(4).FetchPage(ctx),
+		db.ListConnectorGenerationsFromCursor,
+		func(c ConnectorWithDefinition) string { return fmt.Sprintf("%s/%d", c.Id, c.Generation) },
+	)
+	var wantKeys []string
+	for _, w := range want {
+		wantKeys = append(wantKeys, fmt.Sprintf("%s/%d", w.id, w.generation))
+	}
+	require.Equal(t, wantKeys, keys)
 }

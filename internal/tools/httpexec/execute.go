@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -223,18 +224,18 @@ func (p *Program) failure(
 	}
 
 	switch {
-	case errors.Is(err, httphost.ErrTimeout),
-		errors.Is(err, httphost.ErrRequestLimit),
+	case errors.Is(err, aphttp.ErrTimeout),
+		errors.Is(err, aphttp.ErrRequestLimit),
 		errors.Is(err, validation.ErrLimit):
 		code, message = "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded an execution limit."
-	case errors.Is(err, httphost.ErrResponseLimit),
-		errors.Is(err, httphost.ErrStreamLimit),
-		errors.Is(err, httphost.ErrHeaderLimit):
+	case errors.Is(err, aphttp.ErrResponseLimit),
+		errors.Is(err, aphttp.ErrStreamLimit),
+		errors.Is(err, aphttp.ErrHeaderLimit):
 		code, message = "OUTPUT_TOO_LARGE", "The upstream response exceeds the response size limits."
-	case errors.Is(err, httphost.ErrCredentialsUnavailable):
+	case errors.Is(err, aphttp.ErrCredentialsUnavailable):
 		code, message = "CONNECTION_UNAVAILABLE", "Credentials for the Tool connection are unavailable."
-	case errors.Is(err, httphost.ErrEncoding),
-		errors.Is(err, httphost.ErrInvalidResponse):
+	case errors.Is(err, aphttp.ErrEncoding),
+		errors.Is(err, aphttp.ErrInvalidResponse):
 		code, message = "UPSTREAM_PROTOCOL_ERROR", "The upstream response is invalid or uses an unsupported encoding."
 	}
 

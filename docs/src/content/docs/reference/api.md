@@ -129,6 +129,34 @@ The namespace restriction is important when a query can span multiple
 namespaces, because those namespaces may contain the same name. Results still
 include both `metadata.name` and immutable `metadata.id`.
 
+## List order and pagination
+
+Collection APIs return pages in a stable order. Without `orderBy`, resources
+are listed by their immutable ID, and generations are listed oldest first:
+
+| Collection | Default order |
+|---|---|
+| Actors, connections, connectors, keys, rate limits, Tools, ToolSets | `id` ascending |
+| Namespaces | `path` ascending |
+| Connector generations (`/connectors/{id}/generations`) | `generation` ascending |
+| ToolSet generations (`/toolsets/{id}/generations`) | `generation` ascending |
+
+To sort differently, pass `orderBy` as a field name, optionally followed by a
+space and `asc` or `desc`. The direction defaults to `asc`:
+
+```http
+GET /api/v1/connections?orderBy=created_at%20desc&limit=50
+```
+
+Each endpoint's Swagger description lists the fields it accepts. Rows with
+equal values are ordered by ID (or by generation number for generation lists),
+so the order is stable from page to page.
+
+When a response includes a `cursor`, pass it back unchanged to fetch the next
+page. The cursor carries the original filters and order; filter and `orderBy`
+parameters sent with a cursor are ignored. IDs are random rather than
+time-ordered, so request `orderBy=created_at` when you need creation order.
+
 ## Connection resource shape
 
 Connection reads and lists use the `authproxy.net/v1alpha1` resource envelope.

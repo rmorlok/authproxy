@@ -76,7 +76,7 @@ type ResponseInput struct {
 	//
 	// Map does not filter sensitive fields: every supplied header is visible to
 	// the transform and can be projected into Tool output. Executors must pass
-	// the already-filtered httphost.Response.Header (or apply the same filter),
+	// the already-filtered aphttp.Response.Header (or apply the same filter),
 	// which removes cookie, authentication, and hop-by-hop fields. Never pass the
 	// raw upstream http.Response.Header here.
 	Headers http.Header

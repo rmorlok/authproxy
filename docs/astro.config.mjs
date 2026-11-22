@@ -114,6 +114,7 @@ export default defineConfig({
               collapsed: true,
               items: [
                 'development/design',
+                'development/design/bounded-javascript',
                 'development/design/tools-and-toolsets',
                 'development/design/kubernetes-resource-api',
                 'development/design/key-model-migration',

@@ -117,8 +117,8 @@ func TestListToolSets(t *testing.T) {
 	})
 }
 
-// TestListToolSetGenerations pages one ToolSet's generations newest first and
-// hides the history of a deleted parent.
+// TestListToolSetGenerations pages one ToolSet's generations oldest first by
+// default and hides the history of a deleted parent.
 func TestListToolSetGenerations(t *testing.T) {
 	_, db := MustApplyBlankTestDbConfig(t, nil)
 	ctx := context.Background()
@@ -136,20 +136,20 @@ func TestListToolSetGenerations(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	// The first page is newest first and reports more results.
+	// With no order chosen, the first page is oldest first and reports more results.
 	page := db.
 		ListToolSetGenerationsBuilder().
 		ForToolSetId(toolSet.Id).
 		Limit(2).
 		FetchPage(ctx)
-	require.Equal(t, []uint64{3, 2}, generationNumbersForTest(t, page))
+	require.Equal(t, []uint64{1, 2}, generationNumbersForTest(t, page))
 	require.NotEmpty(t, page.Cursor)
 
 	// The cursor resumes on the last generation and ends the listing.
 	listing, err := db.ListToolSetGenerationsFromCursor(ctx, page.Cursor)
 	require.NoError(t, err)
 	next := listing.FetchPage(ctx)
-	require.Equal(t, []uint64{1}, generationNumbersForTest(t, next))
+	require.Equal(t, []uint64{3}, generationNumbersForTest(t, next))
 	require.Empty(t, next.Cursor)
 
 	// Enumerate walks every generation in the same order.
@@ -163,7 +163,15 @@ func TestListToolSetGenerations(t *testing.T) {
 			return pagination.Continue, nil
 		})
 	require.NoError(t, err)
-	require.Equal(t, []uint64{3, 2, 1}, seen)
+	require.Equal(t, []uint64{1, 2, 3}, seen)
+
+	// Newest first is still available explicitly.
+	newest := db.
+		ListToolSetGenerationsBuilder().
+		ForToolSetId(toolSet.Id).
+		OrderBy(ToolSetGenerationOrderByGeneration, pagination.OrderByDesc).
+		FetchPage(ctx)
+	require.Equal(t, []uint64{3, 2, 1}, generationNumbersForTest(t, newest))
 
 	// A listing without a parent is invalid input.
 	require.ErrorIs(t, db.ListToolSetGenerationsBuilder().FetchPage(ctx).Error, ErrInvalidListQuery)

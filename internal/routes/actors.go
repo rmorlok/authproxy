@@ -45,7 +45,7 @@ type ListActorsRequestQuery struct {
 }
 
 // @Summary		List actors
-// @Description	List actors with optional filtering and pagination
+// @Description	List actors with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			actors
 // @Accept			json
 // @Produce		json
@@ -55,7 +55,7 @@ type ListActorsRequestQuery struct {
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			orderBy		query		string	false	"Order by id, namespace, external_id, created_at, updated_at, or deleted_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	schemaapiopenapi.ListActorsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -70,7 +70,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -405,7 +405,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	var req actorschema.Actor
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeCreate); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -483,7 +483,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 
 	var req actorschema.ActorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -573,7 +573,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	var req actorschema.ActorPatch
 	if err := apgin.BindResourceJSON(gctx, &req, smeta.ValidationModeUpdate); err != nil {
-		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, r.logger, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

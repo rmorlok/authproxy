@@ -567,6 +567,7 @@ func (s *service) DeleteRateLimitAnnotations(ctx context.Context, id apid.ID, ke
 type RateLimitOrderByField string
 
 const (
+	RateLimitOrderById        RateLimitOrderByField = "id"
 	RateLimitOrderByCreatedAt RateLimitOrderByField = "created_at"
 	RateLimitOrderByUpdatedAt RateLimitOrderByField = "updated_at"
 	RateLimitOrderByNamespace RateLimitOrderByField = "namespace"
@@ -574,7 +575,8 @@ const (
 
 func IsValidRateLimitOrderByField[T string | RateLimitOrderByField](field T) bool {
 	switch RateLimitOrderByField(field) {
-	case RateLimitOrderByCreatedAt,
+	case RateLimitOrderById,
+		RateLimitOrderByCreatedAt,
 		RateLimitOrderByUpdatedAt,
 		RateLimitOrderByNamespace:
 		return true

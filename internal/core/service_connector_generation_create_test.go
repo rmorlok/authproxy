@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -104,6 +105,63 @@ func TestCreateConnector(t *testing.T) {
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector generation")
 	})
+}
+
+// TestCreateConnectorValidationErrors preserves cancellation for both creation
+// entry points and reserves invalid-argument classification for authored errors.
+func TestCreateConnectorValidationErrors(t *testing.T) {
+	for _, generation := range []bool{false, true} {
+		name := "connector"
+		if generation {
+			name = "generation"
+		}
+		t.Run(name, func(t *testing.T) {
+			for _, tt := range []struct {
+				name       string
+				javascript string
+				canceled   bool
+				wantErr    error
+			}{
+				{name: "canceled without javascript", canceled: true, wantErr: context.Canceled},
+				{name: "canceled javascript validation", javascript: "for (;;) {} // private source", canceled: true, wantErr: context.Canceled},
+				{name: "deadline during javascript validation", javascript: "for (;;) {} // private source", wantErr: context.DeadlineExceeded},
+				{name: "invalid javascript", javascript: "function ( // private source", wantErr: ErrInvalidArgument},
+			} {
+				t.Run(tt.name, func(t *testing.T) {
+					// Strict mocks forbid encryption or persistence after validation stops.
+					s, _, _, _, _, _ := FullMockService(t, gomock.NewController(t))
+					resource := cschema.NewConnector()
+					resource.Metadata.Namespace = "root"
+					resource.Spec.Definition.Javascript = tt.javascript
+					ctx, cancel := context.WithCancel(context.Background())
+					if tt.wantErr == context.DeadlineExceeded {
+						cancel()
+						ctx, cancel = context.WithTimeout(context.Background(), 50*time.Millisecond)
+					}
+					defer cancel()
+					if tt.canceled {
+						cancel()
+					}
+
+					// Caller cancellation stays distinct from an invalid definition.
+					var err error
+					if generation {
+						_, err = s.CreateConnectorGeneration(ctx, apid.New(apid.PrefixConnector), resource)
+					} else {
+						_, err = s.CreateConnector(ctx, resource)
+					}
+					require.ErrorIs(t, err, tt.wantErr)
+					if tt.wantErr != ErrInvalidArgument {
+						require.Equal(t, tt.wantErr, err)
+						require.NotErrorIs(t, err, ErrInvalidArgument)
+					} else {
+						require.ErrorContains(t, err, "$.spec.definition.javascript")
+					}
+					require.NotContains(t, err.Error(), "private")
+				})
+			}
+		})
+	}
 }
 
 func TestUpdateConnectorName(t *testing.T) {

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
@@ -20,7 +21,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
@@ -49,16 +49,18 @@ func executionLimits() httpexec.Limits {
 			MaxOutputBytes:        16384,
 			MaxEncodedResultBytes: 32768,
 			Transform: javascript.Limits{
-				MaxSourceBytes: 4096,
-				MaxInputBytes:  32768,
-				MaxOutputBytes: 16384,
-				MaxDepth:       32,
-				MaxNodes:       10000,
-				MaxStackDepth:  128,
-				Timeout:        time.Second,
+				MaxWorkUnits:       64 << 20,
+				MaxAllocationUnits: 64 << 20,
+				MaxSourceBytes:     4096,
+				MaxInputBytes:      32768,
+				MaxOutputBytes:     16384,
+				MaxDepth:           32,
+				MaxNodes:           10000,
+				MaxStackDepth:      128,
+				Timeout:            time.Second,
 			},
 		},
-		HTTP: httphost.Limits{
+		HTTP: aphttp.Limits{
 			Timeout:          2 * time.Second,
 			MaxRequests:      1,
 			MaxResponseBytes: 16384,
@@ -100,6 +102,14 @@ type executionClient func(*http.Request) (*http.Response, error)
 
 // Do transfers the request to the behavior selected by the current scenario.
 func (c executionClient) Do(request *http.Request) (*http.Response, error) { return c(request) }
+
+// DoWithLabels makes unexpected label support explicit in this unlabeled fixture.
+func (c executionClient) DoWithLabels(request *http.Request, labels map[string]string) (*http.Response, error) {
+	if len(labels) != 0 {
+		panic("executionClient does not support request labels")
+	}
+	return c.Do(request)
+}
 
 // executionBody records response ownership and reads, including discarded errors.
 type executionBody struct {

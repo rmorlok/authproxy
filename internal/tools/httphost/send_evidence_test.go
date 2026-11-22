@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -122,11 +123,11 @@ func TestSessionSendEvidenceCredentialFailure(t *testing.T) {
 		cause error
 		want  error
 	}{
-		{"local operational error", false, private, httphost.ErrTransport},
-		{"OAuth operational error", true, private, httphost.ErrTransport},
-		{"missing credentials", false, unavailable, httphost.ErrCredentialsUnavailable},
-		{"OAuth unusable credentials", true, unavailable, httphost.ErrCredentialsUnavailable},
-		{"HTTP status alone", false, httperr.New(401, "private credentials unavailable"), httphost.ErrTransport},
+		{"local operational error", false, private, aphttp.ErrTransport},
+		{"OAuth operational error", true, private, aphttp.ErrTransport},
+		{"missing credentials", false, unavailable, aphttp.ErrCredentialsUnavailable},
+		{"OAuth unusable credentials", true, unavailable, aphttp.ErrCredentialsUnavailable},
+		{"HTTP status alone", false, httperr.New(401, "private credentials unavailable"), aphttp.ErrTransport},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// The OAuth endpoint is reachable; the target must never be called.
@@ -177,7 +178,7 @@ func TestSessionSendEvidenceCredentialFailure(t *testing.T) {
 
 			// The failed logical call still exhausts the configured budget.
 			_, err = session.Do(evidenceRequest(t, server.URL+"/target"))
-			require.ErrorIs(t, err, httphost.ErrRequestLimit)
+			require.ErrorIs(t, err, aphttp.ErrRequestLimit)
 			require.Equal(t, int32(1), client.calls.Load())
 			require.Equal(t, api.ToolExecutionStateNotStarted, session.ExecutionState())
 		})
@@ -273,7 +274,7 @@ func TestSessionSendEvidenceReplayAndRedirect(t *testing.T) {
 			// turn that already possible upstream effect into notStarted.
 			response, err := session.Do(evidenceRequest(t, server.URL))
 			if scenario == "401 then resolve failure" {
-				require.ErrorIs(t, err, httphost.ErrCredentialsUnavailable)
+				require.ErrorIs(t, err, aphttp.ErrCredentialsUnavailable)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, http.StatusTooManyRequests, response.StatusCode)
@@ -335,7 +336,7 @@ func TestSessionCredentialsUnavailableAfterSuccess(t *testing.T) {
 		return auth_methods.MarkCredentialsUnavailable(errors.New("private missing credential"))
 	}
 	response, err = session.Do(evidenceRequest(t, server.URL))
-	require.ErrorIs(t, err, httphost.ErrCredentialsUnavailable)
+	require.ErrorIs(t, err, aphttp.ErrCredentialsUnavailable)
 	require.Nil(t, response)
 	require.EqualValues(t, 1, calls.Load())
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, session.ExecutionState())
@@ -363,7 +364,7 @@ func TestSessionCredentialFailureFromUnknownClient(t *testing.T) {
 			response, err := session.Do(request)
 
 			// Error cleanup releases both bodies without exposing their data.
-			want := httphost.ErrCredentialsUnavailable
+			want := aphttp.ErrCredentialsUnavailable
 			if canceled {
 				want = context.Canceled
 			}

@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
@@ -52,7 +53,7 @@ func (r *Response) mapTransform(
 				Code:    "UPSTREAM_PROTOCOL_ERROR",
 				Message: "Provider response has invalid headers.",
 			}, nil
-		case errors.Is(err, javascript.ErrLimitExceeded):
+		case errors.Is(err, apjsruntime.ErrLimitExceeded):
 			return &api.ToolResultError{
 				Code:    "EXECUTION_LIMIT_EXCEEDED",
 				Message: "The response transform exceeded an execution limit.",
@@ -164,12 +165,12 @@ func encodeTransformResponse(
 		case responseBodyJSON:
 			// Check capacity before converting bytes to a string for the buffer.
 			if len(decoded.body) > buffer.remaining() {
-				return nil, javascript.ErrLimitExceeded
+				return nil, apjsruntime.ErrLimitExceeded
 			}
 			buffer.write(string(decoded.body))
 		case responseBodyText:
 			if len(decoded.body) > buffer.remaining() {
-				return nil, javascript.ErrLimitExceeded
+				return nil, apjsruntime.ErrLimitExceeded
 			}
 			buffer.quoted(string(decoded.body))
 		default:
@@ -178,7 +179,7 @@ func encodeTransformResponse(
 				return nil, buffer.err
 			}
 			if !responseBase64Fits(len(decoded.body), buffer.remaining()) {
-				return nil, javascript.ErrLimitExceeded
+				return nil, apjsruntime.ErrLimitExceeded
 			}
 			buffer.write(base64.StdEncoding.EncodeToString(decoded.body))
 			buffer.write(`"}`)
@@ -215,7 +216,7 @@ func transformHeaders(
 	// Even an empty value list needs a name, quotes, colon, and array brackets.
 	// Bound width before allocating maps or iterating many zero-byte values.
 	if len(source) > limits.MaxNodes || len(source) > limits.MaxInputBytes/6 {
-		return nil, javascript.ErrLimitExceeded
+		return nil, apjsruntime.ErrLimitExceeded
 	}
 
 	remainingBytes, remainingValues := limits.MaxInputBytes, limits.MaxNodes
@@ -227,7 +228,7 @@ func transformHeaders(
 		}
 
 		if len(name) > remainingBytes || len(values) > remainingValues {
-			return nil, javascript.ErrLimitExceeded
+			return nil, apjsruntime.ErrLimitExceeded
 		}
 
 		remainingBytes -= len(name)
@@ -243,7 +244,7 @@ func transformHeaders(
 
 			// Every value requires at least two JSON quotes, even when empty.
 			if remainingBytes < 2 || len(value) > remainingBytes-2 {
-				return nil, javascript.ErrLimitExceeded
+				return nil, apjsruntime.ErrLimitExceeded
 			}
 
 			remainingBytes -= len(value) + 2
@@ -297,7 +298,7 @@ func (b *transformJSONBuffer) write(fragment string) {
 		return
 	}
 	if len(fragment) > b.remaining() {
-		b.err = javascript.ErrLimitExceeded
+		b.err = apjsruntime.ErrLimitExceeded
 		return
 	}
 	b.bytes = append(b.bytes, fragment...)
@@ -313,7 +314,7 @@ func (b *transformJSONBuffer) quoted(value string) {
 		return
 	}
 	if b.remaining() < 2 || len(value) > b.remaining()-2 {
-		b.err = javascript.ErrLimitExceeded
+		b.err = apjsruntime.ErrLimitExceeded
 		return
 	}
 	encoded, _ := json.Marshal(value)

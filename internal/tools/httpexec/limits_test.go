@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
-	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/tools/validation"
@@ -28,11 +28,13 @@ func policyLimits() Limits {
 			MaxSourceBytes: 4096, MaxResponseBytes: 1024,
 			MaxOutputBytes: 2048, MaxEncodedResultBytes: 16384,
 			Transform: javascript.Limits{
-				MaxSourceBytes: 4096, MaxInputBytes: 32768, MaxOutputBytes: 256,
+				MaxWorkUnits:       64 << 20,
+				MaxAllocationUnits: 64 << 20,
+				MaxSourceBytes:     4096, MaxInputBytes: 32768, MaxOutputBytes: 256,
 				MaxDepth: 32, MaxNodes: 10000, MaxStackDepth: 128, Timeout: time.Second,
 			},
 		},
-		HTTP: httphost.Limits{
+		HTTP: aphttp.Limits{
 			Timeout: 2 * time.Second, MaxRequests: 20, MaxResponseBytes: 4096,
 			MaxStreamBytes: 8192, MaxHeaderBytes: 4096,
 		},

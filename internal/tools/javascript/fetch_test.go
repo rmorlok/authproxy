@@ -15,7 +15,10 @@ import (
 	"testing"
 	"time"
 
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -27,6 +30,14 @@ type fetchClient func(*http.Request) (*http.Response, error)
 
 // Do delegates a request to the scenario's transport behavior.
 func (f fetchClient) Do(request *http.Request) (*http.Response, error) { return f(request) }
+
+// DoWithLabels makes unexpected label support explicit in this unlabeled fixture.
+func (f fetchClient) DoWithLabels(request *http.Request, labels map[string]string) (*http.Response, error) {
+	if len(labels) != 0 {
+		panic("fetchClient does not support request labels")
+	}
+	return f.Do(request)
+}
 
 // fetchBody detects eager reads and records resource release across goroutines.
 type fetchBody struct {
@@ -85,15 +96,15 @@ func (b *fetchBlockedCloseBody) Close() error {
 }
 
 // fetchLimits gives normal examples enough room without disabling any host policy.
-func fetchLimits() httphost.Limits {
-	return httphost.Limits{
+func fetchLimits() aphttp.Limits {
+	return aphttp.Limits{
 		Timeout: 10 * time.Second, MaxRequests: 8, MaxResponseBytes: 8192,
 		MaxStreamBytes: 8192, MaxHeaderBytes: 4096,
 	}
 }
 
 // fetchOptions creates a dedicated invocation session with idempotent fallback cleanup.
-func fetchOptions(t *testing.T, ctx context.Context, client fetchClient, limits httphost.Limits) javascript.FetchOptions {
+func fetchOptions(t *testing.T, ctx context.Context, client fetchClient, limits aphttp.Limits) javascript.FetchOptions {
 	t.Helper()
 	session, err := httphost.New(ctx, client, limits)
 	require.NoError(t, err)
@@ -101,10 +112,12 @@ func fetchOptions(t *testing.T, ctx context.Context, client fetchClient, limits 
 	return javascript.FetchOptions{Session: session, MaxRequestBytes: 8192, MaxPendingOperations: 8}
 }
 
-// fetchInput captures an otherwise empty invocation through the production renderer.
+// fetchInput captures one connection identity with otherwise empty invocation data.
 func fetchInput(t *testing.T) javascript.Input {
 	t.Helper()
-	return javascript.Input{Context: expressionContext(t, render.Input{})}
+	return javascript.Input{Context: expressionContext(t, render.Input{
+		ConnectionID: "cxn_example", ConnectionName: "Example", ConnectionNamespace: "root.product.owner",
+	})}
 }
 
 // fetchResponse builds a valid streaming response whose owner must close its body.
@@ -143,12 +156,12 @@ func TestToolFetchOptionsRequirePositiveLimits(t *testing.T) {
 
 			// Missing policy is an input error even when the source never calls fetch.
 			result, err := program.EvaluateWithHTTP(context.Background(), input, options)
-			require.ErrorIs(t, err, javascript.ErrInvalidInput)
+			require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 			require.Nil(t, result)
 
 			// A valid transferred session is consumed even when another option is invalid.
 			if options.Session != nil && options.Session.Context() != nil {
-				require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+				require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			}
 		})
 	}
@@ -167,10 +180,10 @@ func TestToolFetchInvalidEvaluationClosesSession(t *testing.T) {
 		input   javascript.Input
 		want    error
 	}{
-		{"nil program", nil, context.Background(), input, javascript.ErrInvalidInput},
-		{"uninitialized program", &javascript.ToolProgram{}, context.Background(), input, javascript.ErrInvalidInput},
-		{"nil context", program, nil, input, javascript.ErrInvalidInput},
-		{"invalid input", program, context.Background(), javascript.Input{}, javascript.ErrInvalidInput},
+		{"nil program", nil, context.Background(), input, apjsruntime.ErrInvalidInput},
+		{"uninitialized program", &javascript.ToolProgram{}, context.Background(), input, apjsruntime.ErrInvalidInput},
+		{"nil context", program, nil, input, apjsruntime.ErrInvalidInput},
+		{"invalid input", program, context.Background(), javascript.Input{}, apjsruntime.ErrInvalidInput},
 		{"canceled context", program, canceled, input, context.Canceled},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -184,7 +197,7 @@ func TestToolFetchInvalidEvaluationClosesSession(t *testing.T) {
 			result, err := test.program.EvaluateWithHTTP(test.ctx, test.input, options)
 			require.ErrorIs(t, err, test.want)
 			require.Nil(t, result)
-			require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			require.Zero(t, calls.Load())
 			require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
 		})
@@ -218,9 +231,9 @@ func TestToolFetchSequentialRequests(t *testing.T) {
 		}
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		const first = await fetch("https://provider.example/contacts");
+		const first = await context.connections[0].fetch("https://provider.example/contacts");
 		const contact = await first.json();
-		const second = await fetch("https://provider.example/contacts/" + contact.id, {
+		const second = await context.connections[0].fetch("https://provider.example/contacts/" + contact.id, {
 			method: "POST", headers: {"Content-Type": "application/json"},
 			body: JSON.stringify({enabled: true})
 		});
@@ -238,11 +251,11 @@ func TestToolFetchSequentialRequests(t *testing.T) {
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
 	// Evaluation closes the dedicated session before returning, preventing late admissions.
-	require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+	require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 	request, err := http.NewRequest(http.MethodGet, "https://provider.example/late", nil)
 	require.NoError(t, err)
 	response, err := options.Session.Do(request)
-	require.ErrorIs(t, err, httphost.ErrClosed)
+	require.ErrorIs(t, err, aphttp.ErrClosed)
 	require.Nil(t, response)
 	require.Equal(t, int32(2), calls.Load())
 }
@@ -264,7 +277,7 @@ func TestToolFetchParallelRequests(t *testing.T) {
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
 		return Promise.all(["/one", "/two"].map(async path => {
-			const response = await fetch("https://provider.example" + path);
+			const response = await context.connections[0].fetch("https://provider.example" + path);
 			return await response.text();
 		}));
 	}`, nil)
@@ -285,7 +298,7 @@ func TestToolFetchStatusDoesNotReadBody(t *testing.T) {
 		return response, nil
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		const response = await fetch("https://provider.example/items");
+		const response = await context.connections[0].fetch("https://provider.example/items");
 		return {status: response.status, ok: response.ok, used: response.bodyUsed};
 	}`, nil)
 
@@ -306,7 +319,7 @@ func TestToolFetchBodyIsSingleUse(t *testing.T) {
 				return fetchResponse(http.StatusOK, body), nil
 			}, fetchLimits())
 			program := compileTool(t, fmt.Sprintf(`async function execute() {
-				const response = await fetch("https://provider.example/items");
+				const response = await context.connections[0].fetch("https://provider.example/items");
 				const before = response.bodyUsed;
 				const pending = response.%s();
 				const during = response.bodyUsed;
@@ -343,8 +356,8 @@ func TestToolFetchBodyReadCanRetryAfterPendingLimit(t *testing.T) {
 	}, fetchLimits())
 	options.MaxPendingOperations = 1
 	program := compileTool(t, `async function execute() {
-		const response = await fetch("https://provider.example/body");
-		const other = fetch("https://provider.example/other");
+		const response = await context.connections[0].fetch("https://provider.example/body");
+		const other = context.connections[0].fetch("https://provider.example/other");
 		let refused = false;
 		try { await response.text(); }
 		catch (err) { refused = err instanceof Error; }
@@ -371,7 +384,7 @@ func TestToolFetchArrayBufferRequest(t *testing.T) {
 		return fetchResponse(http.StatusNoContent, http.NoBody), err
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		const response = await fetch("https://provider.example/upload", {
+		const response = await context.connections[0].fetch("https://provider.example/upload", {
 			method: "POST", body: new Uint8Array([0, 128, 255]).buffer
 		});
 		return response.status;
@@ -391,9 +404,9 @@ func TestToolFetchSanitizesTransportFailure(t *testing.T) {
 			options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
 				return nil, errors.New("private-token https://secret.example/path")
 			}, fetchLimits())
-			body := `return await fetch("https://provider.example/items");`
+			body := `return await context.connections[0].fetch("https://provider.example/items");`
 			if caught {
-				body = `try { await fetch("https://provider.example/items"); }
+				body = `try { await context.connections[0].fetch("https://provider.example/items"); }
 					catch (err) { return {error: err instanceof Error, message: err.message}; }`
 			}
 			program := compileTool(t, "async function execute() {"+body+"}", nil)
@@ -406,7 +419,7 @@ func TestToolFetchSanitizesTransportFailure(t *testing.T) {
 				require.NotContains(t, string(result.StructuredContent), "private-token")
 				require.NotContains(t, string(result.StructuredContent), "secret.example")
 			} else {
-				require.ErrorIs(t, err, javascript.ErrEvaluation)
+				require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 				require.Nil(t, result)
 				require.NotContains(t, err.Error(), "private-token")
 				require.NotContains(t, err.Error(), "secret.example")
@@ -424,7 +437,7 @@ func TestToolFetchJSONUsesPristineParser(t *testing.T) {
 	program := compileTool(t, `
 		JSON.parse = () => ({tampered: true});
 		async function execute() {
-			return await (await fetch("https://provider.example/items")).json();
+			return await (await context.connections[0].fetch("https://provider.example/items")).json();
 		}
 	`, nil)
 
@@ -434,6 +447,31 @@ func TestToolFetchJSONUsesPristineParser(t *testing.T) {
 	require.JSONEq(t, `{"n":7}`, string(result.StructuredContent))
 }
 
+// TestToolFetchJSONBudgetsAreSeparate keeps response conversion independent of initial inputs and other bodies.
+func TestToolFetchJSONBudgetsAreSeparate(t *testing.T) {
+	// Each body exceeds the initial-input byte cap, but fits the HTTP allowance.
+	// Two bodies together exceed one traversal allowance; each must get its own.
+	body := `["` + strings.Repeat("x", 512) + `"` + strings.Repeat(`,null`, 20) + `]`
+	options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+		return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader(body))), nil
+	}, fetchLimits())
+	limits := expressionLimits()
+	limits.MaxInputBytes = 256
+	limits.MaxNodes = 32
+	limits.MaxDepth = 2
+	program, err := javascript.CompileTool(`async function execute() {
+		const first = await (await context.connections[0].fetch("https://provider.example/first")).json();
+		const second = await (await context.connections[0].fetch("https://provider.example/second")).json();
+		return [first.length, second.length];
+	}`, nil, limits)
+	require.NoError(t, err)
+
+	// Shared JSON conversion preserves the HTTP host's per-response traversal policy.
+	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
+	require.NoError(t, err)
+	require.JSONEq(t, `[21,21]`, string(result.StructuredContent))
+}
+
 // TestToolFetchInvalidJSONSanitizesParserErrors keeps response content out of JavaScript errors.
 func TestToolFetchInvalidJSONSanitizesParserErrors(t *testing.T) {
 	body := &fetchBody{reader: strings.NewReader(`private-malformed-response`)}
@@ -441,7 +479,7 @@ func TestToolFetchInvalidJSONSanitizesParserErrors(t *testing.T) {
 		return fetchResponse(http.StatusOK, body), nil
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		const response = await fetch("https://provider.example/items");
+		const response = await context.connections[0].fetch("https://provider.example/items");
 		try { await response.json(); }
 		catch (err) { return {error: err instanceof Error, message: err.message, used: response.bodyUsed}; }
 	}`, nil)
@@ -462,12 +500,12 @@ func TestToolFetchInitializationHasNoIO(t *testing.T) {
 		calls.Add(1)
 		return fetchResponse(http.StatusOK, http.NoBody), nil
 	}, fetchLimits())
-	program := compileTool(t, `fetch("https://provider.example/items");
+	program := compileTool(t, `context.connections[0].fetch("https://provider.example/items");
 		async function execute() { return true; }`, nil)
 
 	// Enabling HTTP for execute must not enable it for top-level source or helpers.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.Nil(t, result)
 	require.Zero(t, calls.Load())
 	require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
@@ -484,18 +522,18 @@ func TestToolFetchEntrypointTrapCannotScheduleIO(t *testing.T) {
 		async function execute() { return true; }
 		execute = new Proxy(execute, {
 			getPrototypeOf(target) {
-				Promise.resolve().then(() => fetch("https://example.test"));
+				Promise.resolve().then(() => context.connections[0].fetch("https://example.test"));
 				return Object.getPrototypeOf(target);
 			}
 		});
 	`, nil)
 
 	// Inspecting the entry point is still initialization, including its Proxy's jobs.
-	require.ErrorIs(t, program.Validate(context.Background()), javascript.ErrEvaluation)
+	require.ErrorIs(t, program.Validate(context.Background()), apjsruntime.ErrEvaluation)
 
 	// A job scheduled by that inspection cannot cross into the enabled HTTP phase.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-	require.ErrorIs(t, err, javascript.ErrEvaluation)
+	require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 	require.Nil(t, result)
 	require.Zero(t, calls.Load())
 	require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
@@ -509,7 +547,7 @@ func TestToolFetchHandledInitializationHasNoIO(t *testing.T) {
 		return fetchResponse(http.StatusOK, http.NoBody), nil
 	}, fetchLimits())
 	program := compileTool(t, `
-		Promise.resolve().then(() => fetch("https://example.test")).catch(() => {});
+		Promise.resolve().then(() => context.connections[0].fetch("https://example.test")).catch(() => {});
 		async function execute() { return true; }
 	`, nil)
 
@@ -533,8 +571,8 @@ func TestToolFetchLimits(t *testing.T) {
 			return fetchResponse(http.StatusOK, http.NoBody), nil
 		}, limits)
 		program := compileTool(t, `async function execute() {
-			await fetch("https://provider.example/one");
-			try { await fetch("https://provider.example/two"); }
+			await context.connections[0].fetch("https://provider.example/one");
+			try { await context.connections[0].fetch("https://provider.example/two"); }
 			catch (err) { return err instanceof Error; }
 			return false;
 		}`, nil)
@@ -554,7 +592,7 @@ func TestToolFetchLimits(t *testing.T) {
 		}, fetchLimits())
 		options.MaxRequestBytes = 128
 		program := compileTool(t, `async function execute() {
-			try { await fetch("https://provider.example/items", {method: "POST", body: "x".repeat(129)}); }
+			try { await context.connections[0].fetch("https://provider.example/items", {method: "POST", body: "x".repeat(129)}); }
 			catch (err) { return err instanceof Error; }
 			return false;
 		}`, nil)
@@ -575,9 +613,9 @@ func TestToolFetchLimits(t *testing.T) {
 		}, fetchLimits())
 		options.MaxPendingOperations = 1
 		program := compileTool(t, `async function execute() {
-			const first = fetch("https://provider.example/one");
+			const first = context.connections[0].fetch("https://provider.example/one");
 			let refused = false;
-			try { await fetch("https://provider.example/two"); }
+			try { await context.connections[0].fetch("https://provider.example/two"); }
 			catch (err) { refused = err instanceof Error; }
 			await first;
 			return refused;
@@ -597,14 +635,14 @@ func TestToolFetchLimits(t *testing.T) {
 			return fetchResponse(http.StatusOK, io.NopCloser(strings.NewReader("abc"))), nil
 		}, limits)
 		program := compileTool(t, `async function execute() {
-			await (await fetch("https://provider.example/one")).text();
-			try { await (await fetch("https://provider.example/two")).text(); }
+			await (await context.connections[0].fetch("https://provider.example/one")).text();
+			try { await (await context.connections[0].fetch("https://provider.example/two")).text(); }
 			catch (err) { return "caught"; }
 		}`, nil)
 
 		// Catching a body rejection cannot recover an exhausted invocation-wide budget.
 		result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-		require.ErrorIs(t, err, httphost.ErrResponseLimit)
+		require.ErrorIs(t, err, aphttp.ErrResponseLimit)
 		require.Nil(t, result)
 		require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 	})
@@ -628,9 +666,9 @@ func TestToolFetchCancellation(t *testing.T) {
 					close(stopped)
 					return nil, request.Context().Err()
 				}, limits)
-				body := `return await fetch("https://provider.example/items");`
+				body := `return await context.connections[0].fetch("https://provider.example/items");`
 				if busy {
-					body = `fetch("https://provider.example/items"); while (true) {}`
+					body = `context.connections[0].fetch("https://provider.example/items"); while (true) {}`
 				}
 				jsLimits := expressionLimits()
 				jsLimits.Timeout = 5 * time.Second
@@ -655,7 +693,7 @@ func TestToolFetchCancellation(t *testing.T) {
 
 				// Session policy and caller cancellation keep their distinct classifications.
 				if policy {
-					require.ErrorIs(t, evaluationErr, httphost.ErrTimeout)
+					require.ErrorIs(t, evaluationErr, aphttp.ErrTimeout)
 				} else {
 					require.ErrorIs(t, evaluationErr, context.Canceled)
 				}
@@ -675,7 +713,7 @@ func TestToolFetchCancellationClosesBlockedBody(t *testing.T) {
 		return fetchResponse(http.StatusOK, body), nil
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		return await (await fetch("https://provider.example/items")).text();
+		return await (await context.connections[0].fetch("https://provider.example/items")).text();
 	}`, nil)
 	input := fetchInput(t)
 	var result *javascript.Result
@@ -710,7 +748,7 @@ func TestToolFetchCleanupDoesNotWaitForBlockedClose(t *testing.T) {
 		return fetchResponse(http.StatusOK, body), nil
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		return (await fetch("https://provider.example/items")).status;
+		return (await context.connections[0].fetch("https://provider.example/items")).status;
 	}`, nil)
 	input := fetchInput(t)
 	var result *javascript.Result
@@ -726,7 +764,7 @@ func TestToolFetchCleanupDoesNotWaitForBlockedClose(t *testing.T) {
 	fetchWait(t, done)
 	require.NoError(t, evaluationErr)
 	require.JSONEq(t, `200`, string(result.StructuredContent))
-	require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+	require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
 	// Release the deliberately uncooperative transport after all result assertions.
@@ -753,8 +791,8 @@ func TestToolFetchAbandonedRequestClosesLateBody(t *testing.T) {
 		return fetchResponse(http.StatusOK, http.NoBody), nil
 	}, fetchLimits())
 	program := compileTool(t, `async function execute() {
-		fetch("https://provider.example/late");
-		await fetch("https://provider.example/ready");
+		context.connections[0].fetch("https://provider.example/late");
+		await context.connections[0].fetch("https://provider.example/ready");
 		return true;
 	}`, nil)
 
@@ -780,14 +818,14 @@ func TestToolFetchCombinatorsCancelRemainingRequests(t *testing.T) {
 		want        string
 	}{
 		{"caught all failure", `
-			try { await Promise.all([fetch("https://provider.example/slow"), fetch("https://provider.example/winner")]); }
+			try { await Promise.all([context.connections[0].fetch("https://provider.example/slow"), context.connections[0].fetch("https://provider.example/winner")]); }
 			catch (err) { return {handled: err instanceof Error}; }
 		`, true, `{"handled":true}`},
 		{"race success", `
-			return (await Promise.race([fetch("https://provider.example/slow"), fetch("https://provider.example/winner")])).status;
+			return (await Promise.race([context.connections[0].fetch("https://provider.example/slow"), context.connections[0].fetch("https://provider.example/winner")])).status;
 		`, false, `200`},
 		{"any success", `
-			return (await Promise.any([fetch("https://provider.example/slow"), fetch("https://provider.example/winner")])).status;
+			return (await Promise.any([context.connections[0].fetch("https://provider.example/slow"), context.connections[0].fetch("https://provider.example/winner")])).status;
 		`, false, `200`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -817,7 +855,7 @@ func TestToolFetchCombinatorsCancelRemainingRequests(t *testing.T) {
 			require.NoError(t, err)
 			require.JSONEq(t, test.want, string(result.StructuredContent))
 			fetchWait(t, canceled)
-			require.ErrorIs(t, options.Session.Err(), httphost.ErrClosed)
+			require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
 			// Cleanup cancels without joining the loser and closes any body it returns later.
@@ -842,12 +880,12 @@ func TestToolFetchAbnormalWorkerExit(t *testing.T) {
 			}, fetchLimits())
 			options.Logger = slog.New(slog.NewTextHandler(&diagnostics, nil))
 			program := compileTool(t, `async function execute() {
-				return await fetch("https://provider.example/items");
+				return await context.connections[0].fetch("https://provider.example/items");
 			}`, nil)
 
 			// A worker failure rejects promptly rather than stranding the pending Promise.
 			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
-			require.ErrorIs(t, err, javascript.ErrEvaluation)
+			require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 			require.Nil(t, result)
 			require.NotContains(t, err.Error(), "private-panic-payload")
 			require.NotEmpty(t, diagnostics.String())
@@ -855,4 +893,111 @@ func TestToolFetchAbnormalWorkerExit(t *testing.T) {
 			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 		})
 	}
+}
+
+// TestToolFetchConnectionSnapshot keeps aliases on one copied capability while
+// protecting client identity and the connection collection from authored edits.
+func TestToolFetchConnectionSnapshot(t *testing.T) {
+	input := javascript.Input{Context: expressionContext(t, render.Input{
+		ConnectionID: "cxn_captured", ConnectionName: "Captured", ConnectionNamespace: "root.product.owner",
+		Cfg:    map[string]any{"tenant": "acme", "nested": map[string]any{"region": "us"}},
+		Labels: map[string]string{"team": "blue"}, Annotations: map[string]string{"note": "captured"},
+		ToolID: "tol_example", Revision: 7,
+	}), Response: common.RawJSON(`{"status":202}`)}
+	library := toolLibrary(t, `function tenant() { return cfg.tenant; }`)
+	program := compileTool(t, `async function execute(params, context) {
+		const [connection] = context.connections;
+		const result = {
+			count: context.connections.length, globalFetch: typeof fetch,
+			identity: context.connection, tool: context.tool, responseStatus: response.status,
+			initial: [tenant(), cfg.nested.region, labels.team, annotations.note],
+			aliases: cfg === connection.cfg && context.cfg === connection.cfg &&
+				labels === connection.labels && context.labels === connection.labels &&
+				annotations === connection.annotations && context.annotations === connection.annotations,
+			frozen: Object.isFrozen(context.connections) && Object.isFrozen(connection),
+			methodHidden: !Object.keys(connection).includes("fetch")
+		};
+		let refused = 0;
+		for (const change of [
+			() => context.connections = [], () => context.connections[0] = {},
+			() => context.connections.push({}), () => connection.id = "cxn_other",
+			() => connection.cfg = {}, () => connection.fetch = undefined
+		]) { try { change(); } catch (err) { if (err instanceof TypeError) refused++; } }
+		cfg.nested.region = "local";
+		labels.team = "local";
+		annotations.note = "local";
+		result.refused = refused;
+		result.local = [connection.cfg.nested.region, connection.labels.team, connection.annotations.note];
+		const borrowed = connection.fetch;
+		result.status = (await borrowed.call({id: "cxn_other"}, "https://provider.example/items")).status;
+		return result;
+	}`, library)
+
+	// Reuse the captured input; each invocation gets fresh aliases and its own session.
+	for range 2 {
+		var calls atomic.Int32
+		options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+			calls.Add(1)
+			return fetchResponse(http.StatusOK, http.NoBody), nil
+		}, fetchLimits())
+		result, err := program.EvaluateWithHTTP(context.Background(), input, options)
+		require.NoError(t, err)
+		require.JSONEq(t, `{
+			"count":1,"globalFetch":"undefined",
+			"identity":{"id":"cxn_captured","name":"Captured","namespace":"root.product.owner"},
+			"tool":{"id":"tol_example","revision":7},"responseStatus":202,
+			"initial":["acme","us","blue","captured"],"aliases":true,"frozen":true,
+			"methodHidden":true,"refused":6,"local":["local","local","local"],"status":200
+		}`, string(result.StructuredContent))
+		require.Equal(t, int32(1), calls.Load())
+	}
+}
+
+// TestToolFetchRequiresCapturedConnection rejects missing identity before any
+// authored work or I/O, even if the configured session could otherwise dispatch.
+func TestToolFetchRequiresCapturedConnection(t *testing.T) {
+	program := compileTool(t, `async function execute() {
+		await context.connections[0].fetch("https://provider.example/items");
+		return true;
+	}`, nil)
+	var calls atomic.Int32
+	options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return fetchResponse(http.StatusOK, http.NoBody), nil
+	}, fetchLimits())
+	input := javascript.Input{Context: expressionContext(t, render.Input{})}
+
+	// A session supplies transport authority but cannot fill in absent snapshot identity.
+	result, err := program.EvaluateWithHTTP(context.Background(), input, options)
+	require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
+	require.Nil(t, result)
+	require.Zero(t, calls.Load())
+	require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
+	require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
+}
+
+// TestToolFetchAliasesShareInputAllowance charges connection configuration once
+// even though Tool helper globals and context fields expose the same object.
+func TestToolFetchAliasesShareInputAllowance(t *testing.T) {
+	input := javascript.Input{Context: expressionContext(t, render.Input{
+		ConnectionID: "cxn_example", Cfg: map[string]any{"value": strings.Repeat("<", 400)},
+	})}
+	limits := expressionLimits()
+	limits.MaxInputBytes = 700
+	program, err := javascript.CompileTool(`async function execute() {
+		return cfg === context.cfg && cfg === context.connections[0].cfg && cfg.value.length === 400;
+	}`, nil, limits)
+	require.NoError(t, err)
+	var calls atomic.Int32
+	options := fetchOptions(t, context.Background(), func(*http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return fetchResponse(http.StatusOK, http.NoBody), nil
+	}, fetchLimits())
+
+	// A single snapshot fits; duplicating configuration or HTML-escaping its
+	// ordinary JSON strings would exceed the cap without adding any input data.
+	result, err := program.EvaluateWithHTTP(context.Background(), input, options)
+	require.NoError(t, err)
+	require.JSONEq(t, `true`, string(result.StructuredContent))
+	require.Zero(t, calls.Load())
 }

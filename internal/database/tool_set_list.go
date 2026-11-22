@@ -295,7 +295,7 @@ type ListToolSetGenerationsExecutor interface {
 }
 
 // ListToolSetGenerationsBuilder selects the live generations of one live ToolSet,
-// newest first unless OrderBy is set. ForToolSetId is required. A missing or
+// oldest generation first unless OrderBy is set. ForToolSetId is required. A missing or
 // deleted parent returns ErrNotFound rather than an empty page, so callers can
 // distinguish an unknown ToolSet from one with no live generations.
 type ListToolSetGenerationsBuilder interface {
@@ -308,8 +308,8 @@ type ListToolSetGenerationsBuilder interface {
 	// ForToolSetId selects the parent ToolSet.
 	ForToolSetId(apid.ID) ListToolSetGenerationsBuilder
 
-	// OrderBy selects the sort column and direction. Generation number always
-	// breaks ties, newest first, so pages stay deterministic.
+	// OrderBy selects the sort column and direction. Generation number breaks ties
+	// in the same direction, so pages stay deterministic.
 	OrderBy(ToolSetGenerationOrderByField, pagination.OrderBy) ListToolSetGenerationsBuilder
 }
 
@@ -371,11 +371,20 @@ func (l *listToolSetGenerationsFilters) FetchPage(ctx context.Context) paginatio
 		Limit(l.LimitVal + 1).
 		Offset(l.Offset)
 
-	// The field is validated above. Generation breaks ties so offsets stay stable.
-	if l.OrderByFieldVal != "" {
-		q = q.OrderBy(fmt.Sprintf("%s %s", l.OrderByFieldVal, l.OrderByVal.String()))
+	// The field is validated above. Generation is unique within the ToolSet, so it
+	// breaks ties, in the caller's direction, and keeps offsets stable. With no order
+	// chosen, generations are listed oldest first.
+	switch {
+	case l.OrderByFieldVal == "":
+		q = q.OrderBy("generation ASC")
+	case l.OrderByFieldVal == ToolSetGenerationOrderByGeneration:
+		q = q.OrderBy("generation " + l.OrderByVal.String())
+	default:
+		q = q.OrderBy(
+			fmt.Sprintf("%s %s", l.OrderByFieldVal, l.OrderByVal.String()),
+			"generation "+l.OrderByVal.String(),
+		)
 	}
-	q = q.OrderBy("generation DESC")
 
 	rows, err := q.RunWith(l.s.db).QueryContext(ctx)
 	if err != nil {

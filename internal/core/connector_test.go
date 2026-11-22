@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
+	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -244,6 +247,138 @@ func TestConnector_SetDefinitionResetsJavascriptLibrary(t *testing.T) {
 	ok, err = library.NewContext(nil).EvaluateBoolean(`isUpdated()`)
 	require.NoError(t, err)
 	assert.True(t, ok)
+}
+
+// TestConnectorBoundedJavascriptLibrarySourceBudget checks the raw combined
+// allowance before either compiling a library or returning a cached program.
+func TestConnectorBoundedJavascriptLibrarySourceBudget(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		library    string
+		expression string
+	}{
+		{"combined source", `function allowed() { return true; }`, `allowed()`},
+		{"expression only", "", `true`},
+		{"library only", `const eligible = true;`, ""},
+		{"raw whitespace", strings.Repeat(" ", 32), `true`},
+		{"UTF-8 bytes", `const name = "é";`, `true`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// A one-byte overflow must be rejected before compilation populates the cache.
+			connector := NewTestConnector(cschema.ConnectorDefinition{Javascript: test.library})
+			limits := apjs.ConnectorPredicateLimits()
+			limits.MaxSourceBytes = len(test.library) + len(test.expression) - 1
+			library, err := connector.getBoundedJavascriptLibrary(context.Background(), test.expression, limits)
+			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+			require.Nil(t, library)
+			require.False(t, connector.jsLoaded)
+
+			// The exact combined size fits, and a repeated call reuses the compiled library.
+			limits.MaxSourceBytes++
+			library, err = connector.getBoundedJavascriptLibrary(context.Background(), test.expression, limits)
+			require.NoError(t, err)
+			require.True(t, connector.jsLoaded)
+			cached, err := connector.getBoundedJavascriptLibrary(context.Background(), test.expression, limits)
+			require.NoError(t, err)
+			require.Same(t, library, cached)
+
+			// A later caller's tighter policy still rejects the raw source on a cache hit.
+			limits.MaxSourceBytes--
+			cached, err = connector.getBoundedJavascriptLibrary(context.Background(), test.expression, limits)
+			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+			require.Nil(t, cached)
+			require.Same(t, library, connector.jsLib)
+		})
+	}
+}
+
+// TestConnectorBoundedJavascriptLibraryLoadRetry preserves infrastructure causes
+// and permits a fresh caller to retry when definition admission did not succeed.
+func TestConnectorBoundedJavascriptLibraryLoadRetry(t *testing.T) {
+	for _, name := range []string{"decrypt failure", "decode failure", "canceled during decrypt", "canceled decrypt failure"} {
+		t.Run(name, func(t *testing.T) {
+			// Fail the first contextual load without populating either cache.
+			connector := NewTestConnector(cschema.ConnectorDefinition{})
+			encryption := encryptmock.NewMockE(gomock.NewController(t))
+			connector.s.encrypt = encryption
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			loadFailure := errors.New("decryption failed")
+			encryption.EXPECT().DecryptString(ctx, connector.EncryptedDefinition).DoAndReturn(func(context.Context, encfield.EncryptedField) (string, error) {
+				switch name {
+				case "decrypt failure":
+					return "", loadFailure
+				case "decode failure":
+					return "{", nil
+				case "canceled during decrypt":
+					cancel()
+					return `{}`, nil
+				default:
+					cancel()
+					return "", loadFailure
+				}
+			})
+			limits := apjs.ConnectorPredicateLimits()
+			library, err := connector.getBoundedJavascriptLibrary(ctx, "true", limits)
+			require.Error(t, err)
+			require.Nil(t, library)
+			require.Nil(t, connector.def)
+			require.False(t, connector.jsLoaded)
+			switch name {
+			case "decrypt failure":
+				require.ErrorIs(t, err, loadFailure)
+			case "decode failure":
+				var syntaxError *json.SyntaxError
+				require.ErrorAs(t, err, &syntaxError)
+			default:
+				require.ErrorIs(t, err, context.Canceled)
+			}
+
+			// A live retry decrypts once; later library loads use both successful caches.
+			encryption.EXPECT().DecryptString(context.Background(), connector.EncryptedDefinition).
+				Return(`{"javascript":"const eligible = true;"}`, nil)
+			library, err = connector.getBoundedJavascriptLibrary(context.Background(), "true", limits)
+			require.NoError(t, err)
+			cached, err := connector.getBoundedJavascriptLibrary(context.Background(), "true", limits)
+			require.NoError(t, err)
+			require.Same(t, library, cached)
+		})
+	}
+}
+
+// TestConnectorBoundedJavascriptLibraryErrors keeps authored parser diagnostics
+// private while honoring cancellation and input policy before loading source.
+func TestConnectorBoundedJavascriptLibraryErrors(t *testing.T) {
+	connector := NewTestConnector(cschema.ConnectorDefinition{Javascript: `const privateLibraryDetail = ;`})
+	limits := apjs.ConnectorPredicateLimits()
+
+	// Invalid admission cannot decrypt the definition or populate the program cache.
+	library, err := connector.getBoundedJavascriptLibrary(nil, "true", limits)
+	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
+	require.Nil(t, library)
+	library, err = connector.getBoundedJavascriptLibrary(context.Background(), "true", jsruntime.Limits{})
+	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
+	require.Nil(t, library)
+	require.Nil(t, connector.def)
+	require.False(t, connector.jsLoaded)
+
+	// Both fresh and cached parser failures expose the same safe classification.
+	for range 2 {
+		library, err = connector.getBoundedJavascriptLibrary(context.Background(), "true", limits)
+		require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
+		require.Equal(t, jsruntime.ErrInvalidSource.Error(), err.Error())
+		require.Nil(t, library)
+		require.True(t, connector.jsLoaded)
+	}
+
+	// Cancellation takes precedence over invalid limits and the cached parse error.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	for _, policy := range []jsruntime.Limits{limits, {}} {
+		library, err = connector.getBoundedJavascriptLibrary(ctx, "true", policy)
+		require.ErrorIs(t, err, context.Canceled)
+		require.Nil(t, library)
+	}
 }
 
 // NewTestConnector creates a hydrated test connector using the provided definition.

@@ -560,12 +560,13 @@ limits.Transform = javascript.Limits{
 program, err := httpcodec.CompileResponse(definition.Response, limits)
 ```
 
-Here `javascript` is `internal/tools/javascript`. On each `Map` call, supply
+Here `javascript` is `internal/tools/javascript` and `aphttp` is
+`internal/apjs/http`. On each `Map` call, supply
 `ResponseInput.Context` from `render.NewContext` and `ResponseInput.Headers`
-from the filtered `httphost.Response.Header`, never the raw upstream
+from the filtered `aphttp.Response.Header`, never the raw upstream
 `http.Response.Header`. `Map` does not remove sensitive fields itself: every
 supplied header reaches the transform and can be projected into Tool output.
-httphost removes cookie, authentication, and hop-by-hop fields such as
+The shared HTTP host removes cookie, authentication, and hop-by-hop fields such as
 `Set-Cookie` and `Authentication-Info`. The executor must use the same admission
 snapshot for the context and result identities. Neither field is needed for
 passthrough. Status errors run first and bypass the transform, including its

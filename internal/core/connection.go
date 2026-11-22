@@ -191,6 +191,8 @@ func (c *connection) GetResource(
 	return resource, nil
 }
 
+// GetJavascriptContext builds the legacy expression context with the connector's
+// cached helper library and current connection configuration and metadata.
 func (c *connection) GetJavascriptContext(
 	ctx context.Context,
 ) (apjs.Context, error) {
@@ -198,7 +200,13 @@ func (c *connection) GetJavascriptContext(
 	if err != nil {
 		return apjs.Context{}, err
 	}
+	return c.getJavascriptContext(ctx, jsLib)
+}
 
+// getJavascriptContext binds connection data to an already-selected library.
+// Bounded callers check their source policy before loading the library, then
+// reuse the same configuration and metadata construction as legacy callers.
+func (c *connection) getJavascriptContext(ctx context.Context, library *apjs.Library) (apjs.Context, error) {
 	cfg, err := c.GetConfiguration(ctx)
 	if err != nil {
 		return apjs.Context{}, fmt.Errorf("get connection configuration: %w", err)
@@ -218,7 +226,7 @@ func (c *connection) GetJavascriptContext(
 	}
 
 	return apjs.NewContext(
-		jsLib,
+		library,
 		map[string]any{
 			"cfg":         cfg,
 			"labels":      labels,

@@ -35,6 +35,12 @@ type Connection interface {
 	GetSetupError() *string
 	GetResource(ctx context.Context) (*connectionschema.Connection, error)
 	GetJavascriptContext(ctx context.Context) (apjs.Context, error)
+	// EvaluateJavascriptPredicate evaluates a condition with this connection's
+	// helper library and copied cfg/labels/annotations under apjs.ConnectorPredicateLimits.
+	// Preparation and evaluation honor ctx. Definition/configuration failures
+	// retain their causes; authored errors are sanitized. No I/O host is exposed,
+	// mutations stay local to the VM, and any failure returns false.
+	EvaluateJavascriptPredicate(ctx context.Context, expression string) (bool, error)
 
 	/*
 	 * Nested entities

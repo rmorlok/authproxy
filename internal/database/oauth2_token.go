@@ -352,19 +352,37 @@ type OAuth2TokenWithConnection struct {
 	Connection Connection
 }
 
+// oauth2TokenScanPageSize is the number of tokens EnumerateOAuth2TokensExpiringWithin
+// reads per page.
+const oauth2TokenScanPageSize = 100
+
 func (s *service) EnumerateOAuth2TokensExpiringWithin(
 	ctx context.Context,
 	duration time.Duration,
 	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 ) error {
-	const pageSize = 100
+	return s.enumerateOAuth2TokensExpiringWithin(ctx, duration, oauth2TokenScanPageSize, callback)
+}
+
+// enumerateOAuth2TokensExpiringWithin is EnumerateOAuth2TokensExpiringWithin with a
+// configurable page size, so tests can span several pages with few tokens.
+func (s *service) enumerateOAuth2TokensExpiringWithin(
+	ctx context.Context,
+	duration time.Duration,
+	pageSize uint64,
+	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error),
+) error {
 	now := apctx.GetClock(ctx).Now()
 	expirationThreshold := now.Add(duration)
 
-	offset := uint64(0)
+	// after is the id of the last token returned, or empty before the first page. The
+	// scan pages by token id rather than by offset: refreshing a token replaces it with
+	// one that no longer matches the filter, and refresh workers may do that while the
+	// scan runs, which would shift later tokens under an offset and skip them.
+	after := apid.Nil
 
 	for {
-		rows, err := s.sq.
+		q := s.sq.
 			Select(
 				append(
 					util.PrependAll("t.", util.ToPtr(OAuth2Token{}).cols()),
@@ -385,28 +403,20 @@ func (s *service) EnumerateOAuth2TokensExpiringWithin(
 				sq.LtOrEq{"t.access_token_expires_at": expirationThreshold},
 				sq.LtOrEq{"t.refresh_token_refresh_at": now},
 			}).
-			OrderBy("t.created_at DESC").
-			Limit(pageSize + 1).
-			Offset(offset).
-			RunWith(s.db).
-			Query()
+			OrderBy("t.id ASC").
+			Limit(pageSize + 1)
+		if !after.IsNil() {
+			q = q.Where(sq.Gt{"t.id": after})
+		}
+
+		results, err := s.scanOAuth2TokensWithConnections(q)
 		if err != nil {
 			return err
 		}
 
-		var results []*OAuth2TokenWithConnection
-		for rows.Next() {
-			var r OAuth2TokenWithConnection
-			err := rows.Scan(append(r.Token.fields(), r.Connection.fields()...)...)
-			if err != nil {
-				return err
-			}
-			results = append(results, &r)
-		}
+		lastPage := uint64(len(results)) < pageSize+1
 
-		lastPage := len(results) < pageSize+1
-
-		if len(results) > pageSize {
+		if uint64(len(results)) > pageSize {
 			results = results[:pageSize]
 		}
 
@@ -419,8 +429,28 @@ func (s *service) EnumerateOAuth2TokensExpiringWithin(
 			break
 		}
 
-		offset += pageSize
+		after = results[len(results)-1].Token.Id
 	}
 
 	return nil
+}
+
+// scanOAuth2TokensWithConnections runs q, which selects token columns followed by
+// connection columns, and returns every row. It closes the rows before returning.
+func (s *service) scanOAuth2TokensWithConnections(q sq.SelectBuilder) ([]*OAuth2TokenWithConnection, error) {
+	rows, err := q.RunWith(s.db).Query()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []*OAuth2TokenWithConnection
+	for rows.Next() {
+		var r OAuth2TokenWithConnection
+		if err := rows.Scan(append(r.Token.fields(), r.Connection.fields()...)...); err != nil {
+			return nil, err
+		}
+		results = append(results, &r)
+	}
+	return results, rows.Err()
 }

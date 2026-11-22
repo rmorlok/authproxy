@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/dop251/goja"
+	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -35,7 +36,7 @@ type Result struct {
 // handle in a Go registry. The private prototype distinguishes nested handles
 // from ordinary JSON objects, while the map identifies actual helper results.
 var toolResultFactory = goja.MustCompile("tool-result-helper.js", `
-(function () {
+(function (admit) {
     const results = new WeakMap();
     const has = results.has.bind(results);
     const get = results.get.bind(results);
@@ -47,103 +48,161 @@ var toolResultFactory = goja.MustCompile("tool-result-helper.js", `
     return {
         has, get,
         helper: function toolResult(payload) {
+            admit();
             if (arguments.length !== 1) throw new Invalid("toolResult requires one payload");
             const handle = create(prototype);
             set(handle, payload);
             return freeze(handle);
         }
     };
-})()
+})
 `, true)
 
-// resultEncoder recognizes only this invocation's helper handles and converts
-// their payload with the same bounded JSON traversal used by ordinary returns.
-// All operations belong to the runtime's owner goroutine; nothing escapes it.
-type resultEncoder struct {
-	json *outputEncoder // Pristine reflection and byte/depth/node policy.
-	has  goja.Callable  // Bound WeakMap.has; plain objects cannot forge a handle.
-	get  goja.Callable  // Bound WeakMap.get; retrieves the original authored payload.
+// toolResultExtension supplies only Tool success semantics. The shared runtime
+// owns initialization, promise settlement, cancellation, and output accounting.
+// Ordinary rejections remain private execution failures; ToolError is separate.
+func toolResultExtension() apjsruntime.ResultExtension[*Result] {
+	return apjsruntime.ResultExtension[*Result]{
+		Bindings: []apjsruntime.HostBinding{{Name: "toolResult"}},
+		Install:  installToolResult,
+	}
 }
 
-// newResultEncoder installs the pure toolResult helper in a fresh runtime before
-// initialization. Validation also installs it so top-level constants can use the
-// same helper without network access. Payload validation occurs on conversion.
-func newResultEncoder(vm *goja.Runtime, limits Limits) (*resultEncoder, error) {
-	encoder := newOutputEncoder(vm, limits)
+// toolResultInterpreter recognizes only this invocation's helper handles. Its
+// captured callables belong to the VM owner and never escape result conversion.
+type toolResultInterpreter struct {
+	has goja.Callable // Bound WeakMap.has; plain objects cannot forge a handle.
+	get goja.Callable // Bound WeakMap.get; retrieves the original authored payload.
+}
+
+// installToolResult installs the pure helper before authored initialization in
+// both validation and evaluation. Discarded handles do not stay alive through a
+// Go registry, but every creation still consumes the execution's shared budget.
+func installToolResult(ctx context.Context, vm *goja.Runtime) (apjsruntime.ResultInterpreter[*Result], error) {
+	var empty apjsruntime.ResultInterpreter[*Result]
 	value, err := vm.RunProgram(toolResultFactory)
 	if err != nil {
-		return nil, runtimeEvaluationError(err)
+		return empty, apjsruntime.EvaluationError(err)
+	}
+	factory, _ := goja.AssertFunction(value)
+	admit := vm.ToValue(func(goja.FunctionCall) goja.Value {
+		err := apjsruntime.ChargeWork(ctx, 1)
+		if err == nil {
+			// Reserve one wrapper and one private branding tuple before creating
+			// either. Dropping a handle never refunds cumulative allocation.
+			err = apjsruntime.ReserveAllocation(ctx, 2)
+		}
+		if err != nil {
+			// Interrupt makes exhaustion terminal even if authored code catches
+			// the fixed native exception and tries to issue another request.
+			vm.Interrupt(err)
+			panic(vm.NewTypeError("tool result budget exhausted"))
+		}
+		return goja.Undefined()
+	})
+	value, err = factory(goja.Undefined(), admit)
+	if err != nil {
+		return empty, apjsruntime.EvaluationError(err)
 	}
 	registry := value.ToObject(vm)
 	has, _ := goja.AssertFunction(registry.Get("has"))
 	get, _ := goja.AssertFunction(registry.Get("get"))
 	if err := vm.Set("toolResult", registry.Get("helper")); err != nil {
-		return nil, ErrInvalidInput
+		return empty, apjsruntime.ErrInvalidInput
 	}
-	return &resultEncoder{json: encoder, has: has, get: get}, nil
+	interpreter := &toolResultInterpreter{has: has, get: get}
+	return apjsruntime.ResultInterpreter[*Result]{Fulfilled: interpreter.fulfilled}, nil
 }
 
-// encode maps ordinary JSON or an explicitly branded payload into detached
-// content. MaxOutputBytes counts the ordinary JSON or the entire authored helper
-// payload, including base64 and metadata. Derived text duplication and trusted
-// envelope fields need the executor's separate final serialized-result limit.
-func (e *resultEncoder) encode(ctx context.Context, value goja.Value) (*Result, error) {
-	branded, err := e.has(goja.Undefined(), value)
+// fulfilled maps ordinary JSON or a branded payload into detached content.
+// MaxOutputBytes counts the ordinary JSON or the entire authored helper payload,
+// including media and metadata. Derived text and the trusted envelope still need
+// the executor's separate limit on the complete serialized invocation result.
+func (i *toolResultInterpreter) fulfilled(ctx context.Context, value goja.Value, encoder *apjsruntime.ResultEncoder) (*Result, error) {
+	branded, err := i.has(goja.Undefined(), value)
 	if err != nil {
-		return nil, runtimeEvaluationError(err)
+		return nil, apjsruntime.EvaluationError(err)
 	}
 	if branded.ToBoolean() {
-		value, err = e.get(goja.Undefined(), value)
+		value, err = i.get(goja.Undefined(), value)
 		if err != nil {
-			return nil, runtimeEvaluationError(err)
+			return nil, apjsruntime.EvaluationError(err)
 		}
 	}
-	encoded, err := e.json.encode(ctx, value)
+	encoded, err := encoder.Encode(value)
 	if err != nil {
+		return nil, err
+	}
+	if err := apjsruntime.ReserveAllocation(ctx, 1); err != nil {
 		return nil, err
 	}
 	result := &Result{Content: []api.ToolContentBlock{}}
 	if !branded.ToBoolean() {
-		result.StructuredContent = encoded
+		result.StructuredContent = common.RawJSON(encoded)
 		if encoded[0] == '"' {
-			// A text block cannot represent a lone UTF-16 surrogate. Unquote
-			// rejects it instead of silently replacing authored output.
+			// Conversion works from the already bounded JSON so the output byte
+			// and node allowances are charged once. Reserve the source string,
+			// unquoted copy, and text block before native conversion.
+			if err := apjsruntime.ChargeWork(ctx, len(encoded)); err != nil {
+				return nil, err
+			}
+			for range 2 {
+				if err := apjsruntime.ReserveAllocation(ctx, len(encoded)); err != nil {
+					return nil, err
+				}
+			}
+			if err := apjsruntime.ReserveAllocation(ctx, 1); err != nil {
+				return nil, err
+			}
+			// Unlike Go's JSON decoder, Unquote rejects lone UTF-16 units
+			// instead of silently changing them to replacement characters.
 			text, err := strconv.Unquote(string(encoded))
 			if err != nil {
-				return nil, ErrInvalidOutput
+				return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidString)
 			}
 			result.Content = append(result.Content, api.ToolContentBlock{Type: api.ToolContentTypeText, Text: &text})
 		}
 	} else {
 		if encoded[0] != '{' {
-			return nil, ErrInvalidOutput
+			return nil, apjsruntime.RejectOutput(apjsruntime.OutputUnexpectedType)
 		}
-		// Go's typed JSON decoder would replace lone surrogate escapes in
-		// strings. Check before decoding to keep rich text and URIs lossless.
-		if err := validateInputSurrogates(ctx, encoded); err != nil {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
+		// Typed Go JSON decoding replaces lone surrogate escapes. Require
+		// lossless strings throughout the helper payload before that boundary.
+		if err := apjsruntime.ValidateJSONStrings(ctx, encoded); err != nil {
+			if budgetErr := apjsruntime.ChargeWork(ctx, 0); budgetErr != nil {
+				return nil, budgetErr
 			}
-			return nil, ErrInvalidOutput
+			return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidString)
 		}
-		if err := util.DecodeJSONStrict(encoded, result); err != nil || result.Content == nil {
-			return nil, ErrInvalidOutput
-		}
-		if len(result.Provider) != 0 && bytes.TrimSpace(result.Provider)[0] != '{' {
-			return nil, ErrInvalidOutput
-		}
-		for i := range result.Content {
-			if err := ctx.Err(); err != nil {
+		// The encoded payload bounds decoded strings and native slots by fixed
+		// implementation multiples. Charge decoding and canonical validation
+		// separately, before their Go routines can scan or allocate.
+		for range 2 {
+			if err := apjsruntime.ChargeWork(ctx, len(encoded)); err != nil {
 				return nil, err
 			}
-			// Reuse the canonical content union, including media/base64, URI,
-			// annotations, and provider rules; never copy diagnostics outward.
-			if err := result.Content[i].Validate(nil); err != nil {
-				return nil, ErrInvalidOutput
+			if err := apjsruntime.ReserveAllocation(ctx, len(encoded)); err != nil {
+				return nil, err
+			}
+		}
+		if err := util.DecodeJSONStrict(encoded, result); err != nil || result.Content == nil {
+			return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidShape)
+		}
+		if len(result.Provider) != 0 && bytes.TrimSpace(result.Provider)[0] != '{' {
+			return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidShape)
+		}
+		for j := range result.Content {
+			if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
+				return nil, err
+			}
+			// Reuse the API's content union, including media/base64, URI,
+			// annotations, and provider rules; never expose its diagnostics.
+			if err := result.Content[j].Validate(nil); err != nil {
+				return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidShape)
 			}
 		}
 	}
-	if err := ctx.Err(); err != nil {
+	if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
 		return nil, err
 	}
 	return result, nil

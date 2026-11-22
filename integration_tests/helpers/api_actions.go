@@ -62,6 +62,17 @@ func connectionSetupSubmitAction(
 	)}
 }
 
+// connectionDisconnectAction builds the request body for
+// POST /connections/{id}/_disconnect, using the server's default timeout.
+func connectionDisconnectAction(connectionID string) schemaapi.ConnectionDisconnectAction {
+	// The disconnect action carries a typed status, so NewActionRequest (which
+	// yields an empty status type) cannot build it.
+	return schemaapi.ConnectionDisconnectAction{Action: apiv1alpha1.Action[schemaapi.ConnectionDisconnectSpec, schemaapi.ConnectionDisconnectStatus]{
+		TypeMeta: meta.NewTypeMeta(schemaapi.ConnectionDisconnectActionKind),
+		Metadata: apiv1alpha1.ActionMeta{Target: connectionReference(connectionID)},
+	}}
+}
+
 func connectionSetupControlAction(
 	kind meta.Kind,
 	connectionID string,

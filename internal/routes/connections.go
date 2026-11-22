@@ -154,7 +154,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionInitiateActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -228,7 +228,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionSetupSubmitActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -394,7 +394,7 @@ type ListConnectionRequestQuery struct {
 }
 
 // @Summary		List connections
-// @Description	List connections with optional filtering and pagination
+// @Description	List connections with optional filtering and pagination. Results are ordered by id unless orderBy is set.
 // @Tags			connections
 // @Accept			json
 // @Produce		json
@@ -405,7 +405,7 @@ type ListConnectionRequestQuery struct {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			name			query		string	false	"Filter by exact resource name"
 // @Param			labelSelector	query		string	false	"Filter by label selector"
-// @Param			orderBy		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Param			orderBy		query		string	false	"Order by id, namespace, state, created_at, or updated_at, optionally followed by asc or desc (e.g., 'created_at desc'). Defaults to id."
 // @Success		200				{object}	OpenAPIListConnectionResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
@@ -420,7 +420,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -653,7 +653,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionDisconnectActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -771,7 +771,7 @@ func (r *ConnectionsRoutes) migrateGeneration(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionGenerationMigrationActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -923,7 +923,7 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionSetupAbortActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -997,7 +997,7 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionReconfigureActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1071,7 +1071,7 @@ func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionSetupCancelActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1145,7 +1145,7 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionSetupRetryActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithResponseMsg("invalid request body")))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1220,7 +1220,7 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionReauthActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithResponseMsg("invalid request body")))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1281,7 +1281,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		&req,
 		schemaapi.ConnectionForceStateActionKind,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1395,7 +1395,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		&req,
 		smeta.ValidationModeUpdate,
 	); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		apgin.WriteError(gctx, nil, httperr.RequestValidationErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

@@ -14,6 +14,28 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 )
 
+// connectorValidationError keeps caller cancellation separate from authored
+// validation failures, which are invalid arguments. The context check also
+// stops persistence when validation succeeds after cancellation, including
+// metadata-only updates that do not execute JavaScript.
+func connectorValidationError(ctx context.Context, err error) error {
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+	if errors.Is(err, context.Canceled) {
+		return context.Canceled
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return context.DeadlineExceeded
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+	return nil
+}
+
+// CreateConnector validates a new connector under the caller's context before
+// encrypting and persisting its first generation.
 func (s *service) CreateConnector(
 	ctx context.Context,
 	resource *cschema.Connector,
@@ -22,8 +44,15 @@ func (s *service) CreateConnector(
 		return nil, fmt.Errorf("connector cannot be nil")
 	}
 
-	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	validationErr := resource.ValidateFor(
+		meta.ValidationModeCreate,
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	)
+	if err := connectorValidationError(ctx, validationErr); err != nil {
+		return nil, err
 	}
 
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnector)
@@ -152,7 +181,8 @@ func (s *service) CreateDraftConnectorGeneration(
 
 // CreateConnectorGeneration creates the next generation from a canonical
 // Connector request. A nil request preserves the existing blank-POST behavior
-// and clones the newest generation as a draft.
+// and clones the newest generation as a draft. Supplied definitions are
+// validated under the caller's context before creating a generation.
 func (s *service) CreateConnectorGeneration(
 	ctx context.Context,
 	id apid.ID,
@@ -162,8 +192,15 @@ func (s *service) CreateConnectorGeneration(
 		return s.CreateDraftConnectorGeneration(ctx, id, nil, nil, nil)
 	}
 
-	if err := resource.ValidateFor(meta.ValidationModeCreate, nil); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	validationErr := resource.ValidateFor(
+		meta.ValidationModeCreate,
+		&scommon.ValidationContext{
+			Path: "$",
+			Ctx:  ctx,
+		},
+	)
+	if err := connectorValidationError(ctx, validationErr); err != nil {
+		return nil, err
 	}
 
 	currentPage := s.ListConnectorsBuilder().

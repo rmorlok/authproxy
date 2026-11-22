@@ -17,6 +17,7 @@ import (
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
+	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	coremock "github.com/rmorlok/authproxy/internal/core/mock"
@@ -44,6 +45,12 @@ type integrationClient struct {
 func (c *integrationClient) Do(request *http.Request) (*http.Response, error) {
 	c.calls.Add(1)
 	return c.client.Do(request)
+}
+
+// DoWithLabels counts one handoff and preserves the production client's label path.
+func (c *integrationClient) DoWithLabels(request *http.Request, labels map[string]string) (*http.Response, error) {
+	c.calls.Add(1)
+	return c.client.DoWithLabels(request, labels)
 }
 
 // integrationAuth exposes deterministic credential rotation without external
@@ -155,8 +162,8 @@ func newIntegrationClient(t *testing.T, auth *integrationAuth, options iface.HTT
 }
 
 // integrationLimits keeps deadlines bounded and leaves room for real HTTP headers.
-func integrationLimits() httphost.Limits {
-	return httphost.Limits{
+func integrationLimits() aphttp.Limits {
+	return aphttp.Limits{
 		Timeout: 5 * time.Second, MaxRequests: 1,
 		MaxResponseBytes: 4096, MaxStreamBytes: 4096, MaxHeaderBytes: 4096,
 	}
@@ -276,7 +283,7 @@ func TestSessionIntegrationProxyRecoveryAndAttribution(t *testing.T) {
 			next, err := http.NewRequest(http.MethodGet, server.URL+"/second", nil)
 			require.NoError(t, err)
 			response, err = session.Do(next)
-			require.ErrorIs(t, err, httphost.ErrRequestLimit)
+			require.ErrorIs(t, err, aphttp.ErrRequestLimit)
 			require.Nil(t, response)
 			require.Equal(t, int32(1), client.calls.Load())
 			require.Equal(t, int32(2), attempts.Load())
@@ -316,7 +323,7 @@ func TestSessionIntegrationActorMismatch(t *testing.T) {
 			// The host preserves its safe error boundary and body ownership even
 			// when the configured client rejects the session's admitted identity.
 			response, err := session.Do(request)
-			require.ErrorIs(t, err, httphost.ErrTransport)
+			require.ErrorIs(t, err, aphttp.ErrTransport)
 			require.Nil(t, response)
 			require.Equal(t, int32(1), body.closes.Load())
 			require.Zero(t, body.reads.Load())
@@ -375,7 +382,7 @@ func TestSessionIntegrationGzipStreams(t *testing.T) {
 					request.Header.Set("Accept-Encoding", "gzip")
 				}
 				type readyResponse struct {
-					response *httphost.Response
+					response *aphttp.Response
 					err      error
 				}
 				ready := make(chan readyResponse, 1)
@@ -383,7 +390,7 @@ func TestSessionIntegrationGzipStreams(t *testing.T) {
 					response, err := session.Do(request)
 					ready <- readyResponse{response, err}
 				}()
-				var response *httphost.Response
+				var response *aphttp.Response
 				select {
 				case got := <-ready:
 					require.NoError(t, got.err)
@@ -402,7 +409,7 @@ func TestSessionIntegrationGzipStreams(t *testing.T) {
 				unblock()
 				body, err := io.ReadAll(response.Body)
 				if tooLarge {
-					require.ErrorIs(t, err, httphost.ErrResponseLimit)
+					require.ErrorIs(t, err, aphttp.ErrResponseLimit)
 					require.LessOrEqual(t, int64(len(body)), limits.MaxResponseBytes)
 				} else {
 					require.NoError(t, err)

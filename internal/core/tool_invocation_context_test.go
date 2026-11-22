@@ -43,6 +43,7 @@ func expectPreparationDecryption(f *toolAuthorizationFixture, ctx context.Contex
 func TestPrepareToolInvocationCapturedContext(t *testing.T) {
 	f := newToolAuthorizationFixture(t, []string{"tool:read"})
 	f.snapshot.Connection.State = database.ConnectionStateConfigured
+	f.snapshot.Connection.Name = "Captured connection"
 	f.snapshot.Connection.Labels = database.Labels{"owner": "captured-owner"}
 	f.snapshot.Connection.Annotations = database.Annotations{"note": "captured-note"}
 	ctx := context.Background()
@@ -60,6 +61,7 @@ func TestPrepareToolInvocationCapturedContext(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, got.snapshot.Params)
 	require.Equal(t, f.snapshot.Connection.Id.String(), got.snapshot.ConnectionID)
+	require.Equal(t, string(f.snapshot.Connection.Name), got.snapshot.ConnectionName)
 	require.Equal(t, f.snapshot.Connection.Namespace, got.snapshot.ConnectionNamespace)
 	require.Equal(t, f.snapshot.Revision.ToolId.String(), got.snapshot.ToolID)
 	require.Equal(t, f.snapshot.Revision.Revision, got.snapshot.Revision)

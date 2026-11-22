@@ -276,17 +276,28 @@ func TestConnections(t *testing.T) {
 		}
 
 		t.Run("all connections", func(t *testing.T) {
+			// The database's own id order, read in key order, is the expected default.
+			byKey := db.ListConnectionsBuilder().Limit(100).ResumeAfter("").FetchPage(ctx)
+			assert.NoError(t, byKey.Error)
+			var wantIds []apid.ID
+			for _, connection := range byKey.Results {
+				wantIds = append(wantIds, connection.Id)
+			}
+
+			// With no order chosen, offset pages list connections by id, not creation time.
 			result := db.ListConnectionsBuilder().Limit(10).FetchPage(ctx)
 			assert.NoError(t, result.Error)
 			assert.Len(t, result.Results, 10)
-			assert.Equal(t, result.Results[0].Id, firstUuid)
 			assert.True(t, result.HasMore)
 			assert.NotEmpty(t, result.Cursor)
 
-			total := 10
+			var gotIds []apid.ID
+			for _, connection := range result.Results {
+				gotIds = append(gotIds, connection.Id)
+			}
 			cursor := result.Cursor
-			var last Connection
 
+			// Following the cursor returns the rest, in the same order, without repeats.
 			for cursor != "" {
 				ex, err := db.ListConnectionsFromCursor(ctx, cursor)
 				assert.NoError(t, err)
@@ -294,13 +305,14 @@ func TestConnections(t *testing.T) {
 				assert.NoError(t, result.Error)
 				assert.True(t, len(result.Results) > 0)
 
-				last = result.Results[len(result.Results)-1]
-				total += len(result.Results)
+				for _, connection := range result.Results {
+					gotIds = append(gotIds, connection.Id)
+				}
 				cursor = result.Cursor
 			}
 
-			assert.Equal(t, 50, total)
-			assert.Equal(t, lastUuid, last.Id)
+			assert.Len(t, gotIds, 50)
+			assert.Equal(t, wantIds, gotIds)
 		})
 
 		t.Run("filter by namespace", func(t *testing.T) {
