@@ -37,10 +37,12 @@ type ExecutionLimits struct {
 	TimeoutMillis *int64 `json:"timeoutMillis,omitempty" yaml:"timeoutMillis,omitempty"`
 	MaxRequests   *int   `json:"maxRequests,omitempty" yaml:"maxRequests,omitempty"`
 	MaxInputBytes *int64 `json:"maxInputBytes,omitempty" yaml:"maxInputBytes,omitempty"`
-	// MaxOutputBytes caps decoded result content; MaxResponseBytes caps the
-	// aggregate decoded upstream responses. The runtime may also impose a
-	// shared aggregate budget across both categories.
-	MaxOutputBytes   *int64 `json:"maxOutputBytes,omitempty" yaml:"maxOutputBytes,omitempty"`
+	// MaxOutputBytes caps decoded result content. For JavaScript, it also
+	// bounds the encoded ordinary result, complete toolResult or ToolError
+	// payload, and each console record when logging is enabled.
+	MaxOutputBytes *int64 `json:"maxOutputBytes,omitempty" yaml:"maxOutputBytes,omitempty"`
+	// MaxResponseBytes caps aggregate decoded upstream responses. The runtime
+	// may also impose a shared aggregate budget across output and responses.
 	MaxResponseBytes *int64 `json:"maxResponseBytes,omitempty" yaml:"maxResponseBytes,omitempty"`
 	// MaxEncodedResultBytes separately bounds the serialized result envelope,
 	// including expansion caused by base64-encoded rich content.

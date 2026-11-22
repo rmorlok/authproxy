@@ -2661,13 +2661,16 @@ definitions:
         type: integer
       maxOutputBytes:
         description: |-
-          MaxOutputBytes caps decoded result content; MaxResponseBytes caps the
-          aggregate decoded upstream responses. The runtime may also impose a
-          shared aggregate budget across both categories.
+          MaxOutputBytes caps decoded result content. For JavaScript, it also
+          bounds the encoded ordinary result, complete toolResult or ToolError
+          payload, and each console record when logging is enabled.
         type: integer
       maxRequests:
         type: integer
       maxResponseBytes:
+        description: |-
+          MaxResponseBytes caps aggregate decoded upstream responses. The runtime
+          may also impose a shared aggregate budget across output and responses.
         type: integer
       maxStackDepth:
         type: integer

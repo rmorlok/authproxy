@@ -28,6 +28,8 @@ type Limits struct {
 
 	// Runtime bounds source, combined VM input, output, depth, stack, time,
 	// and shared native work/allocation for initialization and execution.
+	// Its output byte limit applies to ordinary results, complete toolResult
+	// and ToolError payloads, and each console record when logging is enabled.
 	Runtime javascript.Limits
 
 	// HTTP bounds the invocation deadline, logical request count, aggregate
@@ -44,6 +46,7 @@ type Limits struct {
 
 	// MaxEncodedResultBytes bounds the final ToolResult JSON, including
 	// identities, metadata, rich blocks, escaping, and explicit error details.
+	// It does not replace Runtime.MaxOutputBytes for encoding authored payloads.
 	MaxEncodedResultBytes int
 }
 
@@ -70,6 +73,7 @@ func ResolveLimits(policy Limits, caps *toolschema.ExecutionLimits) (Limits, err
 	// Native work/allocation also remains independently controlled by Runtime.
 	policy.Validation.MaxInputBytes = capBytes(policy.Validation.MaxInputBytes, caps.MaxInputBytes)
 	policy.Validation.MaxOutputBytes = capBytes(policy.Validation.MaxOutputBytes, caps.MaxOutputBytes)
+	// The runtime applies this cap to results, explicit errors, and log records.
 	policy.Runtime.MaxOutputBytes = capBytes(policy.Runtime.MaxOutputBytes, caps.MaxOutputBytes)
 	if caps.MaxResponseBytes != nil {
 		policy.HTTP.MaxResponseBytes = min(policy.HTTP.MaxResponseBytes, *caps.MaxResponseBytes)

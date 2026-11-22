@@ -627,7 +627,9 @@ no unlimited defaults.
 - `MaxInputBytes` bounds the serialized snapshot and response together.
 - `MaxOutputBytes` bounds the ordinary JSON value or complete `toolResult` /
   `ToolError` payload, including punctuation, escaping, content, provider metadata,
-  and explicit error fields.
+  and explicit error fields. When logging is enabled, it also bounds each console
+  record's message and optional fields together; an oversized record ends execution
+  with a limit failure.
 - `MaxWorkUnits` bounds cumulative managed work across preparation, initialization,
   utility calls, HTTP conversion, and result encoding. Entries, admitted data
   units, and visited values/properties consume this allowance.

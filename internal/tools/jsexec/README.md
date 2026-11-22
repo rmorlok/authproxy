@@ -91,7 +91,7 @@ caps. `Compile` performs this resolution and validates the complete policy.
 | `timeoutMillis` | `HTTP.Timeout` and `Runtime.Timeout` |
 | `maxRequests` | `HTTP.MaxRequests` |
 | `maxInputBytes` | `Validation.MaxInputBytes`, for caller arguments |
-| `maxOutputBytes` | `Validation.MaxOutputBytes` and `Runtime.MaxOutputBytes` |
+| `maxOutputBytes` | `Validation.MaxOutputBytes` for successful structured output; `Runtime.MaxOutputBytes` for ordinary results, complete `toolResult` / `ToolError` payloads, and each console record |
 | `maxResponseBytes` | `HTTP.MaxResponseBytes`, across decoded response reads |
 | `maxEncodedResultBytes` | `MaxEncodedResultBytes`, for the complete result |
 | `maxStackDepth` | `Runtime.MaxStackDepth` |
@@ -100,6 +100,19 @@ For example, with an operator request ceiling of 20, the definition above record
 a ceiling of 2. With an operator output ceiling of 2048 bytes, its authored 4096
 byte cap leaves that stricter ceiling at 2048. Large positive caps cannot overflow
 duration/byte conversions or raise a ceiling; zero and negative caps are invalid.
+
+For JavaScript, `maxOutputBytes` also bounds an explicit `ToolError`'s code,
+message, and details together, including JSON field names and escaping. When
+logging is enabled, each console record's message and optional fields share this
+byte cap. Exceeding it while encoding a result or error fails conversion; an
+oversized console record ends execution with a limit failure.
+
+For example, `maxOutputBytes: 32` allows `{saved: true}`, but cannot fit the
+`CUSTOMER_LOOKUP_FAILED` error shown above. A long `console.log(...)` message
+can also exhaust that cap even when the eventual result would fit. Choose the
+cap to accommodate all three uses. `maxEncodedResultBytes` separately bounds
+the final result envelope, including error details and trusted identities;
+raising it does not increase the earlier runtime encoding allowance.
 
 Argument bytes, copied configuration, combined VM input, and response data have
 different allowances. A small `maxInputBytes` must not accidentally restrict the
