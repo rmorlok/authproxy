@@ -19,7 +19,6 @@ var toolHostBindings = []apjsruntime.HostBinding{
 	{Name: "atob"},
 	{Name: "btoa"},
 	{Name: "console"},
-	{Name: "ToolError"},
 	{Name: "params", PreserveEnumerable: true},
 	{Name: "context", PreserveEnumerable: true},
 	{Name: "cfg", PreserveEnumerable: true},
