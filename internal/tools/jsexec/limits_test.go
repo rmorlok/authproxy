@@ -21,19 +21,33 @@ func policyLimits() Limits {
 	return Limits{
 		Render: render.Limits{MaxBytes: 32768, MaxDepth: 32, MaxSteps: 10000},
 		Validation: validation.Limits{
-			MaxInputBytes: 4096, MaxOutputBytes: 1024,
-			MaxDepth: 32, MaxValues: 10000, MaxNumberDigits: 128,
+			MaxInputBytes:   4096,
+			MaxOutputBytes:  1024,
+			MaxDepth:        32,
+			MaxValues:       10000,
+			MaxNumberDigits: 128,
 		},
 		Runtime: javascript.Limits{
-			MaxWorkUnits: 64 << 20, MaxAllocationUnits: 64 << 20,
-			MaxSourceBytes: 4096, MaxInputBytes: 32768, MaxOutputBytes: 256,
-			MaxDepth: 32, MaxNodes: 10000, MaxStackDepth: 128, Timeout: time.Second,
+			MaxWorkUnits:       64 << 20,
+			MaxAllocationUnits: 64 << 20,
+			MaxSourceBytes:     4096,
+			MaxInputBytes:      32768,
+			MaxOutputBytes:     256,
+			MaxDepth:           32,
+			MaxNodes:           10000,
+			MaxStackDepth:      128,
+			Timeout:            time.Second,
 		},
 		HTTP: aphttp.Limits{
-			Timeout: 2 * time.Second, MaxRequests: 20, MaxResponseBytes: 4096,
-			MaxStreamBytes: 8192, MaxHeaderBytes: 4096,
+			Timeout:          2 * time.Second,
+			MaxRequests:      20,
+			MaxResponseBytes: 4096,
+			MaxStreamBytes:   8192,
+			MaxHeaderBytes:   4096,
 		},
-		MaxRequestBytes: 8192, MaxPendingOperations: 4, MaxEncodedResultBytes: 16384,
+		MaxRequestBytes:       8192,
+		MaxPendingOperations:  4,
+		MaxEncodedResultBytes: 16384,
 	}
 }
 
