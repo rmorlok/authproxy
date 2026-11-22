@@ -14,13 +14,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// evaluateTool checks that a successful invocation produces detached JSON.
+// evaluateTool extracts the detached JSON from a successful ordinary return.
 func evaluateTool(t *testing.T, program *javascript.ToolProgram, input javascript.Input) common.RawJSON {
 	t.Helper()
 	result, err := program.Evaluate(context.Background(), input)
 	require.NoError(t, err)
-	require.True(t, json.Valid(result))
-	return result
+	require.NotNil(t, result)
+	require.True(t, json.Valid(result.StructuredContent))
+	return result.StructuredContent
 }
 
 // TestToolEvaluateCapturedInput exercises published helpers, entry-point arguments, and copied aliases together.

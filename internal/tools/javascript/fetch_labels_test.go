@@ -112,7 +112,7 @@ func TestToolFetchLabelsReachConfiguredMiddleware(t *testing.T) {
 		"results":[{"operation":"write","workload":"alpha"},{"operation":"read","workload":"beta"},{"operation":"read","workload":""}],
 		"invalid":"invalid JavaScript input", "labels":{"operation":"read","region":"west"},
 		"alias":true,"direct":"undefined"
-	}`, string(result))
+	}`, string(result.StructuredContent))
 	middleware.mu.Lock()
 	defer middleware.mu.Unlock()
 	require.Len(t, middleware.requests, 3)

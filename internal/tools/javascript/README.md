@@ -2,7 +2,7 @@
 
 This package evaluates pure expressions and async JavaScript Tool functions.
 It reuses connector helper libraries and bounds initialization, execution, and
-JSON conversion with explicit limits. HTTP Tools receive one captured connection
+result conversion with explicit limits. HTTP Tools receive one captured connection
 in `context.connections` and send requests through its `fetch` method. Pure
 expressions and ordinary Tool evaluation have no I/O capabilities.
 
@@ -10,9 +10,12 @@ The shared [apjs/runtime primitives](../../apjs/runtime/README.md) own the VM
 lifecycle, expression evaluation, async compilation and execution, Promise
 tracking, execution limits, bounded native JSON conversion, and the HTTP host's
 request conversion, workers, and response readers. This package supplies Tool
-snapshots and aliases, its reserved host names, connector-library selection, and
-session ownership and error precedence. Its `Limits` type refers to the shared policy. Callers reference error classifications
-directly from `internal/apjs/runtime`.
+snapshots and aliases, its reserved host names, connector-library selection,
+rich Tool results, and session ownership and error precedence. It installs Tool
+result handling through the shared runtime's result-extension API; the shared
+runtime has no Tool-specific types or helpers. Its `Limits` type refers to the
+shared policy. Callers reference error classifications directly from
+`internal/apjs/runtime`.
 
 ## Pure expressions
 
@@ -106,8 +109,8 @@ and immutable snapshots may be reused concurrently. No Go maps, structs,
 methods, connection handles, or credentials are reflected into the runtime.
 
 Standard Goja language facilities and the shared runtime's pure utilities are
-available. There is no `fetch`, timer, module loader, filesystem, process
-environment, or application logger.
+available. There is no `fetch`, `toolResult`, timer, module loader, filesystem,
+process environment, or application logger.
 The [HTTP response mapper](../httpcodec/README.md#response-transforms) uses this
 runtime for `transformJavascript`, preparing the response object and converting
 the projection into a rich result. Expressions do not receive connector helper
@@ -201,24 +204,20 @@ capability. All managed utility, input/result conversion, and HTTP work consumes
 the execution's shared `MaxWorkUnits` and `MaxAllocationUnits`. Exhaustion stops
 execution before any later request while preserving earlier send evidence.
 
-`Initialize(vm)` delegates to the shared async initializer. The invocation
-caller installs capabilities and copied input, owns a fresh VM on one goroutine,
-and keeps a deadline active through initialization and execution. The returned
-callable belongs to that VM. Initialization sets the stack cap but does not start
-its own timeout. Most callers should use `Evaluate` or `EvaluateWithHTTP` for the
-complete bounded lifecycle described below. Call `Initialize` inside
-`apjsruntime.Run` with the same limits passed to `CompileTool`; `Run` installs
-the pure utilities and owns the execution budget. `Validate`, `Evaluate`, and
-`EvaluateWithHTTP` handle that setup automatically. `ToolError`/`toolResult` helpers and
-invocation-service integration remain separate work.
+`Validate`, `Evaluate`, and `EvaluateWithHTTP` manage the complete bounded VM
+lifecycle. They install the pure `toolResult` helper before authored
+initialization, so a top-level constant can hold a helper result. Validation
+checks initialization only; payload conversion and validation happen when
+`execute` returns the result. `ToolError` and invocation-service integration
+remain separate work.
 
 ## Evaluate an async Tool
 
 `ToolProgram.Evaluate` binds captured Tool input and delegates invocation and
 Promise settlement to the shared runtime. It calls `execute(params, context)` and
-converts its fulfilled native Promise result into JSON. The Tool and its called
-helpers share a private copy of the captured input. `await` and Promise chains
-can compose their results:
+converts its fulfilled native Promise result into a detached `*javascript.Result`.
+The Tool and its called helpers share a private copy of the captured input.
+`await` and Promise chains can compose their results:
 
 ```javascript
 async function execute(params, context) {
@@ -236,7 +235,10 @@ if err != nil {
 }
 ```
 
-The fulfilled value becomes bounded JSON using the same rules as expressions.
+For this example, `result.StructuredContent` contains the customer-key JSON and
+`result.Content` is an empty array. Ordinary values and explicit rich returns
+follow the [result rules below](#results-and-errors).
+
 `Response` is optional and normally omitted for Tool functions. It is available
 for callers that already have prepared response data. It shares the initial
 input allowance; async preparation counts its depth below the context root.
@@ -405,10 +407,96 @@ invocation or JavaScript Tool publication.
 
 ## Results and errors
 
-Results can be null, booleans, finite numbers, strings, dense arrays, or ordinary
-objects containing those values. Arrays and objects retain their shape. A
-string result is JSON-quoted; conversion into a rich text block belongs to the
-Tool result layer.
+`ToolProgram.Evaluate` and `EvaluateWithHTTP` return `*javascript.Result`,
+containing detached Go data that remains valid after the VM closes:
+
+| Go field | Meaning |
+| --- | --- |
+| `StructuredContent` | Optional JSON. A nil value is absent; the bytes `null` preserve an explicit null. |
+| `Content` | Ordered rich-content blocks. Always a nonnil array, even when empty. |
+| `Provider` | Optional JSON object with extra upstream details selected by the Tool author, such as a request ID or API version. |
+
+Ordinary returns become `StructuredContent`. They can be null, booleans, finite
+numbers, strings, dense arrays, or ordinary objects containing those values.
+Strings also produce one text block: `return "Customer saved"` produces the
+JSON string `"Customer saved"` and `{type: "text", text: "Customer saved"}`.
+Other ordinary values produce no content blocks. An object with a business
+field named `content`, such as `return {content: "draft"}`, remains ordinary
+structured data.
+
+Use `toolResult(...)` to explicitly select rich content. For example, this Tool
+returns both a customer record and a readable summary:
+
+```javascript
+async function execute(params, context) {
+    const [connection] = context.connections;
+    const response = await connection.fetch(
+        connection.cfg.apiBase + "/customers/" + encodeURIComponent(params.id)
+    );
+    const customer = await response.json();
+    return toolResult({
+        structuredContent: {id: customer.id, name: customer.name},
+        content: [{type: "text", text: "Customer: " + customer.name}],
+        provider: {requestId: response.headers.get("x-request-id")}
+    });
+}
+```
+
+In this example, `structuredContent` holds the customer record, `content` holds
+its display text, and `provider.requestId` holds the upstream request ID. An
+application can use that ID to find the matching request in the provider's
+support logs. It is separate from AuthProxy's own invocation ID.
+
+`provider` is an optional place for these extra upstream details. For example,
+`provider: {requestId: "req-7", apiVersion: "2026-01"}` also preserves which API
+version produced the result. The adapter copies those fields into `Result.Provider`
+as JSON; a caller that understands the keys can read them. AuthProxy does not
+interpret the keys or use them to change authorization, retries, or rendering.
+The Tool author explicitly selects and redacts the metadata to return; the
+adapter does not automatically copy upstream headers or remove sensitive fields.
+Omit `provider` when callers do not need this extra information.
+
+The helper accepts only `structuredContent`, `content`, and `provider`.
+Each is optional: `toolResult({})` produces empty content and no structured data
+or provider metadata. Explicit `structuredContent: null` is retained. Supplying
+a structured string through the helper does not add an implicit text block;
+the helper preserves the content blocks selected by the author.
+
+Content supports the canonical `text`, `image`, `audio`, `resource_link`, and
+embedded `resource` blocks. For example, a generated report can be returned as a
+link without downloading it:
+
+```javascript
+return toolResult({
+    content: [{
+        type: "resource_link",
+        uri: "https://reports.example.com/report-42",
+        name: "report-42",
+        mimeType: "application/pdf"
+    }]
+});
+```
+
+Blocks must satisfy their canonical schemas, including required fields, media
+encoding, absolute resource URIs, annotations, and provider metadata. Unknown
+fields and invalid block combinations fail conversion. An explicit
+`content: null` is invalid; omitted content becomes an empty array. Provider
+metadata must be an object. Tool identities, revision and invocation IDs,
+execution state, and errors cannot be supplied through this helper.
+
+Only an actual helper return is recognized. Its identity is private to the
+invocation: copying its properties, wrapping it in a Proxy, or nesting it inside
+ordinary returned data does not create a rich result. Payload validation happens
+after Promise settlement, using the shared bounded encoder before decoding and
+validating the content blocks. No VM values escape into the Go result.
+
+`MaxOutputBytes`, `MaxDepth`, and `MaxNodes` bound the ordinary JSON value or the
+entire explicit helper payload, including content and provider metadata. Native
+conversion and validation also consume the execution's shared work and
+allocation budget. The caller still validates output schemas and bounds the
+complete serialized invocation envelope, including trusted identities and the
+text block derived from an ordinary string. This package does not build that
+envelope.
 
 Conversion rejects undefined, functions, symbols, BigInts, non-finite numbers,
 cycles, array holes, extra array properties, accessors, proxies, and exotic
@@ -440,6 +528,11 @@ This also applies to identifiers in `params` and connection configuration.
 Calling `String(response.body.id)` after a numeric ID has been parsed cannot
 recover digits that were already rounded.
 
+Ordinary structured JSON can preserve lone UTF-16 surrogate units as JSON
+escapes. A plain string also becomes a UTF-8 text block, so it must contain no
+lone units. The entire `toolResult` payload follows the same UTF-8 requirement,
+including structured data and provider metadata, before decoding rich blocks.
+
 Failures return no partial output. Fixed error classifications distinguish
 invalid source, input, output, execution limits, and thrown JavaScript errors.
 Errors never contain authored source, thrown values, stack traces, private
@@ -457,7 +550,8 @@ no unlimited defaults.
 - `MaxSourceBytes` bounds authored UTF-8 source before parsing. For Tools, the
   script and connector helper library share this allowance.
 - `MaxInputBytes` bounds the serialized snapshot and response together.
-- `MaxOutputBytes` bounds emitted JSON, including punctuation and escaping.
+- `MaxOutputBytes` bounds the ordinary JSON value or complete `toolResult`
+  payload, including punctuation, escaping, content, and provider metadata.
 - `MaxWorkUnits` bounds cumulative managed work across preparation, initialization,
   utility calls, HTTP conversion, and result encoding. Entries, admitted data
   units, and visited values/properties consume this allowance.

@@ -44,7 +44,7 @@ func TestToolURLHTTP(t *testing.T) {
 
 	// Resolution, canonical host/port, and form encoding survive the authenticating host boundary.
 	require.NoError(t, err)
-	require.JSONEq(t, `["ok","https://provider.example/v1/","undefined"]`, string(result))
+	require.JSONEq(t, `["ok","https://provider.example/v1/","undefined"]`, string(result.StructuredContent))
 	select {
 	case request := <-requests:
 		require.Equal(t, "https://provider.example/items?tag=first&tag=second&q=caf%C3%A9+%2B+news", request)
@@ -74,7 +74,7 @@ func TestToolURLObjectRequiresExplicitSerialization(t *testing.T) {
 
 	// The malformed object attempt is catchable and unsent; only .href causes I/O.
 	require.NoError(t, err)
-	require.JSONEq(t, `[true,false,"ok"]`, string(result))
+	require.JSONEq(t, `[true,false,"ok"]`, string(result.StructuredContent))
 	require.Equal(t, int32(1), calls.Load())
 }
 

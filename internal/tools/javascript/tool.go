@@ -3,7 +3,6 @@ package javascript
 import (
 	"context"
 
-	"github.com/dop251/goja"
 	"github.com/rmorlok/authproxy/internal/apjs"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 )
@@ -21,7 +20,6 @@ var toolHostBindings = []apjsruntime.HostBinding{
 	{Name: "btoa"},
 	{Name: "console"},
 	{Name: "ToolError"},
-	{Name: "toolResult"},
 	{Name: "params", PreserveEnumerable: true},
 	{Name: "context", PreserveEnumerable: true},
 	{Name: "cfg", PreserveEnumerable: true},
@@ -35,7 +33,7 @@ var toolHostBindings = []apjsruntime.HostBinding{
 // helpers. It retains no invocation state and may serve concurrent evaluations.
 type ToolProgram struct {
 	// program owns compilation, validation, and bounded async execution.
-	program *apjsruntime.AsyncProgram
+	program *apjsruntime.ExtendedAsyncProgram[*Result]
 
 	// limits is the same copied policy used to bind Tool inputs and HTTP hosts.
 	limits Limits
@@ -46,27 +44,21 @@ type ToolProgram struct {
 // declaration conflicts, and safe error classifications come from the shared
 // compiler; invocation still supplies params and captured context positionally.
 func CompileTool(source string, library *apjs.Library, limits Limits) (*ToolProgram, error) {
-	program, err := apjsruntime.CompileAsync(source, library, toolHostBindings, limits)
+	program, err := apjsruntime.CompileExtendedAsync(
+		source,
+		library,
+		toolHostBindings,
+		limits,
+		toolResultExtension(),
+	)
 	if err != nil {
 		return nil, err
 	}
-	return &ToolProgram{program: program, limits: limits}, nil
-}
 
-// Initialize protects Tool globals, initializes helpers and source, and returns
-// the checked async execute binding. The caller owns a fresh VM, keeps its
-// deadline active, and gates I/O until initialization and its rejection checks
-// succeed. The returned callable belongs to that VM and must not outlive it.
-// Call Initialize inside apjsruntime.Run with the same limits supplied to
-// CompileTool. Run installs the pure helpers and
-// owns their execution-wide budgets. A bare VM without those helpers returns
-// apjsruntime.ErrInvalidInput.
-// Validate, Evaluate, and EvaluateWithHTTP manage that setup automatically.
-func (p *ToolProgram) Initialize(vm *goja.Runtime) (goja.Callable, error) {
-	if p == nil || p.program == nil {
-		return nil, apjsruntime.ErrInvalidInput
-	}
-	return p.program.Initialize(vm)
+	return &ToolProgram{
+		program: program,
+		limits:  limits,
+	}, nil
 }
 
 // Validate runs bounded initialization with no inputs or I/O and without calling
@@ -76,5 +68,6 @@ func (p *ToolProgram) Validate(ctx context.Context) error {
 	if p == nil || p.program == nil {
 		return apjsruntime.ErrInvalidInput
 	}
+
 	return p.program.Validate(ctx)
 }

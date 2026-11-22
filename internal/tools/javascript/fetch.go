@@ -6,7 +6,6 @@ import (
 
 	"github.com/dop251/goja"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
-	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 )
 
@@ -35,7 +34,8 @@ type FetchOptions struct {
 }
 
 // EvaluateWithHTTP evaluates a Tool with exactly one entry in context.connections
-// and bounded, single-use response readers. The caller must authorize and validate
+// and bounded, single-use response readers, returning the same detached Result
+// as Evaluate. The caller must authorize and validate
 // the Tool before transferring a session dedicated to this invocation. Validate
 // and ordinary Evaluate remain free of I/O. Connection fetch is unavailable during
 // initialization, and global fetch remains undefined throughout execution.
@@ -55,7 +55,7 @@ func (p *ToolProgram) EvaluateWithHTTP(
 	ctx context.Context,
 	input Input,
 	options FetchOptions,
-) (common.RawJSON, error) {
+) (*Result, error) {
 	// Take ownership before checking any other input so rejected options do not
 	// leave an initialized session's timer running. A zero-value session has no
 	// context or timer and cannot be closed; reject it below without calling Close.
@@ -115,5 +115,5 @@ func (p *ToolProgram) EvaluateWithHTTP(
 		return nil, sessionErr
 	}
 
-	return common.RawJSON(result), err
+	return result, err
 }

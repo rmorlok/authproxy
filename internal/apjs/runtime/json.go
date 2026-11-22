@@ -183,19 +183,24 @@ func (b *inputBudget) validate(encoded []byte) error {
 		return ErrInvalidInput
 	}
 
-	if err := validateInputSurrogates(b.ctx, encoded); err != nil {
+	if err := ValidateJSONStrings(b.ctx, encoded); err != nil {
 		return err
 	}
 
 	return b.ctx.Err()
 }
 
-// validateInputSurrogates rejects unpaired escaped UTF-16 surrogate units in
-// already validated JSON strings and keys. Goja's native JSON.parse uses Go's
-// JSON decoder, which would silently replace those units with U+FFFD. Rejecting
-// them avoids changing input values; valid pairs and literal backslash-u text
-// retain ordinary JSON behavior. This scan does not parse JSON structure.
-func validateInputSurrogates(ctx context.Context, encoded []byte) error {
+// ValidateJSONStrings rejects unpaired escaped UTF-16 surrogate units before
+// native Go JSON decoding can silently replace them with U+FFFD. It checks both
+// string values and object keys; valid pairs and literal backslash-u text pass.
+//
+// encoded must already be syntactically valid UTF-8 JSON, for example from the
+// safe result encoder. This scan does not validate JSON syntax or UTF-8, decode
+// values, or enforce byte/depth/node limits. It charges the inspected bytes to
+// ctx's execution budget and polls cancellation. Lone surrogates return the
+// fixed ErrInvalidInput category; cancellation and budget failures retain their
+// own errors. Output adapters may translate ErrInvalidInput to an output error.
+func ValidateJSONStrings(ctx context.Context, encoded []byte) error {
 	if err := ChargeWork(ctx, len(encoded)); err != nil {
 		return err
 	}

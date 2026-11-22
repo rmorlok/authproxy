@@ -244,7 +244,7 @@ func TestToolFetchSequentialRequests(t *testing.T) {
 	// A resolved fetch exposes safe metadata; body methods drive the next async step.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"status":201,"ok":true,"text":"saved","trace":"trace-7","secret":null}`, string(result))
+	require.JSONEq(t, `{"status":201,"ok":true,"text":"saved","trace":"trace-7","secret":null}`, string(result.StructuredContent))
 	require.Equal(t, int32(2), calls.Load())
 	require.Eventually(t, func() bool { return firstBody.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 	require.Eventually(t, func() bool { return secondBody.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
@@ -285,7 +285,7 @@ func TestToolFetchParallelRequests(t *testing.T) {
 	// Concurrent HTTP completion still resumes every continuation on its owning VM.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `["/one","/two"]`, string(result))
+	require.JSONEq(t, `["/one","/two"]`, string(result.StructuredContent))
 	require.Equal(t, int32(2), entered.Load())
 }
 
@@ -305,7 +305,7 @@ func TestToolFetchStatusDoesNotReadBody(t *testing.T) {
 	// Non-2xx statuses resolve normally and unused bodies close without decoding.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"status":503,"ok":false,"used":false}`, string(result))
+	require.JSONEq(t, `{"status":503,"ok":false,"used":false}`, string(result.StructuredContent))
 	require.Zero(t, body.reads.Load())
 	require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 }
@@ -339,7 +339,7 @@ func TestToolFetchBodyIsSingleUse(t *testing.T) {
 			} else if method == "arrayBuffer" {
 				value = `[123,34,110,34,58,55,125]`
 			}
-			require.JSONEq(t, `{"before":false,"during":true,"after":true,"refused":true,"value":`+value+`}`, string(result))
+			require.JSONEq(t, `{"before":false,"during":true,"after":true,"refused":true,"value":`+value+`}`, string(result.StructuredContent))
 			require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 		})
 	}
@@ -370,7 +370,7 @@ func TestToolFetchBodyReadCanRetryAfterPendingLimit(t *testing.T) {
 	// The other fetch occupies the only slot; refusing a reader must not claim its body.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"refused":true,"usedAfterRefusal":false,"text":"retained body","usedAfterRead":true}`, string(result))
+	require.JSONEq(t, `{"refused":true,"usedAfterRefusal":false,"text":"retained body","usedAfterRead":true}`, string(result.StructuredContent))
 	require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 }
 
@@ -393,7 +393,7 @@ func TestToolFetchArrayBufferRequest(t *testing.T) {
 	// Binary request bytes survive the VM-to-worker copy without text conversion.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `204`, string(result))
+	require.JSONEq(t, `204`, string(result.StructuredContent))
 	require.Equal(t, []byte{0, 128, 255}, observed)
 }
 
@@ -415,14 +415,15 @@ func TestToolFetchSanitizesTransportFailure(t *testing.T) {
 			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 			if caught {
 				require.NoError(t, err)
-				require.Contains(t, string(result), `"error":true`)
+				require.Contains(t, string(result.StructuredContent), `"error":true`)
+				require.NotContains(t, string(result.StructuredContent), "private-token")
+				require.NotContains(t, string(result.StructuredContent), "secret.example")
 			} else {
 				require.ErrorIs(t, err, apjsruntime.ErrEvaluation)
 				require.Nil(t, result)
 				require.NotContains(t, err.Error(), "private-token")
+				require.NotContains(t, err.Error(), "secret.example")
 			}
-			require.NotContains(t, string(result), "private-token")
-			require.NotContains(t, string(result), "secret.example")
 			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 		})
 	}
@@ -443,7 +444,7 @@ func TestToolFetchJSONUsesPristineParser(t *testing.T) {
 	// Response parsing uses the intrinsic captured before either library or Tool initialization.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `{"n":7}`, string(result))
+	require.JSONEq(t, `{"n":7}`, string(result.StructuredContent))
 }
 
 // TestToolFetchJSONBudgetsAreSeparate keeps response conversion independent of initial inputs and other bodies.
@@ -468,7 +469,7 @@ func TestToolFetchJSONBudgetsAreSeparate(t *testing.T) {
 	// Shared JSON conversion preserves the HTTP host's per-response traversal policy.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `[21,21]`, string(result))
+	require.JSONEq(t, `[21,21]`, string(result.StructuredContent))
 }
 
 // TestToolFetchInvalidJSONSanitizesParserErrors keeps response content out of JavaScript errors.
@@ -486,9 +487,9 @@ func TestToolFetchInvalidJSONSanitizesParserErrors(t *testing.T) {
 	// Failed decoding consumes and closes the body but exposes only a safe error.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.Contains(t, string(result), `"error":true`)
-	require.Contains(t, string(result), `"used":true`)
-	require.NotContains(t, string(result), "private-malformed-response")
+	require.Contains(t, string(result.StructuredContent), `"error":true`)
+	require.Contains(t, string(result.StructuredContent), `"used":true`)
+	require.NotContains(t, string(result.StructuredContent), "private-malformed-response")
 	require.Eventually(t, func() bool { return body.closes.Load() == 1 }, 5*time.Second, time.Millisecond)
 }
 
@@ -554,7 +555,7 @@ func TestToolFetchHandledInitializationHasNoIO(t *testing.T) {
 	require.NoError(t, program.Validate(context.Background()))
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `true`, string(result))
+	require.JSONEq(t, `true`, string(result.StructuredContent))
 	require.Zero(t, calls.Load())
 	require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
 }
@@ -579,7 +580,7 @@ func TestToolFetchLimits(t *testing.T) {
 		// A rejected second handoff does not reach the connection's client.
 		result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 		require.NoError(t, err)
-		require.JSONEq(t, `true`, string(result))
+		require.JSONEq(t, `true`, string(result.StructuredContent))
 		require.Equal(t, int32(1), calls.Load())
 	})
 
@@ -599,7 +600,7 @@ func TestToolFetchLimits(t *testing.T) {
 		// Oversized input is rejected before worker allocation or any target handoff.
 		result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 		require.NoError(t, err)
-		require.JSONEq(t, `true`, string(result))
+		require.JSONEq(t, `true`, string(result.StructuredContent))
 		require.Zero(t, calls.Load())
 		require.Equal(t, api.ToolExecutionStateNotStarted, options.Session.ExecutionState())
 	})
@@ -623,7 +624,7 @@ func TestToolFetchLimits(t *testing.T) {
 		// Pending completions still consume capacity until the owner resumes them.
 		result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 		require.NoError(t, err)
-		require.JSONEq(t, `true`, string(result))
+		require.JSONEq(t, `true`, string(result.StructuredContent))
 		require.Equal(t, int32(1), calls.Load())
 	})
 
@@ -674,7 +675,7 @@ func TestToolFetchCancellation(t *testing.T) {
 				program, err := javascript.CompileTool("async function execute() {"+body+"}", nil, jsLimits)
 				require.NoError(t, err)
 				input := fetchInput(t)
-				var result common.RawJSON
+				var result *javascript.Result
 				var evaluationErr error
 				done := make(chan struct{})
 				go func() {
@@ -715,7 +716,7 @@ func TestToolFetchCancellationClosesBlockedBody(t *testing.T) {
 		return await (await context.connections[0].fetch("https://provider.example/items")).text();
 	}`, nil)
 	input := fetchInput(t)
-	var result common.RawJSON
+	var result *javascript.Result
 	var evaluationErr error
 	done := make(chan struct{})
 	go func() {
@@ -750,7 +751,7 @@ func TestToolFetchCleanupDoesNotWaitForBlockedClose(t *testing.T) {
 		return (await context.connections[0].fetch("https://provider.example/items")).status;
 	}`, nil)
 	input := fetchInput(t)
-	var result common.RawJSON
+	var result *javascript.Result
 	var evaluationErr error
 	done := make(chan struct{})
 	go func() {
@@ -762,7 +763,7 @@ func TestToolFetchCleanupDoesNotWaitForBlockedClose(t *testing.T) {
 	fetchWait(t, body.started)
 	fetchWait(t, done)
 	require.NoError(t, evaluationErr)
-	require.JSONEq(t, `200`, string(result))
+	require.JSONEq(t, `200`, string(result.StructuredContent))
 	require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
@@ -798,7 +799,7 @@ func TestToolFetchAbandonedRequestClosesLateBody(t *testing.T) {
 	// A settled root preserves its result while cleanup cancels outstanding operations.
 	result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 	require.NoError(t, err)
-	require.JSONEq(t, `true`, string(result))
+	require.JSONEq(t, `true`, string(result.StructuredContent))
 	fetchWait(t, canceled)
 	require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
 
@@ -852,7 +853,7 @@ func TestToolFetchCombinatorsCancelRemainingRequests(t *testing.T) {
 			// The combinator settles while its losing request remains blocked in the transport.
 			result, err := program.EvaluateWithHTTP(context.Background(), fetchInput(t), options)
 			require.NoError(t, err)
-			require.JSONEq(t, test.want, string(result))
+			require.JSONEq(t, test.want, string(result.StructuredContent))
 			fetchWait(t, canceled)
 			require.ErrorIs(t, options.Session.Err(), aphttp.ErrClosed)
 			require.Equal(t, api.ToolExecutionStateMayHaveExecuted, options.Session.ExecutionState())
@@ -947,7 +948,7 @@ func TestToolFetchConnectionSnapshot(t *testing.T) {
 			"tool":{"id":"tol_example","revision":7},"responseStatus":202,
 			"initial":["acme","us","blue","captured"],"aliases":true,"frozen":true,
 			"methodHidden":true,"refused":6,"local":["local","local","local"],"status":200
-		}`, string(result))
+		}`, string(result.StructuredContent))
 		require.Equal(t, int32(1), calls.Load())
 	}
 }
@@ -997,6 +998,6 @@ func TestToolFetchAliasesShareInputAllowance(t *testing.T) {
 	// ordinary JSON strings would exceed the cap without adding any input data.
 	result, err := program.EvaluateWithHTTP(context.Background(), input, options)
 	require.NoError(t, err)
-	require.JSONEq(t, `true`, string(result))
+	require.JSONEq(t, `true`, string(result.StructuredContent))
 	require.Zero(t, calls.Load())
 }

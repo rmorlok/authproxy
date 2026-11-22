@@ -38,7 +38,7 @@ func TestToolSearchParamsHTTP(t *testing.T) {
 
 	// Duplicate parameters and escaped user text arrive intact at the configured client.
 	require.NoError(t, err)
-	require.JSONEq(t, `["ok","undefined","function","function"]`, string(result))
+	require.JSONEq(t, `["ok","undefined","function","function"]`, string(result.StructuredContent))
 	select {
 	case query := <-queries:
 		require.Equal(t, "status=open&q=caf%C3%A9+%2B+news&status=new", query)
@@ -86,7 +86,7 @@ func TestToolSearchParamsFormBody(t *testing.T) {
 
 	// Both initial send and replay use the same encoded snapshot and inferred header.
 	require.NoError(t, err)
-	require.JSONEq(t, `["ok","undefined"]`, string(result))
+	require.JSONEq(t, `["ok","undefined"]`, string(result.StructuredContent))
 	select {
 	case request := <-requests:
 		const body = "grant_type=client_credentials&scope=first&scope=second&audience=caf%C3%A9+%2B+news"
@@ -191,7 +191,7 @@ func TestToolTextCodecHTTP(t *testing.T) {
 
 	// UTF-8 bytes cross the existing ArrayBuffer HTTP contract without enabling global fetch.
 	require.NoError(t, err)
-	require.JSONEq(t, `["café☃","undefined","function"]`, string(result))
+	require.JSONEq(t, `["café☃","undefined","function"]`, string(result.StructuredContent))
 	select {
 	case body := <-requestBodies:
 		require.Equal(t, "café☃", body)
@@ -264,7 +264,7 @@ func TestToolBase64Availability(t *testing.T) {
 	// Ordinary Tool profiles expose the standard pure helpers.
 	result, err := program.Evaluate(context.Background(), fetchInput(t))
 	require.NoError(t, err)
-	require.JSONEq(t, `["function","function"]`, string(result))
+	require.JSONEq(t, `["function","function"]`, string(result.StructuredContent))
 
 	// The same helpers are available during validation and execution.
 	program, err = javascript.CompileTool(`const encoded = btoa("\xff");
@@ -275,7 +275,7 @@ func TestToolBase64Availability(t *testing.T) {
 	require.NoError(t, program.Validate(context.Background()))
 	result, err = program.Evaluate(context.Background(), fetchInput(t))
 	require.NoError(t, err)
-	require.JSONEq(t, `[255,"undefined","function","function"]`, string(result))
+	require.JSONEq(t, `[255,"undefined","function","function"]`, string(result.StructuredContent))
 }
 
 // TestToolUtilityExhaustionStopsHTTP checks the shared limit at the real Tool

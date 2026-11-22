@@ -5,7 +5,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/rmorlok/authproxy/internal/apjs"
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
@@ -26,17 +25,6 @@ func toolLibrary(t *testing.T, source string) *apjs.Library {
 	library, err := apjs.CompileLibrary(source)
 	require.NoError(t, err)
 	return library
-}
-
-// toolValue calls an initialized async entry point and reads its settled result.
-func toolValue(t *testing.T, execute goja.Callable) goja.Value {
-	t.Helper()
-	value, err := execute(goja.Undefined())
-	require.NoError(t, err)
-	promise, ok := value.Export().(*goja.Promise)
-	require.True(t, ok, "an async entry point returns a Promise")
-	require.Equal(t, goja.PromiseStateFulfilled, promise.State())
-	return promise.Result()
 }
 
 // TestToolRejectsReservedGlobalDeclarations catches claims even without assigned values.
@@ -111,66 +99,62 @@ func TestToolChecksLibraryGlobalsWithoutChangingConnectorPolicy(t *testing.T) {
 			return local(fetch);
 		}
 	`, library)
-	// Low-level initialization receives the same managed pure helpers as evaluation.
-	err := apjsruntime.Run(context.Background(), expressionLimits(), func(_ context.Context, vm *goja.Runtime) error {
-		execute, err := program.Initialize(vm)
-		require.NoError(t, err)
-		require.Equal(t, int64(7), toolValue(t, execute).ToInteger())
-		return nil
-	})
-	require.NoError(t, err)
+	// Publication and invocation accept local names without losing the Tool policy.
+	require.NoError(t, program.Validate(context.Background()))
+	require.JSONEq(t, `7`, string(evaluateTool(t, program, fetchInput(t))))
 }
 
-// TestToolInitializationPreservesHostBindings keeps a caller-installed capability intact.
+// TestToolInitializationPreservesHostBindings keeps shared helpers and Tool input
+// bindings protected before connector initialization and execution.
 func TestToolInitializationPreservesHostBindings(t *testing.T) {
-	// Keep setup and assertions on the owner of the managed VM and its helpers.
-	err := apjsruntime.Run(context.Background(), expressionLimits(), func(_ context.Context, vm *goja.Runtime) error {
-		calls := 0
-		require.NoError(t, vm.Set("fetch", func() string { calls++; return "host-response" }))
-		// Mirror captured input bindings: they are already immutable and enumerable.
-		inputNames := []string{"params", "context", "response", "cfg", "labels", "annotations"}
-		for _, name := range inputNames {
-			require.NoError(t, vm.GlobalObject().DefineDataProperty(
-				name, vm.NewObject(), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE,
-			))
-		}
-		library := toolLibrary(t, `delete globalThis.fetch; globalThis.fetch = () => "replacement";`)
-		program := compileTool(t, `async function execute() { return fetch(); }`, library)
+	library := toolLibrary(t, `
+		delete globalThis.btoa;
+		globalThis.btoa = () => "replacement";
+		globalThis.fetch = () => "replacement";
+	`)
+	program := compileTool(t, `async function execute() {
+		const inputs = ["params", "context", "response", "cfg", "labels", "annotations"];
+		const globals = Object.keys(globalThis);
+		let rejected = false;
+		try { (function () { "use strict"; btoa = () => "replacement"; })(); }
+		catch (_) { rejected = true; }
+		return {
+			encoded: btoa("a"),
+			fetch: typeof fetch,
+			capabilityHidden: !globals.includes("btoa"),
+			inputsVisible: inputs.every(name => globals.includes(name)),
+			inputsProtected: inputs.every(name => {
+				const descriptor = Object.getOwnPropertyDescriptor(globalThis, name);
+				return !descriptor.writable && !descriptor.configurable;
+			}),
+			rejected
+		};
+	}`, library)
 
-		// Initialization protects the host before sloppy helper assignments, without calling execute.
-		execute, err := program.Initialize(vm)
-		require.NoError(t, err)
-		require.Zero(t, calls)
-		require.Equal(t, "host-response", toolValue(t, execute).String())
-		require.Equal(t, 1, calls)
+	// Validation supplies the same protected pure helpers without running execute.
+	require.NoError(t, program.Validate(context.Background()))
 
-		// Capabilities stay hidden from enumeration; existing input visibility is preserved.
-		require.NotContains(t, vm.GlobalObject().Keys(), "fetch")
-		for _, name := range inputNames {
-			require.Contains(t, vm.GlobalObject().Keys(), name)
-		}
-
-		// Host globals are immutable before either helper or Tool initialization runs.
-		_, err = vm.RunString(`"use strict"; fetch = () => "replacement";`)
-		require.Error(t, err)
-		require.Equal(t, "host-response", toolValue(t, execute).String())
-		require.Equal(t, 2, calls)
-		return nil
-	})
-	require.NoError(t, err)
+	// Evaluation preserves helper behavior, hides capabilities, and keeps input aliases visible.
+	result := evaluateTool(t, program, fetchInput(t))
+	require.JSONEq(t, `{
+		"encoded":"YQ==",
+		"fetch":"undefined",
+		"capabilityHidden":true,
+		"inputsVisible":true,
+		"inputsProtected":true,
+		"rejected":true
+	}`, string(result))
 }
 
-// TestToolRejectsMissingPolicyAndRuntime rejects incomplete calls without leaking source text.
-func TestToolRejectsMissingPolicyAndRuntime(t *testing.T) {
+// TestToolRejectsMissingPolicyAndContext rejects incomplete calls without leaking source text.
+func TestToolRejectsMissingPolicyAndContext(t *testing.T) {
 	// Missing policy cannot disable the limits used during publication validation.
 	program, err := javascript.CompileTool(`async function execute() {}`, nil, javascript.Limits{})
 	require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 	require.Nil(t, program)
 
-	// A compiled program still needs a caller-owned runtime or validation context.
+	// A compiled program still needs a validation context.
 	program = compileTool(t, `async function execute() {}`, nil)
-	_, err = program.Initialize(nil)
-	require.ErrorIs(t, err, apjsruntime.ErrInvalidInput)
 	require.ErrorIs(t, program.Validate(nil), apjsruntime.ErrInvalidInput)
 
 	// Compilation errors reveal no authored source even when syntax is private.
