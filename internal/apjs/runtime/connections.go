@@ -100,6 +100,7 @@ func (i *AsyncInvocation) PrepareInput(
 		(host != nil && host.vm != vm) {
 		return ErrInvalidInput
 	}
+
 	if err := ChargeWork(ctx, 1); err != nil {
 		return err
 	}
@@ -109,6 +110,7 @@ func (i *AsyncInvocation) PrepareInput(
 	if limits.MaxNodes < 2 || len(input.Connections) > limits.MaxNodes-2 {
 		return ErrLimitExceeded
 	}
+
 	if err := ReserveAllocation(ctx, 2+len(input.Connections)); err != nil {
 		return err
 	}
@@ -125,9 +127,11 @@ func (i *AsyncInvocation) PrepareInput(
 		if err := ChargeWork(ctx, 1); err != nil {
 			return err
 		}
+
 		if connection.Dispatcher == nil {
 			return ErrInvalidInput
 		}
+
 		documents = append(documents, connection.Snapshot)
 	}
 
@@ -158,6 +162,7 @@ func (i *AsyncInvocation) PrepareInput(
 	if err != nil {
 		return err
 	}
+
 	for _, key := range contextKeys {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -172,10 +177,12 @@ func (i *AsyncInvocation) PrepareInput(
 	if err := ReserveAllocation(ctx, len(input.Connections)); err != nil {
 		return err
 	}
+
 	connections := make([]*goja.Object, len(input.Connections))
 	if err := ReserveAllocation(ctx, len(connections)); err != nil {
 		return err
 	}
+
 	seen := make(map[string]bool, len(connections))
 	for index := range connections {
 		if err := ChargeWork(ctx, 1); err != nil {
@@ -189,12 +196,15 @@ func (i *AsyncInvocation) PrepareInput(
 
 		// Identity conversion and map lookup revisit the decoded string.
 		identity := connection.Get("id").(goja.String)
+
 		if err := ChargeWork(ctx, identity.Length()); err != nil {
 			return err
 		}
+
 		if err := ReserveAllocation(ctx, identity.Length()); err != nil {
 			return err
 		}
+
 		id := identity.String()
 		if seen[id] {
 			return ErrInvalidInput
@@ -218,6 +228,7 @@ func (i *AsyncInvocation) PrepareInput(
 		if err := ChargeWork(ctx, 1); err != nil {
 			return err
 		}
+
 		// Each connection adds an array slot and bounded native capability
 		// metadata. The dispatcher itself stays outside the JavaScript graph.
 		if err := ReserveAllocation(ctx, 3); err != nil {
@@ -312,6 +323,7 @@ func inputPropertyNames(ctx context.Context, object *goja.Object) ([]string, err
 	if err := ReserveAllocation(ctx, len(keys)); err != nil {
 		return nil, err
 	}
+
 	for _, key := range keys {
 		if err := ChargeWork(ctx, len(key)); err != nil {
 			return nil, err
@@ -320,6 +332,7 @@ func inputPropertyNames(ctx context.Context, object *goja.Object) ([]string, err
 			return nil, err
 		}
 	}
+
 	return keys, nil
 }
 
