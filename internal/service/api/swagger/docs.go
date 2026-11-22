@@ -10377,13 +10377,14 @@ const docTemplateApi = `{
                     "type": "integer"
                 },
                 "maxOutputBytes": {
-                    "description": "MaxOutputBytes caps decoded result content; MaxResponseBytes caps the\naggregate decoded upstream responses. The runtime may also impose a\nshared aggregate budget across both categories.",
+                    "description": "MaxOutputBytes caps decoded result content. For JavaScript, it also\nbounds the encoded ordinary result, complete toolResult or ToolError\npayload, and each console record when logging is enabled.",
                     "type": "integer"
                 },
                 "maxRequests": {
                     "type": "integer"
                 },
                 "maxResponseBytes": {
+                    "description": "MaxResponseBytes caps aggregate decoded upstream responses. The runtime\nmay also impose a shared aggregate budget across output and responses.",
                     "type": "integer"
                 },
                 "maxStackDepth": {
