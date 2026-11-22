@@ -38,7 +38,7 @@ func TestToolSearchParamsHTTP(t *testing.T) {
 
 	// Duplicate parameters and escaped user text arrive intact at the configured client.
 	require.NoError(t, err)
-	require.JSONEq(t, `["ok","undefined","undefined","function"]`, string(result))
+	require.JSONEq(t, `["ok","undefined","function","function"]`, string(result))
 	select {
 	case query := <-queries:
 		require.Equal(t, "status=open&q=caf%C3%A9+%2B+news&status=new", query)
@@ -275,7 +275,7 @@ func TestToolBase64Availability(t *testing.T) {
 	require.NoError(t, program.Validate(context.Background()))
 	result, err = program.Evaluate(context.Background(), fetchInput(t))
 	require.NoError(t, err)
-	require.JSONEq(t, `[255,"undefined","undefined","function"]`, string(result))
+	require.JSONEq(t, `[255,"undefined","function","function"]`, string(result))
 }
 
 // TestToolUtilityExhaustionStopsHTTP checks the shared limit at the real Tool

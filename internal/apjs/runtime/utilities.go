@@ -13,7 +13,7 @@ func utilityBindings() []HostBinding {
 	return []HostBinding{
 		{Name: "atob"}, {Name: "btoa"},
 		{Name: "TextEncoder"}, {Name: "TextDecoder"},
-		{Name: "URLSearchParams"},
+		{Name: "URLSearchParams"}, {Name: "URL"},
 	}
 }
 
@@ -48,6 +48,9 @@ func installUtilities(ctx context.Context, vm *goja.Runtime) (*utilityHost, erro
 		return nil, err
 	}
 	if err := newSearchParams(host).install(); err != nil {
+		return nil, err
+	}
+	if err := newURLHost(host).install(); err != nil {
 		return nil, err
 	}
 	return host, nil

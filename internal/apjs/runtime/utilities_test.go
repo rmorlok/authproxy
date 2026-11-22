@@ -59,11 +59,11 @@ func TestUtilityInvalidLimits(t *testing.T) {
 // TestUtilityAvailability installs pure helpers in every managed expression and async profile.
 func TestUtilityAvailability(t *testing.T) {
 	// Ordinary execution profiles install the complete pure-helper surface.
-	expression, err := jsruntime.CompileExpression(`[typeof atob, typeof btoa, typeof TextEncoder, typeof TextDecoder, typeof URLSearchParams]`, runtimeLimits())
+	expression, err := jsruntime.CompileExpression(`[typeof atob, typeof btoa, typeof TextEncoder, typeof TextDecoder, typeof URLSearchParams, typeof URL]`, runtimeLimits())
 	require.NoError(t, err)
 	result, err := expression.Evaluate(context.Background(), nil)
 	require.NoError(t, err)
-	require.JSONEq(t, `["function", "function", "function", "function", "function"]`, string(result))
+	require.JSONEq(t, `["function", "function", "function", "function", "function", "function"]`, string(result))
 
 	// Helpers are available during validation, initialization, and execution.
 	limits := utilityLimits()

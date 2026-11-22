@@ -474,12 +474,12 @@ option remains unsupported for direct requests.
 
 ## Pure utilities and the execution budget
 
-Every bounded VM includes `atob`, `btoa`, `TextEncoder`, `TextDecoder`, and
+Every bounded VM includes `atob`, `btoa`, `TextEncoder`, `TextDecoder`, `URL`, and
 `URLSearchParams`. They are available during validation, initialization,
 expressions, async execution, and trusted result conversion. Their global names
 are reserved, nonwritable, nonconfigurable, and non-enumerable. They perform no
 I/O; direct fetch, supplied connections, and authored logging remain separate
-capabilities. `URL` itself is not implemented yet.
+capabilities.
 
 `Run` owns the execution's remaining `MaxWorkUnits` and `MaxAllocationUnits`.
 It carries that budget in `runCtx`, which adapters pass through all managed
@@ -633,6 +633,75 @@ metadata slot. Their data charges use the execution's same counters:
 Boolean options have constant size and no separate data charge. Exact output
 size is reserved before allocation. These charges accumulate with input copying,
 other helpers, and final result encoding; a codec has no separate allowance.
+
+## URLs
+
+`URL` parses an absolute HTTP(S) URL or resolves a relative path against an
+HTTP(S) base. For example, `..` removes one path segment from the base:
+
+```javascript
+const endpoint = new URL("../contacts?status=open", "https://api.example/v1/users/");
+endpoint.href;     // "https://api.example/v1/contacts?status=open"
+endpoint.origin;   // "https://api.example"
+endpoint.pathname; // "/v1/contacts"
+endpoint.search;   // "?status=open"
+```
+
+The parsed state is immutable. Instances remain extensible JavaScript objects;
+adding or shadowing properties does not change that state. The supported surface is:
+
+| Operation | Behavior |
+| --- | --- |
+| `new URL(input, base?)` | Accepts primitive strings. An omitted or undefined base requires an absolute input; a supplied base must itself be an absolute HTTP(S) URL, even when the input is absolute. |
+| `href`, `origin`, `protocol` | Read-only serialized URL, origin, and scheme with its trailing `:`. |
+| `username`, `password`, `host`, `hostname`, `port` | Read-only authority components. `host` includes a nondefault port; `hostname` does not. |
+| `pathname`, `search`, `hash` | Read-only path, query, and fragment. A nonempty query or fragment includes its leading `?` or `#`. |
+| `toString()` / `toJSON()` | Explicitly returns the same string as `href`. |
+
+Construction requires `new`. Non-HTTP(S) schemes, invalid URLs, boxed strings,
+and other values are rejected without object coercion. Lone UTF-16 surrogates
+in strings become U+FFFD. Methods and getters require a genuine instance from
+the current VM; fake or proxy receivers fail without invoking their hooks.
+Invalid inputs and receivers raise a fixed, catchable `TypeError`; parser
+diagnostics and input URLs are not included. Installed global and prototype
+properties are protected against reassignment and redefinition.
+
+There are no setters, `URL.parse`, `URL.canParse`, object URL APIs, or
+`url.searchParams`. Use `new URLSearchParams(endpoint.search)` for an independent
+query; editing it does not change the URL. Fetch still accepts a primitive URL
+string, so pass `endpoint.href` explicitly:
+
+```javascript
+async function execute(params, context) {
+    const connection = context.connections[0];
+    const endpoint = new URL("contacts", connection.cfg.apiBase);
+    const response = await connection.fetch(endpoint.href);
+    return response.json();
+}
+```
+
+With the connection's `cfg.apiBase` set to `"https://api.example/v1/"`, this requests
+`https://api.example/v1/contacts` through the supplied connection. URL parsing
+itself grants no HTTP capability. The safe result converter rejects URL objects
+and does not call their `toJSON` methods; return `endpoint.href` or explicitly
+call `endpoint.toJSON()` when a result needs the URL string.
+
+Parsing uses [WHATWG URL parser v0.6.2](https://github.com/nlnwa/whatwg-url/tree/v0.6.2),
+the version compatible with this repository's Go 1.25 requirement, with the
+HTTP(S) restriction above. Its query API is not exposed; the bounded
+`URLSearchParams` implementation owns that surface. Before each native parse,
+the host reserves `max(1, n)²` from both shared work and allocation budgets.
+A supplied base is parsed separately with `n` equal to its normalized UTF-8
+byte length. Resolution uses the input's normalized UTF-8 byte length plus the
+serialized base length. This conservative allowance covers the parser's
+repeated prefix copies and serialization; it is not a measurement of heap use.
+Cached component strings and subsequent getter/serializer results also consume
+the shared budget.
+
+String normalization polls cancellation. The native parser has no cancellation
+hook: admission bounds its work, and the host checks cancellation immediately
+before and after each parse. Budget exhaustion is terminal; catching a
+JavaScript exception cannot restore the allowance or permit a later request.
 
 ## Query strings
 

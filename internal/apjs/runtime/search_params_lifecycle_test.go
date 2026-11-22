@@ -13,7 +13,7 @@ import (
 )
 
 // TestSearchParamsAvailability exposes query utilities in every managed execution
-// without granting effectful capabilities or reserving unimplemented URL helpers.
+// without granting effectful capabilities.
 func TestSearchParamsAvailability(t *testing.T) {
 	for _, source := range []string{
 		`const URLSearchParams = 1; async function execute() {}`,
@@ -25,11 +25,11 @@ func TestSearchParamsAvailability(t *testing.T) {
 	_, err := jsruntime.CompileAsync(`async function execute() {}`, asyncLibrary(t, `function URLSearchParams() {}`), nil, runtimeLimits())
 	require.ErrorIs(t, err, jsruntime.ErrInvalidSource)
 
-	// Standard pure helpers are present; HTTP, logging, and unimplemented URL remain absent.
+	// Standard pure helpers are present; HTTP and logging remain absent.
 	result, err := evaluateSource(context.Background(), runtimeLimits(),
 		`[typeof URLSearchParams, typeof URL, typeof TextEncoder, typeof atob, typeof fetch, typeof console]`)
 	require.NoError(t, err)
-	require.JSONEq(t, `["function","undefined","function","function","undefined","undefined"]`, string(result))
+	require.JSONEq(t, `["function","function","function","function","undefined","undefined"]`, string(result))
 }
 
 // TestSearchParamsExactBudgets exercises cumulative allocation/work accounting,
