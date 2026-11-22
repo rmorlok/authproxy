@@ -17,7 +17,7 @@ var textCodecConstructorFactory = goja.MustCompile("", `(function (initialize) {
 })`, true)
 
 // textCodecs owns one VM's UTF-8 codec bindings. Private instance maps implement
-// receiver checks without exposing Go state. Constructor calls consume MaxCalls,
+// receiver checks without exposing Go state. Constructor calls consume execution work and allocation units,
 // so the retained metadata is bounded and released with the evaluation's VM.
 type textCodecs struct {
 	host               *utilityHost                        // Shared accounting, cancellation, and owning VM.
@@ -133,6 +133,7 @@ func (t *textCodecs) newEncoder(call goja.FunctionCall) goja.Value {
 
 	t.readOnly(receiver, "encoding", t.host.vm.ToValue("utf-8"))
 
+	t.host.reserveOutput(1) // Retained native receiver metadata.
 	t.encoders[receiver] = struct{}{}
 
 	return goja.Undefined()
@@ -173,6 +174,7 @@ func (t *textCodecs) newDecoder(call goja.FunctionCall) goja.Value {
 	t.readOnly(receiver, "encoding", t.host.vm.ToValue("utf-8"))
 	t.readOnly(receiver, "fatal", t.host.vm.ToValue(settings.fatal))
 	t.readOnly(receiver, "ignoreBOM", t.host.vm.ToValue(settings.ignoreBOM))
+	t.host.reserveOutput(1) // Retained native receiver metadata.
 	t.decoders[receiver] = settings
 
 	return goja.Undefined()

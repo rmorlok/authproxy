@@ -14,14 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// base64TestLimits enables both pure helpers with explicit shared allowances.
-func base64TestLimits() jsruntime.Limits {
-	limits := runtimeLimits()
-	limits.Utilities = jsruntime.UtilityPolicy{
-		Base64: true, MaxCalls: 16, MaxInputBytes: 4096, MaxOutputBytes: 4096,
-	}
-	return limits
-}
+// base64TestLimits supplies room for ordinary shared-budget base64 fixtures.
+func base64TestLimits() jsruntime.Limits { return runtimeLimits() }
 
 // TestBase64ForgivingDecode accepts the standard alphabet, optional padding,
 // the five ASCII whitespace characters, and unused nonzero trailing bits.
@@ -74,10 +68,10 @@ func TestBase64BinaryFidelity(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, string(want), string(got))
 
-	// Empty strings are valid, and a Latin-1 code unit occupies one utility input byte.
+	// Empty strings are valid; Latin-1 input uses one work unit beyond its helper entry.
 	limits := base64TestLimits()
-	limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = 1, 4
-	got, err = evaluateSource(context.Background(), limits, `[btoa(""), atob(""), btoa("\u00ff")]`)
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 4, 4
+	got, err = runUtilitySource(context.Background(), limits, `[btoa(""), atob(""), btoa("\u00ff")]`)
 	require.NoError(t, err)
 	require.JSONEq(t, `["","","/w=="]`, string(got))
 }
@@ -107,23 +101,21 @@ func TestBase64MalformedInput(t *testing.T) {
 // and preserves a limit failure even if authored JavaScript catches its error.
 func TestBase64SharedExactBudgets(t *testing.T) {
 	limits := base64TestLimits()
-	limits.Utilities.MaxCalls = 2
-	limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = 3, 5
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 5, 5
 	source := `[btoa("f"),atob("Zg")]`
 
-	// One encode and one decode exactly consume all three aggregate allowances.
-	got, err := evaluateSource(context.Background(), limits, source)
+	// Entries and scanned units share work; produced values share allocation allowance.
+	got, err := runUtilitySource(context.Background(), limits, source)
 	require.NoError(t, err)
 	require.JSONEq(t, `["Zg==","f"]`, string(got))
-	for name, change := range map[string]func(*jsruntime.UtilityPolicy){
-		"calls":  func(p *jsruntime.UtilityPolicy) { p.MaxCalls-- },
-		"input":  func(p *jsruntime.UtilityPolicy) { p.MaxInputBytes-- },
-		"output": func(p *jsruntime.UtilityPolicy) { p.MaxOutputBytes-- },
+	for name, change := range map[string]func(*jsruntime.Limits){
+		"work":       func(p *jsruntime.Limits) { p.MaxWorkUnits-- },
+		"allocation": func(p *jsruntime.Limits) { p.MaxAllocationUnits-- },
 	} {
 		t.Run(name, func(t *testing.T) {
 			tight := limits
-			change(&tight.Utilities)
-			got, err := evaluateSource(context.Background(), tight, `try {`+source+`;} catch (_) {} "privateDetail";`)
+			change(&tight)
+			got, err := runUtilitySource(context.Background(), tight, `try {`+source+`;} catch (_) {} "privateDetail";`)
 			require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 			require.Nil(t, got)
 			require.NotContains(t, err.Error(), "privateDetail")
@@ -135,28 +127,26 @@ func TestBase64SharedExactBudgets(t *testing.T) {
 // relevant allowances without charging output that an invalid call never emits.
 func TestBase64AttemptAccounting(t *testing.T) {
 	for _, tt := range []struct {
-		name, source         string
-		calls, input, output int
-		want                 string
+		name, source string
+		work, output int
+		want         string
 	}{
-		{"whitespace exact", `atob(" Zg== ")`, 1, 6, 1, `"f"`},
-		{"whitespace over", `atob(" Zg== ")`, 1, 5, 1, ""},
-		{"decoded binary exact", `atob("////").split("").map(c => c.charCodeAt(0))`, 1, 4, 3, `[255,255,255]`},
-		{"decoded binary over", `atob("////")`, 1, 4, 2, ""},
-		{"empty attempt", `btoa(""); atob("");`, 1, 1, 1, ""},
-		{"malformed consumes calls", `try {atob("!");} catch (_) {} btoa("a");`, 1, 2, 4, ""},
-		{"malformed consumes input", `try {atob("!");} catch (_) {} btoa("a");`, 2, 1, 4, ""},
-		{"malformed emits nothing", `try {atob("!");} catch (_) {} btoa("a");`, 2, 2, 4, `"YQ=="`},
-		{"malformed Unicode units", `try {btoa("😀");} catch (_) {} btoa("a");`, 2, 3, 4, `"YQ=="`},
-		{"Unicode input exceeded", `try {btoa("😀");} catch (_) {} btoa("a");`, 2, 2, 4, ""},
-		{"non-string consumes calls", `try {btoa(null);} catch (_) {} btoa("a");`, 1, 1, 4, ""},
+		{"whitespace exact", `atob(" Zg== ")`, 7, 1, `"f"`},
+		{"whitespace over", `atob(" Zg== ")`, 6, 1, ""},
+		{"decoded binary exact", `atob("////").split("").map(c => c.charCodeAt(0))`, 5, 3, `[255,255,255]`},
+		{"decoded binary over", `atob("////")`, 5, 2, ""},
+		{"empty attempt", `btoa(""); atob("");`, 1, 1, ""},
+		{"malformed consumes work", `try {atob("!");} catch (_) {} btoa("a");`, 3, 4, ""},
+		{"malformed emits nothing", `try {atob("!");} catch (_) {} btoa("a");`, 4, 4, `"YQ=="`},
+		{"malformed Unicode units", `try {btoa("😀");} catch (_) {} btoa("a");`, 5, 4, `"YQ=="`},
+		{"Unicode input exceeded", `try {btoa("😀");} catch (_) {} btoa("a");`, 4, 4, ""},
+		{"non-string consumes entry work", `try {btoa(null);} catch (_) {} btoa("a");`, 2, 4, ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			limits := base64TestLimits()
-			limits.Utilities.MaxCalls = tt.calls
-			limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = tt.input, tt.output
+			limits.MaxWorkUnits, limits.MaxAllocationUnits = tt.work, tt.output
 			// Calls within budget succeed; any exhausted allowance invalidates the entire result.
-			got, err := evaluateSource(context.Background(), limits, tt.source)
+			got, err := runUtilitySource(context.Background(), limits, tt.source)
 			if tt.want == "" {
 				require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
 				require.Nil(t, got)
@@ -172,11 +162,10 @@ func TestBase64AttemptAccounting(t *testing.T) {
 // deadline while distinguishing caller cancellation from policy expiration.
 func TestBase64Cancellation(t *testing.T) {
 	limits := base64TestLimits()
-	limits.Utilities.MaxCalls = 1 << 30
-	limits.Utilities.MaxInputBytes, limits.Utilities.MaxOutputBytes = 1<<30, 1<<30
+	limits.MaxWorkUnits, limits.MaxAllocationUnits = 1<<30, 1<<30
 	source := `for (;;) {atob(btoa("abc"));}`
 
-	// Generous utility counters let the caller's earlier deadline stop the loop.
+	// Generous execution allowances let the caller's earlier deadline stop the loop.
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Millisecond)
 	defer cancel()
 	got, err := evaluateSource(ctx, limits, source)
@@ -231,8 +220,8 @@ func TestBase64CancellationDuringNativeWork(t *testing.T) {
 				limits := base64TestLimits()
 				limits.Timeout = 10 * time.Second
 				limits.MaxInputBytes = len(text)
-				limits.Utilities.MaxInputBytes = len(text)
-				limits.Utilities.MaxOutputBytes = 2 * len(text)
+				limits.MaxWorkUnits = len(text) + 1
+				limits.MaxAllocationUnits = 2 * len(text)
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
 				reads := 0
@@ -274,9 +263,8 @@ func BenchmarkBase64LargeInput(b *testing.B) {
 			limits := base64TestLimits()
 			limits.Timeout = 10 * time.Second
 			limits.MaxInputBytes = len(test.input)
-			limits.Utilities.MaxCalls = 1
-			limits.Utilities.MaxInputBytes = len(test.input)
-			limits.Utilities.MaxOutputBytes = 2 * len(test.input)
+			limits.MaxWorkUnits = 2*len(test.input) + 32
+			limits.MaxAllocationUnits = 2*len(test.input) + 64
 			program, err := jsruntime.CompileExpression(test.helper+"(data).length", limits)
 			require.NoError(b, err)
 			want := fmt.Sprint(test.length)

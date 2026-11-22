@@ -293,7 +293,7 @@ func TestExpressionPreparationFailure(t *testing.T) {
 	safe := errors.New("safe input classification")
 	executed := false
 	result, err := compiled.Evaluate(context.Background(), func(_ context.Context, vm *goja.Runtime) error {
-		// A selected pure helper makes authored execution observable after binding fails.
+		// A pure helper makes authored execution observable after binding fails.
 		if err := vm.Set("record", func() bool { executed = true; return true }); err != nil {
 			return jsruntime.ErrInvalidInput
 		}

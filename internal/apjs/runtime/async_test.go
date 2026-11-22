@@ -112,16 +112,23 @@ func TestAsyncIgnoresSourceMapResources(t *testing.T) {
 	require.NoError(t, program.Validate(context.Background()))
 
 	// Initialize also disables a caller-supplied loader before any authored code runs.
-	vm := goja.New()
-	loads := 0
-	vm.SetParserOptions(parser.WithSourceMapLoader(func(string) ([]byte, error) {
-		loads++
-		return nil, fmt.Errorf("source maps must not be loaded")
-	}))
-	execute, err := program.Initialize(vm)
+	err := jsruntime.Run(
+		context.Background(),
+		runtimeLimits(),
+		func(_ context.Context, vm *goja.Runtime) error {
+			loads := 0
+			vm.SetParserOptions(parser.WithSourceMapLoader(func(string) ([]byte, error) {
+				loads++
+				return nil, fmt.Errorf("source maps must not be loaded")
+			}))
+			execute, err := program.Initialize(vm)
+			require.NoError(t, err)
+			require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
+			require.Zero(t, loads)
+			return nil
+		},
+	)
 	require.NoError(t, err)
-	require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
-	require.Zero(t, loads)
 }
 
 // TestAsyncRequiresDirectAsyncEntrypoint rejects ambiguous or unsupported entry points.
@@ -164,14 +171,22 @@ func TestAsyncReusesHelperProgramInFreshRuntimes(t *testing.T) {
 		t.Run(fmt.Sprintf("runtime-%d", i), func(t *testing.T) {
 			t.Parallel()
 			// The immutable programs can be shared; each VM owns its helper state.
-			execute, err := program.Initialize(goja.New())
-			require.NoError(t, err)
-			require.Equal(t, "contact:1", asyncValue(t, execute).String())
-			require.Equal(t, "contact:2", asyncValue(t, execute).String())
+			err := jsruntime.Run(
+				context.Background(),
+				runtimeLimits(),
+				func(_ context.Context, vm *goja.Runtime) error {
+					execute, err := program.Initialize(vm)
+					require.NoError(t, err)
+					require.Equal(t, "contact:1", asyncValue(t, execute).String())
+					require.Equal(t, "contact:2", asyncValue(t, execute).String())
 
-			// Validation uses another private VM without mutating this invocation's state.
-			require.NoError(t, program.Validate(context.Background()))
-			require.Equal(t, "contact:3", asyncValue(t, execute).String())
+					// Validation uses another private VM without mutating this invocation's state.
+					require.NoError(t, program.Validate(context.Background()))
+					require.Equal(t, "contact:3", asyncValue(t, execute).String())
+					return nil
+				},
+			)
+			require.NoError(t, err)
 		})
 	}
 }
@@ -265,9 +280,13 @@ func TestAsyncEntrypointMustRemainAsync(t *testing.T) {
 		async function execute() { return 1; }
 		execute = async () => 2;
 	`, nil)
-	entry, err := program.Initialize(goja.New())
+	err := jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
+		entry, err := program.Initialize(vm)
+		require.NoError(t, err)
+		require.Equal(t, int64(2), asyncValue(t, entry).ToInteger())
+		return nil
+	})
 	require.NoError(t, err)
-	require.Equal(t, int64(2), asyncValue(t, entry).ToInteger())
 }
 
 // TestAsyncValidationRejectsUnhandledRejections surfaces failures from async initialization.
@@ -379,18 +398,25 @@ func TestAsyncHostBindingsAreCallerOwned(t *testing.T) {
 	bindings[0].Name = "different"
 	bindings[0].PreserveEnumerable = false
 	bindings[1].PreserveEnumerable = true
-	vm := goja.New()
-	require.NoError(t, vm.Set("custom", "input"))
-	require.NoError(t, vm.Set("capability", "host"))
-	execute, err := program.Initialize(vm)
-	require.NoError(t, err)
-	require.Equal(t, "input:host", asyncValue(t, execute).String())
+	err = jsruntime.Run(
+		context.Background(),
+		runtimeLimits(),
+		func(_ context.Context, vm *goja.Runtime) error {
+			require.NoError(t, vm.Set("custom", "input"))
+			require.NoError(t, vm.Set("capability", "host"))
+			execute, err := program.Initialize(vm)
+			require.NoError(t, err)
+			require.Equal(t, "input:host", asyncValue(t, execute).String())
 
-	// Data bindings keep existing visibility; capabilities become non-enumerable.
-	require.Contains(t, vm.GlobalObject().Keys(), "custom")
-	require.NotContains(t, vm.GlobalObject().Keys(), "capability")
-	_, err = vm.RunString(`"use strict"; custom = "changed";`)
-	require.Error(t, err)
+			// Data bindings keep existing visibility; capabilities become non-enumerable.
+			require.Contains(t, vm.GlobalObject().Keys(), "custom")
+			require.NotContains(t, vm.GlobalObject().Keys(), "capability")
+			_, err = vm.RunString(`"use strict"; custom = "changed";`)
+			require.Error(t, err)
+			return nil
+		},
+	)
+	require.NoError(t, err)
 }
 
 // TestAsyncRejectsInvalidHostBindings rejects malformed integration options before probing source.
@@ -420,9 +446,13 @@ func TestAsyncRejectsInvalidHostBindings(t *testing.T) {
 	program, err := jsruntime.CompileAsync(`async function execute() { return typeof café; }`, nil,
 		[]jsruntime.HostBinding{{Name: "café"}}, runtimeLimits())
 	require.NoError(t, err)
-	execute, err := program.Initialize(goja.New())
+	err = jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
+		execute, err := program.Initialize(vm)
+		require.NoError(t, err)
+		require.Equal(t, "undefined", asyncValue(t, execute).String())
+		return nil
+	})
 	require.NoError(t, err)
-	require.Equal(t, "undefined", asyncValue(t, execute).String())
 }
 
 // TestAsyncReservesCustomNames applies the declaration checks to caller-selected globals.
@@ -461,9 +491,13 @@ func TestAsyncNilLibraryAndInvalidArguments(t *testing.T) {
 		program, err := jsruntime.CompileAsync(`async function execute() { return 7; }`, library, nil, runtimeLimits())
 		require.NoError(t, err)
 		require.NoError(t, program.Validate(context.Background()))
-		execute, err := program.Initialize(goja.New())
+		err = jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
+			execute, err := program.Initialize(vm)
+			require.NoError(t, err)
+			require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
+			return nil
+		})
 		require.NoError(t, err)
-		require.Equal(t, int64(7), asyncValue(t, execute).ToInteger())
 		_, err = program.Initialize(nil)
 		require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
 		require.ErrorIs(t, program.Validate(nil), jsruntime.ErrInvalidInput)
@@ -474,8 +508,12 @@ func TestAsyncNilLibraryAndInvalidArguments(t *testing.T) {
 	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
 	require.Nil(t, program)
 	for _, invalid := range []*jsruntime.AsyncProgram{nil, {}} {
-		_, err := invalid.Initialize(goja.New())
-		require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
+		err := jsruntime.Run(context.Background(), runtimeLimits(), func(_ context.Context, vm *goja.Runtime) error {
+			_, err := invalid.Initialize(vm)
+			require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
+			return nil
+		})
+		require.NoError(t, err)
 		require.ErrorIs(t, invalid.Validate(context.Background()), jsruntime.ErrInvalidInput)
 	}
 }

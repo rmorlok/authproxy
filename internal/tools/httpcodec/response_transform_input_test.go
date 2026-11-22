@@ -20,7 +20,9 @@ import (
 // explicit. The expression runtime separately shares these caps with context.
 func transformInputLimits() javascript.Limits {
 	return javascript.Limits{
-		MaxSourceBytes: 4096, MaxInputBytes: 4096, MaxOutputBytes: 4096,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     4096, MaxInputBytes: 4096, MaxOutputBytes: 4096,
 		MaxDepth: 32, MaxNodes: 256, MaxStackDepth: 64, Timeout: time.Second,
 	}
 }

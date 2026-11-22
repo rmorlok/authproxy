@@ -151,7 +151,7 @@ func TestHTTPHostBindingsWaitForInitialization(t *testing.T) {
 // TestHTTPHostRejectsIncompletePolicy prevents a reusable host from accidentally
 // bypassing the positive limits that its former Tool-only caller checked.
 func TestHTTPHostRejectsIncompletePolicy(t *testing.T) {
-	for _, name := range []string{"context", "runtime", "request bytes", "pending operations", "runtime limits"} {
+	for _, name := range []string{"context", "runtime", "request bytes", "pending operations", "runtime limits", "missing query utility"} {
 		t.Run(name, func(t *testing.T) {
 			ctx, vm := context.Background(), goja.New()
 			options := jsruntime.HTTPOptions{MaxRequestBytes: 8192, MaxPendingOperations: 2}
@@ -167,6 +167,9 @@ func TestHTTPHostRejectsIncompletePolicy(t *testing.T) {
 				options.MaxPendingOperations = 0
 			case "runtime limits":
 				limits.MaxDepth = 0
+			case "missing query utility":
+				// Pure utilities must be installed by the enclosing Run before host preparation.
+				limits = searchParamsLimits()
 			}
 
 			// Invalid inputs return no partially initialized host to clean up.
@@ -177,12 +180,78 @@ func TestHTTPHostRejectsIncompletePolicy(t *testing.T) {
 	}
 
 	// A valid owner still refuses a missing dispatch capability before VM binding.
-	host, err := jsruntime.NewHTTPHost(context.Background(), goja.New(), jsruntime.HTTPOptions{
-		MaxRequestBytes: 8192, MaxPendingOperations: 2,
-	}, runtimeLimits())
+	err := jsruntime.Run(context.Background(), runtimeLimits(), func(ctx context.Context, vm *goja.Runtime) error {
+		host, err := jsruntime.NewHTTPHost(ctx, vm, jsruntime.HTTPOptions{
+			MaxRequestBytes: 8192, MaxPendingOperations: 2,
+		}, runtimeLimits())
+		require.NoError(t, err)
+		defer host.Close()
+		fetch, err := host.BindFetch(nil)
+		require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
+		require.Nil(t, fetch)
+		return nil
+	})
 	require.NoError(t, err)
-	defer host.Close()
-	fetch, err := host.BindFetch(nil)
-	require.ErrorIs(t, err, jsruntime.ErrInvalidInput)
-	require.Nil(t, fetch)
+}
+
+// TestHTTPHostRefusedCallsShareExecutionBudget keeps repeated native failures
+// and metadata access bounded even when no new HTTP worker can be admitted.
+func TestHTTPHostRefusedCallsShareExecutionBudget(t *testing.T) {
+	for _, scenario := range []struct {
+		name       string // Identifies the native entry that previously skipped accounting.
+		source     string // Uses enough repetitions to exhaust a modest cumulative budget.
+		allocation bool   // Rejected calls allocate Promises/errors; bodyUsed returns a primitive.
+	}{
+		{"initialization refusal", `
+			for (let i = 0; i < 4096; i++) fetch("https://example.test/blocked").catch(() => {});
+			async function execute() { return null; }`, true},
+		{"saturated fetch", `async function execute() {
+			const pending = fetch("https://example.test/first");
+			for (let i = 0; i < 4096; i++) fetch("https://example.test/blocked").catch(() => {});
+			await pending;
+			return null;
+		}`, true},
+		{"consumed body", `async function execute() {
+			const response = await fetch("https://example.test/first");
+			await response.text();
+			for (let i = 0; i < 4096; i++) await response.text().catch(() => {});
+			return null;
+		}`, true},
+		{"bodyUsed getter", `async function execute() {
+			const response = await fetch("https://example.test/first");
+			for (let i = 0; i < 4096; i++) void response.bodyUsed;
+			return null;
+		}`, false},
+	} {
+		for _, dimension := range []string{"work", "allocation"} {
+			if dimension == "allocation" && !scenario.allocation {
+				continue
+			}
+			t.Run(scenario.name+"/"+dimension, func(t *testing.T) {
+				// Leave the other dimension and deadline generous so the chosen
+				// cumulative counter, not a timeout or request cap, ends execution.
+				limits := runtimeLimits()
+				limits.Timeout = 5 * time.Second
+				if dimension == "work" {
+					limits.MaxWorkUnits = 1024
+				} else {
+					limits.MaxAllocationUnits = 1024
+				}
+				program, err := jsruntime.CompileAsync(scenario.source, nil, nil, limits)
+				require.NoError(t, err)
+				owner, err := aphttp.New(context.Background(), directFetchLimits())
+				require.NoError(t, err)
+				t.Cleanup(owner.Close)
+				input := directFetchInput(t, owner, directFetchClient(func(request *http.Request) (*http.Response, aphttp.SendState, error) {
+					return directFetchResponse("body"), aphttp.SendStateSent, nil
+				}), nil)
+
+				// Catching individual rejections cannot turn shared-budget
+				// exhaustion into a successful final result.
+				result, err := runDirectFetch(context.Background(), program, owner, input, 1)
+				require.ErrorIs(t, err, jsruntime.ErrLimitExceeded)
+				require.Nil(t, result)
+			})
+		}
+	}
 }

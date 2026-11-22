@@ -79,9 +79,10 @@ func EvaluateJSONWithOptions(
 // interrupt watcher. It is also used for initialization validation that returns
 // no data. Work and ordinary VM access stay on the calling goroutine. Only the
 // thread-safe Interrupt method runs elsewhere; no VM or value may escape work.
-// Selected pure utilities are installed before work with fresh aggregate budgets
-// shared by initialization and execution. Utility-budget exhaustion interrupts
-// authored execution; ordinary malformed helper input remains catchable.
+// Pure utilities are always installed. Managed input/output conversion, utilities,
+// and HTTP work inherit one cumulative budget through runCtx. Nested runs also
+// consume the enclosing execution's allowance. Exhaustion interrupts authored
+// execution; ordinary malformed helper input remains catchable.
 //
 // The callback must honor runCtx during Go work, enforce any source/input bounds,
 // and convert authored errors with EvaluationError. Its safe host classifications
@@ -100,6 +101,17 @@ func Run(
 	}
 	runCtx, cancel := context.WithTimeout(ctx, limits.Timeout)
 	defer cancel()
+	budgetCtx, err := WithExecutionBudget(runCtx, limits)
+	if err != nil {
+		// Policy expiry can precede budget admission or watcher installation.
+		// Preserve its limit classification and the caller's cancellation priority.
+		if contextErr := contextError(ctx, runCtx); contextErr != nil {
+			return contextErr
+		}
+		return err
+	}
+	runCtx = budgetCtx
+	budget := executionBudgetFromContext(runCtx)
 	if err := contextError(ctx, runCtx); err != nil {
 		return err
 	}
@@ -113,10 +125,11 @@ func Run(
 		select {
 		case <-runCtx.Done():
 			vm.Interrupt(runCtx.Err())
+		case <-budget.state.done:
+			vm.Interrupt(ErrLimitExceeded)
 		case <-stop:
 		}
 	}()
-	var utilities *utilityHost
 	defer func() {
 		// Join before discarding the VM so no late interrupt outlives this work.
 		close(stop)
@@ -131,15 +144,15 @@ func Run(
 				panic(recovered)
 			}
 		}
-		if utilities != nil && utilities.err != nil {
-			err = utilities.err
+		if budgetErr := budget.err(); budgetErr != nil {
+			err = budgetErr
 		}
 		if contextErr := contextError(ctx, runCtx); contextErr != nil {
 			err = contextErr
 		}
 	}()
 
-	utilities, err = installUtilities(runCtx, vm, limits.Utilities)
+	_, err = installUtilities(runCtx, vm)
 	if err != nil {
 		return err
 	}

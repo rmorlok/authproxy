@@ -37,7 +37,8 @@ type outputEncoder struct {
 	vm *goja.Runtime
 
 	// limits holds the resolved policy used to bound output bytes, nesting, and
-	// traversal work. Each encode call starts fresh counters against these caps.
+	// traversal boundaries. Each encode call starts fresh boundary counters;
+	// its context retains the execution's cumulative work/allocation accounting.
 	limits Limits
 
 	// options records the trusted adapter's serialization choices. The default
@@ -104,7 +105,7 @@ func newOutputEncoder(vm *goja.Runtime, limits Limits) *outputEncoder {
 }
 
 // outputState owns the current traversal's bytes and active object path, plus
-// byte and work counters that may be shared across result fields. Shared acyclic
+// byte and node counters that may be shared across result fields. Shared acyclic
 // objects may appear repeatedly; only a repeated object on the current path is
 // a cycle. No source object or exported Go graph is retained after traversal.
 type outputState struct {
@@ -112,8 +113,9 @@ type outputState struct {
 	// checks, and limits shared throughout this traversal.
 	encoder *outputEncoder
 
-	// ctx carries caller cancellation and the evaluation timeout. Traversal and
-	// string encoding check it cooperatively to stop work after cancellation.
+	// ctx carries cancellation, the evaluation timeout, and the execution's shared
+	// work/allocation ledger. Traversal and string encoding charge that ledger
+	// alongside the output-specific counters below.
 	ctx context.Context
 
 	// bytes accumulates JSON owned by this traversal, bounded by MaxOutputBytes.
@@ -126,7 +128,8 @@ type outputState struct {
 
 	// nodes counts visited values and inspected ordinary-object keys against
 	// MaxNodes, including non-enumerable keys. Array indices and length metadata
-	// do not add separate charges beyond the array and its element values.
+	// do not add separate node charges beyond the array and its element values,
+	// but their inspection still consumes the context's shared work allowance.
 	nodes int
 
 	// active contains objects on the current recursion path. Revisiting one is
@@ -155,6 +158,9 @@ func (e *outputEncoder) encode(
 // Callers sharing a state transfer or discard its buffer between traversals;
 // byte and node charges remain cumulative while each root starts at depth zero.
 func (s *outputState) encode(value goja.Value) (json.RawMessage, error) {
+	if err := ChargeWork(s.ctx, 1); err != nil {
+		return nil, err
+	}
 	var err error
 	if exception := s.encoder.vm.Try(
 		func() { err = s.value(value, 0) },
@@ -164,7 +170,7 @@ func (s *outputState) encode(value goja.Value) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := s.ctx.Err(); err != nil {
+	if err := ChargeWork(s.ctx, 0); err != nil {
 		return nil, err
 	}
 	return json.RawMessage(s.bytes), nil
@@ -253,6 +259,9 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 	if s.active[object] {
 		return ErrInvalidOutput
 	}
+	if err := ReserveAllocation(s.ctx, 1); err != nil {
+		return err
+	}
 
 	s.active[object] = true
 	defer delete(s.active, object)
@@ -276,8 +285,12 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 		}
 	}
 
-	// Goja's public reflection API materializes a key array. Bound its traversal
+	// Goja's public reflection API materializes a key array before exposing its
+	// count. Charge the retained slots as soon as it returns, then bound traversal
 	// before inspecting properties; this is not a hard heap allocation quota.
+	if err := ChargeWork(s.ctx, 1); err != nil {
+		return err
+	}
 	keysValue, err := e.ownKeys(goja.Undefined(), object)
 	if err != nil {
 		return outputReflectionError(err)
@@ -285,6 +298,12 @@ func (s *outputState) object(object *goja.Object, depth int) error {
 
 	keys := keysValue.(*goja.Object)
 	keyCount := keys.Get("length").ToInteger()
+	if keyCount > int64(int(^uint(0)>>1)) {
+		return ErrLimitExceeded
+	}
+	if err := ReserveAllocation(s.ctx, int(keyCount)); err != nil {
+		return err
+	}
 	metadataCount := int64(0)
 
 	if isArray {
@@ -374,13 +393,16 @@ func (s *outputState) array(
 	}
 
 	for i := int64(0); i < keyCount; i++ {
-		if err := s.ctx.Err(); err != nil {
+		if err := ChargeWork(s.ctx, 1); err != nil {
 			return err
 		}
 
 		key, ok := keys.Get(strconv.FormatInt(i, 10)).(goja.String)
 		if !ok {
 			return ErrInvalidOutput
+		}
+		if err := ChargeWork(s.ctx, key.Length()); err != nil {
+			return err
 		}
 
 		// Array indices are returned first in numeric order, followed by length.
@@ -427,7 +449,13 @@ func (s *outputState) property(
 	object *goja.Object,
 	key goja.String,
 ) (goja.Value, bool, error) {
-	if err := s.ctx.Err(); err != nil {
+	if err := ChargeWork(s.ctx, 1); err != nil {
+		return nil, false, err
+	}
+	if err := ChargeWork(s.ctx, key.Length()); err != nil {
+		return nil, false, err
+	}
+	if err := ReserveAllocation(s.ctx, 1); err != nil {
 		return nil, false, err
 	}
 
@@ -469,7 +497,7 @@ func outputReflectionError(err error) error {
 // node charges one value or inspected object key without overflowing the
 // counter. Cancellation is checked even when the next value is very small.
 func (s *outputState) node() error {
-	if err := s.ctx.Err(); err != nil {
+	if err := ChargeWork(s.ctx, 1); err != nil {
 		return err
 	}
 
@@ -487,6 +515,12 @@ func (s *outputState) append(text string) error {
 	if len(text) > s.encoder.limits.MaxOutputBytes-s.usedBytes {
 		return ErrLimitExceeded
 	}
+	if err := ChargeWork(s.ctx, len(text)); err != nil {
+		return err
+	}
+	if err := ReserveAllocation(s.ctx, len(text)); err != nil {
+		return err
+	}
 
 	s.bytes = append(s.bytes, text...)
 	s.usedBytes += len(text)
@@ -500,6 +534,9 @@ func (s *outputState) append(text string) error {
 func (s *outputState) quoted(text goja.String) error {
 	if text.Length() > s.encoder.limits.MaxOutputBytes-s.usedBytes-2 {
 		return ErrLimitExceeded
+	}
+	if err := ChargeWork(s.ctx, text.Length()); err != nil {
+		return err
 	}
 
 	if err := s.append("\""); err != nil {

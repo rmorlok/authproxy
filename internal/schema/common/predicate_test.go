@@ -145,7 +145,9 @@ func TestPredicateGetValue(t *testing.T) {
 // the bounded connector adapter while retaining ordinary predicate behavior.
 func TestPredicateGetValueWithContext(t *testing.T) {
 	limits := jsruntime.Limits{
-		MaxSourceBytes: 4096, MaxInputBytes: 4096, MaxOutputBytes: 5,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     4096, MaxInputBytes: 4096, MaxOutputBytes: 5,
 		MaxDepth: 16, MaxNodes: 100, MaxStackDepth: 64, Timeout: time.Second,
 	}
 	jsctx := apjs.NewContext(nil, map[string]any{"cfg": map[string]any{"enabled": true}})

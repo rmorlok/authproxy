@@ -30,22 +30,35 @@ var toolPublishRenderLimits = render.Limits{
 	MaxSteps: 1_000_000,
 }
 
+// Publication uses fixed payload caps and the same cumulative-budget formula
+// as invocation. Constant arithmetic also checks representability at compile
+// time; operator-configured invocation caps are checked by toolTransformBudget.
+const (
+	toolPublishTransformInputBytes  = 8 << 20
+	toolPublishTransformOutputBytes = 8 << 20
+	toolPublishTransformNodes       = 1_000_000
+	toolPublishTransformUnits       = toolTransformUnitsPerByte*(toolPublishTransformInputBytes+toolPublishTransformOutputBytes) +
+		toolTransformUnitsPerNode*toolPublishTransformNodes
+)
+
 // toolPublishResponseLimits bound response-rule and transform compilation at
-// publication. The byte limits match the design's proposed invocation defaults;
-// compiling does not run the transform or allocate these budgets.
+// publication with a fixed profile. Compilation does not execute the transform
+// or consume its budgets; invocation resolves a separate operator policy.
 var toolPublishResponseLimits = httpcodec.ResponseLimits{
 	MaxSourceBytes:        256 << 10,
 	MaxResponseBytes:      8 << 20,
 	MaxOutputBytes:        8 << 20,
 	MaxEncodedResultBytes: 12 << 20,
 	Transform: javascript.Limits{
-		MaxSourceBytes: 64 << 10,
-		MaxInputBytes:  8 << 20,
-		MaxOutputBytes: 8 << 20,
-		MaxDepth:       64,
-		MaxNodes:       1_000_000,
-		MaxStackDepth:  256,
-		Timeout:        5 * time.Second,
+		MaxWorkUnits:       toolPublishTransformUnits,
+		MaxAllocationUnits: toolPublishTransformUnits,
+		MaxSourceBytes:     64 << 10,
+		MaxInputBytes:      toolPublishTransformInputBytes,
+		MaxOutputBytes:     toolPublishTransformOutputBytes,
+		MaxDepth:           64,
+		MaxNodes:           toolPublishTransformNodes,
+		MaxStackDepth:      256,
+		Timeout:            5 * time.Second,
 	},
 }
 

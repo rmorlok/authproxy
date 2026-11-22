@@ -16,7 +16,9 @@ import (
 // explicit finite bounds for every shared-runtime resource.
 func boundedPredicateTestLimits() jsruntime.Limits {
 	return jsruntime.Limits{
-		MaxSourceBytes: 64 << 10, MaxInputBytes: 64 << 10, MaxOutputBytes: 64,
+		MaxWorkUnits:       64 << 20,
+		MaxAllocationUnits: 64 << 20,
+		MaxSourceBytes:     64 << 10, MaxInputBytes: 64 << 10, MaxOutputBytes: 64,
 		MaxDepth: 32, MaxNodes: 10000, MaxStackDepth: 128, Timeout: time.Second,
 	}
 }

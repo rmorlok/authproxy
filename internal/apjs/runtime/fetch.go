@@ -59,6 +59,13 @@ func (l *HTTPHost) fetch(
 	validateLabels func(map[string]string) error,
 	call goja.FunctionCall,
 ) goja.Value {
+	// Refused calls still enter native code. Charge before the gates so repeated
+	// initialization or saturation failures cannot bypass execution accounting.
+	helper := utilityHost{
+		ctx: l.ctx,
+		vm:  l.vm,
+	}
+	helper.beginCall()
 	if !l.enabled {
 		return l.rejected(ErrEvaluation)
 	}
@@ -71,7 +78,14 @@ func (l *HTTPHost) fetch(
 	var err error
 
 	if exception := l.vm.Try(func() {
-		req, labels, err = prepareFetchRequest(l.ctx, l.vm, call, l.options.MaxRequestBytes, validateLabels != nil)
+		req, labels, err = prepareFetchRequest(
+			l.ctx,
+			l.vm,
+			call,
+			l.options.MaxRequestBytes,
+			validateLabels != nil,
+			l.formEncoder,
+		)
 	}); exception != nil {
 		return l.rejected(ErrInvalidInput)
 	}

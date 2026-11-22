@@ -24,6 +24,46 @@ func fetchRequestCall(t *testing.T, vm *goja.Runtime, source string) goja.Functi
 	return call
 }
 
+// TestPrepareFetchRequestMetadataUsesExecutionBudget charges all reflected
+// metadata even when the request will be rejected before reading its values.
+func TestPrepareFetchRequestMetadataUsesExecutionBudget(t *testing.T) {
+	for _, scenario := range []struct {
+		name, init string
+	}{
+		{"init symbols", `record`},
+		{"header symbols", `{headers: record}`},
+		{"label symbols", `{labels: record}`},
+		{"unknown option name", `{["x".repeat(256)]: "unused"}`},
+		{"names after invalid header", `{"headers": {"bad header": "", ["x".repeat(256)]: "unused"}}`},
+		{"names after invalid label", `{"labels": {first: 1, ["x".repeat(256)]: "unused"}}`},
+	} {
+		for _, dimension := range []string{"work", "allocation"} {
+			t.Run(scenario.name+"/"+dimension, func(t *testing.T) {
+				// Build authored metadata before the native conversion under test.
+				vm := goja.New()
+				_, err := vm.RunString(`const record = {}; for (let i = 0; i < 64; i++) record[Symbol()] = "";`)
+				require.NoError(t, err)
+				call := fetchRequestCall(t, vm, `"https://example.test", `+scenario.init)
+				limits := Limits{MaxWorkUnits: 4096, MaxAllocationUnits: 4096}
+				if dimension == "work" {
+					limits.MaxWorkUnits = 100
+				} else {
+					limits.MaxAllocationUnits = 64
+				}
+				ctx, err := WithExecutionBudget(context.Background(), limits)
+				require.NoError(t, err)
+
+				// The reflected metadata exhausts the shared allowance before
+				// ordinary validation can return a catchable malformed-input error.
+				request, labels, err := prepareFetchRequest(ctx, vm, call, 4096, true, nil)
+				require.ErrorIs(t, err, ErrLimitExceeded)
+				require.Nil(t, request)
+				require.Nil(t, labels)
+			})
+		}
+	}
+}
+
 // TestPrepareFetchRequestConstruction preserves authored HTTP data and replay semantics.
 func TestPrepareFetchRequestConstruction(t *testing.T) {
 	vm := goja.New()
@@ -35,7 +75,7 @@ func TestPrepareFetchRequestConstruction(t *testing.T) {
 	}`)
 
 	// Host routing is separate; connection authentication may later replace the authored candidate.
-	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, nil)
 	require.NoError(t, err)
 	require.Equal(t, "POST", request.Method)
 	require.Equal(t, "network.example.test:8443", request.URL.Host)
@@ -63,7 +103,7 @@ func TestPrepareFetchRequestArrayBufferOwnsBytes(t *testing.T) {
 	_, err := vm.RunString(`var bytes = new Uint8Array([1, 2, 255]);`)
 	require.NoError(t, err)
 	call := fetchRequestCall(t, vm, `"https://example.test", {method: "PUT", body: bytes.buffer}`)
-	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, nil)
 	require.NoError(t, err)
 
 	// Mutate the original buffer after preparation, then verify first send and replay.
@@ -92,7 +132,7 @@ func TestPrepareFetchRequestRecordSemantics(t *testing.T) {
 	} {
 		// Missing and inherited input leave the ordinary GET request untouched.
 		vm := goja.New()
-		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false)
+		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false, nil)
 		require.NoError(t, err, source)
 		require.Equal(t, "GET", request.Method)
 		require.Empty(t, request.Header)
@@ -128,7 +168,7 @@ func TestPrepareFetchRequestMethodNormalization(t *testing.T) {
 			call := fetchRequestCall(t, vm, `"https://example.test", {method: "`+test.authored+`"}`)
 
 			// Normalization changes the transmitted method, without changing its byte allowance.
-			request, _, err := prepareFetchRequest(context.Background(), vm, call, len("https://example.test")+len(test.authored), false)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, len("https://example.test")+len(test.authored), false, nil)
 			require.NoError(t, err)
 			require.Equal(t, test.want, request.Method)
 		})
@@ -149,7 +189,7 @@ func TestPrepareFetchRequestForbiddenMethods(t *testing.T) {
 			}`)
 
 			// Reject before copying header values or returning a request that could be dispatched.
-			request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, nil)
 			require.ErrorIs(t, err, ErrInvalidInput)
 			require.NotContains(t, err.Error(), "private")
 			require.Nil(t, request)
@@ -174,10 +214,10 @@ func TestPrepareFetchRequestBounds(t *testing.T) {
 			vm := goja.New()
 			call := fetchRequestCall(t, vm, test.source)
 			// The exact shared allowance succeeds; one fewer byte returns no partial request.
-			request, _, err := prepareFetchRequest(context.Background(), vm, call, test.size, false)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, test.size, false, nil)
 			require.NoError(t, err)
 			require.NotNil(t, request)
-			request, _, err = prepareFetchRequest(context.Background(), vm, call, test.size-1, false)
+			request, _, err = prepareFetchRequest(context.Background(), vm, call, test.size-1, false, nil)
 			require.ErrorIs(t, err, ErrLimitExceeded)
 			require.Nil(t, request)
 		})
@@ -203,7 +243,7 @@ func TestPrepareFetchRequestRejectsUnsupportedData(t *testing.T) {
 	} {
 		// No unsupported value is coerced or included in the public classification.
 		vm := goja.New()
-		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false)
+		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false, nil)
 		require.ErrorIs(t, err, ErrInvalidInput, source)
 		require.NotContains(t, err.Error(), "private")
 		require.Nil(t, request)
@@ -212,7 +252,7 @@ func TestPrepareFetchRequestRejectsUnsupportedData(t *testing.T) {
 		// Transport-controlled headers are rejected regardless of capitalization.
 		vm := goja.New()
 		source := `"https://example.test", {headers: {"` + strings.ToLower(name) + `": "private"}}`
-		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false)
+		request, _, err := prepareFetchRequest(context.Background(), vm, fetchRequestCall(t, vm, source), 1024, false, nil)
 		require.ErrorIs(t, err, ErrInvalidInput, name)
 		require.Nil(t, request)
 	}
@@ -225,7 +265,7 @@ func TestPrepareFetchRequestCancellationAndGetters(t *testing.T) {
 	var request *http.Request
 	// Getter exceptions are intercepted by the host's VM boundary, before HTTP dispatch.
 	exception := vm.Try(func() {
-		request, _, _ = prepareFetchRequest(context.Background(), vm, call, 1024, false)
+		request, _, _ = prepareFetchRequest(context.Background(), vm, call, 1024, false, nil)
 	})
 	require.NotNil(t, exception)
 	require.Nil(t, request)
@@ -233,7 +273,166 @@ func TestPrepareFetchRequestCancellationAndGetters(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	// Cancellation wins while copying a valid request, with no request returned.
-	request, _, err := prepareFetchRequest(ctx, vm, fetchRequestCall(t, vm, `"https://example.test"`), 1024, false)
+	request, _, err := prepareFetchRequest(ctx, vm, fetchRequestCall(t, vm, `"https://example.test"`), 1024, false, nil)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, request)
+}
+
+// fetchRequestFormRuntime installs bounded query helpers and captures their
+// native serializer before authored code can add instance conversion methods.
+func fetchRequestFormRuntime(t *testing.T) (*goja.Runtime, goja.Callable) {
+	t.Helper()
+	vm := goja.New()
+	ctx, err := WithExecutionBudget(context.Background(), Limits{MaxWorkUnits: 65536, MaxAllocationUnits: 65536})
+	require.NoError(t, err)
+	_, err = installUtilities(ctx, vm)
+	require.NoError(t, err)
+	prototype := vm.Get("URLSearchParams").ToObject(vm).Get("prototype").ToObject(vm)
+	encode, ok := goja.AssertFunction(prototype.Get("toString"))
+	require.True(t, ok)
+	return vm, encode
+}
+
+// TestPrepareFetchRequestSearchParams detaches a branded form body using its
+// protected serializer, preserving Unicode, duplicates, and replay semantics.
+func TestPrepareFetchRequestSearchParams(t *testing.T) {
+	vm, encode := fetchRequestFormRuntime(t)
+	_, err := vm.RunString(`
+		var form = new URLSearchParams("grant_type=client_credentials");
+		form.append("q", "café + news");
+		form.append("item", "first");
+		form.append("item", "second");
+		Object.defineProperty(form, "toString", {get() {throw "private conversion";}});
+	`)
+	require.NoError(t, err)
+	call := fetchRequestCall(t, vm, `"https://example.test/token", {method: "POST", body: form}`)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, encode)
+	require.NoError(t, err)
+	require.Equal(t, "application/x-www-form-urlencoded;charset=UTF-8", request.Header.Get("Content-Type"))
+
+	// Changing the source after preparation cannot change either send or replay.
+	_, err = vm.RunString(`form.set("grant_type", "changed"); form.delete("item"); form.append("q", "later");`)
+	require.NoError(t, err)
+	want := "grant_type=client_credentials&q=caf%C3%A9+%2B+news&item=first&item=second"
+	first, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+	require.NoError(t, request.Body.Close())
+	require.Equal(t, want, string(first))
+	require.Equal(t, int64(len(want)), request.ContentLength)
+	replay, err := request.GetBody()
+	require.NoError(t, err)
+	second, err := io.ReadAll(replay)
+	require.NoError(t, err)
+	require.NoError(t, replay.Close())
+	require.Equal(t, first, second)
+}
+
+// TestPrepareFetchRequestSearchParamsContentType defaults only an absent header;
+// explicitly supplied content types, including empty values, stay authoritative.
+func TestPrepareFetchRequestSearchParamsContentType(t *testing.T) {
+	for _, test := range []struct {
+		name, headers, want string
+	}{
+		{"absent", "{}", "application/x-www-form-urlencoded;charset=UTF-8"},
+		{"explicit", `{"Content-Type":"application/custom"}`, "application/custom"},
+		{"mixed case", `{"cOnTeNt-TyPe":"text/plain;charset=UTF-8"}`, "text/plain;charset=UTF-8"},
+		{"explicit empty", `{"content-type":""}`, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			vm, encode := fetchRequestFormRuntime(t)
+			call := fetchRequestCall(t, vm, `"https://example.test", {
+				method:"POST", headers:`+test.headers+`, body:new URLSearchParams("a=b")
+			}`)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, encode)
+			require.NoError(t, err)
+			defer request.Body.Close()
+
+			// Presence is distinct from Header.Get returning an empty string.
+			values, exists := request.Header["Content-Type"]
+			require.True(t, exists)
+			require.Equal(t, []string{test.want}, values)
+		})
+	}
+	// An empty genuine form still selects its content type and has an empty replay.
+	vm, encode := fetchRequestFormRuntime(t)
+	call := fetchRequestCall(t, vm, `"https://example.test", {method:"POST", body:new URLSearchParams()}`)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, encode)
+	require.NoError(t, err)
+	require.Equal(t, "application/x-www-form-urlencoded;charset=UTF-8", request.Header.Get("Content-Type"))
+	body, err := io.ReadAll(request.Body)
+	require.NoError(t, err)
+	require.Empty(t, body)
+	require.NoError(t, request.Body.Close())
+	replay, err := request.GetBody()
+	require.NoError(t, err)
+	body, err = io.ReadAll(replay)
+	require.NoError(t, err)
+	require.Empty(t, body)
+	require.NoError(t, replay.Close())
+}
+
+// TestPrepareFetchRequestSearchParamsBrands refuses lookalikes and proxies
+// without reading their conversion properties or forwarding proxy traps.
+func TestPrepareFetchRequestSearchParamsBrands(t *testing.T) {
+	for _, candidate := range []string{
+		`({get toString() {touched++; throw "private";}})`,
+		`Object.create(URLSearchParams.prototype)`,
+		`new Proxy(form, {get() {touched++; throw "private";}, getPrototypeOf() {touched++; throw "private";}})`,
+		`(() => {const p = Proxy.revocable(form, {}); p.revoke(); return p.proxy;})()`,
+	} {
+		t.Run(candidate, func(t *testing.T) {
+			vm, encode := fetchRequestFormRuntime(t)
+			_, err := vm.RunString(`var touched = 0; var form = new URLSearchParams("a=b");`)
+			require.NoError(t, err)
+			call := fetchRequestCall(t, vm, `"https://example.test", {method:"POST", body:`+candidate+`}`)
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, encode)
+
+			// Only the private native brand grants form conversion, with fixed failure text.
+			require.ErrorIs(t, err, ErrInvalidInput)
+			require.Nil(t, request)
+			require.Zero(t, vm.Get("touched").ToInteger())
+			require.NotContains(t, err.Error(), "private")
+		})
+	}
+
+	// Without a selected encoder, genuine instances also retain the unsupported-body error.
+	vm, _ := fetchRequestFormRuntime(t)
+	call := fetchRequestCall(t, vm, `"https://example.test", {method:"POST", body:new URLSearchParams("a=b")}`)
+	request, _, err := prepareFetchRequest(context.Background(), vm, call, 1024, false, nil)
+	require.ErrorIs(t, err, ErrInvalidInput)
+	require.Nil(t, request)
+}
+
+// TestPrepareFetchRequestSearchParamsBounds includes serialized form bytes and
+// generated header names/values in the same complete request-byte allowance.
+func TestPrepareFetchRequestSearchParamsBounds(t *testing.T) {
+	const rawURL = "https://example.test/token"
+	const formBody = "q=%C3%A9+%2B&item=one&item=two"
+	for _, test := range []struct {
+		name, headers, headerValue string
+	}{
+		{"default header", "{}", "application/x-www-form-urlencoded;charset=UTF-8"},
+		{"explicit header", `{"content-type":"application/custom"}`, "application/custom"},
+		{"explicit empty", `{"Content-Type":""}`, ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			vm, encode := fetchRequestFormRuntime(t)
+			call := fetchRequestCall(t, vm, `"`+rawURL+`", {method:"POST", headers:`+test.headers+`,
+				body:new URLSearchParams("q=é+%2B&item=one&item=two")}`)
+			exact := len(rawURL) + len("POST") + len("Content-Type") + len(test.headerValue) + len(formBody)
+
+			// The exact cap admits the complete replayable form request.
+			request, _, err := prepareFetchRequest(context.Background(), vm, call, exact, false, encode)
+			require.NoError(t, err)
+			body, err := io.ReadAll(request.Body)
+			require.NoError(t, err)
+			require.NoError(t, request.Body.Close())
+			require.Equal(t, formBody, string(body))
+
+			// A one-byte deficit cannot return a partial request for dispatch.
+			request, _, err = prepareFetchRequest(context.Background(), vm, call, exact-1, false, encode)
+			require.ErrorIs(t, err, ErrLimitExceeded)
+			require.Nil(t, request)
+		})
+	}
 }

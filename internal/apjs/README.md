@@ -18,7 +18,7 @@ top-level code cannot use it during initialization.
 The shared execution packages are:
 
 - [`runtime`](runtime/README.md): bounded VM lifecycle, native JSON copying,
-  pure expressions, async execution, connection bindings, and result extensions.
+  pure utilities, expressions, async execution, connection bindings, and result extensions.
 - [`http`](http/README.md): HTTP budgets, response ownership, and send evidence
   shared by callers that supply their own clients.
 
@@ -46,6 +46,15 @@ compilation, input copying, library initialization, evaluation, and result
 conversion. Go parsing and scalar serialization are bounded by input size and
 checked for cancellation around those operations; they are not interruptible Go
 work. Caller cancellation takes precedence over the execution timeout.
+
+The bounded lifecycle always provides `atob`, `btoa`, `TextEncoder`,
+`TextDecoder`, and `URLSearchParams`, including during helper initialization.
+These pure utilities do not grant HTTP or other external capabilities. Managed
+input conversion, library initialization, utility calls, and result conversion
+share the execution's `MaxWorkUnits` and `MaxAllocationUnits`. Input and final
+result size caps retain their separate payload meanings. The
+[runtime accounting contract](runtime/README.md#pure-utilities-and-the-execution-budget)
+defines the shared units and context propagation.
 
 This adapter preserves connector predicate syntax: non-strict JavaScript,
 statement lists, and trailing semicolons are accepted. For example:
@@ -118,8 +127,10 @@ validation contract rather than predicting the result for a real connection.
 resource binding/rendering and connector create/update operations supply their
 request context. Synchronous callers that omit it, such as configuration and
 local manifest validation, still get finite execution limits. Each library,
-predicate, and hook syntax check gets a separate budget; there is no total
-connector-validation timeout unless the caller supplies one. Authored validation
+predicate, and hook syntax check starts its own bounded evaluation. When the
+caller supplies an execution-budget context, those evaluations also consume that
+parent allowance. There is no total connector-validation timeout unless the
+caller supplies one. Authored validation
 errors keep field paths and safe failure text. Caller cancellation and deadlines
 stop connector validation and retain their context error identity through the
 schema, core, and HTTP layers; they are not reported as invalid JavaScript fields.
@@ -170,6 +181,8 @@ validation; it returns a fresh value on each call:
 | Library plus predicate source | 256 KiB |
 | Serialized input globals | 1 MiB |
 | Boolean JSON output | 5 bytes |
+| Cumulative managed work | 64 × 2²⁰ work units |
+| Cumulative managed allocation | 64 × 2²⁰ allocation units |
 | Value depth | 64 |
 | Values and object keys | 50,000 |
 | JavaScript call stack | 256 |
@@ -179,8 +192,9 @@ Definition loading observes the caller context and preserves decryption/decode
 errors for retry decisions. The source check happens before compiling a connector
 library; only authored compile failures become `ErrInvalidSource`. A predicate
 failure stops the operation with its probe, step, or scope identity in the error.
-HTTP calls keep their existing separate policy. Multiple conditions get separate
-execution budgets, while their common caller context can cancel evaluation.
+HTTP calls keep their existing request/response limits. Independent condition
+evaluations receive separate budgets; evaluations nested under an execution-budget
+context also consume its remaining allowance. The caller context can cancel them.
 
 Setup form and redirect steps evaluate their conditions when the flow checks
 eligibility. OAuth evaluates inclusion before dynamic required status and returns
@@ -230,9 +244,10 @@ Property omission is an explicit object-evaluator option; other runtime callers
 keep the strict default. It does not invoke getters or `toJSON`, and inspecting
 omitted properties still counts toward the traversal budget.
 
-`ConnectorMigrationLimits()` uses the source, input, depth, node, stack, and
-timeout limits above, with a **1 MiB JSON output allowance**. Each generation's
-hook gets its own JavaScript/encoding budget under the common migration context.
+`ConnectorMigrationLimits()` uses the source, input, shared work/allocation,
+depth, node, stack, and timeout limits above, with a **1 MiB JSON output allowance**. Each generation's
+hook receives its own limits under the common migration context. If that context
+already carries an execution budget, hook work also consumes the parent allowance.
 Definition loading uses that context, and raw library-plus-hook source is checked
 by the shared bounded library loader before compilation or reuse from its cache.
 The loader also serves connector predicates and checks each caller's combined
