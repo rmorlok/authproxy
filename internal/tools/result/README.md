@@ -53,6 +53,10 @@ the previous error. It takes ownership of the supplied error and sets its
 execution state. Callers validate authored errors and choose retry advice;
 this package does not infer whether retrying is safe.
 
+`Finish` requires an existing error's execution state to match its `executionState`
+argument. A mismatch returns `ErrInvalidResult` before sizing or changing the
+result, so its reported state cannot depend on whether the envelope fits.
+
 If the completed envelope is too large, `Finish` replaces its payload with a
 small `OUTPUT_TOO_LARGE` error. That replacement also removes previous error
 details and retry advice, while keeping the captured identities and execution

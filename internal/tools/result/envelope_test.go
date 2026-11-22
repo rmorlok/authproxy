@@ -76,6 +76,46 @@ func TestFinishPreservesFittingResults(t *testing.T) {
 	}
 }
 
+// TestFinishRejectsMismatchedExecutionState keeps stale error evidence from
+// producing different public states depending on whether the envelope fits.
+func TestFinishRejectsMismatchedExecutionState(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		state api.ToolExecutionState
+	}{
+		{"stale not started", api.ToolExecutionStateNotStarted},
+		{"stale uncertainty", api.ToolExecutionStateMayHaveExecuted},
+		{"missing error state", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// The error predates the executor's final evidence that the action completed.
+			input := capturedResult(t)
+			input.IsError = true
+			input.Error = &api.ToolResultError{
+				Code: "CUSTOMER_FAILED", Message: "Could not read customer.",
+				Details:        common.RawJSON(`{"reason":"` + strings.Repeat("details", 100) + `"}`),
+				ExecutionState: test.state,
+			}
+			expected := input.Clone()
+			state := api.ToolExecutionStateCompleted
+			for _, limit := range []int{encodedSize(t, input), encodedSize(t, fallbackResult(t, state))} {
+				// Reject both fitting and oversized errors without rewriting their payloads.
+				result, err := toolresult.Finish(context.Background(), input, state, limit)
+				require.ErrorIs(t, err, toolresult.ErrInvalidResult)
+				require.Nil(t, result)
+				require.Equal(t, expected, input)
+			}
+
+			// Caller cancellation still takes precedence over inconsistent evidence.
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			result, err := toolresult.Finish(ctx, input, state, 4096)
+			require.ErrorIs(t, err, context.Canceled)
+			require.Nil(t, result)
+		})
+	}
+}
+
 // TestFinishCountsEncodedExpansion exercises the exact boundary after HTML/JSON
 // escaping and binary base64 encoding, including all trusted envelope fields.
 func TestFinishCountsEncodedExpansion(t *testing.T) {

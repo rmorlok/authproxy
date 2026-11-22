@@ -17,6 +17,10 @@ import (
 // safe failure envelope. No partial or oversized ToolResult accompanies it.
 var ErrEncodedResultLimit = toolresult.ErrEncodedResultLimit
 
+// ErrInvalidResult identifies invalid captured result identities or provenance,
+// or result data that cannot be serialized. It contains no caller or provider data.
+var ErrInvalidResult = toolresult.ErrInvalidResult
+
 // ResponseLimits contains resolved positive policy limits for one response
 // program. Callers apply operator ceilings before compilation. These limits
 // bound data processing; they are not a hard memory-isolation guarantee.
@@ -177,9 +181,11 @@ func (r *Response) NeedsBody(status int) bool {
 //
 // Protocol, content, and size failures produce bounded ToolResult errors with
 // the supplied execution state. Invalid arguments, cancellation, or an allowance
-// too small for the safe error envelope return a Go error and no result. The
-// caller remains responsible for output-schema validation, aggregate execution
-// budgets, and any higher-level API serialization around this result.
+// too small for the safe error envelope return a Go error and no result. Invalid
+// captured identities/provenance and serialization failures return ErrInvalidResult;
+// an allowance too small for a safe failure returns ErrEncodedResultLimit.
+// The caller remains responsible for output-schema validation, aggregate
+// execution budgets, and any higher-level API serialization around this result.
 func (r *Response) Map(
 	ctx context.Context,
 	input ResponseInput,

@@ -30,8 +30,9 @@ func SetFailure(result *api.ToolResult, failure *api.ToolResultError, state api.
 // perform any output-schema checks; this serialization limit is not a hard
 // allocation or process-memory cap.
 //
-// An oversized result is mutated into a clean OUTPUT_TOO_LARGE failure with the
-// supplied execution state. If that replacement cannot fit, Finish returns
+// An existing error must carry the supplied execution state; a mismatch returns
+// ErrInvalidResult before any size check or mutation. An oversized result becomes
+// a clean OUTPUT_TOO_LARGE failure with that state. If it cannot fit, Finish returns
 // ErrEncodedResultLimit and no result; nonpositive maxBytes returns the same error.
 // A nil context or result, an unknown execution state, or unserializable content
 // returns ErrInvalidResult. Caller cancellation takes precedence over serialization
@@ -54,6 +55,10 @@ func Finish(
 	switch state {
 	case api.ToolExecutionStateNotStarted, api.ToolExecutionStateMayHaveExecuted, api.ToolExecutionStateCompleted:
 	default:
+		return nil, ErrInvalidResult
+	}
+	// Existing errors and size-limit fallbacks must report the same evidence.
+	if result.Error != nil && result.Error.ExecutionState != state {
 		return nil, ErrInvalidResult
 	}
 	if maxBytes <= 0 {
