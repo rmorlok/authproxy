@@ -517,9 +517,12 @@ async function execute(params, context) {
         connection.cfg.apiBase + "/customers/" + encodeURIComponent(params.id)
     );
     if (!response.ok) {
-        throw new ToolError("CUSTOMER_LOOKUP_FAILED", "Could not read customer", {
-            upstreamStatus: response.status
-        });
+        throw new ToolError(
+            "CUSTOMER_LOOKUP_FAILED", 
+            "Could not read customer", 
+            {
+                upstreamStatus: response.status
+            });
     }
     return await response.json();
 }

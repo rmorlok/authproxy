@@ -39,6 +39,7 @@ func (i *toolResultInterpreter) rejected(
 	if err := apjsruntime.ReserveAllocation(ctx, 2); err != nil {
 		return nil, true, err
 	}
+
 	failure := &api.ToolResultError{}
 	if err := decodeToolPayload(ctx, encoded, failure); err != nil {
 		return nil, true, err
@@ -54,5 +55,9 @@ func (i *toolResultInterpreter) rejected(
 	if err := apjsruntime.ChargeWork(ctx, 0); err != nil {
 		return nil, true, err
 	}
-	return &Result{Error: failure, Content: []api.ToolContentBlock{}}, true, nil
+
+	return &Result{
+		Error:   failure,
+		Content: []api.ToolContentBlock{},
+	}, true, nil
 }
