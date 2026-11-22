@@ -30,14 +30,16 @@ func TestMigrationHookDiagnostics(t *testing.T) {
 		unit     string
 		position bool
 		want     error
+		reason   jsruntime.OutputRejectionReason
 	}{
 		"library syntax":         {library: "\nconst privateSource = ;", source: "({})", phase: "library-compile", unit: "library", position: true, want: jsruntime.ErrInvalidSource},
 		"hook syntax":            {source: "\nprivateSource ===", phase: "expression-compile", unit: "expression", position: true, want: jsruntime.ErrInvalidSource},
 		"library initialization": {library: `throw new Error("privateLibrary")`, source: "({})", phase: "library-initialize", unit: "library", position: true, want: jsruntime.ErrEvaluation},
 		"helper throw":           {library: "function helper() {\n throw new Error(cfg.secret);\n}", source: "helper()", phase: "execute", unit: "library", position: true, want: jsruntime.ErrEvaluation},
 		"thrown coercion":        {source: `throw {toString() { for (;;) {} }};`, phase: "execute", unit: "expression", position: true, want: jsruntime.ErrEvaluation},
-		"private output key":     {source: `({config: {set: {[cfg.secret]: function() {}}}})`, phase: "output", want: jsruntime.ErrInvalidOutput},
-		"Date output":            {source: `({config: {set: {created: new Date()}}})`, phase: "output", want: jsruntime.ErrInvalidOutput},
+		"private output key":     {source: `({config: {set: {[cfg.secret]: function() {}}}})`, phase: "output", want: jsruntime.ErrInvalidOutput, reason: jsruntime.OutputUnsupportedObject},
+		"private accessor":       {source: `({config: {set: {get [cfg.secret]() {for (;;) {}}}}})`, phase: "output", want: jsruntime.ErrInvalidOutput, reason: jsruntime.OutputAccessor},
+		"Date output":            {source: `({config: {set: {created: new Date()}}})`, phase: "output", want: jsruntime.ErrInvalidOutput, reason: jsruntime.OutputUnsupportedObject},
 		"timeout":                {source: `for (;;) {}`, phase: "execute", want: jsruntime.ErrLimitExceeded},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -52,7 +54,7 @@ func TestMigrationHookDiagnostics(t *testing.T) {
 			generation.s.logger = slog.New(slog.NewJSONHandler(&logs, nil))
 			err := generation.s.applyMigrationHookForGeneration(context.Background(), candidate, generation, 1, 2)
 
-			// API-facing errors stay opaque; logs add only stage and safe coordinates.
+			// API-facing errors stay opaque; logs add only fixed reasons, stage, and safe coordinates.
 			require.ErrorIs(t, err, test.want)
 			require.EqualError(t, err, "evaluate migration hook for generation 1: "+test.want.Error())
 			require.NotContains(t, logs.String(), "private")
@@ -66,6 +68,13 @@ func TestMigrationHookDiagnostics(t *testing.T) {
 			require.Equal(t, float64(2), record["target_generation"])
 			require.Equal(t, test.phase, record["phase"])
 			require.Equal(t, test.want.Error(), record["category"])
+			if test.reason != "" {
+				require.Equal(t, string(test.reason), record["output_reason"])
+			} else {
+				require.NotContains(t, record, "output_reason")
+			}
+			require.NotContains(t, record, "path")
+			require.NotContains(t, record, "output_path")
 			if test.unit != "" {
 				require.Equal(t, test.unit, record["source"])
 			}

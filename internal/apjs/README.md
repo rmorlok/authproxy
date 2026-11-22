@@ -265,8 +265,13 @@ report `phase=execute source=library line=7 column=3` while the API error stays
 `JavaScript execution failed`. This metadata is available to trusted adapters
 through `Diagnostic(err)`. Logs omit exception messages, source snippets,
 configuration, returned values, and JSON property names, which can all contain
-private data. Output rejections currently identify the phase and category,
-without a JSON path.
+private data. Output rejections also expose a fixed `OutputReason`, logged as
+`output_reason`. For example, a returned getter produces
+`phase=output output_reason=accessor` without running the getter. Object/boolean
+root checks and setup-option shape checks use the same closed set of reasons as
+the [shared output converter](runtime/README.md#output-rejection-reasons).
+Paths are intentionally omitted because their keys can contain private data.
+Cancellation or a later budget failure clears an earlier rejection reason.
 
 The unused unbounded object evaluator has been removed; object callers use
 `EvaluateObjectJSONWithContext`. Other legacy library and expression APIs remain

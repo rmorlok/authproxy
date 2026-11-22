@@ -261,8 +261,7 @@ must honor context and return promptly.
 Only explicitly authored messages and fields are emitted. Arguments,
 configuration, credentials, HTTP bodies, results, and exceptions are never
 logged automatically. See the [runtime logging contract and examples](https://github.com/rmorlok/authproxy/blob/main/internal/apjs/runtime/README.md#authored-structured-logging)
-for the supported subset. Tool adapter wiring and safe output-rejection reasons
-remain separate work.
+for the supported subset. Tool adapter wiring remains separate work.
 
 ## HTTP capability contract
 
@@ -451,6 +450,21 @@ stacks, URLs, credentials, and private parser/transport diagnostics do not cross
 the result boundary. Trusted adapters can classify credential unavailability
 separately from other transport failures, independently of send evidence.
 
+Output conversion adds a fixed, detached rejection reason for trusted Go
+diagnostics, such as `accessor`, `cycle`, or `unsupported-object`. Public error
+text and `errors.Is` classification remain unchanged. Shared expressions,
+async execution, and result encoders expose it through `runtime.OutputReason`;
+connector adapters include it in `Diagnostic(err).OutputReason`, and migration
+hook logs use the `output_reason` attribute. Adapter-specific root/shape checks
+use the same closed reason set. Unknown reason strings are discarded.
+
+No diagnostic retains values, source, property names, array indices, or VM
+state. Paths are intentionally omitted: dynamic keys can contain secrets, and
+redacted paths add little useful location information. Cancellation, timeout,
+and budget failures retain precedence and remove any earlier rejection reason.
+See the [supported output reasons](https://github.com/rmorlok/authproxy/blob/main/internal/apjs/runtime/README.md#output-rejection-reasons)
+for the fixed vocabulary. Extracting a reason does not log automatically.
+
 A domain adapter can supply a trusted extension with these responsibilities:
 
 1. Declare reserved names and install pure helpers before authored initialization.
@@ -484,12 +498,12 @@ Pure HTTP transforms receive data only. The
 [Tools design](/development/design/tools-and-toolsets/#javascript-host) owns the
 domain result and permission contracts.
 
-Root `apjs.Context` currently has no cancellation parameter, uses reflected Go
-input/export, and has domain conversions such as null-to-empty-object and
-stringifying option values. Preserve those public-internal APIs during
-extraction. Migrating their callers to explicit budgets/context is a separate
-slice that tests or deliberately migrates these behaviors; a package move must
-not silently change existing connector predicates, transforms, or hooks.
+Retained legacy `apjs.Context` APIs use reflected Go input/export and domain
+conversions such as null-to-empty-object and stringifying option values.
+Production connector predicates, transforms, and hooks now use bounded APIs
+with explicit context, copied native inputs, and shared execution budgets.
+Their compatibility rules are documented and tested in the root `apjs` package;
+remaining legacy entry points do not grant those callers an unbounded fallback.
 
 ## Migration sequence and acceptance
 

@@ -67,6 +67,9 @@ func (s *service) applyMigrationHookForGeneration(
 		if diagnostic.Source != "" {
 			attrs = append(attrs, "source", diagnostic.Source)
 		}
+		if diagnostic.OutputReason != "" {
+			attrs = append(attrs, "output_reason", string(diagnostic.OutputReason))
+		}
 		if diagnostic.Line > 0 && diagnostic.Column > 0 {
 			attrs = append(attrs, "line", diagnostic.Line, "column", diagnostic.Column)
 		}

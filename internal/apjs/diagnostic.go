@@ -18,6 +18,10 @@ type FailureDiagnostic struct {
 	// Phase identifies the host's current evaluation stage, such as "execute"
 	// or "output"; it is never taken from authored code.
 	Phase string
+	// OutputReason identifies a fixed unsupported-output condition, or is empty
+	// when no such rejection survives the final error selection. It contains no
+	// property names, paths, or values; limits and cancellation have no reason.
+	OutputReason jsruntime.OutputRejectionReason
 	// Source identifies "library" or "expression" when a known source unit
 	// supplied the position. It is empty when no position can be attributed.
 	Source string
@@ -70,6 +74,18 @@ func withFailureDiagnostic(err error, diagnostic FailureDiagnostic) error {
 		}
 	}
 	diagnostic.Category = category.Error()
+	// Always recompute from the final error. A saved diagnostic may describe an
+	// earlier conversion that cancellation or a shared-budget failure superseded.
+	diagnostic.OutputReason = ""
+	if category == jsruntime.ErrInvalidOutput {
+		if reason, ok := jsruntime.OutputReason(err); ok {
+			diagnostic.OutputReason = reason
+		} else if existing, ok := Diagnostic(err); ok {
+			// Detached connector transforms wrap an already-sanitized evaluation
+			// error a second time without retaining its original runtime cause.
+			diagnostic.OutputReason = existing.OutputReason
+		}
+	}
 	return &failureError{category: category, diagnostic: diagnostic}
 }
 

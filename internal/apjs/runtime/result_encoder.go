@@ -74,7 +74,7 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 
 	text, ok := value.(goja.String)
 	if !ok {
-		e.err = ErrInvalidOutput
+		e.err = RejectOutput(OutputUnexpectedType)
 		return "", e.err
 	}
 
@@ -104,7 +104,7 @@ func (e *ResultEncoder) String(value goja.Value) (string, error) {
 			}
 		}
 
-		e.err = ErrInvalidOutput
+		e.err = RejectOutput(OutputInvalidString)
 
 		return "", e.err
 	}

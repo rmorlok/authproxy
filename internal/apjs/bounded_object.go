@@ -38,7 +38,7 @@ func (c Context) EvaluateObjectJSONWithContext(
 			// traps. The shared encoder validates prototypes and every property.
 			object, ok := value.(*goja.Object)
 			if !ok || object.ExportType() != reflect.TypeFor[map[string]any]() || object.ClassName() != "Object" {
-				return nil, jsruntime.ErrInvalidOutput
+				return nil, jsruntime.RejectOutput(jsruntime.OutputUnexpectedType)
 			}
 			return object, nil
 		},

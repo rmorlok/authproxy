@@ -156,14 +156,14 @@ func dataSourceOptionsFromJSON(
 	decoder.UseNumber()
 	var value any
 	if err := decoder.Decode(&value); err != nil {
-		return nil, jsruntime.ErrInvalidOutput
+		return nil, jsruntime.RejectOutput(jsruntime.OutputInvalidShape)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	items, ok := value.([]any)
 	if !ok {
-		return nil, jsruntime.ErrInvalidOutput
+		return nil, jsruntime.RejectOutput(jsruntime.OutputInvalidShape)
 	}
 
 	// Reuse the bounded Go JSON writer for exact final response accounting,
@@ -188,12 +188,12 @@ func dataSourceOptionsFromJSON(
 		}
 		object, ok := item.(map[string]any)
 		if !ok {
-			return nil, jsruntime.ErrInvalidOutput
+			return nil, jsruntime.RejectOutput(jsruntime.OutputInvalidShape)
 		}
 		value, hasValue := object["value"]
 		label, hasLabel := object["label"]
 		if !hasValue || !hasLabel {
-			return nil, jsruntime.ErrInvalidOutput
+			return nil, jsruntime.RejectOutput(jsruntime.OutputInvalidShape)
 		}
 		var option DataSourceOption
 		var err error
@@ -319,7 +319,7 @@ func (f *optionFormatter) value(text *strings.Builder, value any) error {
 		}
 		return f.append(text, "]")
 	default:
-		return jsruntime.ErrInvalidOutput
+		return jsruntime.RejectOutput(jsruntime.OutputInvalidShape)
 	}
 }
 

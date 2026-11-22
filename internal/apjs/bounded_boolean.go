@@ -40,7 +40,7 @@ func (c Context) EvaluateBooleanWithContext(
 			// primitive and Boolean wrapper both export one native bool without
 			// coercion or property access, preserving the legacy conversion contract.
 			if value == nil || value.ExportType() != reflect.TypeFor[bool]() {
-				return nil, jsruntime.ErrInvalidOutput
+				return nil, jsruntime.RejectOutput(jsruntime.OutputUnexpectedType)
 			}
 
 			return vm.ToValue(value.Export().(bool)), nil
