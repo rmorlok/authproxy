@@ -64,16 +64,29 @@ func Compile(
 		capturedLibrary = &copy
 	}
 
-	script, err := javascript.CompileTool(*definition.Javascript, capturedLibrary, limits.Runtime)
+	script, err := javascript.CompileTool(
+		*definition.Javascript,
+		capturedLibrary,
+		limits.Runtime,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("JavaScript Tool source: %w", err)
 	}
 
-	schemas, err := validation.Compile(definition.InputSchema, definition.OutputSchema, limits.Validation)
+	schemas, err := validation.Compile(
+		definition.InputSchema,
+		definition.OutputSchema,
+		limits.Validation,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("JavaScript Tool schemas: %w", err)
 	}
-	return &Program{script: script, schemas: schemas, limits: limits}, nil
+
+	return &Program{
+		script:  script,
+		schemas: schemas,
+		limits:  limits,
+	}, nil
 }
 
 // Validate checks connector and Tool initialization without invoking execute or
