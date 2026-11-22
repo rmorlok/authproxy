@@ -81,7 +81,10 @@ Optional global <code dir="auto">fetch</code> makes direct HTTP requests and is 
 <a href="/development/design/tools-and-toolsets/">Tools and ToolSets</a>. It defines package
 responsibilities and execution contracts for contributors. The JavaScript
 shapes and ownership rules below are the target contract; Go type and method
-names can be refined during implementation without changing those rules.</p>
+names can be refined during implementation without changing those rules.
+The November 21, 2026 amendment makes shipped pure utilities part of every
+bounded VM and places cumulative managed work/allocation accounting under one
+execution-owned budget.</p>
 <p>The implementation starts with code already present in <code dir="auto">internal/apjs</code>,
 <code dir="auto">internal/tools/javascript</code>, and <code dir="auto">internal/tools/httphost</code> at main commit
 <code dir="auto">16de2e5d</code>. This document does not enable JavaScript Tool publication or change
@@ -238,7 +241,7 @@ Libraries can declare conflicting names or assume a single <code dir="auto">cfg<
 explicitly selects the libraries and aliases appropriate to its execution.</p>
 <div class="sl-heading-wrapper level-h3"><h3 id="pure-expressions">Pure expressions</h3><a class="sl-anchor-link" href="#pure-expressions"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Pure expressions”</span></a></div>
 <p>A pure expression uses the same fresh VM, input/output conversion, and runtime
-limits. It receives only copied JSON data and explicitly selected pure helpers.
+limits. It receives copied JSON data and all shipped pure utilities.
 It has no connection methods, direct fetch, async HTTP workers, or implicit Tool
 result helpers. A Promise is not a JSON expression result. Domain adapters can
 preserve existing expression bindings such as <code dir="auto">response</code>, <code dir="auto">cfg</code>, and <code dir="auto">params</code>.</p>
@@ -255,16 +258,24 @@ hosts installed before initialization, but every outbound method remains gated
 until initialization and its Promise microtasks have completed successfully.
 No initialization path, including async work, can send a request.</p>
 <div class="sl-heading-wrapper level-h3"><h3 id="reusable-utility-hosts">Reusable utility hosts</h3><a class="sl-anchor-link" href="#reusable-utility-hosts"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Reusable utility hosts”</span></a></div>
-<p>The planned <code dir="auto">URL</code>, <code dir="auto">URLSearchParams</code>, <code dir="auto">TextEncoder</code>, <code dir="auto">TextDecoder</code>, and text/base64
-helpers (<code dir="auto">atob</code>/<code dir="auto">btoa</code>) belong to the shared runtime rather than the Tool adapter.
-They perform no I/O and must bound host-side input/output allocations. They can
-be implemented in separate slices; reserving a name does not make that utility
-available. Their supported behavior must be documented when implemented.</p>
-<p>A structured diagnostic logger is also a generic host supplied by trusted Go
-code, using the existing logging/telemetry configuration. Bound authored log
-records and preserve fixed execution attribution. Do not automatically log
-arguments, configuration, credentials, HTTP bodies, or result payloads. Pure
-expression profiles receive only selected pure helpers, not the logger.</p>
+<p>Every bounded VM receives the implemented pure utilities: <code dir="auto">URLSearchParams</code>,
+<code dir="auto">TextEncoder</code>, <code dir="auto">TextDecoder</code>, <code dir="auto">atob</code>, and <code dir="auto">btoa</code>. Their names are reserved and
+protected before authored initialization. Pure expressions, connector helpers,
+validation, and async execution use the same utility surface. There are no
+per-utility enable flags. <code dir="auto">URL</code> remains a planned helper; reserving a future name
+does not make its implementation available. Each helper documents its supported
+semantics rather than promising complete browser or Node compatibility.</p>
+<p>Pure utilities perform no I/O. Their work and temporary/retained allocations
+consume the execution’s shared budget together with input conversion, output
+conversion, and managed HTTP operations. They receive neither an independent
+allowance nor a new allowance for each call. The caller defines one execution
+policy; lower layers inherit its remaining budget.</p>
+<p>A structured diagnostic logger is a separate generic capability supplied by
+trusted Go code, using the existing logging/telemetry configuration. Bound
+authored log records under the execution policy and preserve fixed attribution.
+Do not automatically log arguments, configuration, credentials, HTTP bodies, or
+result payloads. Pure expression profiles receive the pure utilities without a
+logger or HTTP capability.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="http-capability-contract">HTTP capability contract</h2><a class="sl-anchor-link" href="#http-capability-contract"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “HTTP capability contract”</span></a></div>
 <div class="sl-heading-wrapper level-h3"><h3 id="connection-requests-and-direct-fetch">Connection requests and direct fetch</h3><a class="sl-anchor-link" href="#connection-requests-and-direct-fetch"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Connection requests and direct fetch”</span></a></div>
 <p><code dir="auto">connection.fetch(url, init)</code> preserves the configured connection client’s
@@ -284,8 +295,12 @@ deadline, and aggregate allowances. Tools never enable global <code dir="auto">f
 <p>The initial request contract is a primitive absolute HTTP(S) URL and an optional
 object with <code dir="auto">method</code>, <code dir="auto">headers</code>, and <code dir="auto">body</code>. Default method is GET. Headers are
 string-valued own properties; the existing Host override behavior is retained.
-Body is a string or native ArrayBuffer. JSON requests use <code dir="auto">JSON.stringify</code>
-explicitly. Unsupported options are rejected, not silently ignored. Preserve
+Body is a string, native ArrayBuffer, or genuine <code dir="auto">URLSearchParams</code> instance.
+Form instances use the bounded native serializer and infer
+<code dir="auto">application/x-www-form-urlencoded;charset=UTF-8</code> only when no content type was
+supplied. The form conversion consumes the execution budget, and the body plus
+inferred header count against the request-byte cap. JSON requests use
+<code dir="auto">JSON.stringify</code> explicitly. Unsupported options are rejected, not silently ignored. Preserve
 the existing Fetch method normalization and CONNECT/TRACE/TRACK exclusions.</p>
 <p>The response exposes <code dir="auto">status</code>, <code dir="auto">ok</code>, <code dir="auto">headers.get(name)</code>, <code dir="auto">bodyUsed</code>, and async
 <code dir="auto">text()</code>, <code dir="auto">json()</code>, and <code dir="auto">arrayBuffer()</code> methods. HTTP error statuses resolve as
@@ -316,9 +331,10 @@ keeps caller-configured attribution and does not accept this connection-specific
 extension. Once supported, labels are optional per-call data on connection
 fetch, with no additional runtime enable flag; omission adds no request labels.</p>
 <div class="sl-heading-wrapper level-h2"><h2 id="budgets-and-execution-evidence">Budgets and execution evidence</h2><a class="sl-anchor-link" href="#budgets-and-execution-evidence"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 1 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 0 0-1.42-1.42m8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 1 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 0 0 0 1.42 1 1 0 0 0 1.42 0l3.88-3.89a4.49 4.49 0 0 0 0-6.33M8.83 15.17a1 1 0 0 0 .71.29 1 1 0 0 0 .71-.29l4.92-4.92a1 1 0 1 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42"></path></svg></span><span class="sr-only" data-pagefind-ignore>Section titled “Budgets and execution evidence”</span></a></div>
-<p>One execution owns one deadline, one HTTP budget, and one aggregate evidence
-tracker. Connection handles and direct fetch are dispatch choices under that
-owner, not independent sessions with fresh allowances. The Go-only HTTP package
+<p>One execution owns one cumulative managed-work/allocation budget, one deadline,
+one HTTP allowance, and one aggregate evidence tracker. Connection handles and
+direct fetch are dispatch choices under that owner; they share its remaining
+allowances. The Go-only HTTP package
 also supports a single-client declarative HTTP executor under the same rules.</p>
 <table>
 <thead>
@@ -339,6 +355,14 @@ also supports a single-client declarative HTTP executor under the same rules.</p
 <tr>
 <td>Stack depth</td>
 <td>JavaScript call depth in the owned VM.</td>
+</tr>
+<tr>
+<td>Managed work (<code dir="auto">MaxWorkUnits</code>)</td>
+<td>Native entries, admitted bytes/UTF-16 code units, and visited values/properties across input conversion, utility operations, managed HTTP work, and result conversion. Reprocessing data consumes work again.</td>
+</tr>
+<tr>
+<td>Managed allocation (<code dir="auto">MaxAllocationUnits</code>)</td>
+<td>Cumulative buffer bytes, string UTF-16 code units, and native value/metadata slots across those same operations. Temporary copies and retained state are charged; discarding them does not refund allowance.</td>
 </tr>
 <tr>
 <td>Input bytes/nodes/depth</td>
@@ -374,13 +398,33 @@ also supports a single-client declarative HTTP executor under the same rules.</p
 </tr>
 </tbody>
 </table>
-<p>Input and output have separate traversal counters. Each response JSON parse has
-its own depth/node allowance under the aggregate decoded-byte budget. These
-counters bound host conversion work, not JavaScript instructions. Invalid
-requests rejected before logical dispatch consume no request count; admitted
-requests are never refunded. Per-request rejections can be caught by the
-script; execution-wide timeout or aggregate response exhaustion cannot be
-caught to obtain a fresh budget. Creating another handle never adds allowance.</p>
+<p>Input/output byte caps describe the data crossing those boundaries, rather than
+all intermediate data. Their depth/node checks remain separate structural caps.
+Each response JSON parse has its own depth/node cap and its payload consumes the
+aggregate HTTP decoded-byte allowance. Every such conversion also consumes the
+same remaining execution work/allocation budget. Repeating a decode, creating a
+helper instance, or entering another package never resets that cumulative budget.</p>
+<p><code dir="auto">Run</code> establishes this budget on its execution context. An adapter that performs
+managed conversion before or after <code dir="auto">Run</code> can use <code dir="auto">WithExecutionBudget</code> around the
+whole operation. Nested <code dir="auto">Run</code> calls respect their own ceilings and every parent
+execution’s remaining allowance. The ledger is Go-only accounting state with no
+VM or Goja callback references, so passing cancellation/accounting context to an
+HTTP worker cannot retain a VM through the budget. Trusted native adapters use
+<code dir="auto">ChargeWork</code> and <code dir="auto">ReserveAllocation</code> against that same context.</p>
+<p>Work and allocation units are deterministic accounting measures, not a count of
+JavaScript instructions or live heap bytes. They bound managed native work and
+storage by fixed multiples. Goja built-ins and public reflection APIs may still
+allocate before the host can inspect the resulting size; this design does not
+provide a complete VM heap meter. Fixed VM bootstrap, intrinsic capture, and
+utility binding setup have implementation-bounded cost rather than per-data
+charges. The shared deadline still applies throughout.</p>
+<p>Invalid requests rejected before logical dispatch consume no HTTP request
+count; admitted requests are never refunded. Work and allocations already
+admitted remain charged even if a request is rejected. Per-request rejections
+can be caught by the script; execution-wide work/allocation exhaustion, timeout,
+or aggregate response exhaustion cannot be caught to continue effects or obtain
+a fresh budget. Any cumulative-budget failure permanently fails the enclosing
+execution, including when a trusted adapter ignores the returned error.</p>
 <p>Evidence describes outbound sends, not business-action completion. Client
 adapters report known-unsent, possibly-sent, or confirmed-sent outcomes across
 all target attempts, including redirects and credential recovery. Credential
@@ -523,4 +567,4 @@ predicate/transform/hook compatibility as those callers migrate.</li>
 tools. Keep the dependency graph acyclic and check it when moving packages.
 Preserve package-level tests alongside each extraction rather than postponing
 coverage to a final integration PR.</p>
-</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/development/design/bounded-javascript.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-11-07T02:35:47.000Z">Nov 7, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/development/design/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Design notes</span></span></a><a href="/development/design/tools-and-toolsets/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Tools, ToolSets, and agent access</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
+</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/development/design/bounded-javascript.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-11-22T00:43:13.000Z">Nov 22, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/development/design/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Design notes</span></span></a><a href="/development/design/tools-and-toolsets/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Tools, ToolSets, and agent access</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
