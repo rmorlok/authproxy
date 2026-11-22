@@ -88,12 +88,10 @@ resource "aws_cloudfront_distribution" "redirect" {
   wait_for_deployment = true
 
   origin {
+    # The AWS provider supplies an empty S3 origin config when sending the
+    # request and omits the empty block when reading it back into state.
     domain_name = aws_s3_bucket.origin.bucket_regional_domain_name
     origin_id   = local.s3_origin_id
-
-    s3_origin_config {
-      origin_access_identity = ""
-    }
   }
 
   default_cache_behavior {
