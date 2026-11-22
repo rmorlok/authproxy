@@ -109,8 +109,8 @@ and immutable snapshots may be reused concurrently. No Go maps, structs,
 methods, connection handles, or credentials are reflected into the runtime.
 
 Standard Goja language facilities and the shared runtime's pure utilities are
-available. There is no `fetch`, `toolResult`, timer, module loader, filesystem,
-process environment, or application logger.
+available. There is no `fetch`, `toolResult`, `ToolError`, timer, module loader,
+filesystem, process environment, or application logger.
 The [HTTP response mapper](../httpcodec/README.md#response-transforms) uses this
 runtime for `transformJavascript`, preparing the response object and converting
 the projection into a rich result. Expressions do not receive connector helper
@@ -205,17 +205,19 @@ the execution's shared `MaxWorkUnits` and `MaxAllocationUnits`. Exhaustion stops
 execution before any later request while preserving earlier send evidence.
 
 `Validate`, `Evaluate`, and `EvaluateWithHTTP` manage the complete bounded VM
-lifecycle. They install the pure `toolResult` helper before authored
-initialization, so a top-level constant can hold a helper result. Validation
-checks initialization only; payload conversion and validation happen when
-`execute` returns the result. `ToolError` and invocation-service integration
-remain separate work.
+lifecycle. They install the pure `toolResult` and `ToolError` helpers before
+authored initialization, so a top-level constant can hold a helper result or
+error. Validation checks initialization only; payload conversion and validation
+happen when `execute` settles. Uncaught throws or unhandled Promise rejections
+during initialization fail validation, including a `ToolError`. A constant
+constructed during initialization can be thrown later by `execute`.
+Invocation-service integration remains separate work.
 
 ## Evaluate an async Tool
 
 `ToolProgram.Evaluate` binds captured Tool input and delegates invocation and
 Promise settlement to the shared runtime. It calls `execute(params, context)` and
-converts its fulfilled native Promise result into a detached `*javascript.Result`.
+converts its settled native Promise result into a detached `*javascript.Result`.
 The Tool and its called helpers share a private copy of the captured input.
 `await` and Promise chains can compose their results:
 
@@ -247,12 +249,15 @@ Changing `params` or
 helpers. Reusing a compiled Tool starts fresh each time. This data-only evaluation
 path exposes `context.connections` as an empty array; it has no HTTP capability.
 
-Evaluation fails if `execute` throws or rejects, or another Promise remains
-rejected without a handler when work finishes. Rejections that are caught before
-then are allowed. A Promise that remains pending with no host work capable of
-settling it fails immediately; for example, `await new Promise(() => {})` does
-not consume the whole timeout. A busy loop or endless Promise chain is interrupted
-by the timeout. Errors contain no thrown values, private input, or stack traces.
+An ordinary throw or rejection produces an opaque Go error. An explicit
+`ToolError` rejection instead produces `Result.Error`, as described
+[below](#report-an-expected-failure). Another Promise left rejected without a
+handler still fails evaluation, even alongside a recognized ToolError.
+Rejections caught before work finishes are allowed. A Promise that remains
+pending with no host work capable of settling it fails immediately; for example,
+`await new Promise(() => {})` does not consume the whole timeout. A busy loop or
+endless Promise chain is interrupted by the timeout. Go errors contain no thrown
+values, private input, or stack traces.
 
 Evaluation runs synchronously on one Goja goroutine. Goja drains Promise jobs
 when authored calls finish, which supports `await` and Promise chains that can
@@ -412,6 +417,7 @@ containing detached Go data that remains valid after the VM closes:
 
 | Go field | Meaning |
 | --- | --- |
+| `Error` | Explicit `ToolError` code, message, and optional details. Nil for successful returns; execution state and retry policy belong to the caller. |
 | `StructuredContent` | Optional JSON. A nil value is absent; the bytes `null` preserve an explicit null. |
 | `Content` | Ordered rich-content blocks. Always a nonnil array, even when empty. |
 | `Provider` | Optional JSON object with extra upstream details selected by the Tool author, such as a request ID or API version. |
@@ -498,6 +504,71 @@ complete serialized invocation envelope, including trusted identities and the
 text block derived from an ordinary string. This package does not build that
 envelope.
 
+### Report an expected failure
+
+Throw `new ToolError(code, message, details)` when the Tool intentionally reports
+a failure to its caller. For example, an upstream customer lookup can report a
+safe message and the HTTP status without exposing the upstream error body:
+
+```javascript
+async function execute(params, context) {
+    const [connection] = context.connections;
+    const response = await connection.fetch(
+        connection.cfg.apiBase + "/customers/" + encodeURIComponent(params.id)
+    );
+    if (!response.ok) {
+        throw new ToolError("CUSTOMER_LOOKUP_FAILED", "Could not read customer", {
+            upstreamStatus: response.status
+        });
+    }
+    return await response.json();
+}
+```
+
+If the response status is 404, evaluation returns a `Result` whose `Error.Code`
+is `"CUSTOMER_LOOKUP_FAILED"`, `Error.Message` is `"Could not read customer"`, and
+`Error.Details` contains `{"upstreamStatus":404}`. The Go error is nil: the
+runtime successfully converted the Tool's explicit failure. `Content` is empty,
+and `StructuredContent` and `Provider` are absent. A runtime, conversion, limit,
+or cancellation failure instead returns a nil result and a Go error.
+
+The caller must check both the Go error and `result.Error`. The latter uses
+`api.ToolResultError`, but its `ExecutionState` is unset and `Retryable` is false
+at this boundary. Invocation assembly determines those fields from trusted
+policy and the HTTP session's `ExecutionState()`. In this example the request
+has already been sent; throwing a ToolError does not undo it, mark it unsent, or
+retry it. `Result.Error` is excluded from the success payload's JSON/YAML tags,
+so `toolResult({error: ...})` cannot supply it. This package still does not expose
+the public invocation endpoint or build its complete result envelope.
+
+`ToolError` accepts two or three arguments and can be called with or without
+`new`. Code and message must be primitive strings, and neither may be blank.
+Custom codes cannot use AuthProxy's reserved platform codes, such as
+`INPUT_INVALID` or `EXECUTION_LIMIT_EXCEEDED`. Details may be any supported JSON
+value: omitted or `undefined` means absent, while explicit `null` is retained.
+Blank fields, reserved codes, and unsupported details fail result conversion;
+wrong argument counts or non-string code/message arguments throw a fixed
+TypeError during construction. The author selects safe messages and details;
+the adapter does not redact supplied values or copy exception stacks or upstream
+bodies automatically.
+
+The constructor returns an opaque, frozen handle for throwing or rejecting.
+Catching it and rethrowing the same handle preserves its identity; catching it
+and returning a normal value succeeds. Returning the handle as a success, or
+nesting it in returned data, fails output conversion. Throwing ordinary `Error`
+objects, lookalike objects, copied handles, proxies around a handle, or
+`toolResult` values produces an opaque failure. The handle does not expose Error
+properties or a stack; it is not a general JavaScript `Error` subclass.
+
+Code, message, and details share one output byte/node/depth allowance. Both
+helper creation and detached error conversion consume the execution's shared
+work/allocation budget. Discarding or catching handles never refunds that
+budget, and exhaustion prevents later HTTP requests. Unrelated unhandled
+rejections and initialization failures cannot be converted into an explicit
+ToolError result.
+
+### Conversion rules
+
 Conversion rejects undefined, functions, symbols, BigInts, non-finite numbers,
 cycles, array holes, extra array properties, accessors, proxies, and exotic
 objects such as dates, promises, maps, sets, and typed arrays. It reads ordinary
@@ -530,14 +601,15 @@ recover digits that were already rounded.
 
 Ordinary structured JSON can preserve lone UTF-16 surrogate units as JSON
 escapes. A plain string also becomes a UTF-8 text block, so it must contain no
-lone units. The entire `toolResult` payload follows the same UTF-8 requirement,
-including structured data and provider metadata, before decoding rich blocks.
+lone units. The entire `toolResult` or `ToolError` payload follows the same UTF-8
+requirement, including structured data, provider metadata, and error details,
+before typed decoding.
 
-Failures return no partial output. Fixed error classifications distinguish
-invalid source, input, output, execution limits, and thrown JavaScript errors.
-Errors never contain authored source, thrown values, stack traces, private
-configuration, or response data. Caller cancellation and deadlines remain Go
-context errors. The configured timeout returns `apjsruntime.ErrLimitExceeded`,
+Runtime and conversion failures return no partial output. Fixed Go error
+classifications distinguish invalid source, input, output, execution limits,
+and ordinary thrown JavaScript errors. Those Go errors never contain authored
+source, thrown values, stack traces, private configuration, or response data.
+Caller cancellation and deadlines remain Go context errors. The configured timeout returns `apjsruntime.ErrLimitExceeded`,
 allowing an executor to report an execution-limit failure separately from a
 canceled caller request. If both contexts have expired, the caller's error wins.
 
@@ -550,8 +622,9 @@ no unlimited defaults.
 - `MaxSourceBytes` bounds authored UTF-8 source before parsing. For Tools, the
   script and connector helper library share this allowance.
 - `MaxInputBytes` bounds the serialized snapshot and response together.
-- `MaxOutputBytes` bounds the ordinary JSON value or complete `toolResult`
-  payload, including punctuation, escaping, content, and provider metadata.
+- `MaxOutputBytes` bounds the ordinary JSON value or complete `toolResult` /
+  `ToolError` payload, including punctuation, escaping, content, provider metadata,
+  and explicit error fields.
 - `MaxWorkUnits` bounds cumulative managed work across preparation, initialization,
   utility calls, HTTP conversion, and result encoding. Entries, admitted data
   units, and visited values/properties consume this allowance.

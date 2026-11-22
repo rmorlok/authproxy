@@ -8,15 +8,16 @@ import (
 )
 
 // Evaluate runs execute(params, context) in a fresh runtime and converts its
-// fulfilled Promise value into a detached Tool Result. The supplied input is copied
+// settled Promise value into a detached Tool Result. The supplied input is copied
 // before connector initialization; helpers called by execute can read cfg and
 // the other captured aliases. The caller owns schema validation and admission.
 //
 // This execution path supplies no I/O capabilities and context.connections is
 // empty. Native Promise chains and await work normally, but a pending Promise with
 // no host work cannot make progress and returns apjsruntime.ErrEvaluation. Rejected
-// entry points and otherwise unhandled rejections also return
-// apjsruntime.ErrEvaluation without exposing their values. The entry point must
+// entry points return apjsruntime.ErrEvaluation without exposing their values,
+// except genuine ToolError rejections: these return Result.Error and nil Go error.
+// Unrelated unhandled rejections still fail, even alongside a ToolError. The entry point must
 // return a native Promise, even if top-level code replaced the async declaration.
 // Ordinary JSON becomes structured content; strings also produce a text block.
 // Only toolResult handles opt into explicit rich content.

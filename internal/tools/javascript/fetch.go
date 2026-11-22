@@ -47,7 +47,9 @@ type FetchOptions struct {
 //
 // When execute settles, outstanding operations are canceled and late results
 // are discarded; they do not turn a successful race or caught failure into an
-// evaluation error. Already-observed unhandled rejections still fail. A pending
+// evaluation error. Explicit ToolError rejections return Result.Error; inspect
+// session evidence to determine their execution state. Other unhandled rejections
+// still fail. A pending
 // root with no host work also fails. HTTP status errors resolve normally;
 // transport/body errors reject with fixed messages. Caller cancellation takes
 // precedence over session failure, which takes precedence over runtime errors.

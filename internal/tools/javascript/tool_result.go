@@ -12,12 +12,20 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-// Result is the detached, successful content produced by one JavaScript Tool.
+// Result is the detached success or explicitly authored failure from one JavaScript Tool.
 // It is not the public invocation envelope: the executor supplies trusted Tool,
 // connection, revision, and invocation identities, performs output-schema checks,
-// and bounds the complete ToolResult envelope. Authored failures remain separate.
-// The JSON tags also define the payload accepted by the toolResult helper.
+// and bounds the complete ToolResult envelope. Runtime failures use Go errors.
+// The serialized fields define the success payload accepted by toolResult.
 type Result struct {
+	// Error is set only when execute rejects with a genuine ToolError. Evaluation
+	// then returns this Result with a nil Go error: conversion succeeded, but
+	// the authored operation reported a failure. Code, Message, and Details are
+	// explicitly chosen public data. ExecutionState is unset and Retryable is
+	// false; invocation assembly supplies trusted evidence and retry policy.
+	// The success helper cannot set this field through JSON or YAML decoding.
+	Error *api.ToolResultError `json:"-" yaml:"-"`
+
 	// StructuredContent is absent when nil and explicitly null when its bytes
 	// are "null". Ordinary returns populate this field, including scalar values.
 	StructuredContent common.RawJSON `json:"structuredContent,omitempty" yaml:"structuredContent,omitempty"`
@@ -44,38 +52,58 @@ type Result struct {
 
 // toolResultFactory captures private branding operations before authored code
 // can alter globals or prototypes. A WeakMap avoids retaining every discarded
-// handle in a Go registry. The private prototype distinguishes nested handles
-// from ordinary JSON objects, while the map identifies actual helper results.
+// handle in a Go registry. Private prototypes distinguish nested handles from
+// ordinary JSON objects; separate maps identify success and failure handles.
 var toolResultFactory = goja.MustCompile("tool-result-helper.js", `
-(function (admit) {
+(function (admitResult, admitError) {
     const results = new WeakMap();
     const has = results.has.bind(results);
     const get = results.get.bind(results);
     const set = results.set.bind(results);
+    const errors = new WeakMap();
+    const errorHas = errors.has.bind(errors);
+    const errorGet = errors.get.bind(errors);
+    const errorSet = errors.set.bind(errors);
     const create = Object.create;
     const freeze = Object.freeze;
     const Invalid = TypeError;
     const prototype = freeze(create(null));
+    const errorPrototype = freeze(create(null));
     return {
-        has, get,
+        has, get, errorHas, errorGet,
         helper: function toolResult(payload) {
-            admit();
+            admitResult();
             if (arguments.length !== 1) throw new Invalid("toolResult requires one payload");
             const handle = create(prototype);
             set(handle, payload);
+            return freeze(handle);
+        },
+        ToolError: function ToolError(code, message, details) {
+            admitError();
+            if (arguments.length < 2 || arguments.length > 3 ||
+                typeof code !== "string" || typeof message !== "string") {
+                throw new Invalid("ToolError requires a string code, string message, and optional details");
+            }
+            const payload = create(null);
+            payload.code = code;
+            payload.message = message;
+            if (details !== undefined) payload.details = details;
+            const handle = create(errorPrototype);
+            errorSet(handle, payload);
             return freeze(handle);
         }
     };
 })
 `, true)
 
-// toolResultExtension supplies only Tool success semantics. The shared runtime
-// owns initialization, promise settlement, cancellation, and output accounting.
-// Ordinary rejections remain private execution failures; ToolError is separate.
+// toolResultExtension supplies Tool success and explicit failure semantics. The
+// shared runtime owns initialization, promise settlement, cancellation, and
+// output accounting. Unrecognized rejections remain private execution failures.
 func toolResultExtension() apjsruntime.ResultExtension[*Result] {
 	return apjsruntime.ResultExtension[*Result]{
 		Bindings: []apjsruntime.HostBinding{
 			{Name: "toolResult"},
+			{Name: "ToolError"},
 		},
 		Install: installToolResult,
 	}
@@ -85,10 +113,13 @@ func toolResultExtension() apjsruntime.ResultExtension[*Result] {
 // captured callables belong to the VM owner and never escape result conversion.
 type toolResultInterpreter struct {
 	has goja.Callable // Bound WeakMap.has; plain objects cannot forge a handle.
-	get goja.Callable // Bound WeakMap.get; retrieves the original authored payload.
+	get goja.Callable // Bound WeakMap.get; retrieves the original success payload.
+
+	errorHas goja.Callable // Separate brand check; only explicit failures are public.
+	errorGet goja.Callable // Captured error payload, unaffected by handle properties.
 }
 
-// installToolResult installs the pure helper before authored initialization in
+// installToolResult installs pure success/error helpers before initialization in
 // both validation and evaluation. Discarded handles do not stay alive through a
 // Go registry, but every creation still consumes the execution's shared budget.
 func installToolResult(
@@ -103,24 +134,11 @@ func installToolResult(
 	}
 
 	factory, _ := goja.AssertFunction(value)
-	admit := vm.ToValue(func(goja.FunctionCall) goja.Value {
-		err := apjsruntime.ChargeWork(ctx, 1)
-		if err == nil {
-			// Reserve one wrapper and one private branding tuple before creating
-			// either. Dropping a handle never refunds cumulative allocation.
-			err = apjsruntime.ReserveAllocation(ctx, 2)
-		}
-		if err != nil {
-			// Interrupt makes exhaustion terminal even if authored code catches
-			// the fixed native exception and tries to issue another request.
-			vm.Interrupt(err)
-			panic(vm.NewTypeError("tool result budget exhausted"))
-		}
-
-		return goja.Undefined()
-	})
-
-	value, err = factory(goja.Undefined(), admit)
+	value, err = factory(
+		goja.Undefined(),
+		toolHelperAdmission(ctx, vm, 2), // Success wrapper and branding tuple.
+		toolHelperAdmission(ctx, vm, 6), // Error wrapper, tuple, payload, and three fields.
+	)
 	if err != nil {
 		return empty, apjsruntime.EvaluationError(err)
 	}
@@ -133,9 +151,36 @@ func installToolResult(
 		return empty, apjsruntime.ErrInvalidInput
 	}
 
-	interpreter := &toolResultInterpreter{has: has, get: get}
+	if err := vm.Set("ToolError", registry.Get("ToolError")); err != nil {
+		return empty, apjsruntime.ErrInvalidInput
+	}
+	errorHas, _ := goja.AssertFunction(registry.Get("errorHas"))
+	errorGet, _ := goja.AssertFunction(registry.Get("errorGet"))
+	interpreter := &toolResultInterpreter{has: has, get: get, errorHas: errorHas, errorGet: errorGet}
 
-	return apjsruntime.ResultInterpreter[*Result]{Fulfilled: interpreter.fulfilled}, nil
+	return apjsruntime.ResultInterpreter[*Result]{
+		Fulfilled: interpreter.fulfilled,
+		Rejected:  interpreter.rejected,
+	}, nil
+}
+
+// toolHelperAdmission creates a private native gate used only by the captured
+// helper factories. Each call charges entry work and its fixed native slots
+// before creating handles; discarded or caught values do not refund the ledger.
+func toolHelperAdmission(ctx context.Context, vm *goja.Runtime, slots int) goja.Value {
+	return vm.ToValue(func(goja.FunctionCall) goja.Value {
+		err := apjsruntime.ChargeWork(ctx, 1)
+		if err == nil {
+			err = apjsruntime.ReserveAllocation(ctx, slots)
+		}
+		if err != nil {
+			// Interrupt makes exhaustion terminal even if authored code catches
+			// the fixed native exception and tries to issue another request.
+			vm.Interrupt(err)
+			panic(vm.NewTypeError("tool helper budget exhausted"))
+		}
+		return goja.Undefined()
+	})
 }
 
 // fulfilled maps ordinary JSON or a branded payload into detached content.
@@ -205,26 +250,10 @@ func (i *toolResultInterpreter) fulfilled(
 		if encoded[0] != '{' {
 			return nil, apjsruntime.RejectOutput(apjsruntime.OutputUnexpectedType)
 		}
-		// Typed Go JSON decoding replaces lone surrogate escapes. Require
-		// lossless strings throughout the helper payload before that boundary.
-		if err := apjsruntime.ValidateJSONStrings(ctx, encoded); err != nil {
-			if budgetErr := apjsruntime.ChargeWork(ctx, 0); budgetErr != nil {
-				return nil, budgetErr
-			}
-			return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidString)
+		if err := decodeToolPayload(ctx, encoded, result); err != nil {
+			return nil, err
 		}
-		// The encoded payload bounds decoded strings and native slots by fixed
-		// implementation multiples. Charge decoding and canonical validation
-		// separately, before their Go routines can scan or allocate.
-		for range 2 {
-			if err := apjsruntime.ChargeWork(ctx, len(encoded)); err != nil {
-				return nil, err
-			}
-			if err := apjsruntime.ReserveAllocation(ctx, len(encoded)); err != nil {
-				return nil, err
-			}
-		}
-		if err := util.DecodeJSONStrict(encoded, result); err != nil || result.Content == nil {
+		if result.Content == nil {
 			return nil, apjsruntime.RejectOutput(apjsruntime.OutputInvalidShape)
 		}
 		if len(result.Provider) != 0 && bytes.TrimSpace(result.Provider)[0] != '{' {
@@ -247,4 +276,31 @@ func (i *toolResultInterpreter) fulfilled(
 	}
 
 	return result, nil
+}
+
+// decodeToolPayload admits typed decoding and subsequent field validation of
+// already bounded JSON. It rejects lossy strings and hides decoder diagnostics;
+// success/error interpreters validate their own domain shape after this call.
+func decodeToolPayload(ctx context.Context, encoded []byte, target any) error {
+	// Go's typed decoder replaces lone surrogate escapes, including in keys.
+	if err := apjsruntime.ValidateJSONStrings(ctx, encoded); err != nil {
+		if budgetErr := apjsruntime.ChargeWork(ctx, 0); budgetErr != nil {
+			return budgetErr
+		}
+		return apjsruntime.RejectOutput(apjsruntime.OutputInvalidString)
+	}
+	// Encoded bytes bound decoded strings and native slots by fixed multiples.
+	// Charge decoding and canonical validation separately before native work.
+	for range 2 {
+		if err := apjsruntime.ChargeWork(ctx, len(encoded)); err != nil {
+			return err
+		}
+		if err := apjsruntime.ReserveAllocation(ctx, len(encoded)); err != nil {
+			return err
+		}
+	}
+	if err := util.DecodeJSONStrict(encoded, target); err != nil {
+		return apjsruntime.RejectOutput(apjsruntime.OutputInvalidShape)
+	}
+	return apjsruntime.ChargeWork(ctx, 0)
 }

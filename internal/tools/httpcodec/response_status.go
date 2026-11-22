@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 )
 
@@ -115,7 +116,7 @@ func compileResponseRules(source *tools.HTTPResponse, maxSourceBytes int) (*resp
 			return nil, errors.New("response error codes and messages must be valid UTF-8")
 		}
 
-		if isReservedResponseCode(rule.Code) {
+		if api.IsReservedToolErrorCode(rule.Code) {
 			return nil, errors.New("response error rules cannot use reserved platform codes")
 		}
 	}
@@ -170,24 +171,4 @@ func (r *responseRules) lookup(status int) (responseRule, bool) {
 		return *r.fallback, true
 	}
 	return responseRule{}, false
-}
-
-// isReservedResponseCode protects platform failures from being impersonated by
-// authored HTTP status mappings. Custom codes otherwise retain their spelling.
-func isReservedResponseCode(code string) bool {
-	switch code {
-	case "INPUT_INVALID",
-		"CONNECTION_UNAVAILABLE",
-		"UPSTREAM_AUTH_FAILED",
-		"UPSTREAM_FAILED",
-		"UPSTREAM_PROTOCOL_ERROR",
-		"UNSUPPORTED_CAPABILITY",
-		"EXECUTION_LIMIT_EXCEEDED",
-		"OUTPUT_INVALID",
-		"OUTPUT_TOO_LARGE",
-		"TOOL_REVISION_CHANGED":
-		return true
-	default:
-		return false
-	}
 }
