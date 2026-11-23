@@ -1,6 +1,6 @@
-// Package jsexec prepares JavaScript Tool definitions for admitted execution.
-// It combines captured schemas, the selected connector library, and effective
-// policy without granting connection access or exposing a public invocation API.
+// Package jsexec prepares and executes admitted JavaScript Tools with captured
+// schemas, a selected connector library, and finite execution policy. Callers
+// supply one authorized connection; this package exposes no public invocation API.
 package jsexec
 
 import (
@@ -17,7 +17,7 @@ import (
 
 // Program owns the compiled script, schemas, and policy for one captured Tool
 // revision and selected connector library. It retains no invocation or VM data
-// and supports concurrent initialization checks, each in a fresh bounded VM.
+// and supports concurrent validation and execution, each in a fresh bounded VM.
 // A program must not be reused for another revision, library, or policy.
 type Program struct {
 	script  *javascript.ToolProgram // Tool-only helpers and the shared async runtime.

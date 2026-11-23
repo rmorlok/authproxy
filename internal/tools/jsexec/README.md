@@ -1,15 +1,16 @@
-# JavaScript Tool preparation
+# JavaScript Tool execution
 
 `jsexec` prepares one JavaScript Tool definition, its selected connector helper
 library, and its execution policy. `Compile` captures the script and input/output
-schemas without executing JavaScript. `Validate` checks initialization in a
-fresh bounded VM without calling `execute` or supplying a connection.
+schemas without executing JavaScript. `Validate` checks initialization without
+calling `execute` or supplying a connection. `Execute` runs the prepared Tool in
+a fresh VM against one admitted connection and assembles its bounded result.
 
-This package currently provides compilation and initialization checks. Execution,
-final result-envelope assembly, server policy defaults, and public invocation
-integration are separate work. The lower-level
-[JavaScript adapter](../javascript/README.md) already owns copied Tool inputs,
-the sole connection capability, rich results, and explicit `ToolError` values.
+The lower-level [JavaScript adapter](../javascript/README.md) owns copied Tool
+inputs, the sole connection capability, rich results, and explicit `ToolError`
+values. This executor adds argument/output schemas, invocation identities, and
+final envelope limits. Server policy defaults and core/public invocation
+integration remain separate work.
 
 ## Prepare a customer lookup
 
@@ -80,6 +81,59 @@ effective policy and library wrapper, so later edits to definition buffers,
 authored limit pointers, or the caller's library value cannot change the program.
 Reuse it only for the same captured revision, selected library, and policy.
 
+## Execute an admitted lookup
+
+Once admission has authorized the Tool and prepared its configured HTTP client,
+call the compiled program with the matching captured context:
+
+```go
+result, err := program.Execute(ctx, client, jsexec.Invocation{
+    ID: "tiv_01example0000001",
+    Arguments: common.RawJSON(`{"id":"customer-42"}`),
+    Snapshot: render.Input{
+        ToolID: "tol_01example0000001", Revision: 7,
+        ConnectionID: "cxn_01example0000001",
+        ConnectionNamespace: "root.product.owner",
+        Cfg: map[string]any{"apiBase":"https://crm.example.test"},
+    },
+})
+```
+
+`client` is an `iface.HTTPClient` configured for that connection and actor.
+Admission must ensure that the program, snapshot, and client belong together.
+The caller supplies raw argument JSON; `Execute` validates it and replaces any
+`Snapshot.Params` with the validated values. Connection configuration comes
+from the snapshot; credentials stay in the client.
+
+The customer example receives `params.id == "customer-42"` and one entry in
+`context.connections`. It can call multiple endpoints through that connection;
+all requests share the HTTP allowances and captured attribution. Global direct
+`fetch` is absent. Request label overrides retain the configured client's
+middleware selection and protected-label checks.
+
+Successful structured output is checked against the optional output schema.
+Rich results may omit structured content when no schema is configured. Explicit
+`ToolError` results skip the success schema, retain their public details, and
+receive execution state from HTTP evidence. They do not acquire automatic retry
+advice. The shared [result helpers](../result/README.md) then bound the complete
+envelope, including provider metadata and error details.
+
+Uncaught ordinary exceptions and fetch rejections produce a fixed `OUTPUT_INVALID`
+failure without exposing exception or transport text. A script can catch a
+per-request failure and return a useful result or throw an explicit `ToolError`.
+Exhausting the aggregate response allowance remains terminal and produces
+`OUTPUT_TOO_LARGE`; catching its rejection cannot reset the allowance. Native
+work/output encoding limits and policy timeouts produce `EXECUTION_LIMIT_EXCEEDED`.
+Output-schema mismatches produce `OUTPUT_INVALID`; output validation data limits
+and complete-envelope limits produce `OUTPUT_TOO_LARGE`.
+
+Failure results retain a single snapshot of send evidence taken when evaluation
+ends: `notStarted` requires no possible target send, and possible sends remain
+`mayHaveExecuted`. An HTTP response alone cannot prove completion of a multi-step
+Tool action. Caller cancellation returns a Go context error. Invalid internal
+inputs return `ErrInvalidInvocation`; if even a safe failure cannot fit, execution
+returns `result.ErrEncodedResultLimit` with no result.
+
 ## Apply execution policy
 
 Every field in `Limits` must be positive; this package supplies no defaults.
@@ -122,6 +176,19 @@ work/allocation, response streams/headers, per-request bytes, and pending worker
 retain their independent operator ceilings. These HTTP, data, and envelope limits
 are captured for execution; `Validate` only exercises initialization policy.
 
+`Execute` uses the earlier runtime/HTTP timeout for the whole invocation.
+`Invocation.Deadline` can include time already spent in admission and preparation;
+an earlier caller deadline also applies. The enclosing context stays live after
+the JavaScript adapter closes its dedicated HTTP session, so schema checks and
+envelope assembly remain under the original deadline. Policy expiry can still
+produce a safe error when the original caller context remains live.
+
+Known argument and structured-output JSON passes consume the execution's shared
+native work/allocation ledger, along with managed VM and HTTP conversion work.
+Snapshot copying, schema data, and final envelope serialization also have their
+own finite limits. These do not supply a schema evaluation-step budget or a hard
+memory quota; synchronous bounded operations check cancellation on completion.
+
 ## Check initialization
 
 `Validate(ctx)` initializes the selected library and Tool under the effective
@@ -137,8 +204,8 @@ a context error and policy exhaustion is `apjsruntime.ErrLimitExceeded`.
 Each check uses a fresh VM, including concurrent checks of one program.
 
 Initialization checks do not prove that every invocation will return valid output.
-Admission, argument/output validation, connection execution, and complete result
-limits still belong to the invocation path. The current JSON Schema compiler and
+`Execute` performs argument/output validation, connection execution, and complete
+result limits; admission remains caller-owned. The current JSON Schema compiler and
 evaluator also need the [work bound tracked in #948](https://github.com/rmorlok/authproxy/issues/948)
 before public invocation is enabled. Schema compilation is synchronous and has
 no cancellation hook; callers must check cancellation around it.
