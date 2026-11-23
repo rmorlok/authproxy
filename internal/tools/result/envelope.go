@@ -52,26 +52,33 @@ func Finish(
 	if result == nil {
 		return nil, ErrInvalidResult
 	}
+
 	switch state {
-	case api.ToolExecutionStateNotStarted, api.ToolExecutionStateMayHaveExecuted, api.ToolExecutionStateCompleted:
+	case api.ToolExecutionStateNotStarted,
+		api.ToolExecutionStateMayHaveExecuted,
+		api.ToolExecutionStateCompleted:
 	default:
 		return nil, ErrInvalidResult
 	}
+
 	// Existing errors and size-limit fallbacks must report the same evidence.
 	if result.Error != nil && result.Error.ExecutionState != state {
 		return nil, ErrInvalidResult
 	}
+
 	if maxBytes <= 0 {
 		return nil, ErrEncodedResultLimit
 	}
 
 	encoded, err := json.Marshal(result)
+
 	if contextErr := ctx.Err(); contextErr != nil {
 		return nil, contextErr
 	}
 	if err != nil {
 		return nil, ErrInvalidResult
 	}
+
 	if len(encoded) <= maxBytes {
 		return result, nil
 	}
@@ -82,15 +89,19 @@ func Finish(
 		Code:    "OUTPUT_TOO_LARGE",
 		Message: "The encoded Tool result exceeds the result byte limit.",
 	}, state)
+
 	encoded, err = json.Marshal(result)
 	if contextErr := ctx.Err(); contextErr != nil {
 		return nil, contextErr
 	}
+
 	if err != nil {
 		return nil, ErrInvalidResult
 	}
+
 	if len(encoded) > maxBytes {
 		return nil, ErrEncodedResultLimit
 	}
+
 	return result, nil
 }

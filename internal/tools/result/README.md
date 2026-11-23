@@ -13,9 +13,11 @@ identities and check the complete result against a 16 KiB allowance:
 
 ```go
 result, err := toolresult.New(
-    "tol_01example0000001", 7, "tiv_01example0000001",
+    "tol_01example0000001", 
+	7,                      // revision
+	"tiv_01example0000001",
     api.ToolResultMetadata{ConnectionID: "cxn_01example0000001"},
-    16 * 1024,
+    16 * 1024,              // maxBytes
 )
 if err != nil {
     return nil, err

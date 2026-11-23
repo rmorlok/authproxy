@@ -207,7 +207,10 @@ func (r *Response) Map(
 
 	// Capture detached identities through the same contract used by executors.
 	result, err := toolresult.New(
-		input.ToolID, input.Revision, input.InvocationID, input.Metadata,
+		input.ToolID,
+		input.Revision,
+		input.InvocationID,
+		input.Metadata,
 		r.limits.MaxEncodedResultBytes,
 	)
 	if err != nil {
