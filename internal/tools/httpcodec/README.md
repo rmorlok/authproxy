@@ -622,6 +622,9 @@ required when an expression is configured:
 
 Size failures become `OUTPUT_TOO_LARGE` without truncated content. An oversized
 result, including an authored error message, is replaced once by a safe error.
+Identity capture and final envelope limits use the shared
+[Tool result helpers](../result/README.md), including removal of all partial
+content and provider metadata when replacing a result with a failure.
 If even that envelope cannot fit, `Map` returns `ErrEncodedResultLimit` with no
 result. Invalid invocation metadata and cancellation also return Go errors with
 no partial result. These caps bound processing; they are not hard memory quotas.

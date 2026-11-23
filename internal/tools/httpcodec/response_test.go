@@ -583,7 +583,8 @@ func TestResponseIdentityEncodingAndSize(t *testing.T) {
 			input := responseInput()
 			test.change(&input)
 			result, err := program.Map(context.Background(), input)
-			require.Error(t, err)
+			// Callers can match invalid result data through the mapper's own contract.
+			require.ErrorIs(t, err, httpcodec.ErrInvalidResult)
 			require.Nil(t, result)
 			require.NotContains(t, err.Error(), "private-id")
 		})

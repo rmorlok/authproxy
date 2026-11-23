@@ -143,7 +143,9 @@ rich-result rules. An output schema validates only successful
 structured JSON, so a binary-only response fails unless a projection produces
 the promised JSON. Missing output schemas leave rich passthrough available.
 
-Failures use fixed messages and discard partial output:
+Captured identities and final envelope limits use the shared
+[Tool result helpers](../result/README.md). Failures use fixed messages and
+discard partial output:
 
 | Failure | Result code |
 | --- | --- |
