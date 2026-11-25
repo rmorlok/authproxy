@@ -71,7 +71,11 @@ type Invocation struct {
 // a safe error return a Go error with no result. No automatic retries occur here.
 // Callers must keep invocation data stable during the call; returned data is owned
 // by this invocation and compiled programs support concurrent execution.
-func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocation Invocation) (*api.ToolResult, error) {
+func (p *Program) Execute(
+	ctx context.Context,
+	client iface.HTTPClient,
+	invocation Invocation,
+) (*api.ToolResult, error) {
 	if p == nil || p.script == nil || p.schemas == nil || ctx == nil || client == nil {
 		return nil, ErrInvalidInvocation
 	}
@@ -83,11 +87,19 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	// Output schemas and envelope assembly must consume the original deadline.
 	timed, stop := p.executionContext(ctx, invocation.Deadline)
 	defer stop()
+
 	input := invocation.Snapshot
-	base, err := toolresult.New(input.ToolID, input.Revision, invocation.ID, api.ToolResultMetadata{
-		ConnectionID: input.ConnectionID, ToolSetGeneration: input.ToolSetGeneration,
-		CatalogRevision: input.CatalogRevision,
-	}, p.limits.MaxEncodedResultBytes)
+	base, err := toolresult.New(
+		input.ToolID,
+		input.Revision,
+		invocation.ID,
+		api.ToolResultMetadata{
+			ConnectionID:      input.ConnectionID,
+			ToolSetGeneration: input.ToolSetGeneration,
+			CatalogRevision:   input.CatalogRevision,
+		},
+		p.limits.MaxEncodedResultBytes,
+	)
 	if callerErr := ctx.Err(); callerErr != nil {
 		return nil, callerErr
 	}
@@ -103,6 +115,7 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	if err != nil {
 		return p.failure(ctx, timed, base, state, err, "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded an execution limit.")
 	}
+
 	fail := func(err error, code, message string) (*api.ToolResult, error) {
 		return p.failure(ctx, workCtx, base, state, err, code, message)
 	}
@@ -112,21 +125,25 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	if err := chargeDataPass(workCtx, len(invocation.Arguments)); err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool arguments cannot be prepared.")
 	}
+
 	params, err := p.schemas.ValidateInput(workCtx, invocation.Arguments)
 	if err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool arguments do not match the input schema.")
 	}
+
 	// Schema numbers retain exact JSON spelling, but JavaScript requires finite
 	// Number values. Attribute this incompatibility to arguments before combining
 	// them with the captured connection data.
 	if err := validateArgumentNumbers(workCtx, params); err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool arguments contain a number unsupported by JavaScript.")
 	}
+
 	input.Params = params
 	snapshot, err := render.NewContext(input, p.limits.Render)
 	if err != nil {
 		return fail(err, "CONNECTION_UNAVAILABLE", "The captured Tool connection context cannot be prepared.")
 	}
+
 	if err := apjsruntime.ChargeWork(workCtx, 0); err != nil {
 		return fail(err, "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded an execution limit.")
 	}
@@ -136,10 +153,17 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 		return fail(err, "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation could not start.")
 	}
 	defer session.Close()
-	output, err := p.script.EvaluateWithHTTP(workCtx, javascript.Input{Context: snapshot}, javascript.FetchOptions{
-		Session: session, MaxRequestBytes: p.limits.MaxRequestBytes,
-		MaxPendingOperations: p.limits.MaxPendingOperations, Logger: invocation.Logger,
-	})
+
+	output, err := p.script.EvaluateWithHTTP(
+		workCtx,
+		javascript.Input{Context: snapshot},
+		javascript.FetchOptions{
+			Session:              session,
+			MaxRequestBytes:      p.limits.MaxRequestBytes,
+			MaxPendingOperations: p.limits.MaxPendingOperations,
+			Logger:               invocation.Logger,
+		},
+	)
 
 	// Evaluation closes the dedicated session. Snapshot evidence once; later
 	// worker completions cannot revise the uncertainty reported by this call.
@@ -169,6 +193,7 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	}
 
 	result, err := toolresult.Finish(workCtx, base, state, p.limits.MaxEncodedResultBytes)
+
 	// The HTTP session is closed; only the still-live outer context/budget can
 	// decide whether post-VM work completed inside this invocation's allowance.
 	if workErr := apjsruntime.ChargeWork(workCtx, 0); workErr != nil {
@@ -180,6 +205,7 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	if err != nil {
 		return fail(err, "OUTPUT_INVALID", "The Tool result could not be encoded.")
 	}
+
 	return result, nil
 }
 
