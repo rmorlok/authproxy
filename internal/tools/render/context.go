@@ -214,7 +214,7 @@ func cloneValue(value any, b *budget, depth int) (any, error) {
 	}
 
 	if depth > b.limit.MaxDepth {
-		return nil, errors.New("render depth limit exceeded")
+		return nil, fmt.Errorf("%w: depth limit", ErrLimit)
 	}
 
 	switch v := value.(type) {

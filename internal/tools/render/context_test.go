@@ -213,14 +213,18 @@ func TestContextRejectsNonJSONAndBounds(t *testing.T) {
 	_, err := NewContext(Input{Params: map[string]any{"private-field": func() {}}}, testLimits())
 	require.ErrorContains(t, err, "context field params:")
 	require.NotContains(t, err.Error(), "private-field")
+	// Disabled policy is invalid configuration, distinct from exhausting a valid cap.
+	_, err = NewContext(Input{}, Limits{})
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrLimit)
 	for _, limits := range []Limits{
-		{}, {MaxBytes: 1, MaxDepth: 32, MaxSteps: 10000},
+		{MaxBytes: 1, MaxDepth: 32, MaxSteps: 10000},
 		{MaxBytes: 1 << 20, MaxDepth: 1, MaxSteps: 10000},
 		{MaxBytes: 1 << 20, MaxDepth: 32, MaxSteps: 1},
 	} {
-		// Limits apply while copying, before a render can retain the snapshot.
+		// Limit categories survive the snapshot's contextual wrapping.
 		_, err := NewContext(Input{Params: map[string]any{"large": strings.Repeat("x", 100)}}, limits)
-		require.Error(t, err)
+		require.ErrorIs(t, err, ErrLimit)
 	}
 }
 

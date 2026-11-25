@@ -3,6 +3,7 @@ package runtime_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -14,6 +15,194 @@ import (
 	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/stretchr/testify/require"
 )
+
+// rejectionInput exposes a fake dispatcher through either standard HTTP input
+// path, exercising automatic native-rejection registration in PrepareInput.
+func rejectionInput(dispatch func(*http.Request) (*aphttp.Response, error), connection bool) jsruntime.AsyncInput {
+	if !connection {
+		return jsruntime.AsyncInput{DirectDispatch: dispatch}
+	}
+	return jsruntime.AsyncInput{Connections: []jsruntime.ConnectionInput{{
+		Snapshot: json.RawMessage(`{"id":"captured"}`),
+		Dispatcher: connectionTestDispatcher{dispatch: func(request *http.Request, _ map[string]string) (*aphttp.Response, error) {
+			return dispatch(request)
+		}},
+	}}}
+}
+
+// TestHTTPHostClassifiesGenuineRootRejections preserves safe host classifications
+// after the rejected Promise propagates through await and the host closes.
+func TestHTTPHostClassifiesGenuineRootRejections(t *testing.T) {
+	for _, category := range []error{
+		aphttp.ErrCredentialsUnavailable, aphttp.ErrRequestLimit, aphttp.ErrStreamLimit,
+		aphttp.ErrHeaderLimit, aphttp.ErrEncoding, aphttp.ErrInvalidResponse,
+		aphttp.ErrTransport, aphttp.ErrTimeout, jsruntime.ErrLimitExceeded,
+	} {
+		for _, connection := range []bool{false, true} {
+			name, fetch := "direct", "fetch"
+			if connection {
+				name, fetch = "connection", "context.connections[0].fetch"
+			}
+			t.Run(category.Error()+"/"+name, func(t *testing.T) {
+				program := compileDirectFetch(t, `async function execute(params, context) { await `+fetch+`("https://example.test/fail"); }`)
+				// Only the canonical cause survives a dependency wrapper's private text.
+				input := rejectionInput(func(*http.Request) (*aphttp.Response, error) {
+					return nil, errors.Join(errors.New("private-provider-diagnostic"), category)
+				}, connection)
+				result, err := runDirectFetch(context.Background(), program, nil, input, 2)
+				require.Nil(t, result)
+				require.ErrorIs(t, err, jsruntime.ErrEvaluation)
+				require.ErrorIs(t, err, category)
+				require.Equal(t, jsruntime.ErrEvaluation.Error(), err.Error())
+			})
+		}
+	}
+}
+
+// TestHTTPHostRejectionIdentity distinguishes rethrowing the actual native error
+// from copying its properties, catching it, or throwing an unrelated value.
+func TestHTTPHostRejectionIdentity(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		body       string
+		classified bool
+		success    bool
+	}{
+		{"caught recovery", `try { await fetch("https://example.test/fail"); } catch (e) { return "recovered"; }`, false, true},
+		{"same error", `try { await fetch("https://example.test/fail"); } catch (e) { throw e; }`, true, false},
+		{"mutated error", `try { await fetch("https://example.test/fail"); } catch (e) { e.message = "private replacement"; e.code = "forged"; throw e; }`, true, false},
+		{"copied properties", `try { await fetch("https://example.test/fail"); } catch (e) { throw {...e, message:e.message}; }`, false, false},
+		{"proxy", `try { await fetch("https://example.test/fail"); } catch (e) { throw new Proxy(e, {}); }`, false, false},
+		{"new error same message", `try { await fetch("https://example.test/fail"); } catch (e) { throw new TypeError(e.message); }`, false, false},
+		{"unrelated later error", `try { await fetch("https://example.test/fail"); } catch (e) {} throw new Error("private unrelated");`, false, false},
+		{"unrelated unhandled rejection", `try { await fetch("https://example.test/fail"); } catch (e) { Promise.reject("private detached"); throw e; }`, false, false},
+		{"forged without fetch", `throw new TypeError("HTTP credentials unavailable");`, false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			program := compileDirectFetch(t, `async function execute() { `+test.body+` }`)
+			input := rejectionInput(func(*http.Request) (*aphttp.Response, error) {
+				return nil, aphttp.ErrCredentialsUnavailable
+			}, false)
+			result, err := runDirectFetch(context.Background(), program, nil, input, 2)
+			if test.success {
+				// A handled failure must not replace the script's deliberate recovery.
+				require.NoError(t, err)
+				require.JSONEq(t, `"recovered"`, string(result))
+				return
+			}
+			// Only the exact root error retains its host category; all text is opaque.
+			require.Nil(t, result)
+			require.ErrorIs(t, err, jsruntime.ErrEvaluation)
+			require.Equal(t, test.classified, errors.Is(err, aphttp.ErrCredentialsUnavailable))
+			require.Equal(t, jsruntime.ErrEvaluation.Error(), err.Error())
+		})
+	}
+
+	// The first caught host failure cannot overwrite a later root's own cause.
+	program := compileDirectFetch(t, `async function execute() {
+		try { await fetch("https://example.test/caught"); } catch (e) {}
+		await fetch("https://example.test/final");
+	}`)
+	input := rejectionInput(func(request *http.Request) (*aphttp.Response, error) {
+		if request.URL.Path == "/caught" {
+			return nil, aphttp.ErrCredentialsUnavailable
+		}
+		return nil, aphttp.ErrStreamLimit
+	}, false)
+	result, err := runDirectFetch(context.Background(), program, nil, input, 2)
+	require.Nil(t, result)
+	require.ErrorIs(t, err, aphttp.ErrStreamLimit)
+	require.NotErrorIs(t, err, aphttp.ErrCredentialsUnavailable)
+}
+
+// rejectedReadBody supplies a detached body failure to the host's read worker.
+type rejectedReadBody struct{ err error }
+
+// Read returns the fixed test category without partial bytes or external I/O.
+func (b rejectedReadBody) Read([]byte) (int, error) { return 0, b.err }
+
+// Close releases no resources; its response belongs entirely to this test.
+func (b rejectedReadBody) Close() error { return nil }
+
+// TestHTTPHostClassifiesBodyRejections covers failures originating after fetch
+// resolved and preserves opaque classification for malformed authored requests.
+func TestHTTPHostClassifiesBodyRejections(t *testing.T) {
+	program := compileDirectFetch(t, `async function execute() {
+		return await (await fetch("https://example.test/body")).text();
+	}`)
+	input := rejectionInput(func(*http.Request) (*aphttp.Response, error) {
+		return &aphttp.Response{
+			StatusCode: 200, Header: make(http.Header),
+			Body: rejectedReadBody{err: errors.Join(errors.New("private decoder detail"), aphttp.ErrEncoding)},
+		}, nil
+	}, false)
+	result, err := runDirectFetch(context.Background(), program, nil, input, 2)
+	require.Nil(t, result)
+	require.ErrorIs(t, err, aphttp.ErrEncoding)
+	require.ErrorIs(t, err, jsruntime.ErrEvaluation)
+
+	// An authored invalid fetch argument is not invalid captured invocation data.
+	program = compileDirectFetch(t, `async function execute() { return await fetch({private:"url"}); }`)
+	result, err = runDirectFetch(context.Background(), program, nil, input, 2)
+	require.Nil(t, result)
+	require.ErrorIs(t, err, jsruntime.ErrEvaluation)
+	require.NotErrorIs(t, err, jsruntime.ErrInvalidInput)
+}
+
+// interruptedFetchError synchronizes interruption with native classification,
+// after a worker's completion reaches the owner but before rejection allocation.
+type interruptedFetchError struct {
+	onClassify func() // Cancels the caller or exhausts the VM-free budget ledger.
+}
+
+// Error supplies private dependency text that must never escape the host.
+func (e interruptedFetchError) Error() string { return "private dependency failure" }
+
+// Is runs the test transition only when its actual category is queried.
+func (e interruptedFetchError) Is(target error) bool {
+	if target != aphttp.ErrCredentialsUnavailable {
+		return false
+	}
+	e.onClassify()
+	return true
+}
+
+// TestHTTPHostCompletionAdmissionReturnsErrors covers the plain-Go Await path:
+// cancellation or exhaustion during rejection construction must not panic a VM value.
+func TestHTTPHostCompletionAdmissionReturnsErrors(t *testing.T) {
+	for _, scenario := range []string{"cancellation", "allocation exhaustion"} {
+		t.Run(scenario, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			program := compileDirectFetch(t, `async function execute() { await fetch("https://example.test/fail"); }`)
+			want := error(context.Canceled)
+			if scenario == "allocation exhaustion" {
+				want = jsruntime.ErrLimitExceeded
+			}
+			input := rejectionInput(func(request *http.Request) (*aphttp.Response, error) {
+				return nil, interruptedFetchError{onClassify: func() {
+					if scenario == "cancellation" {
+						cancel()
+					} else {
+						// Charge more than the whole budget after worker handoff;
+						// the owner must propagate exhaustion as an ordinary error.
+						_ = jsruntime.ReserveAllocation(request.Context(), runtimeLimits().MaxAllocationUnits+1)
+					}
+				}}
+			}, false)
+
+			// The transition occurs inside classification, so no timing race or
+			// scheduler-dependent sleep is needed to exercise failed admission.
+			var result json.RawMessage
+			var err error
+			require.NotPanics(t, func() {
+				result, err = runDirectFetch(ctx, program, nil, input, 2)
+			})
+			require.ErrorIs(t, err, want)
+			require.Nil(t, result)
+		})
+	}
+}
 
 // httpHostClient records which fixed client received a request and returns its
 // identity as the body. The buffered record channel never blocks a worker.

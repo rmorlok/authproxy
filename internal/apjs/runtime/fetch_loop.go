@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	goruntime "runtime"
@@ -56,6 +57,13 @@ type HTTPHost struct {
 	nextID      uint64                                 // Monotonic operation identity within this invocation.
 	pending     map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
 	completed   chan fetchCompletion                   // Unbuffered ownership handoff from workers.
+
+	// rejections associates genuine native error identities with fixed safe Go
+	// categories. Entries consume the cumulative allocation budget and live only
+	// until this host/VM is discarded; authored properties cannot forge them.
+	// This map is used to compare the final value that is settled against an err
+	// that should be emitted from the execution.
+	rejections map[*goja.Object]error
 }
 
 // NewHTTPHost captures pristine parsing and starts no work. Call it during
@@ -125,11 +133,29 @@ func (l *HTTPHost) Start() {
 // error. Both allocations consume the execution budget even when the caller
 // catches the rejection. NewGoError is avoided because it reflects a Go error.
 func (l *HTTPHost) rejected(err error) goja.Value {
-	helper := utilityHost{ctx: l.ctx, vm: l.vm}
+	helper := utilityHost{
+		ctx: l.ctx,
+		vm:  l.vm,
+	}
+
 	helper.beginCall()
 	helper.reserveOutput(2) // One Promise and one fixed-error metadata slot.
+
+	// Create a promise to return that we will ultimately reject
 	promise, _, reject := l.vm.NewPromise()
-	_ = reject(l.vm.NewTypeError("%s", fetchErrorMessage(err)))
+
+	// Figure out what the native javascript value we should use for this error
+	value, valueErr := l.rejectionValue(err)
+	if valueErr != nil {
+		// This path runs inside a native JavaScript binding, where the utility
+		// host's interruption convention unwinds through Goja's call boundary.
+		helper.checkContext()
+		helper.failLimit()
+	}
+
+	// Reject the promise
+	_ = reject(value)
+
 	return l.vm.ToValue(promise)
 }
 
@@ -160,7 +186,13 @@ func (l *HTTPHost) start(
 	l.pending[id] = func(done fetchCompletion) error {
 		value, err := convert(done)
 		if err != nil {
-			err = reject(l.vm.NewTypeError("%s", fetchErrorMessage(err)))
+			failure, failureErr := l.rejectionValue(err)
+			if failureErr != nil {
+				// Await invokes completion callbacks directly in Go. Cancellation
+				// and budget admission must return errors, never panic VM values.
+				return failureErr
+			}
+			err = reject(failure)
 		} else {
 			err = resolve(value)
 		}
@@ -173,6 +205,92 @@ func (l *HTTPHost) start(
 	go runFetchWorker(l.ctx, l.completed, l.options.Logger, id, work)
 
 	return l.vm.ToValue(promise), true
+}
+
+// rejectionValue creates a JavaScript-native failure and remembers only a
+// canonical host category. No Go error is reflected into the VM. Unknown errors
+// and malformed authored fetch inputs remain ordinary opaque rejections. Native
+// admission errors are returned because completion callers run outside Goja.
+func (l *HTTPHost) rejectionValue(err error) (*goja.Object, error) {
+	category := fetchErrorCategory(err)
+	if category != nil {
+		// One retained native identity/category entry. Unlike utility bindings,
+		// this function is also called by Await's ordinary Go completion path.
+		if err := ReserveAllocation(l.ctx, 1); err != nil {
+			return nil, err
+		}
+	}
+
+	// Translate the error message into a value that we ultimately allow (either
+	// allowlisted or generic message)
+	value := l.vm.NewTypeError("%s", fetchErrorMessage(err))
+
+	if category != nil {
+		if l.rejections == nil {
+			l.rejections = make(map[*goja.Object]error)
+		}
+
+		// For allowlisted categories, track it in rejections to propagate out
+		l.rejections[value] = category
+	}
+
+	return value, nil
+}
+
+// RejectionError recognizes only a genuine failure produced by this HTTP host.
+// Call it on the owning VM goroutine after root settlement; it remains usable
+// after Close. Copies, forged properties, proxies, and unrelated later errors
+// do not inherit a classification. The returned error retains no VM state.
+func (l *HTTPHost) RejectionError(value goja.Value) error {
+	object, ok := value.(*goja.Object)
+	if !ok {
+		return nil
+	}
+
+	if category := l.rejections[object]; category != nil {
+		return &fetchRejectionError{category: category}
+	}
+
+	return nil
+}
+
+// fetchRejectionError preserves the generic evaluation classification while
+// exposing a canonical host cause to trusted Go adapters through errors.Is.
+// It contains neither the original dependency error nor its native VM object.
+type fetchRejectionError struct {
+	category error // One fixed sentinel admitted by fetchErrorCategory.
+}
+
+// Error preserves the opaque evaluation message; callers classify with errors.Is.
+func (e *fetchRejectionError) Error() string { return ErrEvaluation.Error() }
+
+// Is matches the general evaluation failure or the retained canonical cause.
+func (e *fetchRejectionError) Is(target error) bool {
+	return target == ErrEvaluation || target == e.category
+}
+
+// fetchErrorCategory selects safe classifications without retaining wrappers or
+// private transport diagnostics. Native input misuse remains an opaque script
+// failure, distinct from invalid captured invocation data in a host adapter.
+func fetchErrorCategory(err error) error {
+	for _, category := range []error{
+		ErrLimitExceeded,
+		aphttp.ErrRequestLimit,
+		aphttp.ErrResponseLimit,
+		aphttp.ErrStreamLimit,
+		aphttp.ErrHeaderLimit,
+		aphttp.ErrEncoding,
+		aphttp.ErrInvalidResponse,
+		aphttp.ErrCredentialsUnavailable,
+		aphttp.ErrTransport,
+		aphttp.ErrTimeout,
+	} {
+		if errors.Is(err, category) {
+			return category
+		}
+	}
+
+	return nil
 }
 
 // Await processes one host completion on the VM goroutine. Resolving its Promise
@@ -270,6 +388,8 @@ func fetchWorkerStack() string {
 
 // fetchErrorMessage restricts Promise rejection text to known classifications.
 // Unexpected host errors never disclose their original text to authored code.
+// This function effectively allows certain errors to pass through with their
+// messages and then uses a generic message for all others.
 func fetchErrorMessage(err error) string {
 	switch err {
 	case ErrInvalidInput,

@@ -59,7 +59,7 @@ func compileValue(source common.RawJSON, b *budget, parameterValues bool) (*Valu
 		return nil, err
 	}
 	if len(source) > b.limit.MaxBytes {
-		return nil, errors.New("render source byte limit exceeded")
+		return nil, fmt.Errorf("%w: source byte limit", ErrLimit)
 	}
 
 	if !utf8.Valid(source) {
@@ -100,7 +100,7 @@ func compileValueNode(value any, interpret, parameterValues bool, b *budget, dep
 		return nil, err
 	}
 	if depth > b.limit.MaxDepth {
-		return nil, errors.New("render depth limit exceeded")
+		return nil, fmt.Errorf("%w: depth limit", ErrLimit)
 	}
 	switch v := value.(type) {
 	case map[string]any:
@@ -239,7 +239,7 @@ func (w *valueWriter) emit(value any, depth int) error {
 	}
 
 	if depth > w.budget.limit.MaxDepth {
-		return errors.New("render depth limit exceeded")
+		return fmt.Errorf("%w: depth limit", ErrLimit)
 	}
 
 	switch v := value.(type) {
@@ -275,7 +275,7 @@ func (w *valueWriter) emit(value any, depth int) error {
 		// Every child needs at least one visit. A snapshot may have been captured
 		// under a larger budget, so reject wide maps before allocating their keys.
 		if len(v) > w.budget.limit.MaxSteps-w.budget.steps {
-			return errors.New("render step limit exceeded")
+			return fmt.Errorf("%w: step limit", ErrLimit)
 		}
 		if err := w.write("{"); err != nil {
 			return err
@@ -340,7 +340,7 @@ func (w *valueWriter) emit(value any, depth int) error {
 // context limits can be larger than the current snapshot/render allowance.
 func (w *valueWriter) writeQuoted(text string) error {
 	if len(text) > w.budget.limit.MaxBytes-w.budget.bytes-2 {
-		return errors.New("render byte limit exceeded")
+		return fmt.Errorf("%w: byte limit", ErrLimit)
 	}
 	var encoded bytes.Buffer
 

@@ -51,8 +51,11 @@ type FetchOptions struct {
 // session evidence to determine their execution state. Other unhandled rejections
 // still fail. A pending
 // root with no host work also fails. HTTP status errors resolve normally;
-// transport/body errors reject with fixed messages. Caller cancellation takes
-// precedence over session failure, which takes precedence over runtime errors.
+// transport/body errors reject with fixed messages. An uncaught genuine host
+// rejection also preserves its safe Go category through errors.Is; caught errors
+// and unrelated later exceptions do not carry that classification forward.
+// Caller cancellation takes precedence over session failure, which takes
+// precedence over runtime errors.
 func (p *ToolProgram) EvaluateWithHTTP(
 	ctx context.Context,
 	input Input,
