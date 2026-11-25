@@ -110,6 +110,13 @@
           "type": "integer",
           "minimum": 1
         },
+        "maxRequestBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxPendingOperations": {
+          "type": "integer",
+          "minimum": 1
+        },
         "maxInputBytes": {
           "$ref": "../common/schema.json#/$defs/HumanByteSize"
         },
@@ -125,6 +132,12 @@
         "maxStackDepth": {
           "type": "integer",
           "minimum": 1
+        },
+        "maxJavascriptSourceBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "maxJavascriptInputBytes": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
         },
         "maxRenderBytes": {
           "$ref": "../common/schema.json#/$defs/HumanByteSize"

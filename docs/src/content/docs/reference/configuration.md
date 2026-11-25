@@ -131,24 +131,30 @@ These settings currently govern the internal HTTP Tool invocation path. There
 is no public invocation endpoint yet; bounded schema evaluation remains a
 prerequisite. The declarative HTTP executor makes one logical request. Proxy
 credential recovery and redirects may make additional HTTP attempts under the
-existing proxy policy.
+existing proxy policy. JavaScript Tool policy resolution is also implemented;
+connecting it to core invocation is still pending. JavaScript-specific settings
+below do not change existing connector scripts or HTTP response transforms.
 
 | Field | Default | What it limits |
 |---|---|---|
 | `timeout` | `60s` | Preparation, compilation, and execution after authorization; response transforms share the remaining time |
 | `maxRequests` | `20` | Logical connection-client calls |
+| `maxRequestBytes` | `1mib` | Each JavaScript request's URL, method, headers, body, and label overrides before dispatch |
+| `maxPendingOperations` | `8` | Concurrent JavaScript fetch and body-read operations, including completions waiting for the VM |
 | `maxInputBytes` | `1mib` | Raw argument JSON, including whitespace |
 | `maxResponseBytes` | `8mib` | Aggregate decoded response bytes |
-| `maxOutputBytes` | `8mib` | Result content, structured-output JSON, and transform output |
+| `maxOutputBytes` | `8mib` | Result content, structured-output JSON, and transform output; JavaScript also applies this cap to each complete rich result, `ToolError` payload, and console record |
 | `maxEncodedResultBytes` | `16mib` | The complete JSON result, including metadata, escaping, and base64 |
-| `maxStackDepth` | `256` | Response-transform JavaScript function-call depth |
+| `maxStackDepth` | `256` | JavaScript Tool and response-transform function-call depth |
+| `maxJavascriptSourceBytes` | `256kib` | Combined JavaScript Tool and selected connector helper-library source, including whitespace |
+| `maxJavascriptInputBytes` | `16mib` | Combined serialized arguments, Tool context, and the captured connection supplied to a JavaScript Tool |
 | `maxRenderBytes` | `8mib` | Each copied invocation context, compiled request template, and rendered request |
 | `maxTransformInputBytes` | `16mib` | Serialized invocation context and response supplied to a transform |
 | `maxResponseStreamBytes` | `8mib` | Each response stream before Tool-host decoding; the HTTP transport may already have decompressed it |
 | `maxResponseHeaderBytes` | `64kib` | Each copied response header map, including line overhead |
 | `maxResponseSourceBytes` | `256kib` | Combined response-rule and transform source text |
 | `maxDepth` | `64` | Nesting of copied, rendered, validated, and transformed data |
-| `maxValues` | `1000000` | Values inspected per JSON validation or transform input/output conversion |
+| `maxValues` | `1000000` | Values inspected per JSON validation or JavaScript input/output/body conversion |
 | `maxRenderSteps` | `1000000` | Work per context copy, template compilation, or render |
 | `maxNumberDigits` | `4096` | Mantissa digits plus absolute decimal exponent for JSON validation; cannot exceed 4096 |
 
@@ -166,6 +172,31 @@ counts for the size fields. Raising those settings therefore raises the allowanc
 for native scans, copies, and metadata processing. Repeated or expensive utility
 calls can still exhaust it. A combination too large to fit the runtime's integer
 range is rejected when the invocation policy is resolved.
+
+JavaScript Tools use one cumulative work budget and one cumulative allocation
+budget across arguments, VM input, HTTP conversions, pure utilities, and results.
+Each is derived from the operator's byte and value limits as:
+
+```text
+16 * (maxInputBytes + maxJavascriptInputBytes + maxOutputBytes + maxResponseBytes
+      + maxRequests * (maxRequestBytes + maxResponseHeaderBytes))
+  + 32 * maxValues
+```
+
+Request and header processing scale with the request count. Response bytes are
+already an aggregate allowance, so they are counted once. Raw argument bytes are
+included separately because whitespace is removed before VM input. Raising these
+settings increases the native processing allowance; arbitrary repeated work can
+still exhaust it. Overflow is rejected before execution. Per-Tool caps lower
+their corresponding limits without recomputing this operator budget.
+
+The request and worker limits serve different purposes. For example,
+`maxRequests: 10` and `maxPendingOperations: 2` allow ten logical calls over the
+whole execution, with at most two fetch or body-read operations pending at once.
+Reading a response body uses a worker slot but does not spend another logical
+request. Raising the worker limit does not grant more requests or a fresh native
+budget. JavaScript source/input limits are independent of response-transform
+source/input settings.
 
 Nesting and value counts bound data processing; they do not count JavaScript
 instructions or JSON Schema evaluation steps. The timeout interrupts supported

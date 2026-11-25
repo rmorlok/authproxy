@@ -21,11 +21,15 @@ func TestToolInvocationLimitsSerialization(t *testing.T) {
   invocation:
     timeout: 7s
     maxRequests: 3
+    maxRequestBytes: 512kib
+    maxPendingOperations: 5
     maxInputBytes: 2mib
     maxResponseBytes: 4mib
     maxOutputBytes: 1mib
     maxEncodedResultBytes: 8mib
     maxStackDepth: 100
+    maxJavascriptSourceBytes: 192kib
+    maxJavascriptInputBytes: 24mib
     maxRenderBytes: 16mib
     maxTransformInputBytes: 32mib
     maxResponseStreamBytes: 64mib
@@ -47,6 +51,7 @@ func TestToolInvocationLimitsSerialization(t *testing.T) {
 	l := fromJSON.Tools.Invocation
 	require.Equal(t, 7*time.Second, l.Timeout.Duration)
 	require.Equal(t, 3, *l.MaxRequests)
+	require.Equal(t, 5, *l.MaxPendingOperations)
 	require.Equal(t, 100, *l.MaxStackDepth)
 	require.Equal(t, 32, *l.MaxDepth)
 	require.Equal(t, 50000, *l.MaxValues)
@@ -56,10 +61,13 @@ func TestToolInvocationLimitsSerialization(t *testing.T) {
 		value *HumanByteSize
 		bytes uint64
 	}{
+		{l.MaxRequestBytes, 512 * common.KiB},
 		{l.MaxInputBytes, 2 * common.MiB},
 		{l.MaxResponseBytes, 4 * common.MiB},
 		{l.MaxOutputBytes, common.MiB},
 		{l.MaxEncodedResultBytes, 8 * common.MiB},
+		{l.MaxJavascriptSourceBytes, 192 * common.KiB},
+		{l.MaxJavascriptInputBytes, 24 * common.MiB},
 		{l.MaxRenderBytes, 16 * common.MiB},
 		{l.MaxTransformInputBytes, 32 * common.MiB},
 		{l.MaxResponseStreamBytes, 64 * common.MiB},
@@ -94,8 +102,8 @@ func TestToolInvocationLimitsValidate(t *testing.T) {
 	require.NoError(t, err)
 	require.JSONEq(t, `{"invocation":{}}`, string(encoded))
 
-	counts := []string{"maxRequests", "maxStackDepth", "maxDepth", "maxValues", "maxRenderSteps", "maxNumberDigits"}
-	bytes := []string{"maxInputBytes", "maxResponseBytes", "maxOutputBytes", "maxEncodedResultBytes", "maxRenderBytes", "maxTransformInputBytes", "maxResponseStreamBytes", "maxResponseHeaderBytes", "maxResponseSourceBytes"}
+	counts := []string{"maxRequests", "maxPendingOperations", "maxStackDepth", "maxDepth", "maxValues", "maxRenderSteps", "maxNumberDigits"}
+	bytes := []string{"maxRequestBytes", "maxInputBytes", "maxResponseBytes", "maxOutputBytes", "maxEncodedResultBytes", "maxJavascriptSourceBytes", "maxJavascriptInputBytes", "maxRenderBytes", "maxTransformInputBytes", "maxResponseStreamBytes", "maxResponseHeaderBytes", "maxResponseSourceBytes"}
 	for _, field := range counts {
 		for _, value := range []int{-1, 0, 1} {
 			t.Run(fmt.Sprintf("%s/%d", field, value), func(t *testing.T) {
@@ -180,6 +188,8 @@ func TestToolsSchema(t *testing.T) {
 	for _, source := range []string{
 		`{}`, `{"tools":{}}`, `{"tools":{"invocation":{}}}`,
 		`{"tools":{"invocation":{"timeout":"3s","maxRequests":3,"maxInputBytes":"1mib","maxResponseBytes":"8mib","maxOutputBytes":"8mib","maxEncodedResultBytes":"16mib","maxStackDepth":256,"maxRenderBytes":"8mib","maxTransformInputBytes":"16mib","maxResponseStreamBytes":"8mib","maxResponseHeaderBytes":"64kib","maxResponseSourceBytes":"256kib","maxDepth":64,"maxValues":1000000,"maxRenderSteps":1000000,"maxNumberDigits":4096}}}`,
+		`{"tools":{"invocation":{"maxJavascriptSourceBytes":"256kib","maxJavascriptInputBytes":"16mib","maxRequestBytes":"1mib","maxPendingOperations":8}}}`,
+		`{"tools":{"invocation":{"maxJavascriptSourceBytes":"1b","maxJavascriptInputBytes":"1b","maxRequestBytes":"1b","maxPendingOperations":1}}}`,
 	} {
 		var value any
 		require.NoError(t, json.Unmarshal([]byte(source), &value))
@@ -195,6 +205,13 @@ func TestToolsSchema(t *testing.T) {
 		`{"tools":{"invocation":{"maxInputBytes":1024}}}`,
 		`{"tools":{"invocation":{"timeout":60}}}`,
 		`{"tools":{"invocation":{"maxStackDepth":"256"}}}`,
+		`{"tools":{"invocation":{"maxJavascriptSourceBytes":1024}}}`,
+		`{"tools":{"invocation":{"maxJavascriptInputBytes":1024}}}`,
+		`{"tools":{"invocation":{"maxRequestBytes":1024}}}`,
+		`{"tools":{"invocation":{"maxPendingOperations":0}}}`,
+		`{"tools":{"invocation":{"maxPendingOperations":-1}}}`,
+		`{"tools":{"invocation":{"maxPendingOperations":1.5}}}`,
+		`{"tools":{"invocation":{"maxPendingOperations":"8"}}}`,
 	} {
 		var value any
 		require.NoError(t, json.Unmarshal([]byte(source), &value))

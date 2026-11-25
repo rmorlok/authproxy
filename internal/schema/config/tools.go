@@ -17,26 +17,43 @@ type Tools struct {
 
 // ToolInvocationLimits configures independent execution and processing ceilings.
 // Nil fields select runtime defaults; explicitly configured limits must be
-// positive. Increasing one allowance does not increase the others. These caps
-// bound data processing and interruptible work, not total process memory or the
-// underlying JSON Schema evaluator's work.
+// positive. Data boundaries remain separate; the runtime derives shared native
+// processing budgets from these settings. These caps bound data processing and
+// interruptible work, not total process memory or the underlying JSON Schema
+// evaluator's work.
 type ToolInvocationLimits struct {
 	// Timeout spans preparation and execution after authorization.
 	Timeout *HumanDuration `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	// MaxRequests counts logical outbound requests. Existing proxy credential
 	// recovery and redirects may make additional transport attempts.
 	MaxRequests *int `json:"maxRequests,omitempty" yaml:"maxRequests,omitempty"`
+	// MaxRequestBytes bounds one JavaScript request's URL, method, headers, body,
+	// and label overrides before admitting an HTTP worker.
+	MaxRequestBytes *HumanByteSize `json:"maxRequestBytes,omitempty" yaml:"maxRequestBytes,omitempty"`
+	// MaxPendingOperations bounds outstanding JavaScript fetch and response-read
+	// workers, including completions the VM has not consumed yet.
+	MaxPendingOperations *int `json:"maxPendingOperations,omitempty" yaml:"maxPendingOperations,omitempty"`
 	// MaxInputBytes bounds the caller's encoded argument JSON.
 	MaxInputBytes *HumanByteSize `json:"maxInputBytes,omitempty" yaml:"maxInputBytes,omitempty"`
 	// MaxResponseBytes bounds aggregate decoded upstream response bytes.
 	MaxResponseBytes *HumanByteSize `json:"maxResponseBytes,omitempty" yaml:"maxResponseBytes,omitempty"`
 	// MaxOutputBytes bounds successful content before result envelope encoding.
+	// JavaScript also applies it to rich results, complete ToolError payloads,
+	// and each authored console record when logging is enabled.
 	MaxOutputBytes *HumanByteSize `json:"maxOutputBytes,omitempty" yaml:"maxOutputBytes,omitempty"`
 	// MaxEncodedResultBytes includes result identities, metadata, JSON escaping,
 	// and base64 expansion; content within MaxOutputBytes can still exceed it.
 	MaxEncodedResultBytes *HumanByteSize `json:"maxEncodedResultBytes,omitempty" yaml:"maxEncodedResultBytes,omitempty"`
-	// MaxStackDepth bounds JavaScript function call depth, including recursion.
+	// MaxStackDepth bounds function call depth in JavaScript Tools and response
+	// transforms, including recursion.
 	MaxStackDepth *int `json:"maxStackDepth,omitempty" yaml:"maxStackDepth,omitempty"`
+	// MaxJavascriptSourceBytes bounds a JavaScript Tool's source together with
+	// its selected connector helper library, before either source is parsed.
+	MaxJavascriptSourceBytes *HumanByteSize `json:"maxJavascriptSourceBytes,omitempty" yaml:"maxJavascriptSourceBytes,omitempty"`
+	// MaxJavascriptInputBytes bounds the combined serialized arguments, captured
+	// Tool context, and sole connection supplied to a JavaScript Tool's VM.
+	// It is independent of MaxInputBytes, which applies only to caller arguments.
+	MaxJavascriptInputBytes *HumanByteSize `json:"maxJavascriptInputBytes,omitempty" yaml:"maxJavascriptInputBytes,omitempty"`
 	// MaxRenderBytes bounds each snapshot copy, template compilation, and complete
 	// request render, including connection configuration as well as arguments.
 	MaxRenderBytes *HumanByteSize `json:"maxRenderBytes,omitempty" yaml:"maxRenderBytes,omitempty"`
@@ -52,11 +69,11 @@ type ToolInvocationLimits struct {
 	// MaxResponseSourceBytes bounds response rule metadata and transform source.
 	// Request template source is instead covered by MaxRenderBytes.
 	MaxResponseSourceBytes *HumanByteSize `json:"maxResponseSourceBytes,omitempty" yaml:"maxResponseSourceBytes,omitempty"`
-	// MaxDepth bounds value nesting during validation, rendering, and transforms.
+	// MaxDepth bounds value nesting during validation, rendering, and JavaScript.
 	// Each processor retains its own root-depth convention.
 	MaxDepth *int `json:"maxDepth,omitempty" yaml:"maxDepth,omitempty"`
 	// MaxValues bounds JSON values during validation and value/property inspections
-	// during transforms. It does not count JSON Schema evaluation operations.
+	// in JavaScript Tools and transforms. It does not count JSON Schema operations.
 	MaxValues *int `json:"maxValues,omitempty" yaml:"maxValues,omitempty"`
 	// MaxRenderSteps bounds visited values and template operations, including
 	// repeated section bodies, in each render operation.
@@ -99,10 +116,13 @@ func (l *ToolInvocationLimits) Validate(vc *common.ValidationContext) error {
 		name  string
 		value *HumanByteSize
 	}{
+		{"maxRequestBytes", l.MaxRequestBytes},
 		{"maxInputBytes", l.MaxInputBytes},
 		{"maxResponseBytes", l.MaxResponseBytes},
 		{"maxOutputBytes", l.MaxOutputBytes},
 		{"maxEncodedResultBytes", l.MaxEncodedResultBytes},
+		{"maxJavascriptSourceBytes", l.MaxJavascriptSourceBytes},
+		{"maxJavascriptInputBytes", l.MaxJavascriptInputBytes},
 		{"maxRenderBytes", l.MaxRenderBytes},
 		{"maxTransformInputBytes", l.MaxTransformInputBytes},
 		{"maxResponseStreamBytes", l.MaxResponseStreamBytes},
@@ -120,6 +140,7 @@ func (l *ToolInvocationLimits) Validate(vc *common.ValidationContext) error {
 		value *int
 	}{
 		{"maxRequests", l.MaxRequests},
+		{"maxPendingOperations", l.MaxPendingOperations},
 		{"maxStackDepth", l.MaxStackDepth},
 		{"maxDepth", l.MaxDepth},
 		{"maxValues", l.MaxValues},
