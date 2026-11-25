@@ -84,7 +84,8 @@ var connectionBrand = goja.NewSymbol("AuthProxy connection")
 //
 // A host is required when connections or direct HTTP are supplied. It must belong
 // to this VM, and its Close/Start/Await must already be registered on the invocation.
-// This helper owns no session or worker lifecycle and never enables I/O.
+// Its native rejection classifier is registered for this invocation. This helper
+// owns no session or worker lifecycle and never enables I/O.
 func (i *AsyncInvocation) PrepareInput(
 	ctx context.Context,
 	vm *goja.Runtime,
@@ -103,6 +104,9 @@ func (i *AsyncInvocation) PrepareInput(
 
 	if err := ChargeWork(ctx, 1); err != nil {
 		return err
+	}
+	if host != nil {
+		i.HostRejection = host.RejectionError
 	}
 
 	// Every document consumes at least one node. Bound the document slice before

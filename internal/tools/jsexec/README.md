@@ -103,7 +103,10 @@ result, err := program.Execute(ctx, client, jsexec.Invocation{
 Admission must ensure that the program, snapshot, and client belong together.
 The caller supplies raw argument JSON; `Execute` validates it and replaces any
 `Snapshot.Params` with the validated values. Connection configuration comes
-from the snapshot; credentials stay in the client.
+from the snapshot; credentials stay in the client. Arguments must contain finite
+JavaScript numbers. Invalid caller arguments produce `INPUT_INVALID`; unusable
+captured configuration produces `CONNECTION_UNAVAILABLE`. Snapshot byte, depth,
+and step limits produce `EXECUTION_LIMIT_EXCEEDED`.
 
 The customer example receives `params.id == "customer-42"` and one entry in
 `context.connections`. It can call multiple endpoints through that connection;
@@ -118,9 +121,27 @@ receive execution state from HTTP evidence. They do not acquire automatic retry
 advice. The shared [result helpers](../result/README.md) then bound the complete
 envelope, including provider metadata and error details.
 
-Uncaught ordinary exceptions and fetch rejections produce a fixed `OUTPUT_INVALID`
-failure without exposing exception or transport text. A script can catch a
-per-request failure and return a useful result or throw an explicit `ToolError`.
+Uncaught ordinary exceptions produce a fixed `OUTPUT_INVALID` failure. When the
+rejected result is an actual fetch or body-read error, its safe host category
+determines the public code:
+
+| Uncaught host failure | Result code |
+| --- | --- |
+| Unavailable credentials | `CONNECTION_UNAVAILABLE` |
+| Request, worker, or request-byte limit; timeout | `EXECUTION_LIMIT_EXCEEDED` |
+| Response, stream, or header limit | `OUTPUT_TOO_LARGE` |
+| Invalid response or unsupported/invalid content encoding | `UPSTREAM_PROTOCOL_ERROR` |
+| Transport or response-read failure | `UPSTREAM_FAILED` |
+
+The runtime recognizes the original error object by private identity, so copying
+its properties or writing a matching message cannot supply a host classification.
+Exception text, transport diagnostics, and credentials never enter these errors.
+A script can catch a per-request failure and return a useful result or throw an
+explicit `ToolError`. Rethrowing the original error preserves its classification;
+throwing a different ordinary error produces `OUTPUT_INVALID`, even after a caught
+credentials failure. An earlier handled failure does not override the script's
+chosen outcome.
+
 Exhausting the aggregate response allowance remains terminal and produces
 `OUTPUT_TOO_LARGE`; catching its rejection cannot reset the allowance. Native
 work/output encoding limits and policy timeouts produce `EXECUTION_LIMIT_EXCEEDED`.

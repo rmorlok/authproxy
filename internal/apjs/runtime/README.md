@@ -421,6 +421,15 @@ JavaScript, and map its final error and send evidence into the caller's outcome.
 it does not close the session or its clients. Register cleanup immediately after
 construction, including when later preparation might fail.
 
+`PrepareInput` also registers `HTTPHost.RejectionError` as the invocation's
+`HostRejection` callback. After cleanup, an uncaught rejection carrying an actual
+host-created error retains its safe HTTP or execution-limit category through
+`errors.Is`, while still matching `ErrEvaluation`. The returned Go error contains
+no VM values or dependency diagnostics. Recognition uses private object identity;
+changing error properties does not change its category, and copies or proxies
+cannot acquire one. Caught failures do not override a successful return, an
+explicit domain error, or an unrelated later exception.
+
 Connections preserve caller order; empty or duplicate IDs fail before authored
 code or I/O. Each snapshot accepts only `id`, `name`, `namespace`, `cfg`, `labels`,
 and `annotations`. Missing name/namespace become empty strings and missing

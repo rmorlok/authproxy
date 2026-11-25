@@ -55,7 +55,7 @@ func compileTemplate(source string, b *budget) (*Template, error) {
 		return nil, err
 	}
 	if len(source) > b.limit.MaxBytes {
-		return nil, errors.New("template source exceeds byte limit")
+		return nil, fmt.Errorf("%w: source byte limit", ErrLimit)
 	}
 
 	if !utf8.ValidString(source) {
@@ -166,7 +166,7 @@ func (p *templateParser) parse(section string, depth int) ([]templateNode, error
 					return nil, errors.New("template sections cannot use encoding views")
 				}
 				if depth >= p.budget.limit.MaxDepth {
-					return nil, errors.New("template sections exceed depth limit")
+					return nil, fmt.Errorf("%w: template section depth limit", ErrLimit)
 				}
 				var err error
 				node.children, err = p.parse(content, depth+1)

@@ -197,12 +197,13 @@ func TestExecuteOpaqueFailures(t *testing.T) {
 		calls   int32
 		state   api.ToolExecutionState
 		success bool
+		code    string
 	}{
-		{"ordinary throw", `throw new Error("private thrown text");`, 0, api.ToolExecutionStateNotStarted, false},
-		{"undefined return", `const detail = "private source text"; return undefined;`, 0, api.ToolExecutionStateNotStarted, false},
-		{"function return", `return function() { return "private function text"; };`, 0, api.ToolExecutionStateNotStarted, false},
-		{"uncaught transport", `await context.connections[0].fetch("https://example.test/private-path"); return true;`, 1, api.ToolExecutionStateMayHaveExecuted, false},
-		{"caught transport", `try { await context.connections[0].fetch("https://example.test/private-path"); } catch (_) { return {recovered:true}; } return false;`, 1, api.ToolExecutionStateMayHaveExecuted, true},
+		{"ordinary throw", `throw new Error("private thrown text");`, 0, api.ToolExecutionStateNotStarted, false, "OUTPUT_INVALID"},
+		{"undefined return", `const detail = "private source text"; return undefined;`, 0, api.ToolExecutionStateNotStarted, false, "OUTPUT_INVALID"},
+		{"function return", `return function() { return "private function text"; };`, 0, api.ToolExecutionStateNotStarted, false, "OUTPUT_INVALID"},
+		{"uncaught transport", `await context.connections[0].fetch("https://example.test/private-path"); return true;`, 1, api.ToolExecutionStateMayHaveExecuted, false, "UPSTREAM_FAILED"},
+		{"caught transport", `try { await context.connections[0].fetch("https://example.test/private-path"); } catch (_) { return {recovered:true}; } return false;`, 1, api.ToolExecutionStateMayHaveExecuted, true, ""},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// The configured client reports a private diagnostic without known-unsent evidence.
@@ -220,7 +221,7 @@ func TestExecuteOpaqueFailures(t *testing.T) {
 				require.False(t, result.IsError)
 				require.JSONEq(t, `{"recovered":true}`, string(result.StructuredContent))
 			} else {
-				requireExecuteFailure(t, result, "OUTPUT_INVALID", test.state)
+				requireExecuteFailure(t, result, test.code, test.state)
 			}
 
 			// Neither source text, thrown values, transport diagnostics, nor URLs escape.

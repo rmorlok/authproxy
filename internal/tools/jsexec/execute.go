@@ -2,8 +2,10 @@ package jsexec
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"math"
 	"time"
 
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
@@ -114,10 +116,16 @@ func (p *Program) Execute(ctx context.Context, client iface.HTTPClient, invocati
 	if err != nil {
 		return fail(err, "INPUT_INVALID", "The Tool arguments do not match the input schema.")
 	}
+	// Schema numbers retain exact JSON spelling, but JavaScript requires finite
+	// Number values. Attribute this incompatibility to arguments before combining
+	// them with the captured connection data.
+	if err := validateArgumentNumbers(workCtx, params); err != nil {
+		return fail(err, "INPUT_INVALID", "The Tool arguments contain a number unsupported by JavaScript.")
+	}
 	input.Params = params
 	snapshot, err := render.NewContext(input, p.limits.Render)
 	if err != nil {
-		return fail(err, "INPUT_INVALID", "The Tool invocation context cannot be prepared.")
+		return fail(err, "CONNECTION_UNAVAILABLE", "The captured Tool connection context cannot be prepared.")
 	}
 	if err := apjsruntime.ChargeWork(workCtx, 0); err != nil {
 		return fail(err, "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded an execution limit.")
@@ -183,4 +191,34 @@ func chargeDataPass(ctx context.Context, size int) error {
 		return err
 	}
 	return apjsruntime.ReserveAllocation(ctx, size)
+}
+
+// validateArgumentNumbers checks the already bounded, schema-validated argument
+// tree for numbers the JavaScript decoder cannot represent as finite values. It
+// consumes shared traversal work, retains exact json.Number values, and never
+// coerces or normalizes caller data. The validator's tree cannot contain cycles.
+func validateArgumentNumbers(ctx context.Context, value any) error {
+	if err := apjsruntime.ChargeWork(ctx, 1); err != nil {
+		return err
+	}
+	switch value := value.(type) {
+	case json.Number:
+		number, err := value.Float64()
+		if err != nil || math.IsInf(number, 0) || math.IsNaN(number) {
+			return validation.ErrInvalidInput
+		}
+	case map[string]any:
+		for _, child := range value {
+			if err := validateArgumentNumbers(ctx, child); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, child := range value {
+			if err := validateArgumentNumbers(ctx, child); err != nil {
+				return err
+			}
+		}
+	}
+	return apjsruntime.ChargeWork(ctx, 0)
 }

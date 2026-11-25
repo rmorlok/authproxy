@@ -47,6 +47,15 @@ type AsyncInvocation struct {
 	// acquiring resources, before another VM call can be interrupted. It must
 	// not wait for uncooperative workers or run authored code. Nil needs no cleanup.
 	Close func()
+
+	// HostRejection optionally identifies a native failure created by this
+	// invocation's host. It receives only the rejected entry-point value, after
+	// cleanup and unrelated-rejection checks, on the VM owner. Return nil for
+	// unrecognized values; recognized errors must contain only safe Go categories
+	// and must not retain VM values or private diagnostics. This callback must
+	// remain usable after Close and must not execute authored code. PrepareInput
+	// registers HTTPHost.RejectionError when an HTTP host is supplied.
+	HostRejection func(goja.Value) error
 }
 
 // Evaluate prepares a fresh VM, initializes the program, invokes execute with
@@ -194,7 +203,15 @@ func (p *AsyncProgram) evaluate(
 		return err
 	}
 
-	resultErr := interpret(root)
+	// Preserve a genuine host category only when that exact native failure is
+	// the root rejection. Caught failures cannot mask an unrelated later error.
+	var resultErr error
+	if root.State() == goja.PromiseStateRejected && invocation.HostRejection != nil {
+		resultErr = invocation.HostRejection(root.Result())
+	}
+	if resultErr == nil {
+		resultErr = interpret(root)
+	}
 
 	if err := tracker.checkRootRejections(); err != nil {
 		return err

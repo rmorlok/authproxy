@@ -5,7 +5,13 @@ package render
 import (
 	"context"
 	"errors"
+	"fmt"
 )
+
+// ErrLimit identifies byte, depth, or step exhaustion during snapshot capture,
+// template compilation, or rendering. Invalid policy and malformed data remain
+// separate errors. Callers can match it through contextual error wrapping.
+var ErrLimit = errors.New("render limit exceeded")
 
 // Limits bounds a single context snapshot, template compilation, or render.
 // Callers must supply positive limits from their execution policy. MaxBytes
@@ -44,7 +50,7 @@ func (b *budget) step() error {
 		return err
 	}
 	if b.steps >= b.limit.MaxSteps {
-		return errors.New("render step limit exceeded")
+		return fmt.Errorf("%w: step limit", ErrLimit)
 	}
 	b.steps++
 	return nil
@@ -53,7 +59,7 @@ func (b *budget) step() error {
 // addBytes checks before addition so even unusually large limits cannot overflow.
 func (b *budget) addBytes(n int) error {
 	if n > b.limit.MaxBytes-b.bytes {
-		return errors.New("render byte limit exceeded")
+		return fmt.Errorf("%w: byte limit", ErrLimit)
 	}
 	b.bytes += n
 	return nil

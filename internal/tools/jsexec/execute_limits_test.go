@@ -2,6 +2,7 @@ package jsexec
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -377,4 +378,88 @@ func TestExecuteArgumentBytesRemainSeparateFromConfiguration(t *testing.T) {
 	result, err = program.Execute(context.Background(), client, invocation)
 	require.NoError(t, err)
 	requireExecuteFailure(t, result, "EXECUTION_LIMIT_EXCEEDED", api.ToolExecutionStateNotStarted)
+}
+
+// TestExecuteSnapshotFailureCategories separates exhausted preparation policy
+// and unusable captured connection data from caller argument validation.
+func TestExecuteSnapshotFailureCategories(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		change func(*Limits, *Invocation)
+		code   string
+	}{
+		{"snapshot bytes", func(l *Limits, _ *Invocation) { l.Render.MaxBytes = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"snapshot depth", func(l *Limits, _ *Invocation) { l.Render.MaxDepth = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"snapshot steps", func(l *Limits, _ *Invocation) { l.Render.MaxSteps = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"configuration UTF-8", func(_ *Limits, i *Invocation) {
+			i.Snapshot.Cfg = map[string]any{"private-key": "private-configuration\xff"}
+		}, "CONNECTION_UNAVAILABLE"},
+		{"configuration number", func(_ *Limits, i *Invocation) {
+			i.Snapshot.Cfg = map[string]any{"private-key": json.Number("private-number")}
+		}, "CONNECTION_UNAVAILABLE"},
+		{"label UTF-8", func(_ *Limits, i *Invocation) {
+			i.Snapshot.Labels = map[string]string{"private-key": "private-label\xff"}
+		}, "CONNECTION_UNAVAILABLE"},
+		{"configuration JavaScript number", func(_ *Limits, i *Invocation) {
+			i.Snapshot.Cfg = map[string]any{"private-key": json.Number("1e400")}
+		}, "CONNECTION_UNAVAILABLE"},
+		{"combined VM bytes", func(l *Limits, _ *Invocation) { l.Runtime.MaxInputBytes = 32 }, "EXECUTION_LIMIT_EXCEEDED"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Caller arguments are valid; only captured data or preparation policy changes.
+			limits, invocation := executeLimits(), executeInvocation()
+			test.change(&limits, &invocation)
+			program := compileExecute(t, `async function execute() {
+				await context.connections[0].fetch("https://example.test/never"); return true;
+			}`, limits)
+			var calls atomic.Int32
+			client := executeClient(func(*http.Request) (*http.Response, error) {
+				calls.Add(1)
+				return executeJSONResponse(`true`), nil
+			})
+
+			// No request starts, and diagnostics never copy captured configuration data.
+			result, err := program.Execute(context.Background(), client, invocation)
+			require.NoError(t, err)
+			requireExecuteFailure(t, result, test.code, api.ToolExecutionStateNotStarted)
+			require.Zero(t, calls.Load())
+			encoded, err := json.Marshal(result)
+			require.NoError(t, err)
+			require.NotContains(t, string(encoded), "private-")
+		})
+	}
+}
+
+// TestExecuteCallerNumberCompatibility attributes an unsupported JavaScript
+// number to caller arguments before combining them with connection metadata.
+func TestExecuteCallerNumberCompatibility(t *testing.T) {
+	limits := executeLimits()
+	limits.Validation.MaxNumberDigits = 1024
+	program := compileExecute(t, `async function execute() {
+		await context.connections[0].fetch("https://example.test/customer"); return true;
+	}`, limits)
+	var calls atomic.Int32
+	client := executeClient(func(*http.Request) (*http.Response, error) {
+		calls.Add(1)
+		return executeJSONResponse(`true`), nil
+	})
+	invocation := executeInvocation()
+	invocation.Arguments = common.RawJSON(`{"private-argument":[{"n":1e400}]}`)
+
+	// The exact-number schema accepts this JSON, but the JavaScript boundary cannot.
+	result, err := program.Execute(context.Background(), client, invocation)
+	require.NoError(t, err)
+	requireExecuteFailure(t, result, "INPUT_INVALID", api.ToolExecutionStateNotStarted)
+	require.Zero(t, calls.Load())
+	encoded, err := json.Marshal(result)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "private-argument")
+
+	// A finite exponent remains valid without changing the caller's JSON spelling.
+	invocation.Arguments = common.RawJSON(`{"nested":[{"n":1e300}]}`)
+	result, err = program.Execute(context.Background(), client, invocation)
+	require.NoError(t, err)
+	require.False(t, result.IsError)
+	require.EqualValues(t, 1, calls.Load())
+	require.Equal(t, `{"nested":[{"n":1e300}]}`, string(invocation.Arguments))
 }
