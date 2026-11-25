@@ -57,9 +57,12 @@ type HTTPHost struct {
 	nextID      uint64                                 // Monotonic operation identity within this invocation.
 	pending     map[uint64]func(fetchCompletion) error // VM-only settlement callbacks.
 	completed   chan fetchCompletion                   // Unbuffered ownership handoff from workers.
+
 	// rejections associates genuine native error identities with fixed safe Go
 	// categories. Entries consume the cumulative allocation budget and live only
 	// until this host/VM is discarded; authored properties cannot forge them.
+	// This map is used to compare the final value that is settled against an err
+	// that should be emitted from the execution.
 	rejections map[*goja.Object]error
 }
 
@@ -130,10 +133,18 @@ func (l *HTTPHost) Start() {
 // error. Both allocations consume the execution budget even when the caller
 // catches the rejection. NewGoError is avoided because it reflects a Go error.
 func (l *HTTPHost) rejected(err error) goja.Value {
-	helper := utilityHost{ctx: l.ctx, vm: l.vm}
+	helper := utilityHost{
+		ctx: l.ctx,
+		vm:  l.vm,
+	}
+
 	helper.beginCall()
 	helper.reserveOutput(2) // One Promise and one fixed-error metadata slot.
+
+	// Create a promise to return that we will ultimately reject
 	promise, _, reject := l.vm.NewPromise()
+
+	// Figure out what the native javascript value we should use for this error
 	value, valueErr := l.rejectionValue(err)
 	if valueErr != nil {
 		// This path runs inside a native JavaScript binding, where the utility
@@ -141,7 +152,10 @@ func (l *HTTPHost) rejected(err error) goja.Value {
 		helper.checkContext()
 		helper.failLimit()
 	}
+
+	// Reject the promise
 	_ = reject(value)
+
 	return l.vm.ToValue(promise)
 }
 
@@ -206,13 +220,20 @@ func (l *HTTPHost) rejectionValue(err error) (*goja.Object, error) {
 			return nil, err
 		}
 	}
+
+	// Translate the error message into a value that we ultimately allow (either
+	// allowlisted or generic message)
 	value := l.vm.NewTypeError("%s", fetchErrorMessage(err))
+
 	if category != nil {
 		if l.rejections == nil {
 			l.rejections = make(map[*goja.Object]error)
 		}
+
+		// For allowlisted categories, track it in rejections to propagate out
 		l.rejections[value] = category
 	}
+
 	return value, nil
 }
 
@@ -225,9 +246,11 @@ func (l *HTTPHost) RejectionError(value goja.Value) error {
 	if !ok {
 		return nil
 	}
+
 	if category := l.rejections[object]; category != nil {
 		return &fetchRejectionError{category: category}
 	}
+
 	return nil
 }
 
@@ -252,14 +275,21 @@ func (e *fetchRejectionError) Is(target error) bool {
 func fetchErrorCategory(err error) error {
 	for _, category := range []error{
 		ErrLimitExceeded,
-		aphttp.ErrRequestLimit, aphttp.ErrResponseLimit, aphttp.ErrStreamLimit,
-		aphttp.ErrHeaderLimit, aphttp.ErrEncoding, aphttp.ErrInvalidResponse,
-		aphttp.ErrCredentialsUnavailable, aphttp.ErrTransport, aphttp.ErrTimeout,
+		aphttp.ErrRequestLimit,
+		aphttp.ErrResponseLimit,
+		aphttp.ErrStreamLimit,
+		aphttp.ErrHeaderLimit,
+		aphttp.ErrEncoding,
+		aphttp.ErrInvalidResponse,
+		aphttp.ErrCredentialsUnavailable,
+		aphttp.ErrTransport,
+		aphttp.ErrTimeout,
 	} {
 		if errors.Is(err, category) {
 			return category
 		}
 	}
+
 	return nil
 }
 
@@ -358,6 +388,8 @@ func fetchWorkerStack() string {
 
 // fetchErrorMessage restricts Promise rejection text to known classifications.
 // Unexpected host errors never disclose their original text to authored code.
+// This function effectively allows certain errors to pass through with their
+// messages and then uses a generic message for all others.
 func fetchErrorMessage(err error) string {
 	switch err {
 	case ErrInvalidInput,
