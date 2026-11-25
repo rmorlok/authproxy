@@ -15,13 +15,23 @@ import (
 
 // executionContext owns the full invocation deadline independently of the VM
 // and HTTP session. Earlier admission and caller deadlines cannot be extended.
-func (p *Program) executionContext(ctx context.Context, deadline time.Time) (context.Context, context.CancelFunc) {
-	timed, stop := context.WithTimeoutCause(ctx, min(p.limits.Runtime.Timeout, p.limits.HTTP.Timeout), apjsruntime.ErrLimitExceeded)
+func (p *Program) executionContext(
+	ctx context.Context,
+	deadline time.Time,
+) (context.Context, context.CancelFunc) {
+	timed, stop := context.WithTimeoutCause(
+		ctx,
+		min(p.limits.Runtime.Timeout, p.limits.HTTP.Timeout),
+		apjsruntime.ErrLimitExceeded,
+	)
+
 	current, _ := timed.Deadline()
+
 	if !deadline.IsZero() && deadline.Before(current) {
 		withAdmission, stopAdmission := context.WithDeadlineCause(timed, deadline, apjsruntime.ErrLimitExceeded)
 		return withAdmission, func() { stopAdmission(); stop() }
 	}
+
 	return timed, stop
 }
 
@@ -44,15 +54,22 @@ func (p *Program) failure(
 	if errors.Is(context.Cause(work), apjsruntime.ErrLimitExceeded) {
 		err = apjsruntime.ErrLimitExceeded
 	}
+
 	switch {
-	case errors.Is(err, apjsruntime.ErrLimitExceeded), errors.Is(err, validation.ErrLimit),
-		errors.Is(err, render.ErrLimit), errors.Is(err, aphttp.ErrTimeout), errors.Is(err, aphttp.ErrRequestLimit):
+	case errors.Is(err, apjsruntime.ErrLimitExceeded),
+		errors.Is(err, validation.ErrLimit),
+		errors.Is(err, render.ErrLimit),
+		errors.Is(err, aphttp.ErrTimeout),
+		errors.Is(err, aphttp.ErrRequestLimit):
 		code, message = "EXECUTION_LIMIT_EXCEEDED", "The Tool invocation exceeded an execution limit."
-	case errors.Is(err, aphttp.ErrResponseLimit), errors.Is(err, aphttp.ErrStreamLimit), errors.Is(err, aphttp.ErrHeaderLimit):
+	case errors.Is(err, aphttp.ErrResponseLimit),
+		errors.Is(err, aphttp.ErrStreamLimit),
+		errors.Is(err, aphttp.ErrHeaderLimit):
 		code, message = "OUTPUT_TOO_LARGE", "The upstream response exceeds the response size limits."
 	case errors.Is(err, aphttp.ErrCredentialsUnavailable):
 		code, message = "CONNECTION_UNAVAILABLE", "Credentials for the Tool connection are unavailable."
-	case errors.Is(err, aphttp.ErrEncoding), errors.Is(err, aphttp.ErrInvalidResponse):
+	case errors.Is(err, aphttp.ErrEncoding),
+		errors.Is(err, aphttp.ErrInvalidResponse):
 		code, message = "UPSTREAM_PROTOCOL_ERROR", "The upstream response is invalid or uses an unsupported encoding."
 	case errors.Is(err, aphttp.ErrTransport):
 		code, message = "UPSTREAM_FAILED", "The upstream request or response failed."
@@ -60,6 +77,14 @@ func (p *Program) failure(
 		code, message = "CONNECTION_UNAVAILABLE", "The captured Tool connection context cannot be prepared."
 	}
 
-	toolresult.SetFailure(base, &api.ToolResultError{Code: code, Message: message}, state)
+	toolresult.SetFailure(
+		base,
+		&api.ToolResultError{
+			Code:    code,
+			Message: message,
+		},
+		state,
+	)
+
 	return toolresult.Finish(caller, base, state, p.limits.MaxEncodedResultBytes)
 }
