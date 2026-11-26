@@ -13,6 +13,46 @@ logical resource identity; core is responsible for domain conversion and
 hydration, such as selecting a connector definition generation or loading the
 connector generation pinned by a connection.
 
+## Standalone Tool publication
+
+Creating or updating a standalone JavaScript Tool compiles its source and schemas,
+then checks initialization with the helper library from its connection's pinned
+connector generation. For example, a connector can define:
+
+```javascript
+function apiVersion() { return "v2"; }
+```
+
+A Tool can call that pure helper during initialization:
+
+```javascript
+const path = "/" + apiVersion() + "/customers";
+async function execute(params, context) {
+    const response = await context.connections[0].fetch(
+        context.connections[0].cfg.apiBase + path);
+    return response.json();
+}
+```
+
+Publication initializes the library and Tool, including queued microtasks, but
+does not call `execute`. Arguments, connection configuration, credentials, HTTP,
+and authored logging are unavailable. A connection can still be in setup or
+disabled; execution checks readiness separately.
+
+The fixed publication profile admits 256 KiB of combined Tool and helper source.
+Helper preparation has a five-second allowance; initialization then gets up to
+five seconds, with finite stack and native work/allocation budgets. Authored caps
+can lower initialization limits without shortening dependency loading. Preparation
+timeouts remain internal errors, while an initialization timeout rejects the Tool.
+`tools.invocation` controls the separate execution profile. Synchronous compilation
+is checked for cancellation after it returns; the schema compiler still needs a
+work bound. A validation failure writes no revision. A successful update becomes
+active immediately, while earlier revisions remain inspectable.
+
+Explicit ToolSet JavaScript templates remain unavailable until their installation
+path validates helpers for each selected connection. A generation has no single
+connection from which to select a library.
+
 ## Tool execution policy
 
 Core translates `tools.invocation` configuration into complete operator limits

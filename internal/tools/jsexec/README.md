@@ -14,6 +14,11 @@ policy from `tools.invocation`, authorizes the captured revision, and selects it
 pinned connector helpers and configured connection client. Public invocation
 integration remains separate work.
 
+Core also uses `Compile` and `Validate` before publishing a standalone JavaScript
+Tool. It selects that connection's pinned helpers and applies a fixed publication
+profile without supplying invocation capabilities. See the
+[core publication flow](../../core/README.md#standalone-tool-publication).
+
 ## Prepare a customer lookup
 
 A connector can provide a reusable path helper:

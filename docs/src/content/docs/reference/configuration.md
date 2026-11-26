@@ -136,6 +136,13 @@ single captured connection; preparation and execution share the timeout.
 JavaScript-specific settings below do not change existing connector scripts or
 HTTP response transforms.
 
+Standalone JavaScript Tool publication uses a separate fixed validation profile:
+256 KiB of combined Tool and connector-helper source, five seconds for helper
+preparation, and up to five seconds for initialization. Authored limits can lower
+the initialization allowance; they do not shorten database reads or decryption.
+It does not call `execute` or provide HTTP capabilities. Changing `tools.invocation`
+does not change this publication profile.
+
 | Field | Default | What it limits |
 |---|---|---|
 | `timeout` | `60s` | Preparation, compilation, and execution after authorization; response transforms share the remaining time |
