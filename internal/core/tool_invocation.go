@@ -229,6 +229,7 @@ func (s *service) invokeTool(
 			Arguments: arguments,
 			Deadline:  deadline,
 			Snapshot:  prepared.snapshot,
+			
 			// Worker diagnostics must use the configured service sink and captured
 			// identities. Keep arguments/configuration out of logs; supplying this
 			// logger does not enable JavaScript's separate authored console API.
