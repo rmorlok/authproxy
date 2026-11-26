@@ -31,6 +31,12 @@ var (
 	// ErrToolSetInventoryConnectionNotReady preserves the prior inventory while
 	// the connection is unconfigured or disconnected.
 	ErrToolSetInventoryConnectionNotReady = errors.New("toolset inventory connection is not configured")
+
+	// ErrToolSetInventoryConnectionChanged rejects helpers validated against a
+	// connector generation or definition the connection no longer uses.
+	// Preparation can be retried against the current helpers; the prior inventory
+	// stays intact. Re-encryption also requires a fresh preparation capture.
+	ErrToolSetInventoryConnectionChanged = errors.New("toolset inventory connection's connector definition changed")
 )
 
 // PreparedToolSetTool pairs a generated identity and its discovery metadata with
@@ -47,16 +53,37 @@ type PreparedToolSetTool struct {
 	DefinitionDigest    string
 }
 
+// ToolSetInventoryConnector captures the exact connector helper definition used
+// to validate a candidate inventory. Generation alone is insufficient because
+// forced state changes permit editing a previously published generation. The
+// ciphertext comparison also conservatively rejects concurrent key rotation.
+type ToolSetInventoryConnector struct {
+	// Generation is the connection's selected logical connector and generation.
+	Generation ConnectorGenerationId
+
+	// EncryptedDefinition is the immutable value read before validation. Storage
+	// compares it under a row lock, without decrypting it or interpreting source.
+	EncryptedDefinition encfield.EncryptedField
+}
+
 // ToolSetInventoryInstall captures a complete inventory prepared from a
 // published explicit ToolSet generation, for first installation or replacement.
-// Both nil and empty Tools install an empty inventory. Remote catalogs require
-// connection-context fencing and are not supported by these explicit operations.
+// Both nil and empty Tools install an empty inventory. Helper-dependent explicit
+// templates can fence the selected connector generation. Remote catalogs need
+// additional connection-context fencing and are not supported by these operations.
 type ToolSetInventoryInstall struct {
 	BindingId                apid.ID
 	ExpectedEpoch            uint64
 	ExpectedSelectorRevision uint64
 	Generation               uint64
 	Tools                    []PreparedToolSetTool
+
+	// ExpectedConnector identifies the exact helpers used during preparation.
+	// When set, the connection must still use this connector generation and its
+	// definition must be unchanged at commit. Nil preserves HTTP installation
+	// that does not depend on connector helper code.
+	// It does not fence configuration, credentials, or remote catalog identity.
+	ExpectedConnector *ToolSetInventoryConnector
 }
 
 // prepare detaches and validates the complete batch without database writes or
@@ -79,6 +106,20 @@ func (p ToolSetInventoryInstall) prepare(
 
 	if p.Generation == 0 || p.Generation > math.MaxInt64 {
 		return nil, nil, errors.New("toolset inventory generation must be a positive signed 64-bit integer")
+	}
+	if expected := p.ExpectedConnector; expected != nil {
+		if expected.Generation.Id.IsNil() {
+			return nil, nil, errors.New("expected connector id is required")
+		}
+		if err := expected.Generation.Id.ValidatePrefix(apid.PrefixConnector); err != nil {
+			return nil, nil, fmt.Errorf("expected connector generation: %w", err)
+		}
+		if expected.Generation.Generation == 0 || expected.Generation.Generation > math.MaxInt64 {
+			return nil, nil, errors.New("expected connector generation must be a positive signed 64-bit integer")
+		}
+		if expected.EncryptedDefinition.IsZero() {
+			return nil, nil, errors.New("expected connector definition is required")
+		}
 	}
 
 	tools := make([]Tool, 0, len(p.Tools))
@@ -138,15 +179,19 @@ func (p ToolSetInventoryInstall) prepare(
 // locking the ToolSet and Connection. PostgreSQL share locks keep namespace soft
 // deletion from racing this inventory write; SQLite's initial parent writes already
 // serialize writers. This runs even for empty inventories. It reads no credentials
-// or configuration and does not assert that a remote catalog context is current.
+// or configuration. An optional expected connector generation fences the helper
+// library used during preparation; it does not validate remote catalog context.
 func (s *service) toolSetInventoryNamespace(
 	ctx context.Context,
 	tx *sql.Tx,
 	binding *ToolSetBinding,
+	expectedConnector *ToolSetInventoryConnector,
 ) (string, error) {
 	query := s.sq.Select(
 		"c.namespace",
 		"c.state",
+		"c.connector_id",
+		"c.connector_generation",
 	).
 		From(ConnectionsTable+" c").
 		Join(ToolSetsTable+" t ON t.id = ?", binding.ToolSetId).
@@ -165,10 +210,11 @@ func (s *service) toolSetInventoryNamespace(
 
 	var namespace string
 	var state ConnectionState
+	var connector ConnectorGenerationId
 	err := query.
 		RunWith(tx).
 		QueryRowContext(ctx).
-		Scan(&namespace, &state)
+		Scan(&namespace, &state, &connector.Id, &connector.Generation)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}
@@ -178,14 +224,74 @@ func (s *service) toolSetInventoryNamespace(
 	if state != ConnectionStateConfigured {
 		return "", ErrToolSetInventoryConnectionNotReady
 	}
+	if expectedConnector != nil {
+		if connector != expectedConnector.Generation {
+			return "", ErrToolSetInventoryConnectionChanged
+		}
+		if err := s.checkToolSetInventoryConnector(ctx, tx, expectedConnector); err != nil {
+			return "", err
+		}
+	}
 
 	return namespace, nil
+}
+
+// checkToolSetInventoryConnector locks the live helper definition until inventory
+// commit, then compares the ciphertext captured before JavaScript validation.
+// A same-generation edit, re-encryption, or deletion invalidates the candidate.
+// PostgreSQL share locks prevent those changes after this check; SQLite already
+// serializes writers through the parent writes taken earlier in the transaction.
+func (s *service) checkToolSetInventoryConnector(
+	ctx context.Context,
+	tx *sql.Tx,
+	expected *ToolSetInventoryConnector,
+) error {
+	// Connector mutations acquire the logical row before its generation. Take
+	// these locks in explicit reads rather than relying on joined row-lock order.
+	connectorQuery := s.sq.Select("id").From(ConnectorsTable).
+		Where(sq.Eq{"id": expected.Generation.Id, "deleted_at": nil})
+	if s.cfg.GetProvider() == config.DatabaseProviderPostgres {
+		connectorQuery = connectorQuery.Suffix("FOR SHARE")
+	}
+	var connectorID apid.ID
+	err := connectorQuery.RunWith(tx).QueryRowContext(ctx).Scan(&connectorID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrToolSetInventoryConnectionChanged
+	}
+	if err != nil {
+		return err
+	}
+
+	query := s.sq.Select("encrypted_definition").
+		From(ConnectorGenerationsTable).
+		Where(sq.Eq{
+			"connector_id": expected.Generation.Id,
+			"generation":   expected.Generation.Generation,
+			"deleted_at":   nil,
+		})
+	if s.cfg.GetProvider() == config.DatabaseProviderPostgres {
+		query = query.Suffix("FOR SHARE")
+	}
+	var definition encfield.EncryptedField
+	err = query.RunWith(tx).QueryRowContext(ctx).Scan(&definition)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrToolSetInventoryConnectionChanged
+	}
+	if err != nil {
+		return err
+	}
+	if !definition.Equal(&expected.EncryptedDefinition) {
+		return ErrToolSetInventoryConnectionChanged
+	}
+	return nil
 }
 
 // InstallExplicitToolSetInventory installs a pending binding's complete first
 // inventory and advances its epoch in one transaction. The target must remain
 // primary and the captured selector, membership, and binding epoch must still
 // match. The binding pins that generation; later publication does not migrate it.
+// A supplied connector-generation expectation must match under the connection
+// lock so helper validation cannot race a connector migration.
 // All failures preserve the prior database state and caller inputs. Installation
 // makes the inventory eligible for internal current-definition and candidate
 // reads, which do not confer authorization or assert execution readiness.
@@ -204,6 +310,11 @@ func (s *service) commitExplicitToolSetInventory(
 	params ToolSetInventoryInstall,
 	expectedGeneration uint64,
 ) (*ToolSetBinding, error) {
+	// Keep one detached expectation for validation and the later locked read.
+	if params.ExpectedConnector != nil {
+		expected := *params.ExpectedConnector
+		params.ExpectedConnector = &expected
+	}
 	tools, revisions, err := params.prepare(ctx)
 	if err != nil {
 		return nil, err
@@ -270,7 +381,7 @@ func (s *service) commitExplicitToolSetInventory(
 		}
 	}
 
-	namespace, err := s.toolSetInventoryNamespace(ctx, tx, binding)
+	namespace, err := s.toolSetInventoryNamespace(ctx, tx, binding, params.ExpectedConnector)
 	if err != nil {
 		return nil, err
 	}

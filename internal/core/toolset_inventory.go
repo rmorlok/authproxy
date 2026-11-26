@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 )
 
@@ -32,6 +33,11 @@ type compiledToolTemplate struct {
 	verbs       []string
 	plaintext   []byte
 	digest      string
+
+	// javascript owns the definition needed to validate initialization with
+	// each connection's helpers. HTTP templates need no connection-specific
+	// compilation; their symbolic configuration references remain unresolved.
+	javascript *toolschema.ToolDefinition
 }
 
 // toolSetInstallPlan is a primary generation's inventory, ready to prepare for
@@ -79,6 +85,9 @@ func newToolSetInstallPlan(
 			plaintext:   plaintext,
 			digest:      toolDefinitionDigest(plaintext),
 		}
+		if template.Spec.Javascript != nil {
+			compiled.javascript = template.Spec.Clone()
+		}
 		if template.Metadata != nil {
 			compiled.name = template.Metadata.Name
 			compiled.labels = template.Metadata.Labels
@@ -119,8 +128,10 @@ func generatedToolName(
 	return common.ResourceName(stem + "-" + suffix)
 }
 
-// inventoryFor encrypts the plan for one pending binding's connection namespace
-// and pairs each definition with its Tool identity. The IDs are provisional
+// inventoryFor validates JavaScript initialization against the connection's
+// pinned helpers, encrypts the plan for its namespace, and pairs each definition
+// with its Tool identity. A validation failure returns no candidate, so callers
+// cannot install a partial inventory. The IDs are provisional
 // because storage resolves retained identities by source key. Encryption stays
 // outside the database transaction, and definitions keep their symbolic
 // configuration references rather than resolved connection values.
@@ -141,6 +152,24 @@ func (s *service) inventoryFor(
 
 	for i := range plan.templates {
 		template := &plan.templates[i]
+
+		if template.javascript != nil {
+			connector, err := s.validateToolJavaScriptPublication(ctx, template.javascript, connection)
+			if err != nil {
+				return database.ToolSetInventoryInstall{}, fmt.Errorf("toolset template %q initialization: %w", template.key, err)
+			}
+			// A draft can change without a generation change, and administrators
+			// can force published generations back to draft. Fence the exact
+			// validated definition as well as the connection's selected generation.
+			expected := database.ToolSetInventoryConnector{
+				Generation:          database.ConnectorGenerationId{Id: connector.Id, Generation: connector.Generation},
+				EncryptedDefinition: connector.EncryptedDefinition,
+			}
+			if install.ExpectedConnector != nil && *install.ExpectedConnector != expected {
+				return database.ToolSetInventoryInstall{}, database.ErrToolSetInventoryConnectionChanged
+			}
+			install.ExpectedConnector = &expected
+		}
 
 		encrypted, err := s.encrypt.EncryptForNamespace(ctx, connection.Namespace, template.plaintext)
 		if err != nil {

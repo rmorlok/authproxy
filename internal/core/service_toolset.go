@@ -467,6 +467,8 @@ func (s *service) writeToolSetDraft(
 // explicit template's executor without running authored code, and encrypts the
 // serialized definition for the ToolSet's namespace. OpenAPI and MCP sources are
 // rejected until their importers can validate them at publication.
+// JavaScript initialization requires a selected helper library and is checked
+// when preparing each connection's inventory, before any Tool becomes active.
 func (s *service) prepareToolSetDefinition(
 	ctx context.Context,
 	ns string,

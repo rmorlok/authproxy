@@ -65,7 +65,7 @@ func TestToolJavaScriptPublicationPinnedLibrary(t *testing.T) {
 			expectToolPublicationLibrary(t, f, `function selected() { return "pinned"; }`)
 
 			// The strict mocks reject extra reads or effects; only initialization runs.
-			err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+			_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 			require.NoError(t, err)
 		})
 	}
@@ -92,7 +92,7 @@ func TestToolJavaScriptPublicationInvalidCode(t *testing.T) {
 			// Only helper loading is permitted; invalid initialization cannot send requests.
 			f := toolPublicationFixture(t, code.script)
 			expectToolPublicationLibrary(t, f, code.library)
-			err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+			_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 			require.ErrorIs(t, err, ErrInvalidArgument)
 			require.NotContains(t, err.Error(), "privatePublicationSource")
 		})
@@ -113,7 +113,7 @@ func TestToolJavaScriptPublicationSourceLimit(t *testing.T) {
 			expectToolPublicationLibrary(t, f, strings.Repeat(" ", (256<<10)-len(source)+extra))
 
 			// A raw-byte overflow fails before helper parsing or VM initialization.
-			err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+			_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 			if extra == 0 {
 				require.NoError(t, err)
 			} else {
@@ -130,7 +130,7 @@ func TestToolJavaScriptPublicationSchema(t *testing.T) {
 	f := toolPublicationFixture(t, `async function execute() { return true; }`)
 	f.definition.OutputSchema = common.RawJSON(`{"$ref":"#/missing"}`)
 	// The unresolved schema cannot become part of a published executable revision.
-	err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+	_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 	require.ErrorIs(t, err, ErrInvalidArgument)
 }
 
@@ -154,7 +154,7 @@ func TestToolJavaScriptPublicationStackCap(t *testing.T) {
 			expectToolPublicationLibrary(t, f, "")
 
 			// The same code fits the fixed profile but exceeds its authored lower cap.
-			err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+			_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 			if capped {
 				require.ErrorIs(t, err, ErrInvalidArgument)
 				require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
@@ -200,7 +200,7 @@ func TestToolJavaScriptPublicationPreparationAllowance(t *testing.T) {
 		})
 
 	// Trivial initialization still receives its full independent authored allowance.
-	err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+	_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 	require.NoError(t, err)
 }
 
@@ -239,7 +239,7 @@ func TestToolJavaScriptPublicationInterruption(t *testing.T) {
 			}
 
 			// Only actual initialization exhaustion is reported as invalid authored code.
-			err := f.service.validateToolJavaScriptPublication(ctx, &f.definition, &f.snapshot.Connection)
+			_, err := f.service.validateToolJavaScriptPublication(ctx, &f.definition, &f.snapshot.Connection)
 			if name == "busy initialization" {
 				require.NoError(t, ctx.Err())
 				require.ErrorIs(t, err, ErrInvalidArgument)
@@ -272,7 +272,7 @@ func TestToolJavaScriptPublicationDependencyFailures(t *testing.T) {
 			}
 
 			// Callers can retain their existing retry/status handling for dependency errors.
-			err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+			_, err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 			require.ErrorIs(t, err, failure)
 			require.NotErrorIs(t, err, ErrInvalidArgument)
 			require.NotErrorIs(t, err, apjsruntime.ErrLimitExceeded)

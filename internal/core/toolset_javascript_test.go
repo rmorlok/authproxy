@@ -1,0 +1,288 @@
+package core
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
+	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	toolsetschema "github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
+	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/stretchr/testify/require"
+)
+
+// javascriptToolTemplate keeps the normal generated metadata while selecting a
+// JavaScript executor whose helpers are resolved separately for each connection.
+func javascriptToolTemplate(key, source string) toolsetschema.ToolTemplate {
+	template := toolTemplate(key)
+	template.Spec.ProxyHTTP = nil
+	template.Spec.Javascript = &source
+	return template
+}
+
+// toolSetJavascriptConnector stores a published helper generation without
+// migrating the connection that refers to this logical connector.
+func toolSetJavascriptConnector(t *testing.T, r *toolSetReconcileTest, connection *database.Connection, generation uint64, source string) {
+	t.Helper()
+	definition, err := json.Marshal(map[string]any{
+		"auth": map[string]string{"type": "no-auth"}, "javascript": source,
+	})
+	require.NoError(t, err)
+	encrypted, err := r.service.encrypt.EncryptForNamespace(r.ctx, connection.Namespace, definition)
+	require.NoError(t, err)
+	require.NoError(t, r.db.UpsertConnectorGeneration(r.ctx, &database.ConnectorWithDefinition{
+		Id: connection.ConnectorId, Namespace: connection.Namespace,
+		Generation: generation, State: database.ConnectorGenerationStatePrimary,
+		EncryptedDefinition: encrypted,
+	}))
+}
+
+// TestToolSetJavaScriptReconciliation validates each selected connection's own
+// helpers and never activates part of a mixed inventory after a failed template.
+func TestToolSetJavaScriptReconciliation(t *testing.T) {
+	r := newToolSetReconcileTest(t)
+	labels := map[string]string{"provider": "calendar"}
+	good := r.connection(t, "root.team_a", "good", database.ConnectionStateConfigured, labels)
+	bad := r.connection(t, "root.team_a.sub", "bad", database.ConnectionStateConfigured, labels)
+	toolSetJavascriptConnector(t, r, good, 1, `function selected() { return "supported"; }`)
+	toolSetJavascriptConnector(t, r, good, 2, `throw "new primary must not initialize";`)
+	toolSetJavascriptConnector(t, r, bad, 1, `function selected() { return "unsupported"; }`)
+	const source = `
+		if (selected() !== "supported") throw "private helper incompatibility";
+		async function execute(params, context) {
+			const response = await context.connections[0].fetch(cfg.apiBase + "/customers/" + params.id);
+			return response.json();
+		}
+	`
+
+	// Generation compilation has no selected library; initialization waits for installation.
+	id := r.toolSet(t, "javascript-tools", toolsetschema.ToolSetReleaseStatePrimary,
+		toolTemplate("http-first"), javascriptToolTemplate("javascript", source))
+	err := r.service.reconcileToolSet(r.ctx, id)
+	require.ErrorIs(t, err, ErrInvalidArgument)
+	require.NotContains(t, err.Error(), "private helper incompatibility")
+
+	// A compatible connection installs both templates despite another connection's failure.
+	installed, err := r.db.GetToolSetBindingForConnection(r.ctx, id, good.Id)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), *installed.AppliedGeneration)
+	generated := r.generatedTools(t, installed)
+	require.Len(t, generated, 2)
+	jsTool, err := r.service.GetTool(r.ctx, generated[1].Id)
+	require.NoError(t, err)
+	require.Equal(t, source, *jsTool.GetResource().Spec.Javascript)
+	require.Nil(t, jsTool.GetResource().Spec.ProxyHTTP)
+	require.Equal(t, good.Id, jsTool.GetConnectionId())
+
+	// Even the earlier HTTP template remains absent from the incompatible binding.
+	pending, err := r.db.GetToolSetBindingForConnection(r.ctx, id, bad.Id)
+	require.NoError(t, err)
+	require.Nil(t, pending.AppliedGeneration)
+	require.Zero(t, pending.InventoryRevision)
+	require.Empty(t, r.generatedTools(t, pending))
+
+	// A connector migration supplies compatible helpers; retry installs the same pending binding.
+	toolSetJavascriptConnector(t, r, bad, 2, `function selected() { return "supported"; }`)
+	_, err = r.db.UpdateConnectionForGenerationMigration(r.ctx, database.ConnectionGenerationMigrationUpdate{
+		Id: bad.Id, ConnectorId: bad.ConnectorId, ConnectorGeneration: 2, UserLabels: labels,
+	})
+	require.NoError(t, err)
+	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+	retried, err := r.db.GetToolSetBindingForConnection(r.ctx, id, bad.Id)
+	require.NoError(t, err)
+	require.Equal(t, pending.Id, retried.Id)
+	require.Equal(t, uint64(1), *retried.AppliedGeneration)
+	require.Len(t, r.generatedTools(t, retried), 2)
+	unchanged, err := r.db.GetToolSetBindingForConnection(r.ctx, id, good.Id)
+	require.NoError(t, err)
+	require.Equal(t, installed.Epoch, unchanged.Epoch)
+	require.Equal(t, installed.InventoryRevision, unchanged.InventoryRevision)
+	require.Equal(t, generated[1].Id, r.generatedTools(t, unchanged)[1].Id)
+
+	// A new ToolSet primary affects new connections without migrating installed pins.
+	definition := toolsetschema.ToolSetDefinition{Source: toolsetschema.ToolSetSource{
+		Explicit: &toolsetschema.ExplicitSource{Tools: []toolsetschema.ToolTemplate{
+			javascriptToolTemplate("replacement", source),
+		}},
+	}}
+	_, err = r.service.CreateToolSetGeneration(r.ctx, id, releasePatch(toolsetschema.ToolSetReleaseStatePrimary, &definition))
+	require.NoError(t, err)
+	added := r.connection(t, "root.team_a", "added", database.ConnectionStateConfigured, labels)
+	toolSetJavascriptConnector(t, r, added, 1, `function selected() { return "supported"; }`)
+	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+	fresh, err := r.db.GetToolSetBindingForConnection(r.ctx, id, added.Id)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), *fresh.AppliedGeneration)
+	require.Equal(t, "replacement", r.generatedTools(t, fresh)[0].SourceKey)
+	for _, connection := range []*database.Connection{good, bad} {
+		pinned, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+		require.NoError(t, err)
+		require.Equal(t, uint64(1), *pinned.AppliedGeneration)
+		require.Len(t, r.generatedTools(t, pinned), 2)
+	}
+}
+
+// TestToolSetJavaScriptPlanOwnsValidationDefinition keeps the code checked at
+// installation identical to the serialized definition captured by the plan.
+func TestToolSetJavaScriptPlanOwnsValidationDefinition(t *testing.T) {
+	r := newToolSetReconcileTest(t)
+	connection := r.connection(t, "root.team_a", "owner", database.ConnectionStateConfigured, map[string]string{"provider": "calendar"})
+	toolSetJavascriptConnector(t, r, connection, 1, `function selected() { return true; }`)
+	const source = `if (!selected()) throw "invalid helper"; async function execute() { return cfg.tenant; }`
+	template := javascriptToolTemplate("lookup", source)
+	template.Spec.Limits = &toolschema.ExecutionLimits{MaxStackDepth: util.ToPtr(256)}
+	definition := toolsetschema.ToolSetDefinition{Source: toolsetschema.ToolSetSource{
+		Explicit: &toolsetschema.ExplicitSource{Tools: []toolsetschema.ToolTemplate{template}},
+	}}
+	id := r.toolSet(t, "owned-plan", toolsetschema.ToolSetReleaseStatePrimary, template)
+	logical, err := r.db.GetToolSet(r.ctx, id)
+	require.NoError(t, err)
+	binding, err := r.db.CreateToolSetBinding(r.ctx, id, connection.Id, logical.SelectorRevision)
+	require.NoError(t, err)
+	plan, err := newToolSetInstallPlan(1, &definition)
+	require.NoError(t, err)
+
+	// Mutating all authored buffers after compilation must not replace the checked source or policy.
+	*template.Spec.Javascript = `throw "changed source"; async function execute() {}`
+	template.Spec.InputSchema[0] = '!'
+	*template.Spec.Limits.MaxStackDepth = 0
+	install, err := r.service.inventoryFor(r.ctx, plan, logical, binding, connection)
+	require.NoError(t, err)
+	require.NotNil(t, install.ExpectedConnector)
+	require.Equal(t, database.ConnectorGenerationId{Id: connection.ConnectorId, Generation: 1}, install.ExpectedConnector.Generation)
+	connector, err := r.db.GetConnectorGeneration(r.ctx, connection.ConnectorId, 1)
+	require.NoError(t, err)
+	require.Equal(t, connector.EncryptedDefinition, install.ExpectedConnector.EncryptedDefinition)
+	require.Len(t, install.Tools, 1)
+	plaintext, err := r.service.encrypt.Decrypt(r.ctx, install.Tools[0].EncryptedDefinition)
+	require.NoError(t, err)
+	var captured toolschema.ToolDefinition
+	require.NoError(t, json.Unmarshal(plaintext, &captured))
+	require.Equal(t, source, *captured.Javascript)
+	require.JSONEq(t, `{"type":"object"}`, string(captured.InputSchema))
+	require.Equal(t, 256, *captured.Limits.MaxStackDepth)
+}
+
+// TestToolSetJavaScriptRejectsEditedHelpers prevents source changes within the
+// same connector generation from activating an inventory checked against old code.
+func TestToolSetJavaScriptRejectsEditedHelpers(t *testing.T) {
+	r := newToolSetReconcileTest(t)
+	connection := r.connection(t, "root.team_a", "draft-owner", database.ConnectionStateConfigured, map[string]string{"provider": "calendar"})
+	encrypted, err := r.service.encrypt.EncryptStringForNamespace(r.ctx, connection.Namespace,
+		`{"auth":{"type":"no-auth"},"javascript":"function selected() { return true; }"}`)
+	require.NoError(t, err)
+	connector := &database.ConnectorWithDefinition{
+		Id: connection.ConnectorId, Namespace: connection.Namespace,
+		Generation: 1, State: database.ConnectorGenerationStateDraft, EncryptedDefinition: encrypted,
+	}
+	require.NoError(t, r.db.UpsertConnectorGeneration(r.ctx, connector))
+	template := javascriptToolTemplate("lookup", `if (!selected()) throw "bad helper"; async function execute() { return true; }`)
+	id := r.toolSet(t, "draft-helper-tools", toolsetschema.ToolSetReleaseStatePrimary,
+		template)
+	logical, err := r.db.GetToolSet(r.ctx, id)
+	require.NoError(t, err)
+	pending, err := r.db.CreateToolSetBinding(r.ctx, id, connection.Id, logical.SelectorRevision)
+	require.NoError(t, err)
+	plan, err := newToolSetInstallPlan(1, &toolsetschema.ToolSetDefinition{Source: toolsetschema.ToolSetSource{
+		Explicit: &toolsetschema.ExplicitSource{Tools: []toolsetschema.ToolTemplate{template}},
+	}})
+	require.NoError(t, err)
+
+	// Valid draft helpers are admitted, with their exact stored definition captured for commit.
+	install, err := r.service.inventoryFor(r.ctx, plan, logical, pending, connection)
+	require.NoError(t, err)
+	connector.EncryptedDefinition, err = r.service.encrypt.EncryptStringForNamespace(r.ctx, connection.Namespace,
+		`{"auth":{"type":"no-auth"},"javascript":"function selected() { return false; }"}`)
+	require.NoError(t, err)
+	require.NoError(t, r.db.UpsertConnectorGeneration(r.ctx, connector))
+	_, err = r.db.InstallExplicitToolSetInventory(r.ctx, install)
+	require.ErrorIs(t, err, database.ErrToolSetInventoryConnectionChanged)
+
+	// A retry validates the changed helper rather than reusing the earlier successful result.
+	err = r.service.reconcileToolSet(r.ctx, id)
+	require.ErrorIs(t, err, ErrInvalidArgument)
+	stillPending, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+	require.NoError(t, err)
+	require.Equal(t, pending.Epoch, stillPending.Epoch)
+	require.Nil(t, stillPending.AppliedGeneration)
+	require.Empty(t, r.generatedTools(t, stillPending))
+
+	// Repaired helpers let a later pass install a freshly validated inventory.
+	toolSetJavascriptConnector(t, r, connection, 1, `function selected() { return true; }`)
+	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+	installed, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+	require.NoError(t, err)
+	require.Equal(t, pending.Id, installed.Id)
+	require.Equal(t, uint64(1), *installed.AppliedGeneration)
+	require.Len(t, r.generatedTools(t, installed), 1)
+}
+
+// TestToolSetJavaScriptRejectsMixedHelperSnapshots requires every JavaScript
+// template in one prepared inventory to pass against the same helper definition.
+func TestToolSetJavaScriptRejectsMixedHelperSnapshots(t *testing.T) {
+	f := newToolAuthorizationFixture(t, nil)
+	first := f.snapshot.Connector
+	second := first
+	second.EncryptedDefinition.Data = "changed-connector-definition"
+	definition := toolsetschema.ToolSetDefinition{Source: toolsetschema.ToolSetSource{
+		Explicit: &toolsetschema.ExplicitSource{Tools: []toolsetschema.ToolTemplate{
+			javascriptToolTemplate("first", `if (selected() !== 1) throw "first helper"; async function execute() {}`),
+			javascriptToolTemplate("second", `if (selected() !== 2) throw "second helper"; async function execute() {}`),
+		}},
+	}}
+	plan, err := newToolSetInstallPlan(1, &definition)
+	require.NoError(t, err)
+
+	// Each template can validate independently, but they observe incompatible helper snapshots.
+	gomock.InOrder(
+		f.db.EXPECT().GetConnectorGeneration(gomock.Any(), first.Id, first.Generation).Return(&first, nil),
+		f.encrypt.EXPECT().DecryptString(gomock.Any(), first.EncryptedDefinition).
+			Return(`{"javascript":"function selected() { return 1; }"}`, nil),
+		f.encrypt.EXPECT().EncryptForNamespace(gomock.Any(), f.snapshot.Connection.Namespace, gomock.Any()).
+			Return(f.snapshot.Revision.EncryptedDefinition, nil),
+		f.db.EXPECT().GetConnectorGeneration(gomock.Any(), second.Id, second.Generation).Return(&second, nil),
+		f.encrypt.EXPECT().DecryptString(gomock.Any(), second.EncryptedDefinition).
+			Return(`{"javascript":"function selected() { return 2; }"}`, nil),
+	)
+	install, err := f.service.inventoryFor(context.Background(), plan,
+		&database.ToolSet{Id: f.snapshot.ToolSetId, Name: "mixed-helpers", SelectorRevision: 1},
+		&database.ToolSetBinding{Id: apid.New(apid.PrefixToolSetBinding), Epoch: 1}, &f.snapshot.Connection)
+
+	// Preparation returns no usable candidate; the second template cannot overwrite the first fence.
+	require.ErrorIs(t, err, database.ErrToolSetInventoryConnectionChanged)
+	require.Empty(t, install.Tools)
+	require.Nil(t, install.ExpectedConnector)
+}
+
+// TestToolSetJavaScriptCompilationDefersInitialization checks that publication
+// admits syntax independently from any connection's helper-dependent startup.
+func TestToolSetJavaScriptCompilationDefersInitialization(t *testing.T) {
+	for name, source := range map[string]string{
+		"helper initialization": `const ready = helper(); async function execute() { return ready; }`,
+		"throw":                 `throw "private initialization"; async function execute() {}`,
+		"loop":                  `while (true) {} async function execute() {}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Source-only generation compilation cannot run an unavailable helper, throw, or loop.
+			definition := javascriptToolTemplate("lookup", source).Spec
+			require.NoError(t, compileToolDefinition(&definition, "explicit.tools[0].spec"))
+		})
+	}
+	for name, source := range map[string]string{
+		"syntax":     `async function execute( {`,
+		"sync entry": `function execute() {}`,
+		"host name":  `const fetch = 1; async function execute() {}`,
+		"no execute": `const ready = true;`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			// Invalid static contracts fail before any connection-specific installation work.
+			definition := javascriptToolTemplate("lookup", source).Spec
+			err := compileToolDefinition(&definition, "explicit.tools[0].spec")
+			require.ErrorIs(t, err, ErrInvalidArgument)
+			require.Contains(t, err.Error(), "explicit.tools[0].spec")
+		})
+	}
+}

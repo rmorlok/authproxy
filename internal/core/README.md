@@ -49,9 +49,22 @@ is checked for cancellation after it returns; the schema compiler still needs a
 work bound. A validation failure writes no revision. A successful update becomes
 active immediately, while earlier revisions remain inspectable.
 
-Explicit ToolSet JavaScript templates remain unavailable until their installation
-path validates helpers for each selected connection. A generation has no single
-connection from which to select a library.
+Explicit ToolSet JavaScript templates have two validation stages. Publishing a
+generation compiles each template's source and schemas without initializing code:
+there is no single connection from which to select helpers. The example above
+can therefore be published even though `apiVersion()` comes from a connector.
+
+Before installing an inventory, core validates each JavaScript template with that
+connection's pinned helper library using the same no-I/O profile as standalone
+publication. A failed template leaves the entire binding pending; other matching
+connections can still install. Existing installed bindings keep their generation
+when a new primary is published.
+
+The prepared inventory captures the connector ID, generation, and exact encrypted
+definition used for validation. Storage locks and rechecks these before commit,
+so migration or an edit to the same generation makes the job retry from fresh
+state. Draft helpers are supported; even key re-encryption may cause a harmless
+retry. No resolved connection configuration is stored in the generated definition.
 
 ## Tool execution policy
 

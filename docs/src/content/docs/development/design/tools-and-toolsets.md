@@ -335,6 +335,11 @@ Exactly one of `source.explicit`, `source.openapi`, or `source.mcp` is allowed.
 Explicit template specs reuse `ToolDefinition` and omit `connectionRef`.
 Template metadata permits name, labels, and annotations, not IDs, namespace,
 generation, ownership, or timestamps. Publication compiles every template.
+For JavaScript, this checks source, entry-point declarations, reserved names,
+and schemas without selecting a connector library or running initialization.
+Before activating an inventory, validate each template with that connection's
+pinned helpers. Initialization can therefore use pure connector helper functions
+without requiring a sample connection when the ToolSet generation is published.
 
 ### Imported ToolSets
 
@@ -679,11 +684,20 @@ in-process trusted-code runtime, not a hard memory-isolated tenant sandbox.
   separate client-support implementation slice; they cannot change the admitted actor,
   connection, request type, or trusted invocation attribution.
 
-Compile and validate before publication without live connection capabilities or
-direct HTTP. Initialization and any queued initialization microtasks must finish
-without outbound I/O. Reusing connector libraries does not change their existing
-connection or credential authority in other AuthProxy execution contexts. Pure
-utility globals are consistently available in all bounded execution profiles.
+For standalone Tools, compile and validate initialization before publication.
+ToolSet generation publication performs static compilation; each connection's
+complete candidate inventory must pass initialization before activation. Both
+checks run without live connection capabilities or direct HTTP. Initialization
+and queued initialization microtasks must finish without outbound I/O.
+
+ToolSet activation must recheck the selected connector ID, generation, and exact
+definition used for initialization under database locks. A draft edit or an
+administrator forcing a published generation back to draft can change helpers
+without changing the generation number. Discard stale candidates and retry;
+definition re-encryption may also cause a harmless retry. Reusing connector
+libraries does not change their existing connection or credential authority in
+other AuthProxy execution contexts. Pure utility globals are consistently
+available in all bounded execution profiles.
 
 JSON-compatible ordinary returns become `structuredContent`. Strings also
 produce a text block; objects/arrays need not be duplicated as serialized text
