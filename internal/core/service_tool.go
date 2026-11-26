@@ -92,12 +92,12 @@ func (s *service) CreateTool(ctx context.Context, resource *toolschema.Tool) (if
 	id := apid.New(apid.PrefixTool)
 	candidate := resource.ApplyCreateDefaults(id)
 
-	connectionId, err := s.resolveToolConnection(ctx, candidate)
+	connection, err := s.resolveToolConnection(ctx, candidate)
 	if err != nil {
 		return nil, err
 	}
 
-	prepared, err := s.prepareToolDefinition(ctx, candidate)
+	prepared, err := s.prepareToolDefinition(ctx, candidate, connection)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func (s *service) CreateTool(ctx context.Context, resource *toolschema.Tool) (if
 		Id:           id,
 		Namespace:    candidate.Metadata.Namespace,
 		Name:         candidate.Metadata.Name,
-		ConnectionId: connectionId,
+		ConnectionId: connection.Id,
 		Labels:       database.Labels(maps.Clone(candidate.Metadata.Labels)),
 		Annotations:  database.Annotations(maps.Clone(candidate.Metadata.Annotations)),
 		Description:  candidate.Spec.Description,
@@ -158,19 +158,19 @@ func (s *service) UpdateTool(
 		return nil, fmt.Errorf("%w: %w", ErrInvalidArgument, err)
 	}
 
-	connectionId, err := s.resolveToolConnection(ctx, candidate)
+	connection, err := s.resolveToolConnection(ctx, candidate)
 	if err != nil {
 		return nil, err
 	}
 
-	prepared, err := s.prepareToolDefinition(ctx, candidate)
+	prepared, err := s.prepareToolDefinition(ctx, candidate, connection)
 	if err != nil {
 		return nil, err
 	}
 
 	updated := *current
 	updated.Name = candidate.Metadata.Name
-	updated.ConnectionId = connectionId
+	updated.ConnectionId = connection.Id
 	updated.Labels = database.Labels(maps.Clone(candidate.Metadata.Labels))
 	updated.Annotations = database.Annotations(maps.Clone(candidate.Metadata.Annotations))
 	updated.Description = candidate.Spec.Description
@@ -201,7 +201,8 @@ func (s *service) DeleteTool(ctx context.Context, id apid.ID, expectedRevision u
 // resolveToolConnection resolves an ID or namespace/name connection reference
 // and requires the live connection to be in the Tool's own namespace. A Tool
 // can never bind a connection elsewhere, even an ancestor or descendant.
-func (s *service) resolveToolConnection(ctx context.Context, tool *toolschema.Tool) (apid.ID, error) {
+// The returned row also pins helper-library selection during publication.
+func (s *service) resolveToolConnection(ctx context.Context, tool *toolschema.Tool) (*database.Connection, error) {
 	ref := tool.Spec.ConnectionRef
 	if ref.ID == "" && ref.Namespace == "" {
 		// A name-only reference is relative to the Tool's namespace.
@@ -211,28 +212,39 @@ func (s *service) resolveToolConnection(ctx context.Context, tool *toolschema.To
 	connection, err := s.db.ResolveConnectionReference(ctx, ref)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			return apid.Nil, fmt.Errorf("%w: connection referenced by spec.connectionRef was not found", ErrInvalidArgument)
+			return nil, fmt.Errorf("%w: connection referenced by spec.connectionRef was not found", ErrInvalidArgument)
 		}
-		return apid.Nil, coreObjectReferenceError(ref.Kind, err)
+		return nil, coreObjectReferenceError(ref.Kind, err)
 	}
 	if connection.Namespace != tool.Metadata.Namespace {
-		return apid.Nil, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: spec.connectionRef must be in the tool namespace %q",
 			ErrInvalidArgument,
 			tool.Metadata.Namespace,
 		)
 	}
 
-	return connection.Id, nil
+	return connection, nil
 }
 
-// prepareToolDefinition validates and compiles the definition without
-// executing authored code or making requests, then serializes and encrypts it
-// for the Tool's namespace.
-func (s *service) prepareToolDefinition(ctx context.Context, tool *toolschema.Tool) (*preparedToolDefinition, error) {
+// prepareToolDefinition compiles a standalone definition and validates JavaScript
+// initialization with the resolved connection's pinned helpers. It never calls
+// execute or supplies live connection capabilities. Only a valid definition is
+// serialized and encrypted for publication in the Tool's namespace.
+func (s *service) prepareToolDefinition(
+	ctx context.Context,
+	tool *toolschema.Tool,
+	connection *database.Connection,
+) (*preparedToolDefinition, error) {
 	definition := &tool.Spec.ToolDefinition
-	if err := compileToolDefinition(definition, "spec"); err != nil {
-		return nil, err
+	if definition.Javascript != nil {
+		if err := s.validateToolJavaScriptPublication(ctx, definition, connection); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := compileToolDefinition(definition, "spec"); err != nil {
+			return nil, err
+		}
 	}
 
 	plaintext, err := json.Marshal(definition)
@@ -285,10 +297,10 @@ func compileToolDefinition(
 			return fmt.Errorf("%w: %s.proxyHttp.response: %w", ErrInvalidArgument, field, err)
 		}
 	case definition.Javascript != nil:
-		// The execute(params, context) host is not implemented yet, so there is
-		// no compiler that can validate an entry point. Refuse rather than store
-		// a definition that has never been compiled.
-		return fmt.Errorf("%w: %s.javascript tools are not supported yet; use %s.proxyHttp", ErrInvalidArgument, field, field)
+		// ToolSet generation compilation has no selected connection. Supporting
+		// JavaScript templates also requires library-aware validation before each
+		// binding's inventory is activated. Standalone Tools validate separately.
+		return fmt.Errorf("%w: %s.javascript ToolSet templates are not supported yet; use %s.proxyHttp", ErrInvalidArgument, field, field)
 	default:
 		return fmt.Errorf("%w: %s must declare an executor", ErrInvalidArgument, field)
 	}

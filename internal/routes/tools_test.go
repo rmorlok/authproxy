@@ -274,6 +274,7 @@ func TestTools(t *testing.T) {
 
 	t.Run("create rejects invalid or unsupported definitions before storing", func(t *testing.T) {
 		s, cxns := newToolsTestSetup(t)
+		installToolJavascriptConnector(t, s, cxns["calendar"], 1, "", database.ConnectorGenerationStatePrimary)
 
 		crossNamespace := toolBody("root.acme", "cross", cxns["other"].Id, nil)
 		w := s.do(t, http.MethodPost, "/tools", crossNamespace, all)
@@ -298,10 +299,10 @@ func TestTools(t *testing.T) {
 		javascript := toolBody("root.acme", "js", cxns["calendar"].Id, nil)
 		spec := javascript["spec"].(map[string]any)
 		delete(spec, "proxyHttp")
-		spec["javascript"] = "async function execute(params, context) { return {}; }"
+		spec["javascript"] = "function execute(params, context) { return {}; }"
 		w = s.do(t, http.MethodPost, "/tools", javascript, all)
 		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
-		require.Contains(t, w.Body.String(), "not supported yet")
+		require.Contains(t, w.Body.String(), "javascript")
 
 		withStatus := toolBody("root.acme", "status", cxns["calendar"].Id, nil)
 		withStatus["status"] = map[string]any{"revision": 9}
@@ -390,6 +391,7 @@ func TestTools(t *testing.T) {
 
 	t.Run("failed updates leave the active revision intact", func(t *testing.T) {
 		s, cxns := newToolsTestSetup(t)
+		installToolJavascriptConnector(t, s, cxns["calendar"], 1, "", database.ConnectorGenerationStatePrimary)
 		created := decodeTool(t, s.do(t, http.MethodPost, "/tools", toolBody("root.acme", "stable", cxns["calendar"].Id, nil), all))
 		path := "/tools/" + created.Metadata.ID
 
@@ -400,9 +402,9 @@ func TestTools(t *testing.T) {
 			"uncompilable template": patchBody(nil, map[string]any{
 				"proxyHttp": map[string]any{"method": "GET", "url": "https://{{#cfg.apiHost}}"},
 			}),
-			"javascript executor": patchBody(nil, map[string]any{
+			"invalid javascript entry point": patchBody(nil, map[string]any{
 				"proxyHttp":  nil,
-				"javascript": "async function execute() { return 1; }",
+				"javascript": "function execute() { return 1; }",
 			}),
 			"namespace change": patchBody(map[string]any{"namespace": "root.other"}, nil),
 		} {
