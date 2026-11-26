@@ -9,8 +9,9 @@ a fresh VM against one admitted connection and assembles its bounded result.
 The lower-level [JavaScript adapter](../javascript/README.md) owns copied Tool
 inputs, the sole connection capability, rich results, and explicit `ToolError`
 values. This executor adds argument/output schemas, invocation identities, and
-final envelope limits. Server policy defaults and core/public invocation
-integration remain separate work.
+final envelope limits. Core's JavaScript policy resolver supplies finite server
+defaults from `tools.invocation`; core dispatch and public invocation integration
+remain separate work.
 
 ## Prepare a customer lookup
 
@@ -160,6 +161,8 @@ returns `result.ErrEncodedResultLimit` with no result.
 Every field in `Limits` must be positive; this package supplies no defaults.
 `ResolveLimits` lowers selected operator ceilings with the definition's optional
 caps. `Compile` performs this resolution and validates the complete policy.
+The server's defaults and native-budget formula are documented in the
+[configuration reference](../../../docs/src/content/docs/reference/configuration.md#tool-invocation-limits).
 
 | Authored cap | Effective allowances lowered |
 | --- | --- |

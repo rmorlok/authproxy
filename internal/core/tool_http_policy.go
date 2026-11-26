@@ -32,17 +32,9 @@ const (
 // Configuration remains a schema-layer contract. This translation belongs in
 // core so config does not depend on execution packages or the connection host.
 func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
-	var settings *sconfig.ToolInvocationLimits
-	if s.cfg != nil {
-		if root := s.cfg.GetRoot(); root != nil && root.Tools != nil {
-			settings = root.Tools.Invocation
-		}
-	}
-	if err := settings.Validate(&common.ValidationContext{Path: "$.tools.invocation"}); err != nil {
+	settings, err := s.toolInvocationSettings()
+	if err != nil {
 		return httpexec.Limits{}, err
-	}
-	if settings == nil {
-		settings = &sconfig.ToolInvocationLimits{}
 	}
 
 	timeout := 60 * time.Second
@@ -100,6 +92,30 @@ func (s *service) toolHTTPInvocationPolicy() (httpexec.Limits, error) {
 			MaxHeaderBytes:   toolPolicyBytes(settings.MaxResponseHeaderBytes, 64<<10),
 		},
 	}, nil
+}
+
+// toolInvocationSettings validates the shared configuration before either
+// executor converts byte sizes or derives processing budgets. It supplies an
+// empty settings value for omitted configuration, without modifying the root.
+// Callers may read the returned settings while resolving policy but must not
+// retain its pointers in a compiled executor or mutate them.
+func (s *service) toolInvocationSettings() (*sconfig.ToolInvocationLimits, error) {
+	var settings *sconfig.ToolInvocationLimits
+	if s.cfg != nil {
+		if root := s.cfg.GetRoot(); root != nil && root.Tools != nil {
+			settings = root.Tools.Invocation
+		}
+	}
+
+	if err := settings.Validate(&common.ValidationContext{Path: "$.tools.invocation"}); err != nil {
+		return nil, err
+	}
+
+	if settings == nil {
+		settings = &sconfig.ToolInvocationLimits{}
+	}
+
+	return settings, nil
 }
 
 // toolTransformBudget derives each cumulative allowance from the resolved
