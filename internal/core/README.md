@@ -28,8 +28,25 @@ scale with admitted argument, VM, and HTTP data; all operations share the same
 remaining allowances. See the [configuration reference](../../docs/src/content/docs/reference/configuration.md#tool-invocation-limits)
 for fields, defaults, and accounting formulas.
 
-The private HTTP invocation path uses these limits after authorization and
-preserves the preparation deadline through execution. The JavaScript policy
-resolver is ready for core dispatch integration; it does not itself authorize
-or execute a Tool. Public invocation also requires the schema-evaluation work
-bound tracked in [#948](https://github.com/rmorlok/authproxy/issues/948).
+The private `invokeTool` path authorizes one captured revision, selects its HTTP
+or JavaScript policy, and prepares the matching connection. Both executors retain
+the deadline started before preparation. A JavaScript Tool uses the helper
+library from that same pinned connector generation and receives exactly one
+connection capability; global direct `fetch` is absent.
+
+For example, a customer lookup can call a connector's `customerPath(id)` helper,
+read a customer through `context.connections[0].fetch(...)`, and then write an
+audit record through the same connection. Both requests keep the captured actor
+and connection attribution. Per-call labels still select the configured HTTP
+middleware. Changing a Tool or connector after admission does not replace the
+captured code or configuration during that call.
+
+Library and Tool initialization run once in the execution VM before outbound
+requests are enabled. Readiness failures return bounded `notStarted` results;
+execution failures after a possible send preserve `mayHaveExecuted`. Caller
+cancellation returns a Go error, while an authored/operator timeout can return a
+safe Tool failure using the original caller context. Compilation and dependency
+diagnostics remain internal errors.
+
+This is an internal composition point. Public invocation still requires the
+schema-evaluation work bound tracked in [#948](https://github.com/rmorlok/authproxy/issues/948).

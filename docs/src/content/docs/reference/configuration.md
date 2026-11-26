@@ -127,13 +127,14 @@ units); `kb` and `mb` use decimal units. Per-Tool limits can lower the server's
 limits but cannot raise them. For example, a Tool with `timeoutMillis: 5000`
 gets five seconds under the configuration above.
 
-These settings currently govern the internal HTTP Tool invocation path. There
+These settings govern the internal HTTP and JavaScript Tool invocation paths. There
 is no public invocation endpoint yet; bounded schema evaluation remains a
 prerequisite. The declarative HTTP executor makes one logical request. Proxy
 credential recovery and redirects may make additional HTTP attempts under the
-existing proxy policy. JavaScript Tool policy resolution is also implemented;
-connecting it to core invocation is still pending. JavaScript-specific settings
-below do not change existing connector scripts or HTTP response transforms.
+existing proxy policy. JavaScript Tools can make multiple requests through their
+single captured connection; preparation and execution share the timeout.
+JavaScript-specific settings below do not change existing connector scripts or
+HTTP response transforms.
 
 | Field | Default | What it limits |
 |---|---|---|

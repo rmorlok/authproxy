@@ -77,6 +77,7 @@ func TestPrepareToolInvocationCapturedContext(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, f.snapshot.Connection.Id, client.connection.Id)
 	require.Equal(t, uint64(4), client.connection.connector.Generation)
+	require.Same(t, client.connection.connector, got.connector)
 	require.Equal(t, "captured generation", client.connection.connector.GetDefinition().Description)
 	require.Equal(t, httpf.RequestTypeProxy, client.options.RequestType)
 	require.Equal(t, authorized.actor.Id, client.options.Actor.Actor().GetId())

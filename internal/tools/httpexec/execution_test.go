@@ -18,7 +18,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	stools "github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
@@ -71,12 +72,12 @@ func executionLimits() httpexec.Limits {
 }
 
 // executionDefinition provides the smallest ordinary HTTP Tool contract.
-func executionDefinition() tools.ToolDefinition {
-	return tools.ToolDefinition{
+func executionDefinition() stools.ToolDefinition {
+	return stools.ToolDefinition{
 		Description: "Read a contact",
 		Verbs:       []string{"read"},
 		InputSchema: common.RawJSON(`{"type":"object"}`),
-		ProxyHTTP: &tools.ProxyHTTP{
+		ProxyHTTP: &stools.ProxyHTTP{
 			Method: "GET",
 			URL:    "https://example.test/contact",
 		},
@@ -84,8 +85,8 @@ func executionDefinition() tools.ToolDefinition {
 }
 
 // executionInvocation supplies valid captured identities and caller arguments.
-func executionInvocation() httpexec.Invocation {
-	return httpexec.Invocation{
+func executionInvocation() tools.Invocation {
+	return tools.Invocation{
 		ID:        "tiv_01example0000001",
 		Arguments: common.RawJSON(`{}`),
 		Snapshot: render.Input{
@@ -137,7 +138,11 @@ func executionResponse(body *executionBody) *http.Response {
 }
 
 // compileExecution requires a reusable program for an authored definition.
-func compileExecution(t *testing.T, definition tools.ToolDefinition, limits httpexec.Limits) *httpexec.Program {
+func compileExecution(
+	t *testing.T,
+	definition stools.ToolDefinition,
+	limits httpexec.Limits,
+) *httpexec.Program {
 	t.Helper()
 	program, err := httpexec.Compile(definition, limits)
 	require.NoError(t, err)
@@ -166,12 +171,19 @@ func TestExecuteComposesRequestAndResponse(t *testing.T) {
 	definition := executionDefinition()
 	definition.InputSchema = common.RawJSON(`{"type":"object","required":["id","amount"],"properties":{"id":{"type":"string"},"amount":{"type":"integer"}},"additionalProperties":false}`)
 	definition.OutputSchema = common.RawJSON(`{"type":"object","required":["id","amount","tenant","requestId"],"properties":{"amount":{"const":"9007199254740993"}}}`)
-	definition.ProxyHTTP = &tools.ProxyHTTP{
+	definition.ProxyHTTP = &stools.ProxyHTTP{
 		Method: "POST", URL: "https://{{cfg.host}}/tenants/{{path.cfg.tenant}}/contacts/{{path.params.id}}",
-		Headers:  map[string]string{"Host": "{{cfg.override}}", "X-Team": "{{labels.team}}"},
-		Query:    map[string]common.RawJSON{"tag": common.RawJSON(`{"$value":"cfg.tags"}`)},
+		Headers: map[string]string{
+			"Host":   "{{cfg.override}}",
+			"X-Team": "{{labels.team}}",
+		},
+		Query: map[string]common.RawJSON{
+			"tag": common.RawJSON(`{"$value":"cfg.tags"}`),
+		},
 		BodyJSON: common.RawJSON(`{"amount":{"$value":"params.amount"}}`),
-		Response: &tools.HTTPResponse{TransformJavascript: util.ToPtr(`({id: params.id, amount: response.body.amount, tenant: context.cfg.tenant, requestId: response.headers["x-request-id"][0], headers: response.headers})`)},
+		Response: &stools.HTTPResponse{
+			TransformJavascript: util.ToPtr(`({id: params.id, amount: response.body.amount, tenant: context.cfg.tenant, requestId: response.headers["x-request-id"][0], headers: response.headers})`),
+		},
 	}
 	invocation := executionInvocation()
 	invocation.Arguments = common.RawJSON(`{"id":"sales/42","amount":9007199254740993}`)
@@ -229,28 +241,28 @@ func TestExecuteComposesRequestAndResponse(t *testing.T) {
 func TestExecuteRejectsInputBeforeIO(t *testing.T) {
 	for _, test := range []struct {
 		name     string
-		change   func(*tools.ToolDefinition, *httpexec.Invocation, *httpexec.Limits)
+		change   func(*stools.ToolDefinition, *tools.Invocation, *httpexec.Limits)
 		code     string
 		internal bool
 	}{
-		{"malformed JSON", func(_ *tools.ToolDefinition, i *httpexec.Invocation, _ *httpexec.Limits) {
+		{"malformed JSON", func(_ *stools.ToolDefinition, i *tools.Invocation, _ *httpexec.Limits) {
 			i.Arguments = common.RawJSON(`{"private-value":`)
 		}, "INPUT_INVALID", false},
-		{"schema mismatch", func(d *tools.ToolDefinition, _ *httpexec.Invocation, _ *httpexec.Limits) {
+		{"schema mismatch", func(d *stools.ToolDefinition, _ *tools.Invocation, _ *httpexec.Limits) {
 			d.InputSchema = common.RawJSON(`{"type":"object","required":["private-field"]}`)
 		}, "INPUT_INVALID", false},
-		{"missing reference", func(d *tools.ToolDefinition, _ *httpexec.Invocation, _ *httpexec.Limits) {
+		{"missing reference", func(d *stools.ToolDefinition, _ *tools.Invocation, _ *httpexec.Limits) {
 			d.ProxyHTTP.URL += "/{{params.private_missing}}"
 		}, "INPUT_INVALID", false},
-		{"invalid rendered header", func(d *tools.ToolDefinition, i *httpexec.Invocation, _ *httpexec.Limits) {
+		{"invalid rendered header", func(d *stools.ToolDefinition, i *tools.Invocation, _ *httpexec.Limits) {
 			d.ProxyHTTP.Headers = map[string]string{"X-Value": "{{params.value}}"}
 			i.Arguments = common.RawJSON(`{"value":"private-value\r\nInjected: true"}`)
 		}, "INPUT_INVALID", false},
-		{"input limit", func(_ *tools.ToolDefinition, i *httpexec.Invocation, l *httpexec.Limits) {
+		{"input limit", func(_ *stools.ToolDefinition, i *tools.Invocation, l *httpexec.Limits) {
 			l.Validation.MaxInputBytes = 2
 			i.Arguments = common.RawJSON(`{"private-value":true}`)
 		}, "EXECUTION_LIMIT_EXCEEDED", false},
-		{"invalid identity", func(_ *tools.ToolDefinition, i *httpexec.Invocation, _ *httpexec.Limits) { i.ID = "private-invalid" }, "", true},
+		{"invalid identity", func(_ *stools.ToolDefinition, i *tools.Invocation, _ *httpexec.Limits) { i.ID = "private-invalid" }, "", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			definition, invocation, limits := executionDefinition(), executionInvocation(), executionLimits()
@@ -281,8 +293,15 @@ func TestExecuteStatusErrorsDoNotReadBodies(t *testing.T) {
 		t.Run(fmt.Sprint(status), func(t *testing.T) {
 			definition := executionDefinition()
 			definition.OutputSchema = common.RawJSON(`false`)
-			definition.ProxyHTTP.Response = &tools.HTTPResponse{
-				Errors:              []tools.HTTPErrorRule{{Statuses: []int{200, 404}, Code: "CONTACT_UNAVAILABLE", Message: "The contact is unavailable.", Retryable: util.ToPtr(true)}},
+			definition.ProxyHTTP.Response = &stools.HTTPResponse{
+				Errors: []stools.HTTPErrorRule{
+					{
+						Statuses:  []int{200, 404},
+						Code:      "CONTACT_UNAVAILABLE",
+						Message:   "The contact is unavailable.",
+						Retryable: util.ToPtr(true),
+					},
+				},
 				TransformJavascript: util.ToPtr(`(() => { throw new Error("private-transform"); })()`),
 			}
 			program := compileExecution(t, definition, executionLimits())
@@ -365,39 +384,39 @@ func (failingExecutionReader) Read(p []byte) (int, error) {
 func TestExecuteResponseFailures(t *testing.T) {
 	for _, test := range []struct {
 		name, code string
-		change     func(*tools.ToolDefinition, *httpexec.Limits, *http.Response, *executionBody)
+		change     func(*stools.ToolDefinition, *httpexec.Limits, *http.Response, *executionBody)
 	}{
-		{"read failure", "UPSTREAM_FAILED", func(_ *tools.ToolDefinition, _ *httpexec.Limits, _ *http.Response, b *executionBody) {
+		{"read failure", "UPSTREAM_FAILED", func(_ *stools.ToolDefinition, _ *httpexec.Limits, _ *http.Response, b *executionBody) {
 			b.reader = failingExecutionReader{}
 		}},
-		{"invalid encoding", "UPSTREAM_PROTOCOL_ERROR", func(_ *tools.ToolDefinition, _ *httpexec.Limits, r *http.Response, _ *executionBody) {
+		{"invalid encoding", "UPSTREAM_PROTOCOL_ERROR", func(_ *stools.ToolDefinition, _ *httpexec.Limits, r *http.Response, _ *executionBody) {
 			r.Header.Set("Content-Encoding", "gzip")
 		}},
-		{"invalid response", "UPSTREAM_PROTOCOL_ERROR", func(_ *tools.ToolDefinition, _ *httpexec.Limits, r *http.Response, _ *executionBody) {
+		{"invalid response", "UPSTREAM_PROTOCOL_ERROR", func(_ *stools.ToolDefinition, _ *httpexec.Limits, r *http.Response, _ *executionBody) {
 			r.StatusCode = 600
 		}},
-		{"decoded byte cap", "OUTPUT_TOO_LARGE", func(_ *tools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
+		{"decoded byte cap", "OUTPUT_TOO_LARGE", func(_ *stools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
 			l.HTTP.MaxResponseBytes = 4
 		}},
-		{"stream byte cap", "OUTPUT_TOO_LARGE", func(_ *tools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
+		{"stream byte cap", "OUTPUT_TOO_LARGE", func(_ *stools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
 			l.HTTP.MaxStreamBytes = 4
 		}},
-		{"header byte cap", "OUTPUT_TOO_LARGE", func(_ *tools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
+		{"header byte cap", "OUTPUT_TOO_LARGE", func(_ *stools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
 			l.HTTP.MaxHeaderBytes = 4
 		}},
-		{"malformed output JSON", "OUTPUT_INVALID", func(_ *tools.ToolDefinition, _ *httpexec.Limits, _ *http.Response, b *executionBody) {
+		{"malformed output JSON", "OUTPUT_INVALID", func(_ *stools.ToolDefinition, _ *httpexec.Limits, _ *http.Response, b *executionBody) {
 			b.reader = strings.NewReader(`{"private-value":`)
 		}},
-		{"output schema", "OUTPUT_INVALID", func(d *tools.ToolDefinition, _ *httpexec.Limits, r *http.Response, b *executionBody) {
+		{"output schema", "OUTPUT_INVALID", func(d *stools.ToolDefinition, _ *httpexec.Limits, r *http.Response, b *executionBody) {
 			d.OutputSchema = common.RawJSON(`{"type":"integer"}`)
 			r.Header.Set("Content-Type", "text/plain")
 			b.reader = strings.NewReader("private-text")
 		}},
-		{"output validation cap", "OUTPUT_TOO_LARGE", func(d *tools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
+		{"output validation cap", "OUTPUT_TOO_LARGE", func(d *stools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
 			d.OutputSchema = common.RawJSON(`true`)
 			l.Validation.MaxOutputBytes = 4
 		}},
-		{"output validation values", "OUTPUT_TOO_LARGE", func(d *tools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
+		{"output validation values", "OUTPUT_TOO_LARGE", func(d *stools.ToolDefinition, l *httpexec.Limits, _ *http.Response, _ *executionBody) {
 			d.OutputSchema = common.RawJSON(`true`)
 			l.Validation.MaxValues = 1
 		}},
@@ -474,7 +493,9 @@ func TestExecuteCancellationAndTimeout(t *testing.T) {
 
 	// The same timeout includes projection after a complete upstream response.
 	definition := executionDefinition()
-	definition.ProxyHTTP.Response = &tools.HTTPResponse{TransformJavascript: util.ToPtr(`(() => { while (true) {} })()`)}
+	definition.ProxyHTTP.Response = &stools.HTTPResponse{
+		TransformJavascript: util.ToPtr(`(() => { while (true) {} })()`),
+	}
 	limits.Response.Transform.Timeout = 10 * time.Second
 	transform := compileExecution(t, definition, limits)
 	body := &executionBody{reader: strings.NewReader(`true`)}
@@ -511,7 +532,9 @@ func TestExecuteCancellationAndTimeout(t *testing.T) {
 func TestExecuteConcurrentReuseOwnsDefinition(t *testing.T) {
 	definition := executionDefinition()
 	definition.ProxyHTTP.Headers = map[string]string{"X-Id": "{{params.id}}"}
-	definition.ProxyHTTP.Response = &tools.HTTPResponse{TransformJavascript: util.ToPtr(`({id: params.id, reply: response.body.id})`)}
+	definition.ProxyHTTP.Response = &stools.HTTPResponse{
+		TransformJavascript: util.ToPtr(`({id: params.id, reply: response.body.id})`),
+	}
 	program := compileExecution(t, definition, executionLimits())
 	// Mutating caller-owned source after compilation cannot alter execution.
 	definition.ProxyHTTP.URL = "private-invalid-url"

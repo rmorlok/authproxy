@@ -145,7 +145,7 @@ func TestInvokeHTTPToolConfiguredInputCaps(t *testing.T) {
 			expectHTTPToolPreparation(f)
 
 			// Even semantically empty whitespace consumes argument bytes; strict mocks reject I/O.
-			result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{} `))
+			result, err := f.service.invokeTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{} `))
 			require.NoError(t, err)
 			requireHTTPToolFailure(t, f, result, "EXECUTION_LIMIT_EXCEEDED", api.ToolExecutionStateNotStarted)
 		})
@@ -159,7 +159,7 @@ func TestInvokeHTTPToolConfiguredInputCaps(t *testing.T) {
 		expectHTTPToolDefinition(t, f)
 
 		// A denied Tool is still hidden even when the operator configuration is invalid.
-		result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:other"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+		result, err := f.service.invokeTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:other"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, result)
 	})
@@ -197,7 +197,7 @@ func TestInvokeHTTPToolConfiguredResultCaps(t *testing.T) {
 			})
 
 			// A shrinking projection cannot bypass the independent upstream/input limits.
-			result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+			result, err := f.service.invokeTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			require.NoError(t, err)
 			require.Equal(t, 1, calls)
 			requireHTTPToolFailure(t, f, result, code, api.ToolExecutionStateMayHaveExecuted)
@@ -228,7 +228,7 @@ func TestInvokeHTTPToolIndependentInputBudgets(t *testing.T) {
 	})
 
 	// The two-byte argument is valid while the larger connection snapshot and response flow through.
-	result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+	result, err := f.service.invokeTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 	require.NoError(t, err)
 	require.False(t, result.IsError)
 	require.JSONEq(t, `{"tenant":"acme/team","value":"provider response"}`, string(result.StructuredContent))
@@ -248,7 +248,7 @@ func TestInvokeHTTPToolConfiguredRenderCap(t *testing.T) {
 	expectHTTPToolPreparation(f)
 
 	// Strict factory mocks prove the render allowance is enforced before I/O.
-	result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+	result, err := f.service.invokeTool(context.Background(), toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 	require.NoError(t, err)
 	requireHTTPToolFailure(t, f, result, "INPUT_INVALID", api.ToolExecutionStateNotStarted)
 }
