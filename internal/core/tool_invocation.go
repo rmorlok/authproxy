@@ -50,6 +50,7 @@ func (s *service) invokeTool(
 	// Choose only the captured executor's policy. In particular, an independent
 	// response-transform allowance must not govern JavaScript Tool execution.
 	javascriptTool := authorized.definition.Javascript != nil && authorized.definition.ProxyHTTP == nil
+
 	var httpLimits httpexec.Limits
 	var javascriptLimits jsexec.Limits
 	var timeout time.Duration
@@ -59,10 +60,12 @@ func (s *service) invokeTool(
 		if err != nil {
 			return nil, err
 		}
+
 		javascriptLimits, err = jsexec.ResolveLimits(policy, authorized.definition.Limits)
 		if err != nil {
 			return nil, err
 		}
+
 		timeout = min(javascriptLimits.HTTP.Timeout, javascriptLimits.Runtime.Timeout)
 		maxResultBytes = javascriptLimits.MaxEncodedResultBytes
 	} else {
@@ -70,10 +73,12 @@ func (s *service) invokeTool(
 		if err != nil {
 			return nil, err
 		}
+
 		httpLimits, err = httpexec.ResolveLimits(policy, authorized.definition.Limits)
 		if err != nil {
 			return nil, err
 		}
+
 		timeout, maxResultBytes = httpLimits.HTTP.Timeout, httpLimits.Response.MaxEncodedResultBytes
 	}
 
@@ -106,7 +111,9 @@ func (s *service) invokeTool(
 		// Identity-only failures need no decrypted configuration, compiled source,
 		// or executor-specific invocation wrapper. New detaches source metadata.
 		base, buildErr := toolresult.New(
-			captured.Revision.ToolId.String(), captured.Revision.Revision, invocationID,
+			captured.Revision.ToolId.String(),
+			captured.Revision.Revision,
+			invocationID,
 			api.ToolResultMetadata{
 				ConnectionID:      captured.Connection.Id.String(),
 				ToolSetGeneration: captured.Revision.SourceGeneration,
@@ -119,11 +126,28 @@ func (s *service) invokeTool(
 		if buildErr != nil {
 			return nil, buildErr
 		}
-		toolresult.SetFailure(base, &api.ToolResultError{Code: code, Message: message}, api.ToolExecutionStateNotStarted)
-		return toolresult.Finish(ctx, base, api.ToolExecutionStateNotStarted, maxResultBytes)
+
+		toolresult.SetFailure(
+			base,
+			&api.ToolResultError{
+				Code:    code,
+				Message: message,
+			},
+			api.ToolExecutionStateNotStarted,
+		)
+
+		return toolresult.Finish(
+			ctx,
+			base,
+			api.ToolExecutionStateNotStarted,
+			maxResultBytes,
+		)
 	}
 
-	if !javascriptTool && (authorized.definition.ProxyHTTP == nil || authorized.definition.Javascript != nil) {
+	// Future proof ourselves
+	if !javascriptTool &&
+		(authorized.definition.ProxyHTTP == nil ||
+			authorized.definition.Javascript != nil) {
 		return failBeforeExecution(nil, "UNSUPPORTED_CAPABILITY", "The Tool executor is not supported.")
 	}
 
@@ -155,11 +179,20 @@ func (s *service) invokeTool(
 		// Retain the prepared connector instead of rereading its mutable current
 		// generation. Raw combined source is admitted before library compilation,
 		// including whitespace-only libraries whose compiled source is empty.
-		library, err := prepared.connector.getBoundedJavascriptLibrary(workCtx, *authorized.definition.Javascript, javascriptLimits.Runtime)
+		library, err := prepared.connector.getBoundedJavascriptLibrary(
+			workCtx,
+			*authorized.definition.Javascript,
+			javascriptLimits.Runtime,
+		)
 		if err != nil {
 			return failBeforeExecution(err, "", "")
 		}
-		program, err := jsexec.Compile(authorized.definition, library, javascriptLimits)
+
+		program, err := jsexec.Compile(
+			authorized.definition,
+			library,
+			javascriptLimits,
+		)
 		if err != nil {
 			return failBeforeExecution(fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err), "", "")
 		}
@@ -171,9 +204,15 @@ func (s *service) invokeTool(
 		// initialization completes. Its fresh VM receives one captured connection.
 		// Keep the original caller separate from the policy deadline so expiry can
 		// return a safe ToolResult without discarding possible upstream effects.
-		return program.Execute(ctx, prepared.client, jsexec.Invocation{
-			ID: invocationID, Arguments: arguments, Deadline: deadline, Snapshot: prepared.snapshot,
-		})
+		return program.Execute(
+			ctx,
+			prepared.client,
+			jsexec.Invocation{
+				ID:        invocationID,
+				Arguments: arguments,
+				Deadline:  deadline,
+				Snapshot:  prepared.snapshot,
+			})
 	}
 
 	program, err := httpexec.Compile(authorized.definition, httpLimits)
@@ -192,7 +231,14 @@ func (s *service) invokeTool(
 	// Keep caller cancellation separate from the policy deadline. Passing workCtx
 	// as the parent would make expiry look like caller cancellation and discard
 	// the executor's evidence that a target request may already have been sent.
-	return program.Execute(ctx, prepared.client, httpexec.Invocation{
-		ID: invocationID, Arguments: arguments, Deadline: deadline, Snapshot: prepared.snapshot,
-	})
+	return program.Execute(
+		ctx,
+		prepared.client,
+		httpexec.Invocation{
+			ID:        invocationID,
+			Arguments: arguments,
+			Deadline:  deadline,
+			Snapshot:  prepared.snapshot,
+		},
+	)
 }
