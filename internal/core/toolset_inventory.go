@@ -158,16 +158,22 @@ func (s *service) inventoryFor(
 			if err != nil {
 				return database.ToolSetInventoryInstall{}, fmt.Errorf("toolset template %q initialization: %w", template.key, err)
 			}
+
 			// A draft can change without a generation change, and administrators
 			// can force published generations back to draft. Fence the exact
 			// validated definition as well as the connection's selected generation.
 			expected := database.ToolSetInventoryConnector{
-				Generation:          database.ConnectorGenerationId{Id: connector.Id, Generation: connector.Generation},
+				Generation: database.ConnectorGenerationId{
+					Id:         connector.Id,
+					Generation: connector.Generation,
+				},
 				EncryptedDefinition: connector.EncryptedDefinition,
 			}
+
 			if install.ExpectedConnector != nil && *install.ExpectedConnector != expected {
 				return database.ToolSetInventoryInstall{}, database.ErrToolSetInventoryConnectionChanged
 			}
+
 			install.ExpectedConnector = &expected
 		}
 

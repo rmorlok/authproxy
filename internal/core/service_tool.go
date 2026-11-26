@@ -300,7 +300,11 @@ func compileToolDefinition(
 			return fmt.Errorf("%w: %s.proxyHttp.response: %w", ErrInvalidArgument, field, err)
 		}
 	case definition.Javascript != nil:
-		if _, err := jsexec.Compile(*definition, nil, toolPublishJavaScriptLimits); err != nil {
+		if _, err := jsexec.Compile(
+			*definition,
+			nil, // library; omitted because no connector to supply it
+			toolPublishJavaScriptLimits,
+		); err != nil {
 			return fmt.Errorf("%w: %s.javascript: %w", ErrInvalidArgument, field, err)
 		}
 	default:
