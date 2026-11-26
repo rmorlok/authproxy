@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/hibiken/asynq"
+	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -37,10 +38,15 @@ func setupVerifyTest(
 	encrypt := mockEncrypt.NewMockE(ctrl)
 	logger, _ := mockLog.NewTestLogger(t)
 
+	// Reaching configured requests a ToolSet membership pass.
+	ac := mockAsynq.NewMockClient(ctrl)
+	allowConnectionToolSetReconcile(ac)
+
 	svc := &service{
 		cfg:     nil,
 		db:      db,
 		encrypt: encrypt,
+		ac:      ac,
 		logger:  logger,
 	}
 
