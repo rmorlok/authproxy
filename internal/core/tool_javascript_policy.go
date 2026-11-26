@@ -65,11 +65,14 @@ func (s *service) toolJavaScriptInvocationPolicy() (jsexec.Limits, error) {
 		MaxPendingOperations:  toolPolicyInt(settings.MaxPendingOperations, 8),
 		MaxEncodedResultBytes: toolPolicyBytes(settings.MaxEncodedResultBytes, 16<<20),
 	}
+
 	units, err := toolJavaScriptBudget(policy)
 	if err != nil {
 		return jsexec.Limits{}, err
 	}
+
 	policy.Runtime.MaxWorkUnits, policy.Runtime.MaxAllocationUnits = units, units
+
 	return policy, nil
 }
 
@@ -102,7 +105,9 @@ func toolJavaScriptBudget(limits jsexec.Limits) (int, error) {
 		{limits.HTTP.MaxHeaderBytes, limits.HTTP.MaxRequests, 16},
 		{limits.Runtime.MaxNodes, 1, 32},
 	} {
-		if term.value <= 0 || term.count <= 0 || term.value > (math.MaxInt-units)/term.factor/term.count {
+		if term.value <= 0 ||
+			term.count <= 0 ||
+			term.value > (math.MaxInt-units)/term.factor/term.count {
 			return 0, errors.New("tool JavaScript data and request limits cannot form a representable execution budget")
 		}
 		units += term.value * term.factor * term.count

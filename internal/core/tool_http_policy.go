@@ -106,12 +106,15 @@ func (s *service) toolInvocationSettings() (*sconfig.ToolInvocationLimits, error
 			settings = root.Tools.Invocation
 		}
 	}
+
 	if err := settings.Validate(&common.ValidationContext{Path: "$.tools.invocation"}); err != nil {
 		return nil, err
 	}
+
 	if settings == nil {
 		settings = &sconfig.ToolInvocationLimits{}
 	}
+
 	return settings, nil
 }
 
