@@ -137,10 +137,11 @@ JavaScript-specific settings below do not change existing connector scripts or
 HTTP response transforms.
 
 Standalone JavaScript Tool publication uses a separate fixed validation profile:
-256 KiB of combined Tool and connector-helper source and a five-second allowance
-for helper preparation and initialization. It does not call `execute` or provide
-HTTP capabilities. Changing `tools.invocation` does not change this publication
-profile.
+256 KiB of combined Tool and connector-helper source, five seconds for helper
+preparation, and up to five seconds for initialization. Authored limits can lower
+the initialization allowance; they do not shorten database reads or decryption.
+It does not call `execute` or provide HTTP capabilities. Changing `tools.invocation`
+does not change this publication profile.
 
 | Field | Default | What it limits |
 |---|---|---|

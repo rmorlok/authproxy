@@ -2,12 +2,10 @@ package core
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	aphttp "github.com/rmorlok/authproxy/internal/apjs/http"
-	jsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/database"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
@@ -57,9 +55,10 @@ var toolPublishJavaScriptLimits = jsexec.Limits{
 // Initialization runs without arguments, context, authored logging, or I/O and
 // does not invoke execute. Invalid authored code/schema wraps ErrInvalidArgument;
 // dependency failures remain internal errors, and caller cancellation wins over
-// validation failures. One deadline covers preparation and initialization, but
-// synchronous JavaScript/schema compilation is only checked after returning;
-// schema compilation still needs the separately tracked work bound in #948.
+// validation failures. Preparation has its own fixed deadline; the authored
+// timeout starts only when initialization begins. Synchronous JavaScript/schema
+// compilation is checked after returning; schema compilation still needs the
+// separately tracked work bound in #948.
 func (s *service) validateToolJavaScriptPublication(
 	ctx context.Context,
 	definition *toolschema.ToolDefinition,
@@ -75,17 +74,19 @@ func (s *service) validateToolJavaScriptPublication(
 	if err != nil {
 		return fmt.Errorf("%w: spec.limits: %w", ErrInvalidArgument, err)
 	}
-	validationCtx, cancel := context.WithTimeoutCause(ctx, limits.Runtime.Timeout, jsruntime.ErrLimitExceeded)
+	// Dependency latency must not consume the Tool's authored initialization
+	// allowance or turn a slow database/decryption into invalid authored code.
+	preparationCtx, cancel := context.WithTimeout(ctx, toolPublishJavaScriptLimits.Runtime.Timeout)
 	defer cancel()
 
-	// Preserve cancellation and deadline precedence even when a synchronous
-	// compiler or a dependency returns its own failure after the context ends.
+	// Preparation cancellation/timeouts are infrastructure errors, even when a
+	// synchronous compiler returns an authored failure after the deadline ends.
 	failure := func(err error, authored bool) error {
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if contextErr := ctx.Err(); contextErr != nil {
+			return contextErr
 		}
-		if errors.Is(context.Cause(validationCtx), jsruntime.ErrLimitExceeded) {
-			return fmt.Errorf("%w: spec.javascript publication: %w", ErrInvalidArgument, jsruntime.ErrLimitExceeded)
+		if contextErr := preparationCtx.Err(); contextErr != nil {
+			return contextErr
 		}
 		if err != nil && authored {
 			return fmt.Errorf("%w: spec.javascript publication: %w", ErrInvalidArgument, err)
@@ -93,18 +94,18 @@ func (s *service) validateToolJavaScriptPublication(
 		return err
 	}
 
-	row, err := s.db.GetConnectorGeneration(validationCtx, connection.ConnectorId, connection.ConnectorGeneration)
+	row, err := s.db.GetConnectorGeneration(preparationCtx, connection.ConnectorId, connection.ConnectorGeneration)
 	if err = failure(err, false); err != nil {
 		return err
 	}
 	connector := wrapConnector(*row, s)
 	// Load separately so storage/decryption errors cannot be reported as bad
 	// authored JavaScript. The bounded helper lookup below reuses this cache.
-	_, err = connector.getDefinitionWithContext(validationCtx)
+	_, err = connector.getDefinitionWithContext(preparationCtx)
 	if err = failure(err, false); err != nil {
 		return err
 	}
-	library, err := connector.getBoundedJavascriptLibrary(validationCtx, *definition.Javascript, limits.Runtime)
+	library, err := connector.getBoundedJavascriptLibrary(preparationCtx, *definition.Javascript, limits.Runtime)
 	if err = failure(err, true); err != nil {
 		return err
 	}
@@ -112,5 +113,16 @@ func (s *service) validateToolJavaScriptPublication(
 	if err = failure(err, true); err != nil {
 		return err
 	}
-	return failure(program.Validate(validationCtx), true)
+	cancel()
+
+	// Validate starts its own authored-lowered runtime deadline. An initialization
+	// timeout rejects the code without including time spent waiting for dependencies.
+	err = program.Validate(ctx)
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+	if err != nil {
+		return fmt.Errorf("%w: spec.javascript publication: %w", ErrInvalidArgument, err)
+	}
+	return nil
 }

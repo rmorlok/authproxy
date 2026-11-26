@@ -165,15 +165,59 @@ func TestToolJavaScriptPublicationStackCap(t *testing.T) {
 	}
 }
 
-// TestToolJavaScriptPublicationInterruption applies one deadline from dependency
-// loading onward and keeps original caller cancellation distinct from policy.
+// TestToolJavaScriptPublicationPreparationAllowance keeps dependency loading
+// independent of the Tool's authored initialization timeout.
+func TestToolJavaScriptPublicationPreparationAllowance(t *testing.T) {
+	f := toolPublicationFixture(t, `async function execute() { return true; }`)
+	const authoredTimeout = 100 * time.Millisecond
+	f.definition.Limits = &toolschema.ExecutionLimits{TimeoutMillis: util.ToPtr(int64(authoredTimeout / time.Millisecond))}
+	before := time.Now()
+	var deadline time.Time
+	f.db.EXPECT().GetConnectorGeneration(gomock.Any(), f.snapshot.Connection.ConnectorId, uint64(4)).
+		DoAndReturn(func(workCtx context.Context, _ apid.ID, _ uint64) (*database.ConnectorWithDefinition, error) {
+			var ok bool
+			deadline, ok = workCtx.Deadline()
+			require.True(t, ok)
+			// The preparation deadline uses the fixed allowance, not the authored cap.
+			require.WithinRange(t, deadline, before.Add(5*time.Second), time.Now().Add(5*time.Second))
+			return &f.snapshot.Connector, nil
+		})
+	f.encrypt.EXPECT().DecryptString(gomock.Any(), f.snapshot.Connector.EncryptedDefinition).
+		DoAndReturn(func(workCtx context.Context, _ encfield.EncryptedField) (string, error) {
+			got, ok := workCtx.Deadline()
+			require.True(t, ok)
+			require.Equal(t, deadline, got)
+			// Finish loading after an authored timeout would already have expired.
+			timer := time.NewTimer(authoredTimeout + 10*time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				require.NoError(t, workCtx.Err())
+				return `{}`, nil
+			case <-workCtx.Done():
+				return "", workCtx.Err()
+			}
+		})
+
+	// Trivial initialization still receives its full independent authored allowance.
+	err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
+	require.NoError(t, err)
+}
+
+// TestToolJavaScriptPublicationInterruption distinguishes caller cancellation
+// and dependency deadlines from exhaustion of the initialization allowance.
 func TestToolJavaScriptPublicationInterruption(t *testing.T) {
-	for _, name := range []string{"already canceled", "caller cancels load", "load timeout", "busy initialization"} {
+	for _, name := range []string{"already canceled", "caller cancels load", "caller deadline during load", "busy initialization"} {
 		t.Run(name, func(t *testing.T) {
 			f := toolPublicationFixture(t, `async function execute() { return true; }`)
 			f.definition.Limits = &toolschema.ExecutionLimits{TimeoutMillis: util.ToPtr(int64(250))}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			if name == "caller deadline during load" {
+				var stop context.CancelFunc
+				ctx, stop = context.WithTimeout(ctx, 50*time.Millisecond)
+				defer stop()
+			}
 			switch name {
 			case "already canceled":
 				cancel()
@@ -181,20 +225,11 @@ func TestToolJavaScriptPublicationInterruption(t *testing.T) {
 				*f.definition.Javascript = `while (true) {} async function execute() {}`
 				expectToolPublicationLibrary(t, f, "")
 			default:
-				// The same deadline reaches both the pinned-row lookup and decryption.
-				var deadline time.Time
+				// Cancellation reaches dependency loading without running authored code.
 				f.db.EXPECT().GetConnectorGeneration(gomock.Any(), f.snapshot.Connection.ConnectorId, uint64(4)).
-					DoAndReturn(func(workCtx context.Context, _ apid.ID, _ uint64) (*database.ConnectorWithDefinition, error) {
-						var ok bool
-						deadline, ok = workCtx.Deadline()
-						require.True(t, ok)
-						return &f.snapshot.Connector, nil
-					})
+					Return(&f.snapshot.Connector, nil)
 				f.encrypt.EXPECT().DecryptString(gomock.Any(), f.snapshot.Connector.EncryptedDefinition).
 					DoAndReturn(func(workCtx context.Context, _ encfield.EncryptedField) (string, error) {
-						got, ok := workCtx.Deadline()
-						require.True(t, ok)
-						require.Equal(t, deadline, got)
 						if name == "caller cancels load" {
 							cancel()
 						}
@@ -203,15 +238,16 @@ func TestToolJavaScriptPublicationInterruption(t *testing.T) {
 					})
 			}
 
-			// Only caller cancellation escapes as a context error; policy rejects publication.
+			// Only actual initialization exhaustion is reported as invalid authored code.
 			err := f.service.validateToolJavaScriptPublication(ctx, &f.definition, &f.snapshot.Connection)
-			if name == "already canceled" || name == "caller cancels load" {
-				require.ErrorIs(t, err, context.Canceled)
-				require.NotErrorIs(t, err, ErrInvalidArgument)
-			} else {
+			if name == "busy initialization" {
 				require.NoError(t, ctx.Err())
 				require.ErrorIs(t, err, ErrInvalidArgument)
 				require.ErrorIs(t, err, apjsruntime.ErrLimitExceeded)
+			} else {
+				require.ErrorIs(t, err, ctx.Err())
+				require.NotErrorIs(t, err, ErrInvalidArgument)
+				require.NotErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 			}
 		})
 	}
@@ -220,12 +256,15 @@ func TestToolJavaScriptPublicationInterruption(t *testing.T) {
 // TestToolJavaScriptPublicationDependencyFailures preserves infrastructure
 // failures instead of reporting valid authored definitions as invalid input.
 func TestToolJavaScriptPublicationDependencyFailures(t *testing.T) {
-	for _, name := range []string{"connector read", "definition decrypt"} {
+	for _, name := range []string{"connector read", "definition decrypt", "connector timeout", "decryption timeout"} {
 		t.Run(name, func(t *testing.T) {
 			f := toolPublicationFixture(t, `async function execute() {}`)
 			failure := errors.New("dependency unavailable")
+			if strings.HasSuffix(name, "timeout") {
+				failure = context.DeadlineExceeded
+			}
 			read := f.db.EXPECT().GetConnectorGeneration(gomock.Any(), f.snapshot.Connection.ConnectorId, uint64(4))
-			if name == "connector read" {
+			if name == "connector read" || name == "connector timeout" {
 				read.Return(nil, failure)
 			} else {
 				read.Return(&f.snapshot.Connector, nil)
@@ -236,6 +275,7 @@ func TestToolJavaScriptPublicationDependencyFailures(t *testing.T) {
 			err := f.service.validateToolJavaScriptPublication(context.Background(), &f.definition, &f.snapshot.Connection)
 			require.ErrorIs(t, err, failure)
 			require.NotErrorIs(t, err, ErrInvalidArgument)
+			require.NotErrorIs(t, err, apjsruntime.ErrLimitExceeded)
 		})
 	}
 }

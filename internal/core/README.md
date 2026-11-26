@@ -39,9 +39,11 @@ does not call `execute`. Arguments, connection configuration, credentials, HTTP,
 and authored logging are unavailable. A connection can still be in setup or
 disabled; execution checks readiness separately.
 
-The fixed publication profile admits 256 KiB of combined Tool and helper source
-and allows five seconds for helper preparation and initialization, with finite
-stack and native work/allocation budgets. Authored caps may lower those limits;
+The fixed publication profile admits 256 KiB of combined Tool and helper source.
+Helper preparation has a five-second allowance; initialization then gets up to
+five seconds, with finite stack and native work/allocation budgets. Authored caps
+can lower initialization limits without shortening dependency loading. Preparation
+timeouts remain internal errors, while an initialization timeout rejects the Tool.
 `tools.invocation` controls the separate execution profile. Synchronous compilation
 is checked for cancellation after it returns; the schema compiler still needs a
 work bound. A validation failure writes no revision. A successful update becomes
