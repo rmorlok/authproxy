@@ -21,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/rmorlok/authproxy/internal/tools/jsexec"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -245,8 +246,8 @@ func (c javascriptPolicyClient) DoWithLabels(request *http.Request, labels map[s
 
 // javascriptPolicyInvocation is a captured connection with configuration much
 // larger than its two-byte argument, exercising separate preparation allowances.
-func javascriptPolicyInvocation() jsexec.Invocation {
-	return jsexec.Invocation{ID: "tiv_01example0000001", Arguments: common.RawJSON(`{}`),
+func javascriptPolicyInvocation() tools.Invocation {
+	return tools.Invocation{ID: "tiv_01example0000001", Arguments: common.RawJSON(`{}`),
 		Snapshot: render.Input{ToolID: "tol_01example0000001", Revision: 7,
 			ConnectionID: "cxn_01example0000001", ConnectionNamespace: "root.product.owner",
 			Cfg: map[string]any{"tenant": strings.Repeat("x", 2048)}}}

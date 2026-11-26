@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/tools"
 	toolresult "github.com/rmorlok/authproxy/internal/tools/result"
 )
 
@@ -21,7 +22,7 @@ import (
 // fields return ErrInvalidInvocation.
 func ErrorResult(
 	ctx context.Context,
-	invocation Invocation,
+	invocation tools.Invocation,
 	maxEncodedResultBytes int,
 	state api.ToolExecutionState,
 	code, message string,
@@ -46,13 +47,13 @@ func ErrorResult(
 }
 
 // resultIdentity applies the compiled result allowance to the captured identities.
-func (p *Program) resultIdentity(invocation Invocation) (*api.ToolResult, error) {
+func (p *Program) resultIdentity(invocation tools.Invocation) (*api.ToolResult, error) {
 	return resultIdentity(invocation, p.limits.Response.MaxEncodedResultBytes)
 }
 
 // resultIdentity detaches and validates the correlation data before any request.
 // The same captured identities feed rendering, mapped responses, and local errors.
-func resultIdentity(invocation Invocation, maxEncodedResultBytes int) (*api.ToolResult, error) {
+func resultIdentity(invocation tools.Invocation, maxEncodedResultBytes int) (*api.ToolResult, error) {
 	input := invocation.Snapshot
 	result, err := toolresult.New(
 		input.ToolID, input.Revision, invocation.ID,

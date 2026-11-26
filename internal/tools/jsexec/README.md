@@ -89,7 +89,7 @@ Once admission has authorized the Tool and prepared its configured HTTP client,
 call the compiled program with the matching captured context:
 
 ```go
-result, err := program.Execute(ctx, client, jsexec.Invocation{
+result, err := program.Execute(ctx, client, tools.Invocation{
     ID: "tiv_01example0000001",
     Arguments: common.RawJSON(`{"id":"customer-42"}`),
     Snapshot: render.Input{
@@ -101,7 +101,8 @@ result, err := program.Execute(ctx, client, jsexec.Invocation{
 })
 ```
 
-`client` is an `iface.HTTPClient` configured for that connection and actor.
+`tools.Invocation` is the shared input from `internal/tools`. `client` is an
+`iface.HTTPClient` configured for that connection and actor.
 Admission must ensure that the program, snapshot, and client belong together.
 The caller supplies raw argument JSON; `Execute` validates it and replaces any
 `Snapshot.Params` with the validated values. Connection configuration comes
@@ -202,7 +203,7 @@ retain their independent operator ceilings. These HTTP, data, and envelope limit
 are captured for execution; `Validate` only exercises initialization policy.
 
 `Execute` uses the earlier runtime/HTTP timeout for the whole invocation.
-`Invocation.Deadline` can include time already spent in admission and preparation;
+`tools.Invocation.Deadline` can include time already spent in admission and preparation;
 an earlier caller deadline also applies. The enclosing context stays live after
 the JavaScript adapter closes its dedicated HTTP session, so schema checks and
 envelope assembly remain under the original deadline. Policy expiry can still

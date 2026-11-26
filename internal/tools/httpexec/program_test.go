@@ -11,7 +11,8 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
@@ -22,25 +23,27 @@ import (
 // TestCompileRejectsInvalidPrograms checks each component before a reusable
 // executable is exposed, including malformed source that would otherwise fail later.
 func TestCompileRejectsInvalidPrograms(t *testing.T) {
-	for name, change := range map[string]func(*tools.ToolDefinition, *httpexec.Limits){
-		"missing executor": func(d *tools.ToolDefinition, _ *httpexec.Limits) { d.ProxyHTTP = nil },
-		"two executors": func(d *tools.ToolDefinition, _ *httpexec.Limits) {
+	for name, change := range map[string]func(*toolschema.ToolDefinition, *httpexec.Limits){
+		"missing executor": func(d *toolschema.ToolDefinition, _ *httpexec.Limits) { d.ProxyHTTP = nil },
+		"two executors": func(d *toolschema.ToolDefinition, _ *httpexec.Limits) {
 			d.Javascript = util.ToPtr("async function execute() {}")
 		},
-		"input schema":     func(d *tools.ToolDefinition, _ *httpexec.Limits) { d.InputSchema = common.RawJSON(`true`) },
-		"output schema":    func(d *tools.ToolDefinition, _ *httpexec.Limits) { d.OutputSchema = common.RawJSON(`null`) },
-		"request template": func(d *tools.ToolDefinition, _ *httpexec.Limits) { d.ProxyHTTP.URL = "https://example.test/{{#x}}" },
-		"response transform": func(d *tools.ToolDefinition, _ *httpexec.Limits) {
-			d.ProxyHTTP.Response = &tools.HTTPResponse{TransformJavascript: util.ToPtr("({")}
+		"input schema":  func(d *toolschema.ToolDefinition, _ *httpexec.Limits) { d.InputSchema = common.RawJSON(`true`) },
+		"output schema": func(d *toolschema.ToolDefinition, _ *httpexec.Limits) { d.OutputSchema = common.RawJSON(`null`) },
+		"request template": func(d *toolschema.ToolDefinition, _ *httpexec.Limits) {
+			d.ProxyHTTP.URL = "https://example.test/{{#x}}"
 		},
-		"render limit":     func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.Render.MaxSteps = 0 },
-		"validation limit": func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.Validation.MaxValues = 0 },
-		"response limit":   func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.Response.MaxEncodedResultBytes = 0 },
-		"timeout":          func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.HTTP.Timeout = 0 },
-		"requests":         func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxRequests = 0 },
-		"response bytes":   func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxResponseBytes = 0 },
-		"stream bytes":     func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxStreamBytes = 0 },
-		"header bytes":     func(_ *tools.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxHeaderBytes = 0 },
+		"response transform": func(d *toolschema.ToolDefinition, _ *httpexec.Limits) {
+			d.ProxyHTTP.Response = &toolschema.HTTPResponse{TransformJavascript: util.ToPtr("({")}
+		},
+		"render limit":     func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.Render.MaxSteps = 0 },
+		"validation limit": func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.Validation.MaxValues = 0 },
+		"response limit":   func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.Response.MaxEncodedResultBytes = 0 },
+		"timeout":          func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.HTTP.Timeout = 0 },
+		"requests":         func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxRequests = 0 },
+		"response bytes":   func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxResponseBytes = 0 },
+		"stream bytes":     func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxStreamBytes = 0 },
+		"header bytes":     func(_ *toolschema.ToolDefinition, l *httpexec.Limits) { l.HTTP.MaxHeaderBytes = 0 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			// Each invalid field must reject compilation without a partial program.
@@ -155,22 +158,22 @@ func TestExecuteOutputValidationLimits(t *testing.T) {
 func TestCompileRejectsInvalidAuthoredAndOperatorLimits(t *testing.T) {
 	for _, test := range []struct {
 		name     string
-		cap      func(*tools.ExecutionLimits, int64)
+		cap      func(*toolschema.ExecutionLimits, int64)
 		operator func(*httpexec.Limits, int64)
 	}{
-		{"timeout", func(c *tools.ExecutionLimits, v int64) { c.TimeoutMillis = &v }, func(l *httpexec.Limits, v int64) { l.HTTP.Timeout = time.Duration(v) }},
-		{"requests", func(c *tools.ExecutionLimits, v int64) { c.MaxRequests = util.ToPtr(int(v)) }, func(l *httpexec.Limits, v int64) { l.HTTP.MaxRequests = int(v) }},
-		{"input", func(c *tools.ExecutionLimits, v int64) { c.MaxInputBytes = &v }, func(l *httpexec.Limits, v int64) { l.Validation.MaxInputBytes = int(v) }},
-		{"output", func(c *tools.ExecutionLimits, v int64) { c.MaxOutputBytes = &v }, func(l *httpexec.Limits, v int64) { l.Response.MaxOutputBytes = int(v) }},
-		{"response", func(c *tools.ExecutionLimits, v int64) { c.MaxResponseBytes = &v }, func(l *httpexec.Limits, v int64) { l.HTTP.MaxResponseBytes = v }},
-		{"envelope", func(c *tools.ExecutionLimits, v int64) { c.MaxEncodedResultBytes = &v }, func(l *httpexec.Limits, v int64) { l.Response.MaxEncodedResultBytes = int(v) }},
-		{"stack", func(c *tools.ExecutionLimits, v int64) { c.MaxStackDepth = util.ToPtr(int(v)) }, func(l *httpexec.Limits, v int64) { l.Response.Transform.MaxStackDepth = int(v) }},
+		{"timeout", func(c *toolschema.ExecutionLimits, v int64) { c.TimeoutMillis = &v }, func(l *httpexec.Limits, v int64) { l.HTTP.Timeout = time.Duration(v) }},
+		{"requests", func(c *toolschema.ExecutionLimits, v int64) { c.MaxRequests = util.ToPtr(int(v)) }, func(l *httpexec.Limits, v int64) { l.HTTP.MaxRequests = int(v) }},
+		{"input", func(c *toolschema.ExecutionLimits, v int64) { c.MaxInputBytes = &v }, func(l *httpexec.Limits, v int64) { l.Validation.MaxInputBytes = int(v) }},
+		{"output", func(c *toolschema.ExecutionLimits, v int64) { c.MaxOutputBytes = &v }, func(l *httpexec.Limits, v int64) { l.Response.MaxOutputBytes = int(v) }},
+		{"response", func(c *toolschema.ExecutionLimits, v int64) { c.MaxResponseBytes = &v }, func(l *httpexec.Limits, v int64) { l.HTTP.MaxResponseBytes = v }},
+		{"envelope", func(c *toolschema.ExecutionLimits, v int64) { c.MaxEncodedResultBytes = &v }, func(l *httpexec.Limits, v int64) { l.Response.MaxEncodedResultBytes = int(v) }},
+		{"stack", func(c *toolschema.ExecutionLimits, v int64) { c.MaxStackDepth = util.ToPtr(int(v)) }, func(l *httpexec.Limits, v int64) { l.Response.Transform.MaxStackDepth = int(v) }},
 	} {
 		for _, value := range []int64{0, -1} {
 			t.Run(fmt.Sprintf("%s/%d", test.name, value), func(t *testing.T) {
 				definition := executionDefinition()
-				definition.ProxyHTTP.Response = &tools.HTTPResponse{TransformJavascript: util.ToPtr(`true`)}
-				definition.Limits = &tools.ExecutionLimits{}
+				definition.ProxyHTTP.Response = &toolschema.HTTPResponse{TransformJavascript: util.ToPtr(`true`)}
+				definition.Limits = &toolschema.ExecutionLimits{}
 				// Invalid authored values fail even when the operator policy is usable.
 				test.cap(definition.Limits, value)
 				program, err := httpexec.Compile(definition, executionLimits())
@@ -192,7 +195,7 @@ func TestCompileRejectsInvalidAuthoredAndOperatorLimits(t *testing.T) {
 // Tool to omit pure-JavaScript policy even when its caps also affect projections.
 func TestCompileAuthoredCapsLeaveUnusedTransformLimitsOptional(t *testing.T) {
 	definition, limits := executionDefinition(), executionLimits()
-	definition.Limits = &tools.ExecutionLimits{
+	definition.Limits = &toolschema.ExecutionLimits{
 		TimeoutMillis: util.ToPtr(int64(1000)), MaxStackDepth: util.ToPtr(12),
 		MaxOutputBytes: util.ToPtr(int64(512)),
 	}
@@ -256,7 +259,7 @@ func TestErrorResultRejectsInvalidInputs(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		ctx     context.Context
-		change  func(*httpexec.Invocation)
+		change  func(*tools.Invocation)
 		limit   int
 		state   api.ToolExecutionState
 		code    string
@@ -267,8 +270,8 @@ func TestErrorResultRejectsInvalidInputs(t *testing.T) {
 		{name: "cancelled invalid input", ctx: cancelled, limit: -1, want: context.Canceled},
 		{name: "zero budget", ctx: context.Background(), limit: 0, want: httpcodec.ErrEncodedResultLimit},
 		{name: "negative budget", ctx: context.Background(), limit: -1, want: httpcodec.ErrEncodedResultLimit},
-		{name: "invalid identity", ctx: context.Background(), limit: 4096, change: func(i *httpexec.Invocation) { i.ID = "invalid" }, want: httpexec.ErrInvalidInvocation},
-		{name: "zero revision", ctx: context.Background(), limit: 4096, change: func(i *httpexec.Invocation) { i.Snapshot.Revision = 0 }, want: httpexec.ErrInvalidInvocation},
+		{name: "invalid identity", ctx: context.Background(), limit: 4096, change: func(i *tools.Invocation) { i.ID = "invalid" }, want: httpexec.ErrInvalidInvocation},
+		{name: "zero revision", ctx: context.Background(), limit: 4096, change: func(i *tools.Invocation) { i.Snapshot.Revision = 0 }, want: httpexec.ErrInvalidInvocation},
 		{name: "invalid state", ctx: context.Background(), limit: 4096, state: "invalid", code: "FAILED", message: "Safe failure.", want: httpexec.ErrInvalidInvocation},
 		{name: "blank code", ctx: context.Background(), limit: 4096, state: api.ToolExecutionStateNotStarted, message: "Safe failure.", want: httpexec.ErrInvalidInvocation},
 		{name: "blank message", ctx: context.Background(), limit: 4096, state: api.ToolExecutionStateNotStarted, code: "FAILED", want: httpexec.ErrInvalidInvocation},

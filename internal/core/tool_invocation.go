@@ -12,6 +12,7 @@ import (
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpexec"
 	"github.com/rmorlok/authproxy/internal/tools/jsexec"
 	toolresult "github.com/rmorlok/authproxy/internal/tools/result"
@@ -55,6 +56,8 @@ func (s *service) invokeTool(
 	var javascriptLimits jsexec.Limits
 	var timeout time.Duration
 	var maxResultBytes int
+	var program tools.Executor
+
 	if javascriptTool {
 		policy, err := s.toolJavaScriptInvocationPolicy()
 		if err != nil {
@@ -188,40 +191,27 @@ func (s *service) invokeTool(
 			return failBeforeExecution(err, "", "")
 		}
 
-		program, err := jsexec.Compile(
+		program, err = jsexec.Compile(
 			authorized.definition,
 			library,
 			javascriptLimits,
 		)
 		if err != nil {
-			return failBeforeExecution(fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err), "", "")
+			return failBeforeExecution(
+				fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err),
+				"", // code
+				"", // message
+			)
 		}
-		if err := workCtx.Err(); err != nil {
-			return failBeforeExecution(err, "", "")
+	} else {
+		program, err = httpexec.Compile(authorized.definition, httpLimits)
+		if err != nil {
+			return failBeforeExecution(
+				fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err),
+				"", // code
+				"", // message
+			)
 		}
-
-		// Execute initializes the library and Tool once, with HTTP disabled until
-		// initialization completes. Its fresh VM receives one captured connection.
-		// Keep the original caller separate from the policy deadline so expiry can
-		// return a safe ToolResult without discarding possible upstream effects.
-		return program.Execute(
-			ctx,
-			prepared.client,
-			jsexec.Invocation{
-				ID:        invocationID,
-				Arguments: arguments,
-				Deadline:  deadline,
-				Snapshot:  prepared.snapshot,
-			})
-	}
-
-	program, err := httpexec.Compile(authorized.definition, httpLimits)
-	if err != nil {
-		return failBeforeExecution(
-			fmt.Errorf("failed to compile tool %s revision %d: %w", id, captured.Revision.Revision, err),
-			"", // code
-			"", // message
-		)
 	}
 
 	if err := workCtx.Err(); err != nil {
@@ -234,11 +224,24 @@ func (s *service) invokeTool(
 	return program.Execute(
 		ctx,
 		prepared.client,
-		httpexec.Invocation{
+		tools.Invocation{
 			ID:        invocationID,
 			Arguments: arguments,
 			Deadline:  deadline,
 			Snapshot:  prepared.snapshot,
+			// Worker diagnostics must use the configured service sink and captured
+			// identities. Keep arguments/configuration out of logs; supplying this
+			// logger does not enable JavaScript's separate authored console API.
+			Logger: s.logger.With(
+				"tool_id", prepared.snapshot.ToolID,
+				"tool_revision", prepared.snapshot.Revision,
+				"invocation_id", invocationID,
+				"connection_id", prepared.snapshot.ConnectionID,
+				"namespace", prepared.snapshot.ConnectionNamespace,
+				"connector_id", prepared.connector.Id.String(),
+				"connector_generation", prepared.connector.Generation,
+				"actor_id", authorized.actor.Id.String(),
+			),
 		},
 	)
 }

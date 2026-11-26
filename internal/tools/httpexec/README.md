@@ -35,7 +35,8 @@ is `{"name":"Ada"}`. The output schema checks the projected result.
 
 ## Compile and invoke
 
-Compile the decoded `tools.ToolDefinition` once for its captured revision and
+Compile the decoded `toolschema.ToolDefinition` from `internal/schema/resources/tools`
+once for its captured revision and
 operator policy. `Limits` groups the existing renderer, schema validator,
 response mapper, and HTTP host limits. Required operator limits must be positive;
 `Compile` lowers them with the Tool's optional `limits` before compiling
@@ -55,7 +56,7 @@ client, err := connection.HTTPClient(iface.HTTPClientOptions{
 if err != nil {
     return err
 }
-result, err := program.Execute(ctx, client, httpexec.Invocation{
+result, err := program.Execute(ctx, client, tools.Invocation{
     ID: "tiv_01example0000001",
     Arguments: common.RawJSON(`{"id":"contact-42"}`),
     Snapshot: render.Input{
@@ -70,7 +71,7 @@ result, err := program.Execute(ctx, client, httpexec.Invocation{
 })
 ```
 
-The imports are `internal/tools/httpexec`, `internal/tools/render`,
+The imports are `internal/tools`, `internal/tools/httpexec`, `internal/tools/render`,
 `internal/core/iface`, and `internal/schema/common` from this module. The IDs are
 examples; production calls use the identities captured during admission.
 See the [renderer](../render/README.md), [schema validator](../validation/README.md),
@@ -168,7 +169,7 @@ envelope cannot fit, execution returns `httpcodec.ErrEncodedResultLimit` with no
 partial result. A policy timeout can still produce a result while the caller's
 context remains live.
 
-Admission can set `Invocation.Deadline` to its absolute policy deadline so time
+Admission can set `tools.Invocation.Deadline` to its absolute policy deadline so time
 spent preparing the connection and compiling the Tool reduces the time available
 to execute it. The earlier of that deadline, the compiled timeout, and the caller's
 deadline applies. Leaving it zero starts the policy timeout in `Execute`. An

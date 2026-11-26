@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 	toolresult "github.com/rmorlok/authproxy/internal/tools/result"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -40,12 +41,15 @@ func executeDefinition(source string) toolschema.ToolDefinition {
 }
 
 // executeInvocation represents admission's captured Tool and connection context.
-func executeInvocation() Invocation {
-	return Invocation{
-		ID: "tiv_01example0000001", Arguments: common.RawJSON(`{}`),
+func executeInvocation() tools.Invocation {
+	return tools.Invocation{
+		ID:        "tiv_01example0000001",
+		Arguments: common.RawJSON(`{}`),
 		Snapshot: render.Input{
-			ToolID: "tol_01example0000001", Revision: 7,
-			ConnectionID: "cxn_01example0000001", ConnectionNamespace: "root.product.owner",
+			ToolID:              "tol_01example0000001",
+			Revision:            7,
+			ConnectionID:        "cxn_01example0000001",
+			ConnectionNamespace: "root.product.owner",
 		},
 	}
 }

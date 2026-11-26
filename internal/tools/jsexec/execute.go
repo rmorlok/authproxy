@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"math"
-	"time"
 
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/schema/api"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httphost"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
 	"github.com/rmorlok/authproxy/internal/tools/render"
@@ -22,36 +20,6 @@ import (
 // ErrInvalidInvocation identifies invalid internal inputs, such as a missing
 // program, configured client, or captured identity. It contains no invocation data.
 var ErrInvalidInvocation = errors.New("invalid JavaScript Tool invocation")
-
-// Invocation combines caller arguments with the connection and Tool revision
-// captured by admission. The caller must associate this snapshot, the compiled
-// program, and the configured HTTP client with the same authorized connection.
-// Invocation is an internal execution input, not a serialized API request.
-type Invocation struct {
-	ID string // Captured tiv_ correlation identity.
-
-	// Deadline includes admission/preparation time in the execution allowance.
-	// Zero starts the timeout in Execute. A supplied deadline can only shorten
-	// the compiled runtime/HTTP timeouts and any earlier caller deadline.
-	Deadline time.Time
-
-	// Arguments is the caller's JSON object, for example {"id":"customer-42"}.
-	// Execute validates it against the captured input schema before running
-	// authored code, then exposes its values as execute's params argument.
-	Arguments common.RawJSON
-
-	// Snapshot supplies captured connection configuration, metadata, identities,
-	// and Tool provenance. For example Cfg["tenant"] = "acme" becomes
-	// context.connections[0].cfg.tenant while Arguments supplies params.id.
-	// Execute copies this data and replaces Params with validated Arguments;
-	// leave Snapshot.Params unset. Credentials belong only to the HTTP client.
-	Snapshot render.Input
-
-	// Logger receives fixed HTTP-worker diagnostics with caller attribution.
-	// Nil uses the adapter's default logger. It does not enable authored console
-	// logging or expose request data, panic values, or credentials.
-	Logger *slog.Logger
-}
 
 // Execute evaluates one admitted JavaScript Tool in a fresh VM with exactly one
 // connection capability. The configured client owns authentication and request
@@ -74,7 +42,7 @@ type Invocation struct {
 func (p *Program) Execute(
 	ctx context.Context,
 	client iface.HTTPClient,
-	invocation Invocation,
+	invocation tools.Invocation,
 ) (*api.ToolResult, error) {
 	if p == nil || p.script == nil || p.schemas == nil || ctx == nil || client == nil {
 		return nil, ErrInvalidInvocation
@@ -208,6 +176,9 @@ func (p *Program) Execute(
 
 	return result, nil
 }
+
+// Compiled JavaScript programs satisfy the shared Tool execution contract.
+var _ tools.Executor = (*Program)(nil)
 
 // chargeDataPass admits processing and possible copying of known JSON bytes,
 // including structured output without a configured schema. Independent validator

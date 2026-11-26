@@ -12,6 +12,7 @@ import (
 	apjsruntime "github.com/rmorlok/authproxy/internal/apjs/runtime"
 	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/tools"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,11 +38,11 @@ func TestExecuteRejectsInvalidInvocation(t *testing.T) {
 	require.ErrorIs(t, err, ErrInvalidInvocation)
 	require.Nil(t, result)
 
-	for name, change := range map[string]func(*Invocation){
-		"invocation identity": func(i *Invocation) { i.ID = "invalid" },
-		"Tool identity":       func(i *Invocation) { i.Snapshot.ToolID = "" },
-		"Tool revision":       func(i *Invocation) { i.Snapshot.Revision = 0 },
-		"connection identity": func(i *Invocation) { i.Snapshot.ConnectionID = "invalid" },
+	for name, change := range map[string]func(*tools.Invocation){
+		"invocation identity": func(i *tools.Invocation) { i.ID = "invalid" },
+		"Tool identity":       func(i *tools.Invocation) { i.Snapshot.ToolID = "" },
+		"Tool revision":       func(i *tools.Invocation) { i.Snapshot.Revision = 0 },
+		"connection identity": func(i *tools.Invocation) { i.Snapshot.ConnectionID = "invalid" },
 	} {
 		t.Run(name, func(t *testing.T) {
 			// Malformed trusted identities remain Go errors, not model-facing failures.
@@ -385,25 +386,25 @@ func TestExecuteArgumentBytesRemainSeparateFromConfiguration(t *testing.T) {
 func TestExecuteSnapshotFailureCategories(t *testing.T) {
 	for _, test := range []struct {
 		name   string
-		change func(*Limits, *Invocation)
+		change func(*Limits, *tools.Invocation)
 		code   string
 	}{
-		{"snapshot bytes", func(l *Limits, _ *Invocation) { l.Render.MaxBytes = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
-		{"snapshot depth", func(l *Limits, _ *Invocation) { l.Render.MaxDepth = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
-		{"snapshot steps", func(l *Limits, _ *Invocation) { l.Render.MaxSteps = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
-		{"configuration UTF-8", func(_ *Limits, i *Invocation) {
+		{"snapshot bytes", func(l *Limits, _ *tools.Invocation) { l.Render.MaxBytes = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"snapshot depth", func(l *Limits, _ *tools.Invocation) { l.Render.MaxDepth = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"snapshot steps", func(l *Limits, _ *tools.Invocation) { l.Render.MaxSteps = 1 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"configuration UTF-8", func(_ *Limits, i *tools.Invocation) {
 			i.Snapshot.Cfg = map[string]any{"private-key": "private-configuration\xff"}
 		}, "CONNECTION_UNAVAILABLE"},
-		{"configuration number", func(_ *Limits, i *Invocation) {
+		{"configuration number", func(_ *Limits, i *tools.Invocation) {
 			i.Snapshot.Cfg = map[string]any{"private-key": json.Number("private-number")}
 		}, "CONNECTION_UNAVAILABLE"},
-		{"label UTF-8", func(_ *Limits, i *Invocation) {
+		{"label UTF-8", func(_ *Limits, i *tools.Invocation) {
 			i.Snapshot.Labels = map[string]string{"private-key": "private-label\xff"}
 		}, "CONNECTION_UNAVAILABLE"},
-		{"configuration JavaScript number", func(_ *Limits, i *Invocation) {
+		{"configuration JavaScript number", func(_ *Limits, i *tools.Invocation) {
 			i.Snapshot.Cfg = map[string]any{"private-key": json.Number("1e400")}
 		}, "CONNECTION_UNAVAILABLE"},
-		{"combined VM bytes", func(l *Limits, _ *Invocation) { l.Runtime.MaxInputBytes = 32 }, "EXECUTION_LIMIT_EXCEEDED"},
+		{"combined VM bytes", func(l *Limits, _ *tools.Invocation) { l.Runtime.MaxInputBytes = 32 }, "EXECUTION_LIMIT_EXCEEDED"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			// Caller arguments are valid; only captured data or preparation policy changes.
