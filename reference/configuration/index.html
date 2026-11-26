@@ -179,7 +179,9 @@ gets five seconds under the configuration above.</p>
 is no public invocation endpoint yet; bounded schema evaluation remains a
 prerequisite. The declarative HTTP executor makes one logical request. Proxy
 credential recovery and redirects may make additional HTTP attempts under the
-existing proxy policy.</p>
+existing proxy policy. JavaScript Tool policy resolution is also implemented;
+connecting it to core invocation is still pending. JavaScript-specific settings
+below do not change existing connector scripts or HTTP response transforms.</p>
 <table>
 <thead>
 <tr>
@@ -200,6 +202,16 @@ existing proxy policy.</p>
 <td>Logical connection-client calls</td>
 </tr>
 <tr>
+<td><code dir="auto">maxRequestBytes</code></td>
+<td><code dir="auto">1mib</code></td>
+<td>Each JavaScript request’s URL, method, headers, body, and label overrides before dispatch</td>
+</tr>
+<tr>
+<td><code dir="auto">maxPendingOperations</code></td>
+<td><code dir="auto">8</code></td>
+<td>Concurrent JavaScript fetch and body-read operations, including completions waiting for the VM</td>
+</tr>
+<tr>
 <td><code dir="auto">maxInputBytes</code></td>
 <td><code dir="auto">1mib</code></td>
 <td>Raw argument JSON, including whitespace</td>
@@ -212,7 +224,7 @@ existing proxy policy.</p>
 <tr>
 <td><code dir="auto">maxOutputBytes</code></td>
 <td><code dir="auto">8mib</code></td>
-<td>Result content, structured-output JSON, and transform output</td>
+<td>Result content, structured-output JSON, and transform output; JavaScript also applies this cap to each complete rich result, <code dir="auto">ToolError</code> payload, and console record</td>
 </tr>
 <tr>
 <td><code dir="auto">maxEncodedResultBytes</code></td>
@@ -222,7 +234,17 @@ existing proxy policy.</p>
 <tr>
 <td><code dir="auto">maxStackDepth</code></td>
 <td><code dir="auto">256</code></td>
-<td>Response-transform JavaScript function-call depth</td>
+<td>JavaScript Tool and response-transform function-call depth</td>
+</tr>
+<tr>
+<td><code dir="auto">maxJavascriptSourceBytes</code></td>
+<td><code dir="auto">256kib</code></td>
+<td>Combined JavaScript Tool and selected connector helper-library source, including whitespace</td>
+</tr>
+<tr>
+<td><code dir="auto">maxJavascriptInputBytes</code></td>
+<td><code dir="auto">16mib</code></td>
+<td>Combined serialized arguments, Tool context, and the captured connection supplied to a JavaScript Tool</td>
 </tr>
 <tr>
 <td><code dir="auto">maxRenderBytes</code></td>
@@ -257,7 +279,7 @@ existing proxy policy.</p>
 <tr>
 <td><code dir="auto">maxValues</code></td>
 <td><code dir="auto">1000000</code></td>
-<td>Values inspected per JSON validation or transform input/output conversion</td>
+<td>Values inspected per JSON validation or JavaScript input/output/body conversion</td>
 </tr>
 <tr>
 <td><code dir="auto">maxRenderSteps</code></td>
@@ -284,6 +306,23 @@ counts for the size fields. Raising those settings therefore raises the allowanc
 for native scans, copies, and metadata processing. Repeated or expensive utility
 calls can still exhaust it. A combination too large to fit the runtime’s integer
 range is rejected when the invocation policy is resolved.</p>
+<p>JavaScript Tools use one cumulative work budget and one cumulative allocation
+budget across arguments, VM input, HTTP conversions, pure utilities, and results.
+Each is derived from the operator’s byte and value limits as:</p>
+<div class="expressive-code"><figure class="frame not-content"><figcaption class="header"></figcaption><pre data-language="text"><code><div class="ec-line"><div class="code"><span style="--0:#d6deeb;--1:#403f53">16 * (maxInputBytes + maxJavascriptInputBytes + maxOutputBytes + maxResponseBytes</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#d6deeb;--1:#403f53">      </span></span><span style="--0:#d6deeb;--1:#403f53">+ maxRequests * (maxRequestBytes + maxResponseHeaderBytes))</span></div></div><div class="ec-line"><div class="code"><span class="indent"><span style="--0:#d6deeb;--1:#403f53">  </span></span><span style="--0:#d6deeb;--1:#403f53">+ 32 * maxValues</span></div></div></code></pre><div class="copy"><div aria-live="polite"></div><button title="Copy to clipboard" data-copied="Copied!" data-code="16 * (maxInputBytes + maxJavascriptInputBytes + maxOutputBytes + maxResponseBytes      + maxRequests * (maxRequestBytes + maxResponseHeaderBytes))  + 32 * maxValues"><div></div></button></div></figure></div>
+<p>Request and header processing scale with the request count. Response bytes are
+already an aggregate allowance, so they are counted once. Raw argument bytes are
+included separately because whitespace is removed before VM input. Raising these
+settings increases the native processing allowance; arbitrary repeated work can
+still exhaust it. Overflow is rejected before execution. Per-Tool caps lower
+their corresponding limits without recomputing this operator budget.</p>
+<p>The request and worker limits serve different purposes. For example,
+<code dir="auto">maxRequests: 10</code> and <code dir="auto">maxPendingOperations: 2</code> allow ten logical calls over the
+whole execution, with at most two fetch or body-read operations pending at once.
+Reading a response body uses a worker slot but does not spend another logical
+request. Raising the worker limit does not grant more requests or a fresh native
+budget. JavaScript source/input limits are independent of response-transform
+source/input settings.</p>
 <p>Nesting and value counts bound data processing; they do not count JavaScript
 instructions or JSON Schema evaluation steps. The timeout interrupts supported
 work and HTTP I/O, but cannot preempt synchronous schema-library evaluation.
@@ -304,4 +343,4 @@ repository changes, run:</p>
 <p>Connector definitions have their own schema and authoring guides; continue
 with <a href="/integration/connector-setup-flow/">connector setup flows</a> and
 <a href="/integration/connector-predicates/">connector predicates</a>.</p>
-</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/reference/configuration.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-11-22T00:43:13.000Z">Nov 22, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/reference/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Reference</span></span></a><a href="/reference/related-projects/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Related projects</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
+</div><footer class="sl-flex astro-nntpd7kr"><div class="meta sl-flex astro-nntpd7kr"><a href="https://github.com/rmorlok/authproxy/edit/main/docs/src/content/docs/reference/configuration.md" class="sl-flex print:hidden astro-56gmmyul"><svg aria-hidden="true" class="astro-56gmmyul astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.2em;"><path d="M22 7.24a1 1 0 0 0-.29-.71l-4.24-4.24a1 1 0 0 0-1.1-.22 1 1 0 0 0-.32.22l-2.83 2.83L2.29 16.05a1 1 0 0 0-.29.71V21a1 1 0 0 0 1 1h4.24a1 1 0 0 0 .76-.29l10.87-10.93L21.71 8c.1-.1.17-.2.22-.33a1 1 0 0 0 0-.24v-.14l.07-.05ZM6.83 20H4v-2.83l9.93-9.93 2.83 2.83L6.83 20ZM18.17 8.66l-2.83-2.83 1.42-1.41 2.82 2.82-1.41 1.42Z"/></svg>Edit page</a><p>Last updated: <time datetime="2026-11-26T12:38:46.000Z">Nov 26, 2026</time></p></div><div class="pagination-links print:hidden astro-anvk7qgk" dir="ltr"><a href="/reference/" rel="prev" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17 11H9.41l3.3-3.29a1.004 1.004 0 1 0-1.42-1.42l-5 5a1 1 0 0 0-.21.33 1 1 0 0 0 0 .76 1 1 0 0 0 .21.33l5 5a1.002 1.002 0 0 0 1.639-.325 1 1 0 0 0-.219-1.095L9.41 13H17a1 1 0 0 0 0-2Z"/></svg><span class="astro-anvk7qgk">Previous<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Reference</span></span></a><a href="/reference/related-projects/" rel="next" class="astro-anvk7qgk"><svg aria-hidden="true" class="astro-anvk7qgk astro-qa7dmyhc" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="--sl-icon-size: 1.5rem;"><path d="M17.92 11.62a1.001 1.001 0 0 0-.21-.33l-5-5a1.003 1.003 0 1 0-1.42 1.42l3.3 3.29H7a1 1 0 0 0 0 2h7.59l-3.3 3.29a1.002 1.002 0 0 0 .325 1.639 1 1 0 0 0 1.095-.219l5-5a1 1 0 0 0 .21-.33 1 1 0 0 0 0-.76Z"/></svg><span class="astro-anvk7qgk">Next<br class="astro-anvk7qgk"><span class="link-title astro-anvk7qgk">Related projects</span></span></a></div></footer></div></div></main></div></div></div></div></body></html>
