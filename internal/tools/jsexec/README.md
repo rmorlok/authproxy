@@ -9,9 +9,10 @@ a fresh VM against one admitted connection and assembles its bounded result.
 The lower-level [JavaScript adapter](../javascript/README.md) owns copied Tool
 inputs, the sole connection capability, rich results, and explicit `ToolError`
 values. This executor adds argument/output schemas, invocation identities, and
-final envelope limits. Core's JavaScript policy resolver supplies finite server
-defaults from `tools.invocation`; core dispatch and public invocation integration
-remain separate work.
+final envelope limits. Core's private invocation path supplies finite server
+policy from `tools.invocation`, authorizes the captured revision, and selects its
+pinned connector helpers and configured connection client. Public invocation
+integration remains separate work.
 
 ## Prepare a customer lookup
 

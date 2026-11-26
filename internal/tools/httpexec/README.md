@@ -177,11 +177,11 @@ request was sent; expiration after a possible send retains `mayHaveExecuted`.
 
 ## Integration boundary
 
-Core's private `invokeHTTPTool` helper connects authorization and connection
+Core's private `invokeTool` helper connects authorization and connection
 preparation to this executor using the server's `tools.invocation` configuration
-and finite defaults. It uses
-`ResolveLimits` and `ErrorResult` to return bounded readiness failures before
-compilation, and supplies one deadline for preparation and execution. The
+and finite defaults. It resolves authored limits under the server ceilings,
+uses the shared result helpers for bounded readiness failures, and supplies
+one deadline for preparation and execution. The
 [configuration reference](../../../docs/src/content/docs/reference/configuration.md#tool-invocation-limits)
 describes the defaults and independent allowances. The public invocation
 endpoint remains separate work.

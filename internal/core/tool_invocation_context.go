@@ -21,6 +21,11 @@ var errToolConnectionUnavailable = errors.New("tool connection is not configured
 // execution may use. Both derive from the same authorized connection capture.
 // It is private preparation data, not an API response or a running invocation.
 type preparedToolInvocation struct {
+	// connector is the hydrated, pinned generation used by client. JavaScript
+	// compilation selects helpers from its already loaded definition, avoiding
+	// a second lookup that could pick a different generation after authorization.
+	connector *Connector
+
 	// snapshot exposes configuration and metadata to templates, with Params left
 	// unset for the executor to replace with validated caller arguments. Maps and
 	// source pointers are detached from the client's private connection state.
@@ -100,7 +105,8 @@ func (s *service) prepareToolInvocation(
 	}
 
 	return &preparedToolInvocation{
-		client: client,
+		connector: connector,
+		client:    client,
 		snapshot: render.Input{
 			Cfg:                 cfg,
 			Labels:              maps.Clone(map[string]string(storedConnection.Labels)),

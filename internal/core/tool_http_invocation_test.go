@@ -129,7 +129,7 @@ func TestInvokeHTTPToolCapturedExecution(t *testing.T) {
 			})
 
 			// A Tool grant without proxy permission is sufficient; the captured revision is returned.
-			result, err := f.service.invokeHTTPTool(context.Background(), auth, f.snapshot.Revision.ToolId, util.ToPtr(uint64(7)), common.RawJSON(`{"id":"contact/42"}`))
+			result, err := f.service.invokeTool(context.Background(), auth, f.snapshot.Revision.ToolId, util.ToPtr(uint64(7)), common.RawJSON(`{"id":"contact/42"}`))
 			require.NoError(t, err)
 			require.NoError(t, result.Validate(nil))
 			require.False(t, result.IsError)
@@ -157,7 +157,7 @@ func TestInvokeHTTPToolCapturedExecution(t *testing.T) {
 // preparation, and classifies admitted failures without building HTTP middleware
 // or reaching the upstream transport.
 func TestInvokeHTTPToolPreSendFailures(t *testing.T) {
-	for _, name := range []string{"denied", "stale revision", "unavailable", "unsupported executor", "unsupported auth", "invalid arguments", "authored input cap", "authored envelope cap", "compile error", "decrypt error"} {
+	for _, name := range []string{"denied", "stale revision", "unavailable", "unsupported executor", "multiple executors", "unsupported auth", "invalid arguments", "authored input cap", "authored envelope cap", "compile error", "decrypt error"} {
 		t.Run(name, func(t *testing.T) {
 			f, _ := toolPreparationFixture(t)
 			verb, input, code := "tool:read", common.RawJSON(`{}`), ""
@@ -179,6 +179,9 @@ func TestInvokeHTTPToolPreSendFailures(t *testing.T) {
 				}
 			case "unsupported executor":
 				f.definition.ProxyHTTP = nil
+				f.definition.Javascript = nil
+				code, prepare = "UNSUPPORTED_CAPABILITY", false
+			case "multiple executors":
 				f.definition.Javascript = util.ToPtr(`async function execute() { return true; }`)
 				code, prepare = "UNSUPPORTED_CAPABILITY", false
 			case "unsupported auth":
@@ -201,7 +204,7 @@ func TestInvokeHTTPToolPreSendFailures(t *testing.T) {
 			}
 
 			// No factory expectation permits accidental sends or eager credential setup.
-			result, err := f.service.invokeHTTPTool(context.Background(), toolInvocationAuth(toolInvocationGrant(verb), nil), f.snapshot.Revision.ToolId, expected, input)
+			result, err := f.service.invokeTool(context.Background(), toolInvocationAuth(toolInvocationGrant(verb), nil), f.snapshot.Revision.ToolId, expected, input)
 			if wantErr != nil || name == "compile error" {
 				require.Error(t, err)
 				require.Nil(t, result)
@@ -240,7 +243,7 @@ func TestInvokeHTTPToolPreparationInterruption(t *testing.T) {
 				})
 
 			// The budget covers decryption; only caller cancellation escapes as a Go error.
-			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+			result, err := f.service.invokeTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			if canceled {
 				require.ErrorIs(t, err, context.Canceled)
 				require.Nil(t, result)
@@ -275,7 +278,7 @@ func TestInvokeHTTPToolTimeoutAfterSend(t *testing.T) {
 			})
 
 			// Only the policy deadline yields a result; neither interruption retries the call.
-			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+			result, err := f.service.invokeTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			require.Equal(t, 1, calls)
 			if name == "caller cancellation" {
 				require.ErrorIs(t, err, context.Canceled)
@@ -318,7 +321,7 @@ func TestInvokeHTTPToolInvalidContextAndPolicy(t *testing.T) {
 			}
 
 			// Missing or canceled contexts cannot read the snapshot; bad policy stops after authorization.
-			result, err := f.service.invokeHTTPTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
+			result, err := f.service.invokeTool(ctx, toolInvocationAuth(toolInvocationGrant("tool:read"), nil), f.snapshot.Revision.ToolId, nil, common.RawJSON(`{}`))
 			require.Error(t, err)
 			require.Nil(t, result)
 			if name == "already canceled" {
