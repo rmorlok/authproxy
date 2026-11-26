@@ -56,9 +56,17 @@ can therefore be published even though `apiVersion()` comes from a connector.
 
 Before installing an inventory, core validates each JavaScript template with that
 connection's pinned helper library using the same no-I/O profile as standalone
-publication. A failed template leaves the entire binding pending; other matching
-connections can still install. Existing installed bindings keep their generation
-when a new primary is published.
+publication. An incompatible template leaves the entire binding pending without
+retrying the queue task; other matching connections can still install. Storage
+failures and stale helper snapshots still request retries. Existing installed
+bindings keep their generation when a new primary is published.
+
+Connector-generation migration schedules a fresh pass for pending bindings in a
+separate retryable workflow activity. Repairing the connector's helpers can then
+install those bindings without editing the ToolSet. The API currently reports
+`InventoryPending`; the specific validation failure is logged with the ToolSet,
+binding, and connection IDs. Persisted diagnostics and periodic repair are
+tracked in #953.
 
 The prepared inventory captures the connector ID, generation, and exact encrypted
 definition used for validation. Storage locks and rechecks these before commit,

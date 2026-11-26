@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,7 +17,8 @@ import (
 const (
 	WorkflowNameMigrateConnectionGenerationV1 = "core.connection.migrate_generation.v1"
 
-	ActivityNameMigrateConnectionGenerationApplyV1 = "core.connection.migrate_generation.apply.v1"
+	ActivityNameMigrateConnectionGenerationApplyV1             = "core.connection.migrate_generation.apply.v1"
+	ActivityNameMigrateConnectionGenerationReconcileToolSetsV1 = "core.connection.migrate_generation.reconcile_toolsets.v1"
 )
 
 type migrateConnectionGenerationWorkflowInputV1 struct {
@@ -64,14 +66,38 @@ func migrateConnectionGenerationWorkflowV1(
 	if timedOut {
 		return fmt.Errorf("connection generation migration timed out")
 	}
-	if applyErr != nil {
-		return applyErr
+
+	// Reconciliation has its own activity so a queue/database failure retries
+	// only this follow-up, never the already-committed migration. Run it even
+	// when apply reports an error: health/notification updates can fail after
+	// the generation was stored. The activity checks whether that write landed.
+	reconcileFuture := wflib.ExecuteActivity[any](
+		activityCtx,
+		wflib.DefaultActivityOptions,
+		ActivityNameMigrateConnectionGenerationReconcileToolSetsV1,
+		input.ConnectionID,
+		input.TargetGeneration,
+	)
+	var reconcileErr error
+	wflib.Select(ctx,
+		wflib.Await(timer, func(_ wflib.Context, _ wflib.Future[any]) {
+			timedOut = true
+			cancelActivities()
+		}),
+		wflib.Await(reconcileFuture, func(ctx wflib.Context, future wflib.Future[any]) {
+			_, reconcileErr = future.Get(ctx)
+		}),
+	)
+	if timedOut {
+		return fmt.Errorf("connection generation migration timed out")
 	}
 
 	cancelTimer()
-	return nil
+	return errors.Join(applyErr, reconcileErr)
 }
 
+// registerMigrateConnectionGenerationWorkflow registers the durable workflow
+// and its independently retried migration and ToolSet reconciliation activities.
 func (s *service) registerMigrateConnectionGenerationWorkflow(
 	worker workflowRegistrar,
 ) error {
@@ -81,9 +107,15 @@ func (s *service) registerMigrateConnectionGenerationWorkflow(
 	); err != nil {
 		return err
 	}
-	return worker.RegisterActivity(
+	if err := worker.RegisterActivity(
 		s.applyMigrateConnectionGenerationV1,
 		registry.WithName(ActivityNameMigrateConnectionGenerationApplyV1),
+	); err != nil {
+		return err
+	}
+	return worker.RegisterActivity(
+		s.reconcileToolSetsAfterConnectionMigrationV1,
+		registry.WithName(ActivityNameMigrateConnectionGenerationReconcileToolSetsV1),
 	)
 }
 

@@ -450,7 +450,8 @@ readiness are checked again at invocation.
 ### Membership and catalog jobs
 
 Enqueue reconciliation after ToolSet selection changes, primary publication,
-connection creation/configuration completion, label propagation, connection
+connection creation/configuration completion, connector-generation migration,
+label propagation, connection
 deletion/disconnection, and ToolSet deletion. Add a periodic sweep to repair
 missed events. Reuse Asynq, Redis leadership, and injectable clocks; do not
 depend on in-memory event delivery for correctness.
@@ -689,6 +690,13 @@ ToolSet generation publication performs static compilation; each connection's
 complete candidate inventory must pass initialization before activation. Both
 checks run without live connection capabilities or direct HTTP. Initialization
 and queued initialization microtasks must finish without outbound I/O.
+
+An incompatible template leaves its binding pending without failing the whole
+reconciliation pass or requesting queue retries. Other connections can still
+install; dependency failures and stale candidates remain retryable. After a
+connector-generation migration, schedule reconciliation for pending bindings so
+repaired helpers can activate their inventory. Scheduling must retry separately
+from applying the migration. Existing installed bindings remain pinned.
 
 ToolSet activation must recheck the selected connector ID, generation, and exact
 definition used for initialization under database locks. A draft edit or an

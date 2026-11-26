@@ -1,11 +1,15 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
@@ -44,6 +48,8 @@ func toolSetJavascriptConnector(t *testing.T, r *toolSetReconcileTest, connectio
 // helpers and never activates part of a mixed inventory after a failed template.
 func TestToolSetJavaScriptReconciliation(t *testing.T) {
 	r := newToolSetReconcileTest(t)
+	var logs bytes.Buffer
+	r.service.logger = slog.New(slog.NewTextHandler(&logs, nil))
 	labels := map[string]string{"provider": "calendar"}
 	good := r.connection(t, "root.team_a", "good", database.ConnectionStateConfigured, labels)
 	bad := r.connection(t, "root.team_a.sub", "bad", database.ConnectionStateConfigured, labels)
@@ -61,9 +67,11 @@ func TestToolSetJavaScriptReconciliation(t *testing.T) {
 	// Generation compilation has no selected library; initialization waits for installation.
 	id := r.toolSet(t, "javascript-tools", toolsetschema.ToolSetReleaseStatePrimary,
 		toolTemplate("http-first"), javascriptToolTemplate("javascript", source))
-	err := r.service.reconcileToolSet(r.ctx, id)
-	require.ErrorIs(t, err, ErrInvalidArgument)
-	require.NotContains(t, err.Error(), "private helper incompatibility")
+	task, err := newReconcileToolSetTask(id)
+	require.NoError(t, err)
+	require.NoError(t, r.service.reconcileToolSetTask(r.ctx, task))
+	require.Contains(t, logs.String(), "toolset binding remains pending after template validation")
+	require.NotContains(t, logs.String(), "private helper incompatibility")
 
 	// A compatible connection installs both templates despite another connection's failure.
 	installed, err := r.db.GetToolSetBindingForConnection(r.ctx, id, good.Id)
@@ -84,13 +92,19 @@ func TestToolSetJavaScriptReconciliation(t *testing.T) {
 	require.Zero(t, pending.InventoryRevision)
 	require.Empty(t, r.generatedTools(t, pending))
 
-	// A connector migration supplies compatible helpers; retry installs the same pending binding.
+	// A connector migration supplies compatible helpers; its follow-up queues a fresh pass.
 	toolSetJavascriptConnector(t, r, bad, 2, `function selected() { return "supported"; }`)
 	_, err = r.db.UpdateConnectionForGenerationMigration(r.ctx, database.ConnectionGenerationMigrationUpdate{
 		Id: bad.Id, ConnectorId: bad.ConnectorId, ConnectorGeneration: 2, UserLabels: labels,
 	})
 	require.NoError(t, err)
-	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+	*r.enqueued = nil
+	require.NoError(t, r.service.reconcileToolSetsAfterConnectionMigrationV1(r.ctx, bad.Id, 2))
+	require.Len(t, *r.enqueued, 1)
+	require.Equal(t, taskTypeReconcileToolSet, (*r.enqueued)[0].Type())
+
+	// Processing that queued task installs the same pending binding and preserves installed pins.
+	require.NoError(t, r.service.reconcileToolSetTask(r.ctx, (*r.enqueued)[0]))
 	retried, err := r.db.GetToolSetBindingForConnection(r.ctx, id, bad.Id)
 	require.NoError(t, err)
 	require.Equal(t, pending.Id, retried.Id)
@@ -201,9 +215,8 @@ func TestToolSetJavaScriptRejectsEditedHelpers(t *testing.T) {
 	_, err = r.db.InstallExplicitToolSetInventory(r.ctx, install)
 	require.ErrorIs(t, err, database.ErrToolSetInventoryConnectionChanged)
 
-	// A retry validates the changed helper rather than reusing the earlier successful result.
-	err = r.service.reconcileToolSet(r.ctx, id)
-	require.ErrorIs(t, err, ErrInvalidArgument)
+	// A fresh pass validates the changed helper and leaves the binding pending without retrying.
+	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
 	stillPending, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
 	require.NoError(t, err)
 	require.Equal(t, pending.Epoch, stillPending.Epoch)
@@ -218,6 +231,73 @@ func TestToolSetJavaScriptRejectsEditedHelpers(t *testing.T) {
 	require.Equal(t, pending.Id, installed.Id)
 	require.Equal(t, uint64(1), *installed.AppliedGeneration)
 	require.Len(t, r.generatedTools(t, installed), 1)
+}
+
+// toolSetHelperReadFailureDB injects a dependency failure for one connection's
+// helper lookup while letting the rest of a reconciliation pass use real storage.
+type toolSetHelperReadFailureDB struct {
+	database.DB
+	connectorID apid.ID
+	failure     error
+}
+
+// GetConnectorGeneration fails only the selected connector's helper read.
+func (d *toolSetHelperReadFailureDB) GetConnectorGeneration(ctx context.Context, id apid.ID, generation uint64) (*database.ConnectorWithDefinition, error) {
+	if id == d.connectorID {
+		return nil, d.failure
+	}
+	return d.DB.GetConnectorGeneration(ctx, id, generation)
+}
+
+// TestToolSetJavaScriptReconciliationRetriesDependencies keeps retryable failures
+// visible even when the same pass encounters permanently incompatible helpers.
+func TestToolSetJavaScriptReconciliationRetriesDependencies(t *testing.T) {
+	for name, failure := range map[string]error{
+		"unavailable": errors.New("helper storage unavailable"),
+		"timeout":     context.DeadlineExceeded,
+		"canceled":    context.Canceled,
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := newToolSetReconcileTest(t)
+			labels := map[string]string{"provider": "calendar"}
+			good := r.connection(t, "root.team_a", "good", database.ConnectionStateConfigured, labels)
+			bad := r.connection(t, "root.team_a", "bad", database.ConnectionStateConfigured, labels)
+			delayed := r.connection(t, "root.team_a", "delayed", database.ConnectionStateConfigured, labels)
+			toolSetJavascriptConnector(t, r, good, 1, `function selected() { return true; }`)
+			toolSetJavascriptConnector(t, r, bad, 1, `function selected() { return false; }`)
+			toolSetJavascriptConnector(t, r, delayed, 1, `function selected() { return true; }`)
+			id := r.toolSet(t, "mixed-failures", toolsetschema.ToolSetReleaseStatePrimary,
+				javascriptToolTemplate("lookup", `if (!selected()) throw "incompatible"; async function execute() {}`))
+			task, err := newReconcileToolSetTask(id)
+			require.NoError(t, err)
+			r.service.db = &toolSetHelperReadFailureDB{DB: r.db, connectorID: delayed.ConnectorId, failure: failure}
+
+			// The bad helper must not suppress retries needed by the unavailable dependency.
+			err = r.service.reconcileToolSetTask(r.ctx, task)
+			require.ErrorIs(t, err, failure)
+			require.NotErrorIs(t, err, ErrInvalidArgument)
+			require.NotErrorIs(t, err, asynq.SkipRetry)
+			installed, err := r.db.GetToolSetBindingForConnection(r.ctx, id, good.Id)
+			require.NoError(t, err)
+			require.NotNil(t, installed.AppliedGeneration)
+			for _, connection := range []*database.Connection{bad, delayed} {
+				pending, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
+				require.NoError(t, err)
+				require.Nil(t, pending.AppliedGeneration)
+				require.Empty(t, r.generatedTools(t, pending))
+			}
+
+			// Once storage recovers, the retry installs the delayed binding and completes.
+			r.service.db = r.db
+			require.NoError(t, r.service.reconcileToolSetTask(r.ctx, task))
+			recovered, err := r.db.GetToolSetBindingForConnection(r.ctx, id, delayed.Id)
+			require.NoError(t, err)
+			require.NotNil(t, recovered.AppliedGeneration)
+			pending, err := r.db.GetToolSetBindingForConnection(r.ctx, id, bad.Id)
+			require.NoError(t, err)
+			require.Nil(t, pending.AppliedGeneration)
+		})
+	}
 }
 
 // TestToolSetJavaScriptRejectsMixedHelperSnapshots requires every JavaScript
