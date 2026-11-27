@@ -52,8 +52,10 @@ Arbitrary JSON objects that resemble references are not treated as references.
 resource package's typed `meta.GenerationPolicy` into checked runtime calls for
 state classification, generation-affecting patches, target selection, and patch
 finalization. A nil capability means ordinary resource handling. Connector
-policy lives in `resources/connectors`; its draft/primary names, field paths,
-and logical-endpoint publication behavior are not interpreted by callers.
+and ToolSet policies live in their respective resource packages and own the
+meaning of release states, field paths, and publication intent. ToolSet patches
+use the `toolsets` collection. Changes to the shared `spec.connectionSelector`
+and logical metadata do not edit a definition or publish a generation.
 
 The capability performs no I/O, merging, or execution. Apply supplies selected,
 editable, and newest snapshots through the standard collection/generations API,

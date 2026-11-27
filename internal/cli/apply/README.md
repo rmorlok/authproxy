@@ -165,6 +165,11 @@ patches, avoiding unnecessary generations; unspecified release intent is
 preserved. Effective typed comparison handles API serialization that omits empty
 values.
 
+ToolSet updates preserve omitted spec fields so partial manifests can change
+only membership or release intent. A supplied `connectionSelector` replaces
+the match as a whole. Comparison treats an omitted selector namespace as the
+owner subtree, matching the default projected by the API.
+
 ### Selecting resource generations
 
 `resolveApplyTarget` consults `ResourceType.Generations`. Resources without this
@@ -175,6 +180,12 @@ states and choose a source. It passes opaque selection context into finalization
 `Reconcile` performs the three-way merge, delegates lifecycle adjustments, and
 validates the resulting patch before execution. No resource type, release state
 name, or lifecycle field path is encoded in this orchestration.
+
+ToolSet apply uses the logical endpoint. Its generation policy keeps selector
+and metadata edits separate from draft selection and publication. Apply stores
+history on the logical resource, so manifests with an explicit ToolSet
+generation are rejected. The ToolSet generation endpoint accepts only
+generation fields.
 
 Connector policy lives in its resource package and requires the existing
 `connectors:list/generations` read permission. It prefers existing drafts for
@@ -202,9 +213,9 @@ deletion.
 Missing history produces an adoption warning and preserves unspecified fields.
 Invalid, unsupported, duplicate-key, unsafe or mismatched history fails closed.
 History is included in the same create/PATCH as the resource, with the complete
-annotation map checked against the 256 KiB total annotation limit. Planning and
-server-rejected writes do not advance history. A lost response after a successful write
-still has an uncertain outcome; there is no second history-only request.
+annotation map checked against the 256 KiB total annotation limit. It advances
+if the server commits the metadata change, including when a later generation
+write fails in the same request. A lost response leaves the outcome uncertain.
 
 ### Ordering the batch
 

@@ -18,6 +18,9 @@ import (
 const LastAppliedAnnotation = "authproxy.net/last-applied-configuration"
 const historyVersion = 1
 
+// ToolSet generation endpoints cannot write the logical last-applied annotation.
+const toolSetApplyGenerationError = "ToolSet apply addresses the logical resource; omit metadata.generation"
+
 // History contains desired field presence, never secret values or their hashes.
 // Secret paths use RFC 6901 JSON pointers. It is private to client-side apply.
 type History struct {
@@ -105,7 +108,13 @@ func exclude(value map[string]any, path []string) {
 	}
 }
 
+// newHistory records the desired fields of a logical resource or a generation
+// whose endpoint accepts apply history.
 func newHistory(doc Document) (*History, error) {
+	if doc.Kind == "ToolSet" && doc.Metadata.Generation != 0 {
+		return nil, fmt.Errorf(toolSetApplyGenerationError)
+	}
+
 	object, err := plainObject(doc.Object)
 	if err != nil {
 		return nil, err

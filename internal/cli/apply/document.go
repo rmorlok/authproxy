@@ -280,6 +280,9 @@ func (l *inputLoader) object(
 	}
 
 	if _, ok := metadata["generation"]; ok {
+		if kind == "ToolSet" {
+			return fail(toolSetApplyGenerationError)
+		}
 		descriptor, err := resourceType(meta.Kind(kind))
 		if err != nil || descriptor.Generations == nil {
 			return fail("metadata.generation is not supported for this resource type")
@@ -395,6 +398,7 @@ func supportedKind(kind string) bool {
 		"Key",
 		"RateLimit",
 		"Tool",
+		"ToolSet",
 		"Connection":
 		return true
 	}
@@ -403,6 +407,7 @@ func supportedKind(kind string) bool {
 
 func validateNamespace(value string) error { return ns.ValidatePath(value) }
 
+// normalizeIdentity validates resource addressing and resolves namespace defaults.
 func normalizeIdentity(kind string, m *meta.ObjectMeta, fallback string) error {
 	if kind == "Namespace" && m.ID != "" {
 		canonical, err := ns.NewResourceMetadata(m.ID)
