@@ -49,9 +49,32 @@ is checked for cancellation after it returns; the schema compiler still needs a
 work bound. A validation failure writes no revision. A successful update becomes
 active immediately, while earlier revisions remain inspectable.
 
-Explicit ToolSet JavaScript templates remain unavailable until their installation
-path validates helpers for each selected connection. A generation has no single
-connection from which to select a library.
+Explicit ToolSet JavaScript templates have two validation stages. Publishing a
+generation compiles each template's source and schemas without initializing code:
+there is no single connection from which to select helpers. The example above
+can therefore be published even though `apiVersion()` comes from a connector.
+
+Before installing an inventory, core validates each JavaScript template with that
+connection's pinned helper library using the same no-I/O profile as standalone
+publication. An incompatible template leaves the entire binding pending without
+retrying the queue task; other matching connections can still install. Storage
+failures and connector-generation changes still request retries. Existing installed
+bindings keep their generation when a new primary is published.
+
+Connector-generation migration schedules a fresh pass for pending bindings in a
+separate retryable workflow activity. Repairing the connector's helpers can then
+install those bindings without editing the ToolSet. The API currently reports
+`InventoryPending`; the specific validation failure is logged with the ToolSet,
+binding, and connection IDs. Persisted diagnostics and periodic repair are
+tracked in #953.
+
+The prepared inventory captures the connector ID and generation used for
+validation. Storage locks and rechecks these before commit, so migration makes
+the job retry from fresh state. It does not compare connector definitions: draft
+edits, administrative force-state edits within a generation, and key re-encryption
+do not invalidate preparation. Administrators accept the compatibility risk of
+changing helpers without changing the generation. No resolved connection
+configuration is stored in the generated definition.
 
 ## Tool execution policy
 

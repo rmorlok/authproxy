@@ -335,6 +335,11 @@ Exactly one of `source.explicit`, `source.openapi`, or `source.mcp` is allowed.
 Explicit template specs reuse `ToolDefinition` and omit `connectionRef`.
 Template metadata permits name, labels, and annotations, not IDs, namespace,
 generation, ownership, or timestamps. Publication compiles every template.
+For JavaScript, this checks source, entry-point declarations, reserved names,
+and schemas without selecting a connector library or running initialization.
+Before activating an inventory, validate each template with that connection's
+pinned helpers. Initialization can therefore use pure connector helper functions
+without requiring a sample connection when the ToolSet generation is published.
 
 ### Imported ToolSets
 
@@ -445,7 +450,8 @@ readiness are checked again at invocation.
 ### Membership and catalog jobs
 
 Enqueue reconciliation after ToolSet selection changes, primary publication,
-connection creation/configuration completion, label propagation, connection
+connection creation/configuration completion, connector-generation migration,
+label propagation, connection
 deletion/disconnection, and ToolSet deletion. Add a periodic sweep to repair
 missed events. Reuse Asynq, Redis leadership, and injectable clocks; do not
 depend on in-memory event delivery for correctness.
@@ -679,11 +685,29 @@ in-process trusted-code runtime, not a hard memory-isolated tenant sandbox.
   separate client-support implementation slice; they cannot change the admitted actor,
   connection, request type, or trusted invocation attribution.
 
-Compile and validate before publication without live connection capabilities or
-direct HTTP. Initialization and any queued initialization microtasks must finish
-without outbound I/O. Reusing connector libraries does not change their existing
-connection or credential authority in other AuthProxy execution contexts. Pure
-utility globals are consistently available in all bounded execution profiles.
+For standalone Tools, compile and validate initialization before publication.
+ToolSet generation publication performs static compilation; each connection's
+complete candidate inventory must pass initialization before activation. Both
+checks run without live connection capabilities or direct HTTP. Initialization
+and queued initialization microtasks must finish without outbound I/O.
+
+An incompatible template leaves its binding pending without failing the whole
+reconciliation pass or requesting queue retries. Other connections can still
+install; dependency failures and stale candidates remain retryable. After a
+connector-generation migration, schedule reconciliation for pending bindings so
+repaired helpers can activate their inventory. Scheduling must retry separately
+from applying the migration. Existing installed bindings remain pinned.
+
+ToolSet activation must recheck the selected connector ID and generation used
+for initialization under database locks. A connector migration invalidates the
+candidate and requires fresh preparation. Do not compare encrypted definitions,
+including for draft generations: same-generation edits and key re-encryption do
+not invalidate preparation. This accepts the compatibility risk of draft edits
+and an administrator forcing a published generation back to draft and changing
+its helpers without changing the generation number. Reusing connector
+libraries does not change their existing connection or credential authority in
+other AuthProxy execution contexts. Pure utility globals are consistently
+available in all bounded execution profiles.
 
 JSON-compatible ordinary returns become `structuredContent`. Strings also
 produce a text block; objects/arrays need not be duplicated as serialized text

@@ -110,10 +110,11 @@ func (m *toolSetMembership) selects(connection *database.Connection) bool {
 // connections, leaves installed bindings pinned, and removes nonmatching ones.
 // The pass is idempotent, so a retry repeats only reads for finished work.
 //
-// One connection's failure does not stop the others. Failures are returned
-// together so asynq retries the pass, and stale work (a selector or binding that
-// changed underneath it) is rejected by storage fencing and redone from fresh
-// reads. A deleted ToolSet is a no-op here; its cleanup is separate.
+// One connection's failure does not stop the others. Invalid authored templates
+// leave that binding pending without requesting retries. Infrastructure failures
+// are returned together so asynq retries the pass, and stale work (a selector or
+// binding that changed underneath it) is rejected by storage fencing and redone
+// from fresh reads. A deleted ToolSet is a no-op here; its cleanup is separate.
 func (s *service) reconcileToolSet(ctx context.Context, toolSetId apid.ID) error {
 	logical, err := s.db.GetToolSet(ctx, toolSetId)
 	if errors.Is(err, database.ErrNotFound) {
@@ -226,6 +227,8 @@ func (s *service) reconcileToolSetAdditions(
 // An installed binding is left alone: publication never migrates it. Conflicts
 // showing the connection stopped matching or became unready are not failures,
 // because a later trigger or pass will handle the new state.
+// A template incompatible with the connection's helpers also stays pending;
+// retrying unchanged authored code cannot repair it.
 func (s *service) reconcileToolSetConnection(
 	ctx context.Context,
 	membership *toolSetMembership,
@@ -256,6 +259,20 @@ func (s *service) reconcileToolSetConnection(
 	}
 
 	install, err := s.inventoryFor(ctx, membership.plan, logical, binding, connection)
+	if errors.Is(err, ErrInvalidArgument) {
+		// This is a per-binding validation outcome, not a failed queue operation.
+		// Returning SkipRetry would also suppress retries for other connections'
+		// transient failures. Later publication or connector migration can repair
+		// the binding, at which point a fresh pass validates it again.
+		s.logger.Warn("toolset binding remains pending after template validation",
+			"toolset_id", logical.Id,
+			"binding_id", binding.Id,
+			"connection_id", connection.Id,
+			"generation", membership.plan.generation,
+			"error", err,
+		)
+		return nil
+	}
 	if err != nil {
 		return err
 	}

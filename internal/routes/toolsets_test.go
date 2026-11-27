@@ -132,11 +132,11 @@ func TestToolSets(t *testing.T) {
 		template := toolSetTemplate("js", "")
 		spec := template["spec"].(map[string]any)
 		delete(spec, "proxyHttp")
-		spec["javascript"] = "async function execute(params, context) { return {}; }"
+		spec["javascript"] = "function execute(params, context) { return {}; }"
 		javascript["spec"].(map[string]any)["definition"] = toolSetDefinition(template)
 		w = s.do(t, http.MethodPost, "/toolsets", javascript, all)
 		require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
-		require.Contains(t, w.Body.String(), "not supported yet")
+		require.Contains(t, w.Body.String(), "explicit.tools[0].spec.javascript")
 
 		mcp := toolSetBody("root.acme", "mcp", "")
 		mcp["spec"].(map[string]any)["definition"] = map[string]any{
@@ -477,4 +477,64 @@ func TestToolSets(t *testing.T) {
 		w = s.do(t, http.MethodPost, "/toolsets", toolSetBody("root.acme", "calendar", ""), all)
 		require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 	})
+}
+
+// TestToolSetJavaScriptPublication compiles JavaScript templates without choosing
+// a connection or running initialization, including when promoting an existing draft.
+func TestToolSetJavaScriptPublication(t *testing.T) {
+	s, _ := newToolsTestSetup(t)
+	all := aschema.AllPermissions()
+	const source = `const path = connectorPath(); async function execute(params, context) {
+		return context.connections[0].fetch(path);
+	}`
+	template := toolSetTemplate("customer-lookup", "")
+	spec := template["spec"].(map[string]any)
+	delete(spec, "proxyHttp")
+	spec["javascript"] = source
+	body := toolSetBody("root.acme", "javascript-templates", "")
+	body["spec"].(map[string]any)["definition"] = toolSetDefinition(template)
+
+	// The helper is intentionally unavailable: only per-connection installation can validate it.
+	w := s.do(t, http.MethodPost, "/toolsets", body, all)
+	require.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	created := decodeToolSet(t, w)
+	require.Equal(t, toolsetschema.ToolSetReleaseStateDraft, created.Status.Release.State)
+	path := "/toolsets/" + created.Metadata.ID + "/generations/1"
+
+	for name, change := range map[string]map[string]any{
+		"syntax": {"javascript": `async function execute( {`},
+		"entry":  {"javascript": `function execute() { return true; }`},
+		"host":   {"javascript": `const fetch = 1; async function execute() {}`},
+		"schema": {"inputSchema": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]any{"type": "invalid"}}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			invalid := toolSetTemplate("customer-lookup", "")
+			invalidSpec := invalid["spec"].(map[string]any)
+			delete(invalidSpec, "proxyHttp")
+			invalidSpec["javascript"] = source
+			for field, value := range change {
+				invalidSpec[field] = value
+			}
+
+			// A failed replacement cannot change the draft's definition or release state.
+			w := s.do(t, http.MethodPatch, path, toolSetPatchBody(nil, map[string]any{
+				"definition": toolSetDefinition(invalid),
+			}), all)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+			w = s.do(t, http.MethodGet, path, nil, all)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+			stored := decodeToolSet(t, w)
+			require.Equal(t, source, *stored.Spec.Definition.Source.Explicit.Tools[0].Spec.Javascript)
+			require.Equal(t, toolsetschema.ToolSetReleaseStateDraft, stored.Status.Release.State)
+		})
+	}
+
+	// Publication rechecks the exact draft source without a sample connector or I/O.
+	w = s.do(t, http.MethodPatch, path, toolSetPatchBody(nil, map[string]any{
+		"release": map[string]any{"desiredState": "primary"},
+	}), all)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	published := decodeToolSet(t, w)
+	require.Equal(t, toolsetschema.ToolSetReleaseStatePrimary, published.Status.Release.State)
+	require.Equal(t, source, *published.Spec.Definition.Source.Explicit.Tools[0].Spec.Javascript)
 }

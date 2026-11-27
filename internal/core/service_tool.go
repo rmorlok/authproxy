@@ -18,6 +18,7 @@ import (
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/tools/httpcodec"
 	"github.com/rmorlok/authproxy/internal/tools/javascript"
+	"github.com/rmorlok/authproxy/internal/tools/jsexec"
 	"github.com/rmorlok/authproxy/internal/tools/render"
 )
 
@@ -238,7 +239,7 @@ func (s *service) prepareToolDefinition(
 ) (*preparedToolDefinition, error) {
 	definition := &tool.Spec.ToolDefinition
 	if definition.Javascript != nil {
-		if err := s.validateToolJavaScriptPublication(ctx, definition, connection); err != nil {
+		if _, err := s.validateToolJavaScriptPublication(ctx, definition, connection); err != nil {
 			return nil, err
 		}
 	} else {
@@ -273,6 +274,8 @@ func toolDefinitionDigest(plaintext []byte) string {
 // compileToolDefinition validates a Tool definition and compiles its executor
 // without running authored code or making requests. field prefixes error paths,
 // such as "spec" for a standalone Tool or a ToolSet template's spec path.
+// JavaScript ToolSet templates have no selected helper library at this point;
+// initialization is validated separately for each connection before activation.
 // Failures wrap ErrInvalidArgument.
 func compileToolDefinition(
 	definition *toolschema.ToolDefinition,
@@ -297,10 +300,13 @@ func compileToolDefinition(
 			return fmt.Errorf("%w: %s.proxyHttp.response: %w", ErrInvalidArgument, field, err)
 		}
 	case definition.Javascript != nil:
-		// ToolSet generation compilation has no selected connection. Supporting
-		// JavaScript templates also requires library-aware validation before each
-		// binding's inventory is activated. Standalone Tools validate separately.
-		return fmt.Errorf("%w: %s.javascript ToolSet templates are not supported yet; use %s.proxyHttp", ErrInvalidArgument, field, field)
+		if _, err := jsexec.Compile(
+			*definition,
+			nil, // library; omitted because no connector to supply it
+			toolPublishJavaScriptLimits,
+		); err != nil {
+			return fmt.Errorf("%w: %s.javascript: %w", ErrInvalidArgument, field, err)
+		}
 	default:
 		return fmt.Errorf("%w: %s must declare an executor", ErrInvalidArgument, field)
 	}

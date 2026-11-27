@@ -14,7 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/tools/validation"
 )
 
-// toolPublishJavaScriptLimits is the fixed standalone publication profile,
+// toolPublishJavaScriptLimits is the fixed publication/installation profile,
 // independent of tools.invocation. Initialization uses finite time, stack, and
 // native work/allocation allowances; authored caps may lower them. The remaining
 // fields let jsexec compile the complete definition and schemas, but publication
@@ -47,8 +47,10 @@ var toolPublishJavaScriptLimits = jsexec.Limits{
 	MaxEncodedResultBytes: 16 << 20,
 }
 
-// validateToolJavaScriptPublication checks a standalone Tool with the helper
-// library pinned by its resolved connection. It loads only the connector
+// validateToolJavaScriptPublication checks a Tool with the helper library pinned
+// by its resolved connection and returns the hydrated connector it validated.
+// Standalone publication and ToolSet inventory preparation share this check.
+// It loads only the connector
 // definition, never connection configuration, credentials, or an HTTP client.
 // Setup and disabled connections can therefore have Tools defined in advance.
 //
@@ -63,16 +65,16 @@ func (s *service) validateToolJavaScriptPublication(
 	ctx context.Context,
 	definition *toolschema.ToolDefinition,
 	connection *database.Connection,
-) error {
+) (*Connector, error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := definition.Validate(nil); err != nil {
-		return fmt.Errorf("%w: spec: %w", ErrInvalidArgument, err)
+		return nil, fmt.Errorf("%w: spec: %w", ErrInvalidArgument, err)
 	}
 	limits, err := jsexec.ResolveLimits(toolPublishJavaScriptLimits, definition.Limits)
 	if err != nil {
-		return fmt.Errorf("%w: spec.limits: %w", ErrInvalidArgument, err)
+		return nil, fmt.Errorf("%w: spec.limits: %w", ErrInvalidArgument, err)
 	}
 	// Dependency latency must not consume the Tool's authored initialization
 	// allowance or turn a slow database/decryption into invalid authored code.
@@ -96,22 +98,22 @@ func (s *service) validateToolJavaScriptPublication(
 
 	row, err := s.db.GetConnectorGeneration(preparationCtx, connection.ConnectorId, connection.ConnectorGeneration)
 	if err = failure(err, false); err != nil {
-		return err
+		return nil, err
 	}
 	connector := wrapConnector(*row, s)
 	// Load separately so storage/decryption errors cannot be reported as bad
 	// authored JavaScript. The bounded helper lookup below reuses this cache.
 	_, err = connector.getDefinitionWithContext(preparationCtx)
 	if err = failure(err, false); err != nil {
-		return err
+		return nil, err
 	}
 	library, err := connector.getBoundedJavascriptLibrary(preparationCtx, *definition.Javascript, limits.Runtime)
 	if err = failure(err, true); err != nil {
-		return err
+		return nil, err
 	}
 	program, err := jsexec.Compile(*definition, library, limits)
 	if err = failure(err, true); err != nil {
-		return err
+		return nil, err
 	}
 	cancel()
 
@@ -119,10 +121,10 @@ func (s *service) validateToolJavaScriptPublication(
 	// timeout rejects the code without including time spent waiting for dependencies.
 	err = program.Validate(ctx)
 	if contextErr := ctx.Err(); contextErr != nil {
-		return contextErr
+		return nil, contextErr
 	}
 	if err != nil {
-		return fmt.Errorf("%w: spec.javascript publication: %w", ErrInvalidArgument, err)
+		return nil, fmt.Errorf("%w: spec.javascript publication: %w", ErrInvalidArgument, err)
 	}
-	return nil
+	return connector, nil
 }

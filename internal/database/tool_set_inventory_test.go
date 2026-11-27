@@ -91,6 +91,10 @@ func explicitInventoryForTest(t *testing.T, count int) *toolSetInventoryFixture 
 // copyInventoryForTest detaches nested slices and maps so unchanged-input
 // assertions can detect mutations instead of sharing the production input.
 func copyInventoryForTest(request ToolSetInventoryInstall) ToolSetInventoryInstall {
+	if request.ExpectedConnector != nil {
+		expected := *request.ExpectedConnector
+		request.ExpectedConnector = &expected
+	}
 	request.Tools = slices.Clone(request.Tools)
 	for index := range request.Tools {
 		request.Tools[index].Tool = copyToolMetadataForTest(&request.Tools[index].Tool)
@@ -213,6 +217,219 @@ func TestExplicitToolSetInventoryEmpty(t *testing.T) {
 		f.request.ExpectedEpoch = installed.Epoch
 		_, err = f.db.InstallExplicitToolSetInventory(f.ctx, f.request)
 		require.ErrorIs(t, err, ErrToolSetBindingInventoryConflict)
+	}
+}
+
+// TestExplicitToolSetInventoryConnectorFence checks generation identity and live
+// parents, while allowing same-generation edits and key rotation. The contract
+// applies to first installation, replacement, and empty inventories alike.
+func TestExplicitToolSetInventoryConnectorFence(t *testing.T) {
+	for _, replace := range []bool{false, true} {
+		for _, empty := range []bool{false, true} {
+			for _, changed := range []string{"connector", "generation", "draft definition", "republished definition", "key rotation", "deleted connector", "deleted generation"} {
+				t.Run(fmt.Sprintf("replace=%t/empty=%t/%s", replace, empty, changed), func(t *testing.T) {
+					// Capture the helper generation used to prepare this candidate inventory.
+					var f *toolSetInventoryFixture
+					if replace {
+						f = installedInventoryForTest(t, 1)
+					} else {
+						f = explicitInventoryForTest(t, 1)
+					}
+					// Exercise write/read timestamp agreement at PostgreSQL's precision boundary.
+					f.ctx = apctx.WithFixedClock(f.ctx, apctx.GetClock(f.ctx).Now().Add(123456789*time.Nanosecond))
+					toolID := f.request.Tools[0].Tool.Id
+					f.request.ExpectedConnector = &ConnectorGenerationId{
+						Id: f.connection.ConnectorId, Generation: f.connection.ConnectorGeneration,
+					}
+					current := ConnectorWithDefinition{
+						Id: f.connection.ConnectorId, Namespace: f.connection.Namespace,
+						Generation: f.connection.ConnectorGeneration, State: ConnectorGenerationStatePrimary,
+						EncryptedDefinition: f.request.Tools[0].EncryptedDefinition,
+					}
+					require.NoError(t, f.db.UpsertConnectorGeneration(f.ctx, &current))
+					if empty {
+						f.request.Tools = nil
+					}
+					before := copyInventoryForTest(f.request)
+					bindingBefore := readInventoryBindingForTest(t, f)
+					var toolBefore *Tool
+					if replace {
+						toolBefore = readToolRowForTest(t, f.ctx, f.db, toolID)
+					}
+
+					// Only identity and liveness changes invalidate this expectation;
+					// definition bytes are deliberately outside the commit check.
+					s := f.db.(*service)
+					switch changed {
+					case "connector", "generation":
+						if changed == "connector" {
+							current.Id = apid.New(apid.PrefixConnector)
+						} else {
+							current.Generation++
+						}
+						// Upsert fills these identities on the caller's model; a new
+						// connector/generation needs freshly assigned values.
+						current.Name = ""
+						current.DefinitionGenerationId = apid.Nil
+						require.NoError(t, f.db.UpsertConnectorGeneration(f.ctx, &current))
+						_, err := s.sq.Update(ConnectionsTable).
+							Set("connector_id", current.Id).Set("connector_generation", current.Generation).
+							Where(sq.Eq{"id": f.connection.Id}).RunWith(s.db).ExecContext(f.ctx)
+						require.NoError(t, err)
+					case "draft definition", "republished definition":
+						current.EncryptedDefinition.Data = "Y2hhbmdlZA=="
+						require.NoError(t, f.db.SetConnectorGenerationState(f.ctx, current.Id,
+							current.Generation, ConnectorGenerationStateDraft))
+						if changed == "draft definition" {
+							current.State = ConnectorGenerationStateDraft
+						}
+						require.NoError(t, f.db.UpsertConnectorGeneration(f.ctx, &current))
+					case "key rotation":
+						current.EncryptedDefinition.ID = apid.New(apid.PrefixDataEncryptionKey)
+						_, err := s.sq.Update(ConnectorGenerationsTable).Set("encrypted_definition", current.EncryptedDefinition).
+							Where(sq.Eq{"connector_id": current.Id, "generation": current.Generation}).
+							RunWith(s.db).ExecContext(f.ctx)
+						require.NoError(t, err)
+					case "deleted connector":
+						_, err := s.sq.Update(ConnectorsTable).Set("deleted_at", apctx.GetClock(f.ctx).Now()).
+							Where(sq.Eq{"id": current.Id}).
+							RunWith(s.db).ExecContext(f.ctx)
+						require.NoError(t, err)
+					case "deleted generation":
+						_, err := s.sq.Update(ConnectorGenerationsTable).Set("deleted_at", apctx.GetClock(f.ctx).Now()).
+							Where(sq.Eq{"connector_id": current.Id, "generation": current.Generation}).
+							RunWith(s.db).ExecContext(f.ctx)
+						require.NoError(t, err)
+					}
+					commit := func() (*ToolSetBinding, error) {
+						if replace {
+							return f.db.ReplaceExplicitToolSetInventory(f.ctx, f.request, *f.binding.AppliedGeneration)
+						}
+						return f.db.InstallExplicitToolSetInventory(f.ctx, f.request)
+					}
+					installed, err := commit()
+					if changed == "connector" || changed == "generation" || changed == "deleted connector" || changed == "deleted generation" {
+						// A stale identity or removed parent must leave all inventory
+						// rows, revisions, and caller-owned data unchanged.
+						require.ErrorIs(t, err, ErrToolSetInventoryConnectionChanged)
+						require.Equal(t, before, f.request)
+						require.Equal(t, bindingBefore, readInventoryBindingForTest(t, f))
+						if replace {
+							require.Equal(t, toolBefore, readToolRowForTest(t, f.ctx, f.db, toolID))
+							require.Equal(t, 1, countToolRevisionsForTest(t, f.ctx, f.db, toolID))
+						} else {
+							_, err = f.db.GetTool(f.ctx, toolID)
+							require.ErrorIs(t, err, ErrNotFound)
+							require.Zero(t, countToolRevisionsForTest(t, f.ctx, f.db, toolID))
+						}
+						if changed == "deleted connector" || changed == "deleted generation" {
+							return // A removed parent cannot supply a fresh expectation.
+						}
+						// Repreparing against the connection's new generation allows
+						// the same complete inventory to activate normally.
+						f.request.ExpectedConnector = &ConnectorGenerationId{Id: current.Id, Generation: current.Generation}
+						installed, err = commit()
+					}
+					// Draft edits, republishing, and key rotation commit immediately
+					// with the original expectation, without comparing definition bytes.
+					require.NoError(t, err)
+					require.Equal(t, bindingBefore.Epoch+1, installed.Epoch)
+					require.Equal(t, bindingBefore.InventoryRevision+1, installed.InventoryRevision)
+					stored, err := f.db.GetToolSetBinding(f.ctx, f.binding.Id)
+					require.NoError(t, err)
+					require.Equal(t, installed.Epoch, stored.Epoch)
+					require.Equal(t, installed.AppliedGeneration, stored.AppliedGeneration)
+					require.Equal(t, installed.InventoryRevision, stored.InventoryRevision)
+					require.True(t, installed.CreatedAt.Equal(stored.CreatedAt))
+					require.True(t, installed.UpdatedAt.Equal(stored.UpdatedAt))
+				})
+			}
+		}
+	}
+}
+
+// TestExplicitToolSetInventoryOptionalConnectorFence leaves connection-independent
+// templates installable without requiring their callers to select helper code.
+func TestExplicitToolSetInventoryOptionalConnectorFence(t *testing.T) {
+	f := explicitInventoryForTest(t, 1)
+	// Ordinary HTTP preparation omits the expectation, so a helper change is irrelevant.
+	require.Nil(t, f.request.ExpectedConnector)
+	s := f.db.(*service)
+	_, err := s.sq.Update(ConnectionsTable).Set("connector_generation", f.connection.ConnectorGeneration+1).
+		Where(sq.Eq{"id": f.connection.Id}).RunWith(s.db).ExecContext(f.ctx)
+	require.NoError(t, err)
+	_, err = f.db.InstallExplicitToolSetInventory(f.ctx, f.request)
+	require.NoError(t, err)
+}
+
+// TestExplicitToolSetInventoryInvalidConnectorFence rejects incomplete expected
+// identities before database access, including for candidates with no Tool rows.
+func TestExplicitToolSetInventoryInvalidConnectorFence(t *testing.T) {
+	for name, generation := range map[string]ConnectorGenerationId{
+		"missing id":          {Generation: 1},
+		"wrong id type":       {Id: apid.New(apid.PrefixConnection), Generation: 1},
+		"missing generation":  {Id: apid.New(apid.PrefixConnector)},
+		"overflow generation": {Id: apid.New(apid.PrefixConnector), Generation: math.MaxUint64},
+	} {
+		t.Run(name, func(t *testing.T) {
+			request := ToolSetInventoryInstall{
+				BindingId: apid.New(apid.PrefixToolSetBinding), ExpectedEpoch: 1,
+				ExpectedSelectorRevision: 1, Generation: 1, ExpectedConnector: &generation,
+			}
+			// No valid batch can carry an incomplete or unrepresentable helper identity.
+			_, _, err := request.prepare(context.Background())
+			require.Error(t, err)
+		})
+	}
+}
+
+// TestExplicitToolSetInventoryConnectorLocks prevents either connector parent
+// from being deleted after validation and before the inventory commit.
+func TestExplicitToolSetInventoryConnectorLocks(t *testing.T) {
+	for _, table := range []string{ConnectorsTable, ConnectorGenerationsTable} {
+		t.Run(table, func(t *testing.T) {
+			f := explicitInventoryForTest(t, 0)
+			s := f.db.(*service)
+			if s.cfg.GetProvider() != config.DatabaseProviderPostgres {
+				t.Skip("PostgreSQL share-lock contention; SQLite serializes writers")
+			}
+			expected := &ConnectorGenerationId{Id: f.connection.ConnectorId, Generation: f.connection.ConnectorGeneration}
+			require.NoError(t, f.db.UpsertConnectorGeneration(f.ctx, &ConnectorWithDefinition{
+				Id: expected.Id, Namespace: f.connection.Namespace,
+				Generation: expected.Generation, State: ConnectorGenerationStatePrimary,
+				EncryptedDefinition: encfield.EncryptedField{
+					ID: apid.New(apid.PrefixDataEncryptionKey), Data: "e30=",
+				},
+			}))
+			f.request.ExpectedConnector = expected
+			s.db.SetMaxOpenConns(2)
+			ctx, cancel := context.WithTimeout(f.ctx, 5*time.Second)
+			defer cancel()
+			installTx, err := s.db.BeginTx(ctx, nil)
+			require.NoError(t, err)
+			defer installTx.Rollback()
+			// Preparation is rechecked after the inventory transaction takes its parent locks.
+			_, _, _, err = s.lockToolSetBindingMembership(ctx, installTx, f.toolSet.Id, f.connection.Id)
+			require.NoError(t, err)
+			_, err = s.toolSetInventoryNamespace(ctx, installTx, f.binding, expected)
+			require.NoError(t, err)
+			deleteTx, err := s.db.BeginTx(ctx, nil)
+			require.NoError(t, err)
+			defer deleteTx.Rollback()
+			_, err = deleteTx.ExecContext(ctx, "SET LOCAL lock_timeout = '150ms'")
+			require.NoError(t, err)
+			// Either parent must remain live until the candidate commits or aborts.
+			query := s.sq.Update(table).Set("deleted_at", apctx.GetClock(f.ctx).Now())
+			if table == ConnectorsTable {
+				query = query.Where(sq.Eq{"id": expected.Id})
+			} else {
+				query = query.Where(sq.Eq{"connector_id": expected.Id, "generation": expected.Generation})
+			}
+			_, err = query.RunWith(deleteTx).ExecContext(ctx)
+			var postgresError interface{ SQLState() string }
+			require.ErrorAs(t, err, &postgresError)
+			require.Equal(t, "55P03", postgresError.SQLState())
+		})
 	}
 }
 
@@ -527,7 +744,7 @@ func TestExplicitToolSetInventoryNamespaceLocks(t *testing.T) {
 			defer installTx.Rollback()
 			_, _, _, err = s.lockToolSetBindingMembership(ctx, installTx, f.toolSet.Id, f.connection.Id)
 			require.NoError(t, err)
-			_, err = s.toolSetInventoryNamespace(ctx, installTx, f.binding)
+			_, err = s.toolSetInventoryNamespace(ctx, installTx, f.binding, nil)
 			require.NoError(t, err)
 			deleteTx, err := s.db.BeginTx(ctx, nil)
 			require.NoError(t, err)
