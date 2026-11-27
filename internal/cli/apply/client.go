@@ -156,10 +156,11 @@ func (c *Client) ResolveBatch(
 		// Tools store connection references by ID. Resolve the authored reference
 		// before comparison/history so named references remain idempotent and a
 		// changed connection name cannot retarget a prepared batch during execution.
-		doc, err = c.resolveToolConnection(ctx, doc, live)
+		resolved, err := c.resolveToolConnection(ctx, doc, live)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", doc.Source, err)
 		}
+		doc = resolved
 
 		target := Target{
 			Document: doc,

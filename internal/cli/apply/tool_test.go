@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	toolschema "github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/stretchr/testify/require"
@@ -167,6 +168,52 @@ func TestToolApplyInvalidConnectionPreventsBatchWrites(t *testing.T) {
 			_, err := client.Prepare(context.Background(), docs, ReconcileOptions{Overwrite: true})
 			require.ErrorContains(t, err, tc.message)
 			require.Empty(t, server.writes)
+		})
+	}
+}
+
+// TestToolConnectionErrorsRetainSourceAndReason keeps reference diagnostics
+// actionable in multi-document apply and history adoption without any writes.
+func TestToolConnectionErrorsRetainSourceAndReason(t *testing.T) {
+	for _, tc := range []struct {
+		name, reference, reason, validationPath string
+	}{
+		{"missing named connection", `{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","name":"missing","namespace":"root"}`, "existing Connection target was not found", ""},
+		{"cross namespace", `{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","name":"account","namespace":"root.other"}`, `namespace: must equal the tool namespace "root"`, "$.namespace"},
+		{"wrong resource kind", `{"apiVersion":"authproxy.net/v1alpha1","kind":"Actor","name":"account","namespace":"root"}`, `kind: must be "Connection", got "Actor"`, "$.kind"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server, client, _, connectionID := newToolApplyServer(t)
+			ctx := context.Background()
+			// A valid first document makes the failing second document's source
+			// and prevalidation before any history writes observable.
+			input := manifestText("Connection", "  id: "+connectionID+"\n  labels: {updated: yes}", `{}`) + "---\n" +
+				manifestText("Tool", "  name: example\n  namespace: root", toolApplySpec(tc.reference))
+			docs, err := loadText(t, input, "")
+			require.NoError(t, err)
+
+			assertReferenceError := func(err error) {
+				t.Helper()
+				require.ErrorContains(t, err, "stdin: document 2: ")
+				require.ErrorContains(t, err, tc.reason)
+				if tc.validationPath != "" {
+					var validationError *common.ValidationError
+					require.ErrorAs(t, err, &validationError)
+					require.Equal(t, tc.validationPath, validationError.Path)
+				}
+				require.Empty(t, server.writes)
+			}
+
+			// Apply preserves both the original source and the validation cause.
+			_, err = client.ResolveBatch(ctx, docs)
+			assertReferenceError(err)
+
+			// History adoption reports the same diagnostic before changing the
+			// valid Connection's annotation or the invalid Tool's annotation.
+			targets, err := client.HistoryTargets(ctx, docs)
+			require.NoError(t, err)
+			_, err = client.SetLastApplied(ctx, targets, docs, true)
+			assertReferenceError(err)
 		})
 	}
 }

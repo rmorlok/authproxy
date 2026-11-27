@@ -35,7 +35,7 @@ func (c *Client) resolveToolConnection(ctx context.Context, doc Document, curren
 		namespace = current.Metadata.Namespace
 	}
 	if err := toolschema.ValidateConnectionReference(ref, namespace, nil); err != nil {
-		return Document{}, fmt.Errorf("invalid Tool connection reference")
+		return Document{}, fmt.Errorf("invalid Tool connection reference: %w", err)
 	}
 	connection, err := c.Resolve(ctx, Document{
 		Kind:     ref.Kind,

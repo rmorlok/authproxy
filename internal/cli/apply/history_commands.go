@@ -89,10 +89,11 @@ func (c *Client) SetLastApplied(
 
 		// Store Tool references in the same ID form used by normal apply, so
 		// adopting named manifests does not leave stale names in future merges.
-		doc, err := c.resolveToolConnection(ctx, doc, target.Current)
+		resolved, err := c.resolveToolConnection(ctx, doc, target.Current)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", doc.Source, err)
 		}
+		doc = resolved
 
 		h, err := newHistory(doc)
 		if err != nil {
