@@ -117,6 +117,31 @@ those operations.
 See [Resource identity and names](/reference/api/#resource-identity-and-names)
 for create, rename-by-ID, conflict, and query examples.
 
+### `ap list tools` / `ap list toolsets` / `ap get`
+
+Use these commands to inspect the management resources created through
+`ap apply` or the API.
+
+```bash
+ap list tools --connection cxn_01example0000001
+ap list toolsets --namespace 'root.integrations.**' --selector 'team=inventory'
+ap get tools tol_01example0000001
+ap get toolsets inventory-tools --namespace root.integrations --generation 2
+```
+
+Lists follow all cursor pages. Both lists accept a namespace matcher, exact
+`--name`, label `--selector`, and `--order`. Tools can also be filtered by
+connection ID. A named `get` requires an exact namespace and uses the list
+permission for the resource. An ID lookup uses the get permission. If a resource
+name starts with a reserved ID prefix, use the exact `--name` list filter.
+ToolSet generation lookup also requires `toolsets:list/generations`.
+
+The default output is a JSON array for a list and a JSON object for a get.
+Use `-o name` for `kind/ID`, `-o yaml` for resource documents, or the same
+JSONPath and Go-template formats as `ap apply`. Templates receive the resource
+array or object directly. These commands use the configured API or admin API
+and the existing management permissions.
+
 ### `ap sign-jwt`
 
 Prints a signed JWT to stdout — useful for piping into 

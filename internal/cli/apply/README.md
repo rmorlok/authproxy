@@ -128,6 +128,12 @@ contain secrets and must not be logged. API errors expose HTTP status without
 reflecting response bodies, and the HTTP client refuses redirects so signing
 credentials are not forwarded elsewhere.
 
+The Tool and ToolSet CLI reads use the same client. `Resolve` handles a single
+ID or exact namespaced name, including a requested ToolSet generation.
+`ListResources` follows every cursor and validates the complete collection
+before returning it. Prune uses the same list reader and checks its exact
+namespace separately before considering deletions.
+
 ### Computing a plan
 
 `Reconcile(target, ReconcileOptions{Overwrite: true})` returns a validated
