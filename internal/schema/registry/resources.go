@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -205,6 +206,15 @@ func resourceTypes() []ResourceType {
 			func(current *tools.Tool, patch *tools.ToolPatch) (*tools.Tool, error) {
 				return patch.ApplyTo(current, nil)
 			}),
+		withGenerations(describe[toolsets.ToolSet, toolsets.ToolSetPatch](
+			toolsets.ToolSetKind,
+			toolsets.SchemaIDToolSets,
+			"toolsets",
+			toolsets.ValidateID,
+			func(r *toolsets.ToolSet) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
+			func(current *toolsets.ToolSet, patch *toolsets.ToolSetPatch) (*toolsets.ToolSet, error) {
+				return patch.ApplyTo(current, nil)
+			}), toolsets.GenerationPolicy()),
 	}
 }
 

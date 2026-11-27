@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
+	"github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +29,8 @@ func TestCanonicalResourcesAndLists(t *testing.T) {
 	checkRegistration[namespace.Namespace](t, namespace.NamespaceKind)
 	checkRegistration[rate_limit.RateLimit](t, rate_limit.RateLimitKind)
 	checkRegistration[tools.Tool](t, tools.ToolKind)
-	require.Len(t, NewResourceScheme().RegisteredGVKs(), 14)
+	checkRegistration[toolsets.ToolSet](t, toolsets.ToolSetKind)
+	require.Len(t, NewResourceScheme().RegisteredGVKs(), 16)
 }
 
 func checkRegistration[T any](t *testing.T, kind meta.Kind) {
@@ -90,6 +92,7 @@ func TestResourceCapabilities(t *testing.T) {
 		{namespace.NamespaceKind, "namespaces", "root.example", new(namespace.NamespacePatch)},
 		{rate_limit.RateLimitKind, "rate-limits", apid.New(apid.PrefixRateLimit).String(), new(rate_limit.RateLimitPatch)},
 		{tools.ToolKind, "tools", apid.New(apid.PrefixTool).String(), new(tools.ToolPatch)},
+		{toolsets.ToolSetKind, "toolsets", apid.New(apid.PrefixToolSet).String(), new(toolsets.ToolSetPatch)},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.kind), func(t *testing.T) {
@@ -200,6 +203,35 @@ spec:
 	}
 	_, err = descriptor.ApplyPatch(current, patch)
 	require.ErrorContains(t, err, "managed by ToolSet")
+}
+
+// TestToolSetGenerationCapability verifies that the registered lifecycle
+// separates changes to shared connection selection from publication intent.
+func TestToolSetGenerationCapability(t *testing.T) {
+	descriptor, err := LookupResource(manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: toolsets.ToolSetKind})
+	require.NoError(t, err)
+	require.NotNil(t, descriptor.Generations)
+
+	// Shared metadata and selection stay on the logical ToolSet.
+	selector, err := descriptor.DecodePatchJSON([]byte(`{
+		"apiVersion":"authproxy.net/v1alpha1","kind":"ToolSet",
+		"metadata":{"labels":{"team":"one"}},
+		"spec":{"connectionSelector":{"matchLabels":{"provider":"calendar"}}}
+	}`))
+	require.NoError(t, err)
+	changes, err := descriptor.Generations.ChangesGeneration(selector)
+	require.NoError(t, err)
+	require.False(t, changes)
+
+	// Publication belongs to the generation, even when the definition is unchanged.
+	publish, err := descriptor.DecodePatchJSON([]byte(`{
+		"apiVersion":"authproxy.net/v1alpha1","kind":"ToolSet",
+		"metadata":{},"spec":{"release":{"desiredState":"primary"}}
+	}`))
+	require.NoError(t, err)
+	changes, err = descriptor.Generations.ChangesGeneration(publish)
+	require.NoError(t, err)
+	require.True(t, changes)
 }
 
 func TestPatchApplicationAndTypeSafety(t *testing.T) {

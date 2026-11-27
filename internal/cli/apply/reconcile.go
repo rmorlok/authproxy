@@ -10,6 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apserde"
 	"github.com/rmorlok/authproxy/internal/schema/registry"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	"github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 )
 
 type ReconcileOptions struct {
@@ -209,12 +211,29 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 		now, np := liveSpec[field]
 		next, dp := desiredSpec[field]
 
-		value, present, err := merger.merge(old, op, now, np, next, dp, []string{"spec", field})
+		path := []string{"spec", field}
+		var value any
+		var present bool
+		var err error
+		switch {
+		case doc.Kind == toolsets.ToolSetKind && !dp:
+			// Omitted ToolSet spec fields leave the logical selector, definition,
+			// or release intent alone. A partial manifest can edit just one of them.
+			continue
+		case doc.Kind == toolsets.ToolSetKind && field == "connectionSelector":
+			// The supplied selector describes the whole match. In particular,
+			// matchLabels: {} removes every label requirement, even on adoption.
+			old = toolSetSelectorWithScope(old, current.Metadata.Namespace)
+			next = toolSetSelectorWithScope(next, current.Metadata.Namespace)
+			value, present, err = merger.mergeAtomic(old, op, now, np, next, dp, path)
+		default:
+			value, present, err = merger.merge(old, op, now, np, next, dp, path)
+		}
 		if err != nil {
 			return nil, err
 		}
 
-		forced := merger.forced([]string{"spec", field})
+		forced := merger.forced(path)
 
 		if present == np && equalJSON(value, now) && !forced {
 			continue
@@ -445,6 +464,24 @@ func clearSpecField(kind meta.Kind, field string) any {
 	return nil
 }
 
+// toolSetSelectorWithScope compares omitted and empty namespace scopes as the
+// same owner-subtree matcher projected by the server. Retain invalid values so
+// patch validation can reject them.
+func toolSetSelectorWithScope(value any, owner string) any {
+	selector, ok := value.(map[string]any)
+	if !ok {
+		return value
+	}
+	scope, supplied := selector["namespace"]
+	if supplied && scope != "" {
+		return value
+	}
+
+	result := asMap(selector)
+	result["namespace"] = owner + namespace.WildcardSuffix
+	return result
+}
+
 type threeWay struct {
 	overwrite bool
 	force     map[string]bool
@@ -525,6 +562,12 @@ func (m threeWay) merge(
 		}
 	}
 
+	return m.mergeAtomic(old, op, live, lp, desired, dp, path)
+}
+
+// mergeAtomic compares and replaces a field as one unit, including whole
+// selectors. Presence and overwrite checks match the recursive merge.
+func (m threeWay) mergeAtomic(old any, op bool, live any, lp bool, desired any, dp bool, path []string) (any, bool, error) {
 	changed := dp != lp || !equalJSON(desired, live)
 	if changed && op && !m.overwrite && (op != lp || !equalJSON(old, live)) && !m.forced(path) {
 		return nil, false, fmt.Errorf("apply conflict at %s; live field differs from last-applied configuration", pointer(path))

@@ -14,8 +14,8 @@ type toolSetGenerationContext struct {
 	publishDefinition bool
 }
 
-// GenerationPolicy supplies pure draft/publication rules for future registry
-// integration. Selection changes affect the logical ToolSet, never a generation
+// GenerationPolicy supplies draft and publication rules to the resource
+// registry. Selection changes affect the logical ToolSet, never a generation
 // or an existing connection's pinned generation. Callers own I/O, comparison,
 // patch validation, and publication; none of these functions changes status.
 func GenerationPolicy() meta.GenerationPolicy[ToolSet, ToolSetPatch] {
