@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -139,7 +140,7 @@ func TypeOf(resource any) (ResourceType, error) {
 	return ResourceType{}, fmt.Errorf("expected a canonical resource")
 }
 
-// This is the sole catalogue of resource, list, patch and metadata bindings.
+// resourceTypes is the sole catalogue of resource, list, patch and metadata bindings.
 // Constructing descriptor values avoids a mutable global registry.
 func resourceTypes() []ResourceType {
 	return []ResourceType{
@@ -193,6 +194,15 @@ func resourceTypes() []ResourceType {
 			rate_limit.ValidateID,
 			func(r *rate_limit.RateLimit) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
 			func(current *rate_limit.RateLimit, patch *rate_limit.RateLimitPatch) (*rate_limit.RateLimit, error) {
+				return patch.ApplyTo(current, nil)
+			}),
+		describe[tools.Tool, tools.ToolPatch](
+			tools.ToolKind,
+			tools.SchemaIDToolResource,
+			"tools",
+			tools.ValidateID,
+			func(r *tools.Tool) (meta.TypeMeta, meta.ObjectMeta) { return r.TypeMeta, r.Metadata },
+			func(current *tools.Tool, patch *tools.ToolPatch) (*tools.Tool, error) {
 				return patch.ApplyTo(current, nil)
 			}),
 	}

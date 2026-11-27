@@ -19,6 +19,14 @@ resource package's immutable-field and merge rules and returns the resulting
 resource without modifying the original. Lifecycle validation is available
 through `descriptor.ValidateResource` and stays implemented in resource packages.
 
+Standalone `Tool` resources use the `tools` collection, `ToolList` envelope, and
+canonical `ToolPatch` contract. Patches replace complete executable-plan fields
+and preserve explicit nulls used to clear optional fields. Tool revisions live
+in server-owned `status.revision`; Tools have no generation lifecycle capability.
+Their `spec.connectionRef` participates in typed reference discovery. The registry
+also decodes generated Tools, but their canonical patch contract rejects direct
+updates and directs the caller to the owning ToolSet.
+
 Each constructor returns an independent generic scheme. Additional custom
 contracts can be registered on its embedded `Scheme`; this does not grant them
 canonical resource capabilities. There is no mutable global registry or `init()`

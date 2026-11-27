@@ -394,6 +394,7 @@ func supportedKind(kind string) bool {
 		"Connector",
 		"Key",
 		"RateLimit",
+		"Tool",
 		"Connection":
 		return true
 	}

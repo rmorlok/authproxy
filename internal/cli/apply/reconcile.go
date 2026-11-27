@@ -85,6 +85,9 @@ func Reconcile(target Target, options ReconcileOptions) (*Plan, error) {
 	}
 
 	current := target.Current
+	if err := validateToolApplyTarget(current); err != nil {
+		return nil, err
+	}
 	actualMeta, actualKind, err := resourceMetadata(current.Resource)
 
 	if err != nil || actualKind != doc.Kind || actualMeta.ID != current.Metadata.ID {
