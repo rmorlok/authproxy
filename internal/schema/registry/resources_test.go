@@ -2,9 +2,9 @@ package registry
 
 import (
 	"fmt"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	apiv1alpha1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/manifest"
 	"github.com/rmorlok/authproxy/internal/schema/resources/actor"
@@ -14,9 +14,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/stretchr/testify/require"
 )
 
+// TestCanonicalResourcesAndLists checks fresh typed resource and list factories
+// through the canonical JSON and YAML decoding paths.
 func TestCanonicalResourcesAndLists(t *testing.T) {
 	checkRegistration[actor.Actor](t, actor.ActorKind)
 	checkRegistration[connection.Connection](t, connection.ConnectionKind)
@@ -24,7 +27,8 @@ func TestCanonicalResourcesAndLists(t *testing.T) {
 	checkRegistration[key.Key](t, key.KeyKind)
 	checkRegistration[namespace.Namespace](t, namespace.NamespaceKind)
 	checkRegistration[rate_limit.RateLimit](t, rate_limit.RateLimitKind)
-	require.Len(t, NewResourceScheme().RegisteredGVKs(), 12)
+	checkRegistration[tools.Tool](t, tools.ToolKind)
+	require.Len(t, NewResourceScheme().RegisteredGVKs(), 14)
 }
 
 func checkRegistration[T any](t *testing.T, kind meta.Kind) {
@@ -70,6 +74,8 @@ func TestIndependentSchemesAndUnsupportedContracts(t *testing.T) {
 	}
 }
 
+// TestResourceCapabilities keeps metadata, ID validation, and strict patch
+// decoding attached to each registered canonical resource type.
 func TestResourceCapabilities(t *testing.T) {
 	cases := []struct {
 		kind       meta.Kind
@@ -83,6 +89,7 @@ func TestResourceCapabilities(t *testing.T) {
 		{key.KeyKind, "keys", apid.New(apid.PrefixKey).String(), new(key.KeyPatch)},
 		{namespace.NamespaceKind, "namespaces", "root.example", new(namespace.NamespacePatch)},
 		{rate_limit.RateLimitKind, "rate-limits", apid.New(apid.PrefixRateLimit).String(), new(rate_limit.RateLimitPatch)},
+		{tools.ToolKind, "tools", apid.New(apid.PrefixTool).String(), new(tools.ToolPatch)},
 	}
 	for _, tc := range cases {
 		t.Run(string(tc.kind), func(t *testing.T) {
@@ -118,6 +125,81 @@ func TestResourceCapabilities(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+// TestToolResourceCapabilities preserves standalone Tool patch semantics and
+// revision status without assigning a published-generation lifecycle.
+func TestToolResourceCapabilities(t *testing.T) {
+	scheme := NewResourceScheme()
+	descriptor, err := scheme.Lookup(manifest.GVK{APIVersion: meta.APIVersionV1Alpha1, Kind: tools.ToolKind})
+	require.NoError(t, err)
+	require.Equal(t, tools.SchemaIDToolResource, descriptor.SchemaRef)
+	require.Nil(t, descriptor.Generations)
+
+	// A normal authored YAML Tool resolves to the same canonical contract as JSON.
+	value, err := scheme.DecodeYAML([]byte(`apiVersion: authproxy.net/v1alpha1
+kind: Tool
+metadata:
+  name: lookup-record
+  namespace: root
+spec:
+  connectionRef:
+    apiVersion: authproxy.net/v1alpha1
+    kind: Connection
+    name: provider
+    namespace: root
+  description: Look up a record
+  verbs: ["tool:records.read"]
+  inputSchema:
+    type: object
+    properties:
+      id: {type: integer}
+  outputSchema: {type: object}
+  proxyHttp:
+    method: GET
+    url: https://example.com/records
+`))
+	require.NoError(t, err)
+	require.NoError(t, descriptor.ValidateResource(value, meta.ValidationModeCreate))
+	current := value.(*tools.Tool)
+	current.Metadata.ID = apid.New(apid.PrefixTool).String()
+	current.Status = &tools.ToolStatus{Revision: 7}
+
+	// Registry patch application delegates explicit clears and whole-plan
+	// replacement to ToolPatch, retaining server-owned revision status.
+	patch, err := descriptor.DecodePatchJSON([]byte(`{
+		"apiVersion":"authproxy.net/v1alpha1","kind":"Tool","metadata":{},
+		"spec":{"proxyHttp":null,"javascript":"async function execute() { return {}; }","outputSchema":null}
+	}`))
+	require.NoError(t, err)
+	updated, err := descriptor.ApplyPatch(current, patch)
+	require.NoError(t, err)
+	candidate := updated.(*tools.Tool)
+	require.Nil(t, candidate.Spec.ProxyHTTP)
+	require.NotNil(t, candidate.Spec.Javascript)
+	require.Nil(t, candidate.Spec.OutputSchema)
+	require.Equal(t, uint64(7), candidate.Status.Revision)
+	require.Zero(t, candidate.Metadata.Generation)
+	require.NotNil(t, current.Spec.ProxyHTTP)
+	require.Nil(t, current.Spec.Javascript)
+	require.NotEmpty(t, current.Spec.OutputSchema)
+
+	// Status and generation remain read-only/unsupported even through the registry.
+	_, err = descriptor.DecodePatchJSON([]byte(`{"apiVersion":"authproxy.net/v1alpha1","kind":"Tool","metadata":{},"spec":{},"status":{"revision":8}}`))
+	require.ErrorContains(t, err, "status")
+	_, err = descriptor.DecodePatchJSON([]byte(`{"apiVersion":"authproxy.net/v1alpha1","kind":"Tool","metadata":{"generation":1},"spec":{}}`))
+	require.ErrorContains(t, err, "metadata.generation")
+
+	// A generated Tool cannot be edited by applying an ordinary standalone patch.
+	current.Status.ManagedBy = &tools.ToolManagedBy{
+		ToolSetRef: meta.ObjectReference{
+			APIVersion: meta.APIVersionV1Alpha1, Kind: "ToolSet",
+			ID: apid.New(apid.PrefixToolSet).String(), Namespace: "root", Generation: 1,
+		},
+		SourceKey: "lookup-record",
+	}
+	_, err = descriptor.ApplyPatch(current, patch)
+	require.ErrorContains(t, err, "managed by ToolSet")
 }
 
 func TestPatchApplicationAndTypeSafety(t *testing.T) {

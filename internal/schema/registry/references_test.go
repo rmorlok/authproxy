@@ -7,8 +7,30 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	"github.com/rmorlok/authproxy/internal/schema/resources/tools"
 	"github.com/stretchr/testify/require"
 )
+
+// TestToolConnectionReference finds the authored connection dependency without
+// mistaking reference-shaped objects in the executable schema for dependencies.
+func TestToolConnectionReference(t *testing.T) {
+	resource := tools.NewTool()
+	resource.Metadata.Namespace = "root"
+	resource.Spec.ConnectionRef = meta.ObjectReference{
+		APIVersion: meta.APIVersionV1Alpha1, Kind: connection.ConnectionKind,
+		Name: "provider", Namespace: "root",
+	}
+	resource.Spec.InputSchema = []byte(`{"type":"object","default":{"apiVersion":"authproxy.net/v1alpha1","kind":"Connection","name":"not-a-dependency"}}`)
+
+	// Typed reference discovery includes only the actual connectionRef field.
+	refs, err := References(resource)
+	require.NoError(t, err)
+	require.Equal(t, []meta.ObjectReference{resource.Spec.ConnectionRef}, refs)
+
+	// Mutating the discovered reference cannot retarget the source manifest.
+	refs[0].Name = "changed"
+	require.Equal(t, "provider", string(resource.Spec.ConnectionRef.Name))
+}
 
 func TestReferencesDiscoverTypedResourceFields(t *testing.T) {
 	t.Run("pointer", func(t *testing.T) {

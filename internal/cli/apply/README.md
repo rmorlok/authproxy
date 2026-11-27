@@ -108,6 +108,15 @@ and connector generations must already exist. Namespace names derive a canonical
 path for direct lookup; a missing name-addressed Namespace can be created.
 Connections can only update existing mutable metadata.
 
+Standalone Tools support creation and updates. `resolveToolConnection` resolves
+their connection reference to an ID before reconciliation and history storage.
+This matches the server's response and prevents named references from producing
+unnecessary updates or retaining an old ID when changing the connection. The
+prepared batch keeps that ID; preparing the manifest again resolves the name
+again. Connection references must resolve within the Tool's namespace. Tools
+managed by a ToolSet are rejected even when the desired fields are unchanged.
+Tool revisions are server-owned status, not resource generations.
+
 `ResolveBatch` returns targets, not retained execution plans. `Client.Prepare`
 uses `Reconcile` on each target with the caller's overwrite policy to obtain the
 plans it will execute.
@@ -252,8 +261,10 @@ writer between the final read and mutation can still be overwritten. Some server
 updates perform metadata/history and generation writes separately; an error can
 therefore follow partial effects. No strong conflict guarantee is claimed, even
 with `Overwrite: false`. Low-level `Create`/`Update` still submit once without
-refresh; the executor owns refresh and reconciliation. Namespaced-name references remain references in the
-request; the server resolves them after ordered prerequisites succeed.
+refresh; the executor owns refresh and reconciliation. Namespaced-name references
+usually remain references in the request; the server resolves them after ordered
+prerequisites succeed. Tool connection references are resolved during preparation
+because connections must already exist and the server stores only their IDs.
 
 Server validation and authorization remain authoritative.
 

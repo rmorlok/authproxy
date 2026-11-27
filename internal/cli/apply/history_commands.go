@@ -87,6 +87,14 @@ func (c *Client) SetLastApplied(
 			return nil, fmt.Errorf("history editing cannot change kind or generation")
 		}
 
+		// Store Tool references in the same ID form used by normal apply, so
+		// adopting named manifests does not leave stale names in future merges.
+		resolved, err := c.resolveToolConnection(ctx, doc, target.Current)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", doc.Source, err)
+		}
+		doc = resolved
+
 		h, err := newHistory(doc)
 		if err != nil {
 			return nil, err
