@@ -159,34 +159,42 @@ func (s *service) inventoryFor(
 				return database.ToolSetInventoryInstall{}, fmt.Errorf("toolset template %q initialization: %w", template.key, err)
 			}
 
-			// A draft can change without a generation change, and administrators
-			// can force published generations back to draft. Fence the exact
-			// validated definition as well as the connection's selected generation.
-			expected := database.ToolSetInventoryConnector{
-				Generation: database.ConnectorGenerationId{
-					Id:         connector.Id,
-					Generation: connector.Generation,
-				},
-				EncryptedDefinition: connector.EncryptedDefinition,
+			// Keep the connection on the generation used for validation until
+			// installation commits. Edits within that generation are accepted,
+			// including draft edits and administrative force-state changes.
+			expected := database.ConnectorGenerationId{
+				Id:         connector.Id,
+				Generation: connector.Generation,
 			}
 
-			if install.ExpectedConnector != nil && *install.ExpectedConnector != expected {
+			if install.ExpectedConnector != nil &&
+				*install.ExpectedConnector != expected {
 				return database.ToolSetInventoryInstall{}, database.ErrToolSetInventoryConnectionChanged
 			}
 
 			install.ExpectedConnector = &expected
 		}
 
-		encrypted, err := s.encrypt.EncryptForNamespace(ctx, connection.Namespace, template.plaintext)
+		encrypted, err := s.encrypt.EncryptForNamespace(
+			ctx,
+			connection.Namespace,
+			template.plaintext,
+		)
 		if err != nil {
 			return database.ToolSetInventoryInstall{}, fmt.Errorf("failed to encrypt toolset template %q: %w", template.key, err)
 		}
 
 		install.Tools = append(install.Tools, database.PreparedToolSetTool{
 			Tool: database.Tool{
-				Id:           apid.New(apid.PrefixTool),
-				Namespace:    connection.Namespace,
-				Name:         generatedToolName(logical.Name, template.name, logical.Id, connection.Id, template.key),
+				Id:        apid.New(apid.PrefixTool),
+				Namespace: connection.Namespace,
+				Name: generatedToolName(
+					logical.Name,
+					template.name,
+					logical.Id,
+					connection.Id,
+					template.key,
+				),
 				ConnectionId: connection.Id,
 				BindingId:    binding.Id,
 				SourceKey:    template.key,

@@ -166,10 +166,7 @@ func TestToolSetJavaScriptPlanOwnsValidationDefinition(t *testing.T) {
 	install, err := r.service.inventoryFor(r.ctx, plan, logical, binding, connection)
 	require.NoError(t, err)
 	require.NotNil(t, install.ExpectedConnector)
-	require.Equal(t, database.ConnectorGenerationId{Id: connection.ConnectorId, Generation: 1}, install.ExpectedConnector.Generation)
-	connector, err := r.db.GetConnectorGeneration(r.ctx, connection.ConnectorId, 1)
-	require.NoError(t, err)
-	require.Equal(t, connector.EncryptedDefinition, install.ExpectedConnector.EncryptedDefinition)
+	require.Equal(t, database.ConnectorGenerationId{Id: connection.ConnectorId, Generation: 1}, *install.ExpectedConnector)
 	require.Len(t, install.Tools, 1)
 	plaintext, err := r.service.encrypt.Decrypt(r.ctx, install.Tools[0].EncryptedDefinition)
 	require.NoError(t, err)
@@ -180,9 +177,9 @@ func TestToolSetJavaScriptPlanOwnsValidationDefinition(t *testing.T) {
 	require.Equal(t, 256, *captured.Limits.MaxStackDepth)
 }
 
-// TestToolSetJavaScriptRejectsEditedHelpers prevents source changes within the
-// same connector generation from activating an inventory checked against old code.
-func TestToolSetJavaScriptRejectsEditedHelpers(t *testing.T) {
+// TestToolSetJavaScriptAllowsEditedHelpers documents that preparation does not
+// prevent a draft helper edit within the same connector generation from installing.
+func TestToolSetJavaScriptAllowsEditedHelpers(t *testing.T) {
 	r := newToolSetReconcileTest(t)
 	connection := r.connection(t, "root.team_a", "draft-owner", database.ConnectionStateConfigured, map[string]string{"provider": "calendar"})
 	encrypted, err := r.service.encrypt.EncryptStringForNamespace(r.ctx, connection.Namespace,
@@ -205,7 +202,7 @@ func TestToolSetJavaScriptRejectsEditedHelpers(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
-	// Valid draft helpers are admitted, with their exact stored definition captured for commit.
+	// Validate against the draft, then change its helpers without changing its generation.
 	install, err := r.service.inventoryFor(r.ctx, plan, logical, pending, connection)
 	require.NoError(t, err)
 	connector.EncryptedDefinition, err = r.service.encrypt.EncryptStringForNamespace(r.ctx, connection.Namespace,
@@ -213,19 +210,11 @@ func TestToolSetJavaScriptRejectsEditedHelpers(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, r.db.UpsertConnectorGeneration(r.ctx, connector))
 	_, err = r.db.InstallExplicitToolSetInventory(r.ctx, install)
-	require.ErrorIs(t, err, database.ErrToolSetInventoryConnectionChanged)
-
-	// A fresh pass validates the changed helper and leaves the binding pending without retrying.
-	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
-	stillPending, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
 	require.NoError(t, err)
-	require.Equal(t, pending.Epoch, stillPending.Epoch)
-	require.Nil(t, stillPending.AppliedGeneration)
-	require.Empty(t, r.generatedTools(t, stillPending))
 
-	// Repaired helpers let a later pass install a freshly validated inventory.
-	toolSetJavascriptConnector(t, r, connection, 1, `function selected() { return true; }`)
-	require.NoError(t, r.service.reconcileToolSet(r.ctx, id))
+	// Installation accepts the edit even though fresh validation would fail.
+	_, err = r.service.inventoryFor(r.ctx, plan, logical, pending, connection)
+	require.ErrorIs(t, err, ErrInvalidArgument)
 	installed, err := r.db.GetToolSetBindingForConnection(r.ctx, id, connection.Id)
 	require.NoError(t, err)
 	require.Equal(t, pending.Id, installed.Id)
@@ -300,9 +289,9 @@ func TestToolSetJavaScriptReconciliationRetriesDependencies(t *testing.T) {
 	}
 }
 
-// TestToolSetJavaScriptRejectsMixedHelperSnapshots requires every JavaScript
-// template in one prepared inventory to pass against the same helper definition.
-func TestToolSetJavaScriptRejectsMixedHelperSnapshots(t *testing.T) {
+// TestToolSetJavaScriptAllowsSameGenerationHelperChanges accepts edits or key
+// rotation between template validations when the connector generation is unchanged.
+func TestToolSetJavaScriptAllowsSameGenerationHelperChanges(t *testing.T) {
 	f := newToolAuthorizationFixture(t, nil)
 	first := f.snapshot.Connector
 	second := first
@@ -316,7 +305,7 @@ func TestToolSetJavaScriptRejectsMixedHelperSnapshots(t *testing.T) {
 	plan, err := newToolSetInstallPlan(1, &definition)
 	require.NoError(t, err)
 
-	// Each template can validate independently, but they observe incompatible helper snapshots.
+	// Each template validates independently; changes within the generation are accepted.
 	gomock.InOrder(
 		f.db.EXPECT().GetConnectorGeneration(gomock.Any(), first.Id, first.Generation).Return(&first, nil),
 		f.encrypt.EXPECT().DecryptString(gomock.Any(), first.EncryptedDefinition).
@@ -326,15 +315,17 @@ func TestToolSetJavaScriptRejectsMixedHelperSnapshots(t *testing.T) {
 		f.db.EXPECT().GetConnectorGeneration(gomock.Any(), second.Id, second.Generation).Return(&second, nil),
 		f.encrypt.EXPECT().DecryptString(gomock.Any(), second.EncryptedDefinition).
 			Return(`{"javascript":"function selected() { return 2; }"}`, nil),
+		f.encrypt.EXPECT().EncryptForNamespace(gomock.Any(), f.snapshot.Connection.Namespace, gomock.Any()).
+			Return(f.snapshot.Revision.EncryptedDefinition, nil),
 	)
 	install, err := f.service.inventoryFor(context.Background(), plan,
 		&database.ToolSet{Id: f.snapshot.ToolSetId, Name: "mixed-helpers", SelectorRevision: 1},
 		&database.ToolSetBinding{Id: apid.New(apid.PrefixToolSetBinding), Epoch: 1}, &f.snapshot.Connection)
 
-	// Preparation returns no usable candidate; the second template cannot overwrite the first fence.
-	require.ErrorIs(t, err, database.ErrToolSetInventoryConnectionChanged)
-	require.Empty(t, install.Tools)
-	require.Nil(t, install.ExpectedConnector)
+	// The candidate only carries connector identity, so both prepared templates are usable.
+	require.NoError(t, err)
+	require.Len(t, install.Tools, 2)
+	require.Equal(t, &database.ConnectorGenerationId{Id: first.Id, Generation: first.Generation}, install.ExpectedConnector)
 }
 
 // TestToolSetJavaScriptCompilationDefersInitialization checks that publication

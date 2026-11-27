@@ -58,7 +58,7 @@ Before installing an inventory, core validates each JavaScript template with tha
 connection's pinned helper library using the same no-I/O profile as standalone
 publication. An incompatible template leaves the entire binding pending without
 retrying the queue task; other matching connections can still install. Storage
-failures and stale helper snapshots still request retries. Existing installed
+failures and connector-generation changes still request retries. Existing installed
 bindings keep their generation when a new primary is published.
 
 Connector-generation migration schedules a fresh pass for pending bindings in a
@@ -68,11 +68,13 @@ install those bindings without editing the ToolSet. The API currently reports
 binding, and connection IDs. Persisted diagnostics and periodic repair are
 tracked in #953.
 
-The prepared inventory captures the connector ID, generation, and exact encrypted
-definition used for validation. Storage locks and rechecks these before commit,
-so migration or an edit to the same generation makes the job retry from fresh
-state. Draft helpers are supported; even key re-encryption may cause a harmless
-retry. No resolved connection configuration is stored in the generated definition.
+The prepared inventory captures the connector ID and generation used for
+validation. Storage locks and rechecks these before commit, so migration makes
+the job retry from fresh state. It does not compare connector definitions: draft
+edits, administrative force-state edits within a generation, and key re-encryption
+do not invalidate preparation. Administrators accept the compatibility risk of
+changing helpers without changing the generation. No resolved connection
+configuration is stored in the generated definition.
 
 ## Tool execution policy
 

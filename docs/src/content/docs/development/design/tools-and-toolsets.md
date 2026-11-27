@@ -698,11 +698,13 @@ connector-generation migration, schedule reconciliation for pending bindings so
 repaired helpers can activate their inventory. Scheduling must retry separately
 from applying the migration. Existing installed bindings remain pinned.
 
-ToolSet activation must recheck the selected connector ID, generation, and exact
-definition used for initialization under database locks. A draft edit or an
-administrator forcing a published generation back to draft can change helpers
-without changing the generation number. Discard stale candidates and retry;
-definition re-encryption may also cause a harmless retry. Reusing connector
+ToolSet activation must recheck the selected connector ID and generation used
+for initialization under database locks. A connector migration invalidates the
+candidate and requires fresh preparation. Do not compare encrypted definitions,
+including for draft generations: same-generation edits and key re-encryption do
+not invalidate preparation. This accepts the compatibility risk of draft edits
+and an administrator forcing a published generation back to draft and changing
+its helpers without changing the generation number. Reusing connector
 libraries does not change their existing connection or credential authority in
 other AuthProxy execution contexts. Pure utility globals are consistently
 available in all bounded execution profiles.
