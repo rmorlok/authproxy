@@ -134,6 +134,11 @@ ID or exact namespaced name, including a requested ToolSet generation.
 before returning it. Prune uses the same list reader and checks its exact
 namespace separately before considering deletions.
 
+The CLI's explicit ToolSet generation operations also share this transport.
+Their lists validate each item against the same ToolSet ID and treat generation
+numbers as the identities within that list. Create and publish each send one
+mutation and verify the returned generation and release state.
+
 ### Computing a plan
 
 `Reconcile(target, ReconcileOptions{Overwrite: true})` returns a validated
