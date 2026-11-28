@@ -59,26 +59,45 @@ func cmdUpdateToolSetGeneration() *cobra.Command {
 	var generation uint64
 	var filename string
 	var definition *toolsets.ToolSetDefinition
+
 	cmd := cmdToolSetGeneration(
-		"update", "Replace a draft generation's definition", true,
+		"update", // verb
+		"Replace a draft generation's definition", // short
+		true, // mutation
 		func(ctx context.Context, client *apply.Client, id apid.ID) ([]*apply.LiveResource, error) {
 			updated, err := client.UpdateToolSetGeneration(ctx, id, generation, definition)
 			return []*apply.LiveResource{updated}, err
 		},
 	)
-	cmd.Flags().Uint64Var(&generation, "generation", 0, "Draft generation to update (required)")
-	cmd.Flags().StringVarP(&filename, "filename", "f", "", "ToolSet definition in YAML or JSON (use - for stdin)")
+
+	cmd.Flags().Uint64Var(
+		&generation,
+		"generation",                            // name
+		0,                                       // value
+		"Draft generation to update (required)", // usage
+	)
+	cmd.Flags().StringVarP(
+		&filename,
+		"filename", // name
+		"f",        // shorthand
+		"",         // value
+		"ToolSet definition in YAML or JSON (use - for stdin)", // usage
+	)
 	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
 		if generation == 0 {
 			return fmt.Errorf("--generation must be positive")
 		}
+
 		if filename == "" {
 			return fmt.Errorf("--filename is required")
 		}
+
 		var err error
 		definition, err = apply.LoadToolSetDefinition(filename, cmd.InOrStdin())
+
 		return err
 	}
+
 	return cmd
 }
 

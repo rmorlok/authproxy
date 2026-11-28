@@ -50,6 +50,7 @@ func LoadToolSetDefinition(filename string, stdin io.Reader) (*toolsets.ToolSetD
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("%s: expected a regular definition file", filename)
 	}
+
 	return readToolSetDefinition(filename, f)
 }
 
@@ -72,14 +73,17 @@ func readToolSetDefinition(source string, r io.Reader) (*toolsets.ToolSetDefinit
 	} else if err != nil {
 		return nil, fmt.Errorf("%s: malformed YAML or JSON", source)
 	}
+
 	if err := decoder.Decode(&yaml.Node{}); err == nil {
 		return nil, fmt.Errorf("%s: expected exactly one ToolSet definition document", source)
 	} else if err != io.EOF {
 		return nil, fmt.Errorf("%s: malformed YAML or JSON", source)
 	}
+
 	if err := checkNode(&node); err != nil {
 		return nil, fmt.Errorf("%s: %w", source, err)
 	}
+
 	if len(node.Content) != 1 || node.Content[0].Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("%s: expected one ToolSet definition object", source)
 	}
@@ -88,9 +92,11 @@ func readToolSetDefinition(source string, r io.Reader) (*toolsets.ToolSetDefinit
 	if err := node.Decode(&definition); err != nil {
 		return nil, fmt.Errorf("%s: %w", source, toolSetDefinitionDecodeDiagnostic(node.Content[0], err))
 	}
+
 	if err := validateToolSetDefinition(&definition); err != nil {
 		return nil, fmt.Errorf("%s: %w", source, err)
 	}
+
 	return &definition, nil
 }
 
@@ -106,10 +112,12 @@ func toolSetDefinitionDecodeDiagnostic(object *yaml.Node, err error) error {
 			}
 		}
 	}
+
 	var wrongType *json.UnmarshalTypeError
 	if errors.As(err, &wrongType) && wrongType.Field != "" {
 		return fmt.Errorf("invalid type for ToolSet definition field %s", wrongType.Field)
 	}
+
 	return fmt.Errorf("invalid ToolSet definition fields or types (expected the contents of spec.definition)")
 }
 
@@ -119,6 +127,7 @@ func validateToolSetDefinition(definition *toolsets.ToolSetDefinition) error {
 	if err := apserde.ValidateNoRedactedPlaceholders(definition); err != nil {
 		return fmt.Errorf("redacted placeholders cannot be submitted")
 	}
+
 	if err := definition.Validate(nil); err != nil {
 		var field *common.ValidationError
 		if errors.As(err, &field) && field.Path != "" {
@@ -126,16 +135,23 @@ func validateToolSetDefinition(definition *toolsets.ToolSetDefinition) error {
 		}
 		return fmt.Errorf("ToolSet definition failed semantic validation")
 	}
+
 	return nil
 }
 
 // safeToolSetDefinitionPath keeps the schema path and template index, stopping
 // before arbitrary keys in request headers, query parameters, form, and JSON.
 func safeToolSetDefinitionPath(path string) string {
-	for _, field := range []string{".proxyHttp.headers", ".proxyHttp.query", ".proxyHttp.form.fields", ".proxyHttp.bodyJson"} {
+	for _, field := range []string{
+		".proxyHttp.headers",
+		".proxyHttp.query",
+		".proxyHttp.form.fields",
+		".proxyHttp.bodyJson",
+	} {
 		if i := strings.Index(path, field); i >= 0 {
 			path = path[:i+len(field)]
 		}
 	}
+
 	return path
 }
