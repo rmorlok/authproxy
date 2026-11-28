@@ -10,6 +10,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// UnknownDefinitionFieldError identifies an unexpected top-level definition key
+// so callers can locate it in the input without displaying its authored text.
+type UnknownDefinitionFieldError struct {
+	Field string
+}
+
+// Error describes the unexpected key for callers that can display input values.
+func (e *UnknownDefinitionFieldError) Error() string {
+	return fmt.Sprintf("unknown tool set definition field %q", e.Field)
+}
+
 // MarshalJSON preserves a supplied empty mapping list. Omitting that list would
 // hide an invalid explicit-source policy before lifecycle validation can run.
 func (d ToolSetDefinition) MarshalJSON() ([]byte, error) {
@@ -46,7 +57,7 @@ func (d *ToolSetDefinition) UnmarshalJSON(data []byte) error {
 		case "defaults":
 			destination = &decoded.Defaults
 		default:
-			return fmt.Errorf("unknown tool set definition field %q", name)
+			return &UnknownDefinitionFieldError{Field: name}
 		}
 		if bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 			return fmt.Errorf("%s must not be null", name)

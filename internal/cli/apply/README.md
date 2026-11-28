@@ -136,8 +136,10 @@ namespace separately before considering deletions.
 
 The CLI's explicit ToolSet generation operations also share this transport.
 Their lists validate each item against the same ToolSet ID and treat generation
-numbers as the identities within that list. Create and publish each send one
-mutation and verify the returned generation and release state.
+numbers as the identities within that list. Create, update, and publish each
+send one mutation and verify the returned generation and release state.
+The update reads a canonical definition and sends a replacement containing
+only `spec.definition`. It does not use the apply merge or history annotation.
 
 ### Computing a plan
 

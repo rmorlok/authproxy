@@ -144,8 +144,8 @@ and the existing management permissions.
 
 ### `ap toolsets generations`
 
-List a ToolSet's generations, create a draft from its newest generation, or
-publish a specific draft. For example, after creating an initial primary
+List a ToolSet's generations, create a draft from its newest generation,
+replace its definition, and publish it. After creating an initial primary
 generation, clone it into a draft:
 
 ```bash
@@ -153,25 +153,51 @@ ap toolsets generations list tls_01example0000001 --order "generation desc"
 ap toolsets generations create tls_01example0000001
 ```
 
-Read `metadata.generation` from the create response. If the new draft is
-generation 2, review it and publish it with:
+Read `metadata.generation` from the create response. To update the draft, save
+the complete value of `spec.definition` in a YAML or JSON file. For example,
+`inventory-definition.yaml` could contain:
+
+```yaml
+source:
+  explicit:
+    tools:
+      - key: list-items
+        spec:
+          description: List inventory items
+          verbs: [read]
+          inputSchema:
+            type: object
+            additionalProperties: false
+          proxyHttp:
+            method: GET
+            url: https://api.example.com/v2/items
+```
+
+If the new draft is generation 2, replace its definition, review it, and
+publish it with:
 
 ```bash
+ap toolsets generations update tls_01example0000001 --generation 2 -f inventory-definition.yaml
 ap get toolsets tls_01example0000001 --generation 2
 ap toolsets generations publish tls_01example0000001 --generation 2
 ```
 
-Creating a draft returns a conflict if one already exists. Publishing makes
-the selected draft primary and demotes the previous primary to active.
-Existing connections keep their pinned generation.
+The update reads one definition from a local file or stdin (`-f -`). It replaces
+the entire definition and keeps the generation in draft. The logical ToolSet
+keeps its metadata, connection selector, and apply history.
+
+Creating a draft returns a conflict if one already exists. Updating a published
+generation also returns a conflict. Publishing makes the selected draft primary
+and demotes the previous primary to active. Installed bindings keep their pinned
+generation.
 
 Each command also accepts an exact ToolSet name with `--namespace`.
 Name lookup requires `toolsets:list`. Supplying `--namespace` with an ID
-checks the namespace using `toolsets:get`. The generation operations require
-`toolsets:list/generations`, `toolsets:create`, and `toolsets:update`,
-respectively. List output defaults to a JSON array. Create and publish return
-the affected generation as a JSON object. They support the same output
-formats as the management reads above.
+checks the namespace using `toolsets:get`. Listing requires
+`toolsets:list/generations`, creating requires `toolsets:create`, and updating
+or publishing requires `toolsets:update`. List output defaults to a JSON array.
+Create, update, and publish return the affected generation as a JSON object.
+They support the same output formats as the management reads above.
 
 ### `ap sign-jwt`
 
@@ -551,8 +577,7 @@ Selector changes do not create a draft or publish a generation.
 ToolSet apply targets the logical resource by name and namespace or by ID.
 Leave `metadata.generation` out of the manifest. Use the
 [`ap toolsets generations` commands](#ap-toolsets-generations) to inspect,
-create, and publish generations. Use the management API to edit a specific
-draft definition.
+create, update, and publish generations.
 
 ### Create, edit, and adopt resources
 
