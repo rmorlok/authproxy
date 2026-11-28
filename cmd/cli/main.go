@@ -18,6 +18,7 @@ func main() {
 
 	rootCmd.AddCommand(cmdList())
 	rootCmd.AddCommand(cmdGet())
+	rootCmd.AddCommand(cmdDelete())
 	rootCmd.AddCommand(cmdToolSets())
 	rootCmd.AddCommand(cmdApply())
 	rootCmd.AddCommand(cmdSignJwt())

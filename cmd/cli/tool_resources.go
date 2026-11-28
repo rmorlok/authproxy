@@ -42,7 +42,7 @@ func cmdGetToolResource(kind meta.Kind, collection string, prefix apid.Prefix) *
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 	}
-	read := toolResourceFlags(cmd)
+	read := toolResourceFlags(cmd, "json")
 	cmd.Flags().StringVarP(
 		&ns,
 		"namespace", // name
@@ -120,6 +120,19 @@ func resolveToolResource(ctx context.Context, client *apply.Client, target apply
 	return live, err
 }
 
+// resolveToolResourceID pins a namespaced target to an immutable ID for an
+// action. An unqualified ID goes directly to the action's permission check.
+func resolveToolResourceID(ctx context.Context, client *apply.Client, target apply.Document) (apid.ID, error) {
+	if target.Metadata.ID != "" && target.Metadata.Namespace == "" {
+		return apid.ID(target.Metadata.ID), nil
+	}
+	live, err := resolveToolResource(ctx, client, target)
+	if err != nil {
+		return apid.Nil, err
+	}
+	return apid.ID(live.Metadata.ID), nil
+}
+
 // cmdListToolResources lists resources across all cursor pages using the
 // management endpoint's filters and ordering.
 func cmdListToolResources(kind meta.Kind, collection string) *cobra.Command {
@@ -130,7 +143,7 @@ func cmdListToolResources(kind meta.Kind, collection string) *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 	}
-	read := toolResourceFlags(cmd)
+	read := toolResourceFlags(cmd, "json")
 	cmd.Flags().
 		StringVarP(
 			&options.Namespace,
@@ -194,14 +207,14 @@ type toolResourceOptions struct {
 }
 
 // toolResourceFlags registers the shared options on a management command.
-func toolResourceFlags(cmd *cobra.Command) *toolResourceOptions {
+func toolResourceFlags(cmd *cobra.Command, defaultOutput string) *toolResourceOptions {
 	read := &toolResourceOptions{resolver: config.WithConfigParams(cmd)}
 	cmd.Flags().
 		StringVarP(
 			&read.output,
 			"output", // name
 			"o",      // shorthand
-			"json",   // value
+			defaultOutput,
 			"Output: name, json, yaml, go-template[-file], jsonpath[-file], jsonpath-as-json",
 		)
 	cmd.Flags().

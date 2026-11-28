@@ -117,7 +117,7 @@ func cmdToolSetGeneration(
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 	}
-	options := toolResourceFlags(cmd)
+	options := toolResourceFlags(cmd, "json")
 	cmd.Flags().StringVarP(&ns, "namespace", "n", "", "Exact namespace (required when looking up a name)")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
@@ -130,13 +130,9 @@ func cmdToolSetGeneration(
 			return err
 		}
 
-		id := apid.ID(target.Metadata.ID)
-		if id.IsNil() || ns != "" {
-			live, err := resolveToolResource(cmd.Context(), client, target)
-			if err != nil {
-				return err
-			}
-			id = apid.ID(live.Metadata.ID)
+		id, err := resolveToolResourceID(cmd.Context(), client, target)
+		if err != nil {
+			return err
 		}
 
 		resources, err := request(cmd.Context(), client, id)
