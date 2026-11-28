@@ -113,7 +113,7 @@ func TestToolSetGenerationUpdateRejectsInvalidInput(t *testing.T) {
 		{"multiple documents", generationUpdateYAML + "---\n" + generationUpdateYAML, "3", "exactly one ToolSet definition document"},
 		{"duplicate nested key", "source: {explicit: {tools: [], tools: []}}\n", "3", "duplicate mapping key"},
 		{"unknown field", "source: {explicit: {tools: [], unknown: true}}\n", "3", "invalid ToolSet definition fields"},
-		{"wrong field type", "source: {explicit: {tools: false}}\n", "3", "invalid ToolSet definition fields"},
+		{"wrong field type", "source: {explicit: {tools: false}}\n", "3", "invalid type for ToolSet definition field tools"},
 		{"missing generation", generationUpdateYAML, "", "--generation must be positive"},
 		{"zero generation", generationUpdateYAML, "0", "--generation must be positive"},
 		{"negative generation", generationUpdateYAML, "-1", "invalid argument"},
@@ -125,6 +125,63 @@ func TestToolSetGenerationUpdateRejectsInvalidInput(t *testing.T) {
 			}
 			_, err := runToolSetGenerationUpdate(t, endpoint, tc.input, args...)
 			require.ErrorContains(t, err, tc.diagnostic)
+		})
+	}
+}
+
+// TestToolSetGenerationUpdateDiagnostics reports the affected fields while
+// keeping authored values out of CLI errors.
+func TestToolSetGenerationUpdateDiagnostics(t *testing.T) {
+	id := apid.New(apid.PrefixToolSet)
+	endpoint := toolSetGenerationServer(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("invalid input sent a request: %s %s", r.Method, r.URL)
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+
+	const private = "private-fixture-token!"
+	for _, tc := range []struct {
+		name, input, field, reason string
+	}{
+		{
+			name:   "unknown top-level field",
+			input:  generationUpdateYAML + "\"" + private + "\": \"" + private + "\"\n",
+			field:  "contents of spec.definition",
+			reason: "unknown top-level ToolSet definition field at line",
+		},
+		{
+			name:   "value with wrong type",
+			input:  "source: {explicit: {tools: \"" + private + "\"}}\n",
+			field:  "tools",
+			reason: "invalid type for ToolSet definition field",
+		},
+		{
+			name:   "missing permission verbs",
+			input:  strings.Replace(generationUpdateYAML, "          verbs: [lookup]\n", "", 1),
+			field:  "source.explicit.tools[0].spec.verbs",
+			reason: "invalid ToolSet definition at",
+		},
+		{
+			name: "invalid authored label",
+			input: strings.Replace(generationUpdateYAML, "        spec:\n",
+				"        metadata:\n          labels:\n            team: \""+private+"\"\n        spec:\n", 1),
+			field:  "source.explicit.tools[0].metadata.labels",
+			reason: "invalid ToolSet definition at",
+		},
+		{
+			name: "invalid authored header name",
+			input: strings.Replace(generationUpdateYAML, "            method: POST\n",
+				"            method: POST\n            headers: {\"invalid "+private+"\": present}\n", 1),
+			field:  "source.explicit.tools[0].spec.proxyHttp.headers",
+			reason: "invalid ToolSet definition at",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := runToolSetGenerationUpdate(t, endpoint, tc.input, id.String(), "--generation=3", "-f", "-")
+			require.ErrorContains(t, err, "stdin")
+			require.ErrorContains(t, err, tc.field)
+			require.ErrorContains(t, err, tc.reason)
+			require.NotContains(t, err.Error(), private)
+			require.Empty(t, out)
 		})
 	}
 }

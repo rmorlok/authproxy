@@ -2,12 +2,15 @@ package apply
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
 	"github.com/rmorlok/authproxy/internal/apserde"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/resources/toolsets"
 	"gopkg.in/yaml.v3"
 )
@@ -51,8 +54,8 @@ func LoadToolSetDefinition(filename string, stdin io.Reader) (*toolsets.ToolSetD
 }
 
 // readToolSetDefinition checks stream size and YAML key structure before
-// using the canonical definition codec. Decoder errors can embed input
-// values, so return the source and stage rather than the codec's error text.
+// using the canonical definition codec. Diagnostics identify the source and
+// the failing field when available, without displaying decoder error text.
 func readToolSetDefinition(source string, r io.Reader) (*toolsets.ToolSetDefinition, error) {
 	data, err := io.ReadAll(io.LimitReader(r, maxSourceBytes+1))
 	if err != nil {
@@ -83,12 +86,31 @@ func readToolSetDefinition(source string, r io.Reader) (*toolsets.ToolSetDefinit
 
 	var definition toolsets.ToolSetDefinition
 	if err := node.Decode(&definition); err != nil {
-		return nil, fmt.Errorf("%s: invalid ToolSet definition fields or types (expected the contents of spec.definition)", source)
+		return nil, fmt.Errorf("%s: %w", source, toolSetDefinitionDecodeDiagnostic(node.Content[0], err))
 	}
 	if err := validateToolSetDefinition(&definition); err != nil {
 		return nil, fmt.Errorf("%s: %w", source, err)
 	}
 	return &definition, nil
+}
+
+// toolSetDefinitionDecodeDiagnostic uses positions and declared struct fields
+// from structured decoder errors. Raw error text can include authored values.
+func toolSetDefinitionDecodeDiagnostic(object *yaml.Node, err error) error {
+	var unknown *toolsets.UnknownDefinitionFieldError
+	if errors.As(err, &unknown) {
+		for i := 0; i < len(object.Content); i += 2 {
+			key := object.Content[i]
+			if key.Value == unknown.Field {
+				return fmt.Errorf("unknown top-level ToolSet definition field at line %d (expected the contents of spec.definition)", key.Line)
+			}
+		}
+	}
+	var wrongType *json.UnmarshalTypeError
+	if errors.As(err, &wrongType) && wrongType.Field != "" {
+		return fmt.Errorf("invalid type for ToolSet definition field %s", wrongType.Field)
+	}
+	return fmt.Errorf("invalid ToolSet definition fields or types (expected the contents of spec.definition)")
 }
 
 // validateToolSetDefinition checks the authored replacement before it can be
@@ -98,7 +120,22 @@ func validateToolSetDefinition(definition *toolsets.ToolSetDefinition) error {
 		return fmt.Errorf("redacted placeholders cannot be submitted")
 	}
 	if err := definition.Validate(nil); err != nil {
+		var field *common.ValidationError
+		if errors.As(err, &field) && field.Path != "" {
+			return fmt.Errorf("invalid ToolSet definition at %s", safeToolSetDefinitionPath(field.Path))
+		}
 		return fmt.Errorf("ToolSet definition failed semantic validation")
 	}
 	return nil
+}
+
+// safeToolSetDefinitionPath keeps the schema path and template index, stopping
+// before arbitrary keys in request headers, query parameters, form, and JSON.
+func safeToolSetDefinitionPath(path string) string {
+	for _, field := range []string{".proxyHttp.headers", ".proxyHttp.query", ".proxyHttp.form.fields", ".proxyHttp.bodyJson"} {
+		if i := strings.Index(path, field); i >= 0 {
+			path = path[:i+len(field)]
+		}
+	}
+	return path
 }
