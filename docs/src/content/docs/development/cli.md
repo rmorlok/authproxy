@@ -142,6 +142,37 @@ JSONPath and Go-template formats as `ap apply`. Templates receive the resource
 array or object directly. These commands use the configured API or admin API
 and the existing management permissions.
 
+### `ap toolsets generations`
+
+List a ToolSet's generations, create a draft from its newest generation, or
+publish a specific draft. For example, after creating an initial primary
+generation, clone it into a draft:
+
+```bash
+ap toolsets generations list tls_01example0000001 --order "generation desc"
+ap toolsets generations create tls_01example0000001
+```
+
+Read `metadata.generation` from the create response. If the new draft is
+generation 2, review it and publish it with:
+
+```bash
+ap get toolsets tls_01example0000001 --generation 2
+ap toolsets generations publish tls_01example0000001 --generation 2
+```
+
+Creating a draft returns a conflict if one already exists. Publishing makes
+the selected draft primary and demotes the previous primary to active.
+Existing connections keep their pinned generation.
+
+Each command also accepts an exact ToolSet name with `--namespace`.
+Name lookup requires `toolsets:list`. Supplying `--namespace` with an ID
+checks the namespace using `toolsets:get`. The generation operations require
+`toolsets:list/generations`, `toolsets:create`, and `toolsets:update`,
+respectively. List output defaults to a JSON array. Create and publish return
+the affected generation as a JSON object. They support the same output
+formats as the management reads above.
+
 ### `ap sign-jwt`
 
 Prints a signed JWT to stdout — useful for piping into 
@@ -518,8 +549,10 @@ selector, definition, or release preserves that field during an update.
 Selector changes do not create a draft or publish a generation.
 
 ToolSet apply targets the logical resource by name and namespace or by ID.
-Leave `metadata.generation` out of the manifest. Use the management API for
-operations that target a particular draft generation.
+Leave `metadata.generation` out of the manifest. Use the
+[`ap toolsets generations` commands](#ap-toolsets-generations) to inspect,
+create, and publish generations. Use the management API to edit a specific
+draft definition.
 
 ### Create, edit, and adopt resources
 

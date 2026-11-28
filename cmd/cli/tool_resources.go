@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,7 +42,7 @@ func cmdGetToolResource(kind meta.Kind, collection string, prefix apid.Prefix) *
 		Args:         cobra.ExactArgs(1),
 		SilenceUsage: true,
 	}
-	read := toolResourceReadFlags(cmd)
+	read := toolResourceFlags(cmd)
 	cmd.Flags().StringVarP(
 		&ns,
 		"namespace", // name
@@ -63,47 +64,60 @@ func cmdGetToolResource(kind meta.Kind, collection string, prefix apid.Prefix) *
 			return fmt.Errorf("--generation must be positive")
 		}
 
-		m := meta.ObjectMeta{
-			Namespace:  ns,
-			Generation: generation,
+		target, err := toolResourceTarget(kind, prefix, args[0], ns)
+		if err != nil {
+			return err
 		}
-
-		if id, err := apid.Parse(args[0]); err == nil && !id.IsNil() {
-			if id.ValidatePrefix(prefix) != nil {
-				return fmt.Errorf("expected a %s ID", kind)
-			}
-			m.ID = id.String()
-		} else {
-			if ns == "" {
-				return fmt.Errorf("--namespace is required when looking up a %s name", kind)
-			}
-
-			m.Name = common.ResourceName(args[0])
-			if err := m.Name.Validate(); err != nil {
-				return fmt.Errorf("invalid %s name: %w", kind, err)
-			}
-		}
-
-		if ns != "" {
-			if err := namespace.ValidatePath(ns); err != nil {
-				return fmt.Errorf("--namespace must be an exact namespace: %w", err)
-			}
-		}
+		target.Metadata.Generation = generation
 
 		client, printer, err := read.prepare()
 		if err != nil {
 			return err
 		}
-		live, err := client.Resolve(cmd.Context(), apply.Document{Kind: kind, Metadata: m})
-		if errors.Is(err, apply.ErrResourceNotFound) || (err == nil && live == nil) {
-			return fmt.Errorf("%s not found", kind)
-		}
+		live, err := resolveToolResource(cmd.Context(), client, target)
 		if err != nil {
 			return err
 		}
 		return read.write(cmd, printer, []*apply.LiveResource{live}, true)
 	}
 	return cmd
+}
+
+// toolResourceTarget validates an ID or exact namespaced name before using the
+// management API. Names require a namespace to avoid ambiguous writes or reads.
+func toolResourceTarget(kind meta.Kind, prefix apid.Prefix, identity, ns string) (apply.Document, error) {
+	m := meta.ObjectMeta{Namespace: ns}
+	if id, err := apid.Parse(identity); err == nil && !id.IsNil() {
+		if id.ValidatePrefix(prefix) != nil {
+			return apply.Document{}, fmt.Errorf("expected a %s ID", kind)
+		}
+		m.ID = id.String()
+	} else {
+		if ns == "" {
+			return apply.Document{}, fmt.Errorf("--namespace is required when looking up a %s name", kind)
+		}
+
+		m.Name = common.ResourceName(identity)
+		if err := m.Name.Validate(); err != nil {
+			return apply.Document{}, fmt.Errorf("invalid %s name: %w", kind, err)
+		}
+	}
+	if ns != "" {
+		if err := namespace.ValidatePath(ns); err != nil {
+			return apply.Document{}, fmt.Errorf("--namespace must be an exact namespace: %w", err)
+		}
+	}
+	return apply.Document{Kind: kind, Metadata: m}, nil
+}
+
+// resolveToolResource requires an existing target and gives CLI callers one
+// diagnostic for missing IDs, names, and generations.
+func resolveToolResource(ctx context.Context, client *apply.Client, target apply.Document) (*apply.LiveResource, error) {
+	live, err := client.Resolve(ctx, target)
+	if errors.Is(err, apply.ErrResourceNotFound) || (err == nil && live == nil) {
+		return nil, fmt.Errorf("%s not found", target.Kind)
+	}
+	return live, err
 }
 
 // cmdListToolResources lists resources across all cursor pages using the
@@ -116,7 +130,7 @@ func cmdListToolResources(kind meta.Kind, collection string) *cobra.Command {
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 	}
-	read := toolResourceReadFlags(cmd)
+	read := toolResourceFlags(cmd)
 	cmd.Flags().
 		StringVarP(
 			&options.Namespace,
@@ -169,9 +183,9 @@ func cmdListToolResources(kind meta.Kind, collection string) *cobra.Command {
 	return cmd
 }
 
-// toolResourceReadOptions shares signing, timeout, and output conventions
-// across the Tool and ToolSet inspection commands.
-type toolResourceReadOptions struct {
+// toolResourceOptions shares signing, timeout, and output conventions
+// across the Tool and ToolSet management commands.
+type toolResourceOptions struct {
 	resolver     *config.Resolver
 	output       string
 	expression   string
@@ -179,9 +193,9 @@ type toolResourceReadOptions struct {
 	timeout      time.Duration
 }
 
-// toolResourceReadFlags registers the shared options on a read command.
-func toolResourceReadFlags(cmd *cobra.Command) *toolResourceReadOptions {
-	read := &toolResourceReadOptions{resolver: config.WithConfigParams(cmd)}
+// toolResourceFlags registers the shared options on a management command.
+func toolResourceFlags(cmd *cobra.Command) *toolResourceOptions {
+	read := &toolResourceOptions{resolver: config.WithConfigParams(cmd)}
 	cmd.Flags().
 		StringVarP(
 			&read.output,
@@ -217,7 +231,7 @@ func toolResourceReadFlags(cmd *cobra.Command) *toolResourceReadOptions {
 
 // prepare validates the output expression before resolving credentials and
 // constructing the authenticated management client.
-func (r *toolResourceReadOptions) prepare() (*apply.Client, applyPrinter, error) {
+func (r *toolResourceOptions) prepare() (*apply.Client, applyPrinter, error) {
 	if r.timeout < 0 {
 		return nil, nil, fmt.Errorf("--request-timeout cannot be negative")
 	}
@@ -233,7 +247,7 @@ func (r *toolResourceReadOptions) prepare() (*apply.Client, applyPrinter, error)
 
 // write formats fully read and sanitized resources. Failed pagination cannot
 // leave a partial result on stdout.
-func (r *toolResourceReadOptions) write(
+func (r *toolResourceOptions) write(
 	cmd *cobra.Command,
 	printer applyPrinter,
 	resources []*apply.LiveResource,

@@ -59,12 +59,27 @@ func (c *Client) ListResources(
 		}
 	}
 
+	return c.listResources(ctx, kind, descriptor.Collection, query, func(m meta.ObjectMeta) (string, error) {
+		return m.ID, nil
+	})
+}
+
+// listResources validates a complete collection, using its identity rule to
+// detect duplicate items across all pages. Generation lists can repeat the
+// logical ID but each generation number must occur only once.
+func (c *Client) listResources(
+	ctx context.Context,
+	kind meta.Kind,
+	path string,
+	query url.Values,
+	identity func(meta.ObjectMeta) (string, error),
+) ([]*LiveResource, error) {
 	seen := map[string]bool{}
 	ids := map[string]bool{}
 
 	var result []*LiveResource
 	for {
-		data, redacted, err := c.request(ctx, http.MethodGet, descriptor.Collection, query, nil)
+		data, redacted, err := c.request(ctx, http.MethodGet, path, query, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -88,11 +103,15 @@ func (c *Client) ListResources(
 				return nil, err
 			}
 
-			if ids[live.Metadata.ID] {
+			key, err := identity(live.Metadata)
+			if err != nil {
+				return nil, err
+			}
+			if ids[key] {
 				return nil, fmt.Errorf("duplicate identity in resource list")
 			}
 
-			ids[live.Metadata.ID] = true
+			ids[key] = true
 			result = append(result, live)
 		}
 
