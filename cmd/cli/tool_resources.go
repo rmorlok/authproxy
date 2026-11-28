@@ -42,15 +42,32 @@ func cmdGetToolResource(kind meta.Kind, collection string, prefix apid.Prefix) *
 		SilenceUsage: true,
 	}
 	read := toolResourceReadFlags(cmd)
-	cmd.Flags().StringVarP(&ns, "namespace", "n", "", "Exact namespace (required when looking up a name)")
+	cmd.Flags().StringVarP(
+		&ns,
+		"namespace", // name
+		"n",         // shorthand
+		"",          // value
+		"Exact namespace (required when looking up a name)", // usage
+	)
 	if kind == toolsets.ToolSetKind {
-		cmd.Flags().Uint64Var(&generation, "generation", 0, "Read a specific ToolSet generation")
+		cmd.Flags().
+			Uint64Var(
+				&generation,
+				"generation",                         // name
+				0,                                    // value
+				"Read a specific ToolSet generation", // usage
+			)
 	}
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		if cmd.Flags().Changed("generation") && generation == 0 {
 			return fmt.Errorf("--generation must be positive")
 		}
-		m := meta.ObjectMeta{Namespace: ns, Generation: generation}
+
+		m := meta.ObjectMeta{
+			Namespace:  ns,
+			Generation: generation,
+		}
+
 		if id, err := apid.Parse(args[0]); err == nil && !id.IsNil() {
 			if id.ValidatePrefix(prefix) != nil {
 				return fmt.Errorf("expected a %s ID", kind)
@@ -60,11 +77,13 @@ func cmdGetToolResource(kind meta.Kind, collection string, prefix apid.Prefix) *
 			if ns == "" {
 				return fmt.Errorf("--namespace is required when looking up a %s name", kind)
 			}
+
 			m.Name = common.ResourceName(args[0])
 			if err := m.Name.Validate(); err != nil {
 				return fmt.Errorf("invalid %s name: %w", kind, err)
 			}
 		}
+
 		if ns != "" {
 			if err := namespace.ValidatePath(ns); err != nil {
 				return fmt.Errorf("--namespace must be an exact namespace: %w", err)
@@ -132,10 +151,36 @@ type toolResourceReadOptions struct {
 // toolResourceReadFlags registers the shared options on a read command.
 func toolResourceReadFlags(cmd *cobra.Command) *toolResourceReadOptions {
 	read := &toolResourceReadOptions{resolver: config.WithConfigParams(cmd)}
-	cmd.Flags().StringVarP(&read.output, "output", "o", "json", "Output: name, json, yaml, go-template[-file], jsonpath[-file], jsonpath-as-json")
-	cmd.Flags().StringVar(&read.expression, "template", "", "Go-template or JSONPath expression, or path with a file output format")
-	cmd.Flags().BoolVar(&read.allowMissing, "allow-missing-template-keys", true, "Ignore missing fields in templates and JSONPath")
-	cmd.Flags().DurationVar(&read.timeout, "request-timeout", apply.DefaultRequestTimeout, "Timeout per cluster request; 0 disables the deadline")
+	cmd.Flags().
+		StringVarP(
+			&read.output,
+			"output", // name
+			"o",      // shorthand
+			"json",   // value
+			"Output: name, json, yaml, go-template[-file], jsonpath[-file], jsonpath-as-json",
+		)
+	cmd.Flags().
+		StringVar(
+			&read.expression,
+			"template", // name
+			"",         // value
+			"Go-template or JSONPath expression, or path with a file output format",
+		)
+	cmd.Flags().
+		BoolVar(
+			&read.allowMissing,
+			"allow-missing-template-keys", // name
+			true,                          // value
+			"Ignore missing fields in templates and JSONPath",
+		)
+	cmd.Flags().
+		DurationVar(
+			&read.timeout,
+			"request-timeout",           // name
+			apply.DefaultRequestTimeout, // value
+			"Timeout per cluster request; 0 disables the deadline",
+		)
+
 	return read
 }
 
@@ -145,17 +190,24 @@ func (r *toolResourceReadOptions) prepare() (*apply.Client, applyPrinter, error)
 	if r.timeout < 0 {
 		return nil, nil, fmt.Errorf("--request-timeout cannot be negative")
 	}
+
 	printer, err := newApplyPrinter(r.output, r.expression, r.allowMissing)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	client, err := r.resolver.ResolveApplyClient(r.timeout)
 	return client, printer, err
 }
 
 // write formats fully read and sanitized resources. Failed pagination cannot
 // leave a partial result on stdout.
-func (r *toolResourceReadOptions) write(cmd *cobra.Command, printer applyPrinter, resources []*apply.LiveResource, single bool) error {
+func (r *toolResourceReadOptions) write(
+	cmd *cobra.Command,
+	printer applyPrinter,
+	resources []*apply.LiveResource,
+	single bool,
+) error {
 	w := cmd.OutOrStdout()
 	if r.output == "name" {
 		for _, resource := range resources {
@@ -173,6 +225,7 @@ func (r *toolResourceReadOptions) write(cmd *cobra.Command, printer applyPrinter
 		// values remain numbers instead of quoted JSON number strings.
 		sanitize = apserde.SanitizeYAMLForAPI
 	}
+
 	for _, resource := range resources {
 		object, _, err := sanitize(cmd.Context(), resource.Resource)
 		if err != nil {
@@ -185,9 +238,11 @@ func (r *toolResourceReadOptions) write(cmd *cobra.Command, printer applyPrinter
 	if single {
 		value = objects[0]
 	}
+
 	if printer != nil {
 		return printer(w, value)
 	}
+
 	if r.output == "yaml" {
 		enc := yaml.NewEncoder(w)
 		enc.SetIndent(2)
@@ -202,5 +257,6 @@ func (r *toolResourceReadOptions) write(cmd *cobra.Command, printer applyPrinter
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
+
 	return enc.Encode(value)
 }
