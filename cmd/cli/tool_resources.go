@@ -117,24 +117,55 @@ func cmdListToolResources(kind meta.Kind, collection string) *cobra.Command {
 		SilenceUsage: true,
 	}
 	read := toolResourceReadFlags(cmd)
-	cmd.Flags().StringVarP(&options.Namespace, "namespace", "n", "", "Filter by namespace matcher")
-	cmd.Flags().StringVar(&options.Name, "name", "", "Filter by exact name")
-	cmd.Flags().StringVarP(&options.LabelSelector, "selector", "l", "", "Filter by label selector")
-	cmd.Flags().StringVar(&options.OrderBy, "order", "", "Order by field and optional ASC or DESC")
+	cmd.Flags().
+		StringVarP(
+			&options.Namespace,
+			"namespace",                   // name
+			"n",                           // shorthand
+			"",                            // value
+			"Filter by namespace matcher", // usage
+		)
+	cmd.Flags().
+		StringVar(
+			&options.Name,
+			"name",                 // name
+			"",                     // value
+			"Filter by exact name", // usage
+		)
+	cmd.Flags().
+		StringVarP(
+			&options.LabelSelector,
+			"selector",                 // name
+			"l",                        // shorthand
+			"",                         // value
+			"Filter by label selector", // usage
+		)
+	cmd.Flags().
+		StringVar(
+			&options.OrderBy,
+			"order", // name
+			"",      // value
+			"Order by field and optional ASC or DESC", // usage
+		)
+
 	if kind == tools.ToolKind {
 		cmd.Flags().StringVar(&options.ConnectionID, "connection", "", "Filter by bound connection ID")
 	}
+
 	cmd.RunE = func(cmd *cobra.Command, _ []string) error {
 		client, printer, err := read.prepare()
 		if err != nil {
 			return err
 		}
+
 		list, err := client.ListResources(cmd.Context(), kind, options)
 		if err != nil {
 			return err
 		}
+
 		return read.write(cmd, printer, list, false)
 	}
+
 	return cmd
 }
 
