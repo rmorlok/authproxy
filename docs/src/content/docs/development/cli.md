@@ -142,6 +142,29 @@ JSONPath and Go-template formats as `ap apply`. Templates receive the resource
 array or object directly. These commands use the configured API or admin API
 and the existing management permissions.
 
+### `ap delete tools` / `ap delete toolsets`
+
+Delete one standalone Tool or one logical ToolSet. Address it by ID, or by
+its exact name and namespace.
+
+```bash
+ap delete tools tol_01example0000001
+ap delete toolsets inventory-tools --namespace root.integrations
+```
+
+Deleting a Tool retains its revision history. The API returns a conflict
+if a ToolSet manages the Tool. Deleting a ToolSet makes all its generations
+unreadable.
+
+Deletion requires `tools:delete` or `toolsets:delete`. Name lookup also requires
+the corresponding list permission. Supplying a namespace with an ID checks
+the namespace using the corresponding get permission. Deleting by ID alone
+succeeds if the resource is already absent.
+
+The default output is `kind/ID deleted`. Use `-o name` for the identifier
+alone or the same result formats as `ap apply` for structured output,
+JSONPath, and Go templates.
+
 ### `ap toolsets generations`
 
 List a ToolSet's generations, create a draft from its newest generation,
