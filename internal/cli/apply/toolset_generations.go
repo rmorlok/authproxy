@@ -48,6 +48,22 @@ func (c *Client) CreateToolSetGeneration(ctx context.Context, id apid.ID) (*Live
 	return c.writeToolSetGeneration(ctx, id, 0, http.MethodPost, path, nil, toolsets.ToolSetReleaseStateDraft)
 }
 
+// UpdateToolSetGeneration replaces an addressed draft's complete definition.
+// The patch carries no release intent or logical ToolSet fields.
+func (c *Client) UpdateToolSetGeneration(
+	ctx context.Context,
+	id apid.ID,
+	generation uint64,
+	definition *toolsets.ToolSetDefinition,
+) (*LiveResource, error) {
+	if err := validateToolSetDefinition(definition); err != nil {
+		return nil, err
+	}
+	patch := toolsets.NewToolSetPatch()
+	patch.Spec.Definition = definition
+	return c.patchToolSetGeneration(ctx, id, generation, patch, toolsets.ToolSetReleaseStateDraft)
+}
+
 // PublishToolSetGeneration requests primary state for the addressed generation.
 // A successful API response for a historical generation can be a no-op, so the
 // client confirms the observed state before reporting publication.
@@ -55,6 +71,21 @@ func (c *Client) PublishToolSetGeneration(
 	ctx context.Context,
 	id apid.ID,
 	generation uint64,
+) (*LiveResource, error) {
+	patch := toolsets.NewToolSetPatch()
+	primary := toolsets.ToolSetReleaseStatePrimary
+	patch.Spec.Release = &toolsets.ToolSetReleaseSpecPatch{DesiredState: &primary}
+	return c.patchToolSetGeneration(ctx, id, generation, patch, primary)
+}
+
+// patchToolSetGeneration sends the exact generation patch and verifies the
+// resulting state without attempting to create a missing generation.
+func (c *Client) patchToolSetGeneration(
+	ctx context.Context,
+	id apid.ID,
+	generation uint64,
+	patch *toolsets.ToolSetPatch,
+	expectedState toolsets.ToolSetReleaseState,
 ) (*LiveResource, error) {
 	path, err := toolSetGenerationsPath(id)
 	if err != nil {
@@ -64,15 +95,12 @@ func (c *Client) PublishToolSetGeneration(
 		return nil, fmt.Errorf("ToolSet generation must be positive")
 	}
 
-	patch := toolsets.NewToolSetPatch()
-	primary := toolsets.ToolSetReleaseStatePrimary
-	patch.Spec.Release = &toolsets.ToolSetReleaseSpecPatch{DesiredState: &primary}
 	body, err := json.Marshal(patch)
 	if err != nil {
-		return nil, fmt.Errorf("encode ToolSet publication patch: %w", err)
+		return nil, fmt.Errorf("cannot encode ToolSet generation patch")
 	}
 
-	return c.writeToolSetGeneration(ctx, id, generation, http.MethodPatch, path+"/"+strconv.FormatUint(generation, 10), body, primary)
+	return c.writeToolSetGeneration(ctx, id, generation, http.MethodPatch, path+"/"+strconv.FormatUint(generation, 10), body, expectedState)
 }
 
 // toolSetGenerationsPath validates the ToolSet ID before building a path.
