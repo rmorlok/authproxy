@@ -87,6 +87,7 @@ func TestResolveIDConsistencyAndMissingIDs(t *testing.T) {
 		require.ErrorContains(t, err, "does not match")
 	}
 	_, err = c.Resolve(context.Background(), clientDoc(t, "Actor", "  id: "+apid.New(apid.PrefixActor).String(), "{}"))
+	require.ErrorIs(t, err, ErrResourceNotFound)
 	var apiErr *APIError
 	require.ErrorAs(t, err, &apiErr)
 	require.Equal(t, 404, apiErr.StatusCode)
@@ -181,7 +182,7 @@ func TestMissingResourcesAndCreateValidation(t *testing.T) {
 	_, err = c.ResolveBatch(context.Background(), []Document{clientDoc(t, "Connection", "  name: cxn\n  namespace: root", "{}")})
 	require.ErrorContains(t, err, "not found")
 	_, err = c.Resolve(context.Background(), clientDoc(t, "Connector", "  name: cxr\n  namespace: root\n  generation: 3", "{}"))
-	require.ErrorContains(t, err, "not found")
+	require.ErrorIs(t, err, ErrResourceNotFound)
 	targets, err = c.ResolveBatch(context.Background(), []Document{clientDoc(t, "Namespace", "  name: prod\n  namespace: root", "{}")})
 	require.NoError(t, err)
 	require.Nil(t, targets[0].Current)

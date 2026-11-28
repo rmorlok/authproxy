@@ -1108,7 +1108,7 @@ Proposed examples:
 ```bash
 ap apply -f calendar-tools.yaml
 ap get toolsets calendar-tools --namespace root.product
-ap get tools --connection cxn_01example0000001
+ap list tools --connection cxn_01example0000001
 ap invoke tol_01example0000001 --input @arguments.json
 ap invoke tol_01example0000001 --input @arguments.json -o 'jsonpath={.structuredContent.id}'
 ap toolsets migrate calendar-tools --connection cxn_01example0000001 --generation 3

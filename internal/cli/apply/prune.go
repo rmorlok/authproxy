@@ -2,20 +2,16 @@ package apply
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/database"
-	apiv1 "github.com/rmorlok/authproxy/internal/schema/api/v1alpha1"
 	"github.com/rmorlok/authproxy/internal/schema/registry"
 	"github.com/rmorlok/authproxy/internal/schema/resources/meta"
-	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type PruneOptions struct {
@@ -79,85 +75,18 @@ type PrunePlan struct {
 	batch      *Batch
 }
 
-// listAll exhausts and validates every page. Namespace filtering is repeated
-// locally by callers because server filters may include descendants.
+// listAll reads the complete prune inventory. Callers check the exact namespace
+// locally because the server's filter may include descendants.
 func (c *Client) listAll(
 	ctx context.Context,
 	kind meta.Kind,
 	namespace string,
 ) ([]*LiveResource, error) {
-	descriptor, err := resourceType(kind)
+	resources, err := c.ListResources(ctx, kind, ListOptions{Namespace: namespace})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("prune inventory: %w", err)
 	}
-
-	query := url.Values{}
-	if namespace != "" {
-		query.Set("namespace", namespace)
-	}
-
-	seen := map[string]bool{}
-	ids := map[string]bool{}
-
-	var result []*LiveResource
-	for {
-		data, redacted, err := c.request(
-			ctx,
-			http.MethodGet,
-			descriptor.Collection,
-			query,
-			nil, // body
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		var page apiv1.ResourceList[json.RawMessage]
-		if util.DecodeJSONStrict(data, &page) != nil ||
-			page.APIVersion != meta.APIVersionV1Alpha1 ||
-			page.Kind != apiv1.ListKind(kind) ||
-			page.Items == nil {
-			return nil, fmt.Errorf("invalid prune inventory response")
-		}
-
-		if page.Metadata.RemainingItemCount != nil &&
-			*page.Metadata.RemainingItemCount < 0 {
-			return nil, fmt.Errorf("invalid prune inventory count")
-		}
-
-		for _, item := range page.Items {
-			live, err := c.decodeLive(kind, item, redacted)
-			if err != nil {
-				return nil, err
-			}
-
-			if ids[live.Metadata.ID] {
-				return nil, fmt.Errorf("duplicate identity in prune inventory")
-			}
-
-			ids[live.Metadata.ID] = true
-
-			result = append(result, live)
-		}
-
-		cursor := page.Metadata.Continue
-
-		if cursor == "" {
-			if page.Metadata.RemainingItemCount != nil &&
-				*page.Metadata.RemainingItemCount > 0 {
-				return nil, fmt.Errorf("incomplete prune inventory")
-			}
-
-			return result, nil
-		}
-
-		if seen[cursor] {
-			return nil, fmt.Errorf("repeated prune inventory cursor")
-		}
-
-		seen[cursor] = true
-		query = url.Values{"cursor": {cursor}}
-	}
+	return resources, nil
 }
 
 // PreparePrune fixes the maximum deletion set before any apply writes. It never

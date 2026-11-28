@@ -29,6 +29,10 @@ const DefaultRequestTimeout = 30 * time.Second
 // preparation; a failed mutation must never be retried automatically.
 var ErrRequestFailed = errors.New("API request failed")
 
+// ErrResourceNotFound identifies HTTP 404 responses and required lookups with
+// no matching resource.
+var ErrResourceNotFound = errors.New("not found")
+
 // ClientOptions selects a single cluster service. Timeout zero disables the
 // deadline; CLI callers should use DefaultRequestTimeout unless overridden.
 type ClientOptions struct {
@@ -102,6 +106,12 @@ type APIError struct{ StatusCode int }
 
 func (e *APIError) Error() string {
 	return fmt.Sprintf("AuthProxy API returned HTTP %d (%s)", e.StatusCode, http.StatusText(e.StatusCode))
+}
+
+// Is lets callers recognize a missing resource while preserving the HTTP
+// status for callers that inspect APIError directly.
+func (e *APIError) Is(target error) bool {
+	return target == ErrResourceNotFound && e.StatusCode == http.StatusNotFound
 }
 
 // LiveResource contains a typed resource and transport redaction information.
@@ -230,9 +240,7 @@ func (c *Client) Resolve(
 			doc.Kind,
 			pathToOptionalGeneration(adapter.Collection, id, 0),
 		)
-		var apiErr *APIError
-		if errors.As(err, &apiErr) &&
-			apiErr.StatusCode == http.StatusNotFound &&
+		if errors.Is(err, ErrResourceNotFound) &&
 			doc.Metadata.ID == "" &&
 			doc.Kind == "Namespace" {
 			// Namespaces are the only resource type that you can define the id
@@ -249,7 +257,7 @@ func (c *Client) Resolve(
 
 	if live == nil {
 		if doc.Kind == "Connection" || m.Generation != 0 {
-			return nil, fmt.Errorf("existing %s target was not found", doc.Kind)
+			return nil, fmt.Errorf("existing %s target was %w", doc.Kind, ErrResourceNotFound)
 		}
 		return nil, nil
 	}

@@ -95,7 +95,7 @@ func newApplyPrinter(
 
 		var out bytes.Buffer
 		if err = execute(&out, object); err != nil {
-			return fmt.Errorf("cannot render apply output: %w", err)
+			return fmt.Errorf("cannot render output: %w", err)
 		}
 
 		_, err = out.WriteTo(w)
