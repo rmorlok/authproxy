@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/cli/apply"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,6 +185,41 @@ func TestGetToolByID(t *testing.T) {
 	require.Equal(t, "1", strings.TrimSpace(output))
 }
 
+// TestToolResourceJSONPreservesJavaScript checks that CLI JSON is readable as
+// plain text, including comparison and logical operators in authored source.
+func TestToolResourceJSONPreservesJavaScript(t *testing.T) {
+	id := apid.New(apid.PrefixTool)
+	const source = "async function execute(params) { return params.count < 10 && params.count > 0; }"
+	resource := strings.Replace(
+		toolReadFixture(id, apid.New(apid.PrefixConnection), "inventory", "root"),
+		`"proxyHttp":{"method":"GET","url":"https://example.com/items"}`,
+		fmt.Sprintf(`"javascript":%q`, source),
+		1,
+	)
+	endpoint := toolReadServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/tools":
+			writeToolReadList(w, "ToolList", "", resource)
+		case "/api/v1/tools/" + id.String():
+			fmt.Fprint(w, resource)
+		default:
+			t.Errorf("unexpected read: %s", r.URL)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	// The two commands share JSON output but pass different result shapes.
+	out, err := runToolRead(t, cmdList(), endpoint, "tools")
+	require.NoError(t, err)
+	require.JSONEq(t, "["+resource+"]", out)
+	require.Contains(t, out, source)
+
+	out, err = runToolRead(t, cmdGet(), endpoint, "tools", id.String())
+	require.NoError(t, err)
+	require.JSONEq(t, resource, out)
+	require.Contains(t, out, source)
+}
+
 // TestGetToolSetGenerationByName verifies exact namespace selection before
 // requesting the specified generation by the resolved logical ID.
 func TestGetToolSetGenerationByName(t *testing.T) {
@@ -218,6 +254,54 @@ func TestGetToolSetGenerationByName(t *testing.T) {
 	require.NoError(t, err)
 	require.EqualValues(t, 3, requests.Load())
 	require.JSONEq(t, historical, output)
+}
+
+// TestGetToolSetNotFound verifies that lookup forms give the same message for
+// an absent target while preserving other status errors.
+func TestGetToolSetNotFound(t *testing.T) {
+	missing := apid.New(apid.PrefixToolSet).String()
+	existing := apid.New(apid.PrefixToolSet)
+	forbidden := apid.New(apid.PrefixToolSet).String()
+	logical := toolSetReadFixture(existing, "inventory", "root", 7, "primary")
+	endpoint := toolReadServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/toolsets":
+			assert.Equal(t, url.Values{"namespace": {"root"}, "name": {"missing"}}, r.URL.Query())
+			writeToolReadList(w, "ToolSetList", "")
+		case "/api/v1/toolsets/" + existing.String():
+			fmt.Fprint(w, logical)
+		case "/api/v1/toolsets/" + missing, "/api/v1/toolsets/" + existing.String() + "/generations/3":
+			w.WriteHeader(http.StatusNotFound)
+		case "/api/v1/toolsets/" + forbidden:
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			t.Errorf("unexpected read: %s", r.URL)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	})
+
+	for _, tc := range []struct {
+		name string
+		args []string
+	}{
+		{"missing ID", []string{missing}},
+		{"missing name", []string{"missing", "-n", "root"}},
+		{"missing name with generation", []string{"missing", "-n", "root", "--generation=3"}},
+		{"missing generation", []string{existing.String(), "--generation=3"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := runToolRead(t, cmdGet(), endpoint, append([]string{"toolsets"}, tc.args...)...)
+			require.EqualError(t, err, "ToolSet not found")
+			require.Empty(t, out)
+		})
+	}
+
+	// A forbidden read still reports the API's failure status.
+	out, err := runToolRead(t, cmdGet(), endpoint, "toolsets", forbidden)
+	var apiErr *apply.APIError
+	require.ErrorAs(t, err, &apiErr)
+	require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
+	require.Empty(t, out)
 }
 
 // TestGetToolResourcesRejectInvalidTargets verifies malformed addressing

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -75,11 +76,11 @@ func cmdGetToolResource(kind meta.Kind, collection string, prefix apid.Prefix) *
 			return err
 		}
 		live, err := client.Resolve(cmd.Context(), apply.Document{Kind: kind, Metadata: m})
+		if errors.Is(err, apply.ErrResourceNotFound) || (err == nil && live == nil) {
+			return fmt.Errorf("%s not found", kind)
+		}
 		if err != nil {
 			return err
-		}
-		if live == nil {
-			return fmt.Errorf("%s not found in the specified namespace", kind)
 		}
 		return read.write(cmd, printer, []*apply.LiveResource{live}, true)
 	}
@@ -200,5 +201,6 @@ func (r *toolResourceReadOptions) write(cmd *cobra.Command, printer applyPrinter
 
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
 	return enc.Encode(value)
 }
